@@ -8,6 +8,7 @@ import {PASSIVE_MOBS,HOSTILE_MOBS,choosePassiveMob,chooseHostileMob,isNightTime,
 import {canAttack,applyDamage,knockbackDirection} from '../src/combat.js';
 import {xpToNextLevel,totalXpForLevel,levelForTotalXp,experienceState} from '../src/experience.js';
 import {segmentAabbIntersectionT,segmentIntersectsAabb,aimVelocity} from '../src/projectile-rules.js';
+import {resolveSpiderClimb} from '../src/spider-rules.js';
 
 function testInventoryAndCrafting(){
   const inv=new Inventory('survival');assert.equal(inv.add('block:6',5),0);assert.equal(inv.slots[0].count,5);
@@ -39,9 +40,17 @@ function testEntityStore(){
 function testMobRules(){
   assert.deepEqual(Object.keys(PASSIVE_MOBS),['cow','sheep','pig','chicken']);for(const def of Object.values(PASSIVE_MOBS)){assert.ok(def.hp>0);assert.ok(def.speed>0);assert.ok(def.width>0&&def.height>0);assert.ok(Array.isArray(def.loot));}
   assert.equal(choosePassiveMob(()=>0),'cow');assert.equal(choosePassiveMob(()=>.26),'sheep');assert.equal(choosePassiveMob(()=>.51),'pig');assert.equal(choosePassiveMob(()=>.99),'chicken');
-  assert.deepEqual(Object.keys(HOSTILE_MOBS),['zombie','skeleton','creeper']);assert.equal(chooseHostileMob(()=>0),'zombie');assert.equal(chooseHostileMob(()=>.34),'skeleton');assert.equal(chooseHostileMob(()=>.99),'creeper');assert.equal(HOSTILE_MOBS.zombie.attackStyle,'melee');assert.equal(HOSTILE_MOBS.skeleton.attackStyle,'ranged');assert.ok(HOSTILE_MOBS.skeleton.projectileSpeed>0);assert.equal(HOSTILE_MOBS.creeper.attackStyle,'fuse');assert.ok(HOSTILE_MOBS.creeper.fuseTime>0);assert.ok(HOSTILE_MOBS.creeper.explosionRadius>0);assert.ok(HOSTILE_MOBS.creeper.damageRadius>=HOSTILE_MOBS.creeper.explosionRadius);
+  assert.deepEqual(Object.keys(HOSTILE_MOBS),['zombie','skeleton','creeper','spider']);assert.equal(chooseHostileMob(()=>0),'zombie');assert.equal(chooseHostileMob(()=>.26),'skeleton');assert.equal(chooseHostileMob(()=>.51),'creeper');assert.equal(chooseHostileMob(()=>.99),'spider');assert.equal(HOSTILE_MOBS.zombie.attackStyle,'melee');assert.equal(HOSTILE_MOBS.skeleton.attackStyle,'ranged');assert.ok(HOSTILE_MOBS.skeleton.projectileSpeed>0);assert.equal(HOSTILE_MOBS.creeper.attackStyle,'fuse');assert.ok(HOSTILE_MOBS.creeper.fuseTime>0);assert.ok(HOSTILE_MOBS.creeper.explosionRadius>0);assert.ok(HOSTILE_MOBS.creeper.damageRadius>=HOSTILE_MOBS.creeper.explosionRadius);assert.equal(HOSTILE_MOBS.spider.model,'spider');assert.equal(HOSTILE_MOBS.spider.hp,16);assert.equal(HOSTILE_MOBS.spider.attackStyle,'melee');assert.ok(HOSTILE_MOBS.spider.climbRate>0);assert.ok(HOSTILE_MOBS.spider.maxClimbHeight>1.05);
   assert.equal(isNightTime(12000),false);assert.equal(isNightTime(13000),true);assert.equal(isNightTime(22999),true);assert.equal(isNightTime(23000),false);assert.equal(isNightTime(37000),true);
-  assert.deepEqual(rollMobLoot('cow',()=>0),[{id:'raw_beef',count:1}]);assert.deepEqual(rollMobLoot('cow',()=>.999),[{id:'raw_beef',count:3},{id:'leather',count:2}]);assert.deepEqual(rollMobLoot('skeleton',()=>0),[]);assert.deepEqual(rollMobLoot('skeleton',()=>.999),[{id:'bone',count:2},{id:'arrow',count:2}]);assert.deepEqual(rollMobLoot('creeper',()=>0),[]);assert.deepEqual(rollMobLoot('creeper',()=>.999),[{id:'gunpowder',count:2}]);assert.deepEqual(rollMobLoot('unknown',()=>.5),[]);assert.equal(rollMobXp('zombie',()=>0),5);assert.equal(rollMobXp('skeleton',()=>.7),5);assert.equal(rollMobXp('creeper',()=>.5),5);assert.equal(rollMobXp('cow',()=>0),1);assert.equal(rollMobXp('cow',()=>.999),3);
+  assert.deepEqual(rollMobLoot('cow',()=>0),[{id:'raw_beef',count:1}]);assert.deepEqual(rollMobLoot('cow',()=>.999),[{id:'raw_beef',count:3},{id:'leather',count:2}]);assert.deepEqual(rollMobLoot('skeleton',()=>0),[]);assert.deepEqual(rollMobLoot('skeleton',()=>.999),[{id:'bone',count:2},{id:'arrow',count:2}]);assert.deepEqual(rollMobLoot('creeper',()=>0),[]);assert.deepEqual(rollMobLoot('creeper',()=>.999),[{id:'gunpowder',count:2}]);assert.deepEqual(rollMobLoot('spider',()=>0),[]);assert.deepEqual(rollMobLoot('spider',()=>.999),[{id:'string',count:2}]);assert.deepEqual(rollMobLoot('unknown',()=>.5),[]);assert.equal(rollMobXp('zombie',()=>0),5);assert.equal(rollMobXp('skeleton',()=>.7),5);assert.equal(rollMobXp('creeper',()=>.5),5);assert.equal(rollMobXp('spider',()=>.4),5);assert.equal(rollMobXp('cow',()=>0),1);assert.equal(rollMobXp('cow',()=>.999),3);
+}
+
+function testSpiderRules(){
+  assert.deepEqual(resolveSpiderClimb(64,65,.1),{blocked:false,climbing:false,y:65,canAdvance:true});
+  const climb=resolveSpiderClimb(64,66.5,.1,{climbRate:3,maxClimbHeight:3});assert.equal(climb.blocked,false);assert.equal(climb.climbing,true);assert.ok(Math.abs(climb.y-64.3)<1e-9);assert.equal(climb.canAdvance,false);
+  assert.deepEqual(resolveSpiderClimb(64,68,.1,{climbRate:3,maxClimbHeight:3}),{blocked:true,climbing:false,y:64,canAdvance:false});
+  const finish=resolveSpiderClimb(65.8,66,.1,{climbRate:3,maxClimbHeight:3});assert.deepEqual(finish,{blocked:false,climbing:false,y:66,canAdvance:true});
+  assert.throws(()=>resolveSpiderClimb(64,66,-.1),RangeError);assert.throws(()=>resolveSpiderClimb(64,66,.1,{climbRate:0,maxClimbHeight:3}),RangeError);
 }
 
 function testCombatRules(){
@@ -65,4 +74,4 @@ async function testTerrainWorker(){
   const messages=[];globalThis.self={postMessage:m=>messages.push(m)};await import(`../src/world-worker.js?test=${Date.now()+1}`);self.onmessage({data:{type:'init',seed:'test-seed',prompt:'森林丘陵'}});assert.equal(messages.shift().type,'ready');self.onmessage({data:{type:'generate',cx:0,cz:0}});const out=messages.shift(),data=new Uint8Array(out.data);assert.equal(data.length,16*16*64);assert.ok(data.some(v=>v===3));assert.ok(data.some(v=>v===1||v===4));
 }
 
-testInventoryAndCrafting();testCommands();testSpatialHash();testEntityStore();testMobRules();testCombatRules();testExperienceRules();testProjectileRules();await testMeshWorker();await testTerrainWorker();console.log('logic + worker checks: PASS');
+testInventoryAndCrafting();testCommands();testSpatialHash();testEntityStore();testMobRules();testSpiderRules();testCombatRules();testExperienceRules();testProjectileRules();await testMeshWorker();await testTerrainWorker();console.log('logic + worker checks: PASS');
