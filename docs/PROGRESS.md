@@ -11,10 +11,10 @@
 - [x] Node 22 `src/*.js` 语法检查。
 - [x] `scripts/check.mjs` 纯逻辑 / Worker 回归。
 - [x] GitHub Pages 仓库源设置为 GitHub Actions，并验证真实 Pages Deployment 成功。
-- [x] Playwright Chromium browser smoke：真实页面加载→单人世界菜单→创建世界→HUD/Canvas→暂停→IndexedDB 世界记录。
+- [x] Playwright Chromium browser smoke：页面加载→生存世界创建→HUD/Canvas→命令→虚空死亡/重生→暂停→IndexedDB 状态核对。
 - [x] 浏览器失败时保留 Playwright trace / screenshot 报告目录。
 - [ ] 将 Three.js 从运行时 jsDelivr 依赖迁移为版本锁定的本地 vendor / 构建依赖，降低外部 CDN 对运行时和 E2E 的影响。
-- [ ] 扩展浏览器 E2E 到战斗、掉落/经验、死亡、存档重载和指令链。
+- [ ] 扩展浏览器 E2E 到普通死亡掉落/拾回、战斗、存档重载和更多指令链。
 
 ## v0.4.0 — 实体、战斗与生存扩展（开发中）
 
@@ -46,6 +46,8 @@
 - [x] `death-rules.js`：生存/冒险损失策略、死亡 XP 公式 `min(100, level × 7)` 和可恢复死亡位置判断
 - [x] 生存/冒险死亡统一抽空 36 格背包、cursor、2×2/3×3 合成输入；普通死亡在原死亡点生成物品和经验球并清零总经验
 - [x] `y < -10` 虚空死亡直接损失携带物品/经验，不创建无法回收的掉落实体；创造/旁观不执行死亡损失
+- [x] Chromium E2E：`/give` 产生物品→`/tp` 进入虚空→死亡/重生→暂停存档→IndexedDB 核对背包为空与重生位置有效
+- [ ] 普通可恢复死亡的浏览器 E2E：物品/经验生成、死亡点存在与重新拾回
 - [ ] 死亡界面、死亡统计、床/重生点和 `keepInventory`
 - [ ] 死亡掉落/经验球跨页面重载持久化
 - [ ] 将 DropSystem / ExperienceOrbSystem / ProjectileSystem 统一到 EntityStore / SpatialHash（只有规模证明需要时再做）
