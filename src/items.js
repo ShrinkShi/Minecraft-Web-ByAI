@@ -24,7 +24,8 @@ export const ITEMS={
   rotten_flesh:{name:'腐肉',stack:64,color:0x8d613a,texture:solidIcon('8d613a')},
   bone:{name:'骨头',stack:64,color:0xe8e2d3,texture:solidIcon('e8e2d3')},
   arrow:{name:'箭',stack:64,color:0xb8a17d,texture:solidIcon('b8a17d')},
-  gunpowder:{name:'火药',stack:64,color:0x646b60,texture:solidIcon('646b60')}
+  gunpowder:{name:'火药',stack:64,color:0x646b60,texture:solidIcon('646b60')},
+  string:{name:'线',stack:64,color:0xe3e1dc,texture:solidIcon('e3e1dc')}
 };
 
 export const CREATIVE_START=['block:1','block:2','block:3','block:4','block:5','block:6','block:7','block:9','wooden_pickaxe'];
