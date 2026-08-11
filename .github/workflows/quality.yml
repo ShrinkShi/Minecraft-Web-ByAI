@@ -20,8 +20,9 @@ jobs:
         run: |
           set -e
           for file in src/*.js; do node --check "$file"; done
+          for file in scripts/*.mjs; do node --check "$file"; done
       - name: Logic and worker regression checks
-        run: node scripts/check.mjs
+        run: npm run test:logic
 
   browser-smoke:
     needs: static-checks
