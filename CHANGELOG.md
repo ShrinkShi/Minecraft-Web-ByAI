@@ -2,49 +2,37 @@
 
 ## [Unreleased]
 
-### Added
-- v0.4-a 实体数据基础：新增 `EntityStore`，统一实体 ID、类型、组件与位置生命周期。
-- 新增 `SpatialHash` X/Z 空间索引，支持半径与 AABB 邻域候选查询，并在实体跨 cell 移动时同步迁移索引。
-- 为 EntityStore / SpatialHash 增加 Node 回归测试，覆盖负坐标、跨桶移动、删除清理、位置封装和非法参数。
-- v0.4-b 第一批被动生物运行时：牛、羊、猪、鸡，当前使用轻量彩色方块占位模型。
-- 被动生物支持草地/泥土地表附近生成、固定 10 Hz 漫游、受击逃跑、实体数量上限和远距离回收。
-- 玩家左键瞄准加入实体候选，并与方块 raycast 距离比较后选择前方目标。
-- 增加被动生物静态规则 Node 回归测试。
-- v0.4-c 新增纯逻辑 `combat.js`，提供基础攻击冷却、受击无敌窗口、伤害结算和击退方向。
-- 玩家加入受伤、水平/垂直击退、0 HP / 掉出世界后的出生点重生；木镐加入基础近战伤害元数据。
-- 第一种敌对生物僵尸：夜间地表生成、固定 10 Hz 追踪、近战攻击、受击和击退。
-- 被动生物受击也迁移到公共 combat 规则，避免两套伤害窗口继续分叉。
-- 增加 Combat / Zombie 规则 Node 回归测试。
-- v0.4-d 生物死亡奖励链：被动生物与僵尸死亡通过统一回调生成战利品和经验球。
-- 第一批战利品物品：生牛肉、皮革、白色羊毛、生羊肉、生猪排、生鸡肉、羽毛、腐肉；缺少正式纹理的物品先使用明确的内联 SVG 色块占位图标。
-- `DropSystem` 增加纯色 Sprite fallback，防止只有物品数据却无法在世界生成视觉掉落。
-- 新增 `ExperienceOrbSystem`：共享低面数经验球、重力/弹跳、6 格内吸附、拾取和 300 秒销毁。
-- 新增 Java 风格经验等级公式与 total XP → level/progress 派生逻辑。
-- 世界快照逻辑版本升级到 v4，保存并恢复 `totalXp`。
-- 增加 loot min/max、未知实体奖励和经验 16/17、31/32 级边界回归测试。
-- v0.4-e 第二种敌对生物骷髅：加入夜间敌对生成池，在近距离后退、中距离侧移、远距离靠近，并按冷却发起远程攻击。
-- 新增 `ProjectileSystem`：共享轻量箭矢几何，重力轨迹、方块阻挡、玩家命中和 8 秒生命周期。
-- 新增纯逻辑 `projectile-rules.js`：线段/AABB 首次命中参数和带重力的瞄准初速度。
-- 骷髅基础掉落加入骨头和箭，经验为 5；对应物品暂使用显式色块占位图标。
-- 增加骷髅选择/loot 与投射物碰撞、瞄准规则 Node 回归测试。
+### Engineering quality
+- GitHub Pages 仓库发布源已设置为 **GitHub Actions**，并于 2026-08-12 验证一次完整 `configure → artifact upload → deploy` 流水线成功。
+- 新增 `package.json`，固定 `@playwright/test` `1.62.0`，要求 Node 22+。
+- 新增 `scripts/serve.mjs` 跨平台静态 HTTP server，作为本地/CI 浏览器测试统一入口。
+- 新增 `playwright.config.mjs` 和 `tests/e2e/smoke.spec.mjs`。
+- `Repository quality` 从单一 Node job 扩展为两层质量门：`static-checks` 成功后，再运行 Chromium `browser-smoke`。
+- browser smoke 真实验证：主菜单→单人世界→创建世界→HUD/Canvas→暂停→IndexedDB 世界记录，并捕获 page/console error。
+- 浏览器测试失败时上传 trace / screenshot / HTML report 目录作为定位工件。
+- GitHub Actions checkout/setup-node 更新到 v6；浏览器 CI 只安装 Chromium，避免无用浏览器下载。
+- `.gitignore` 增加 `playwright-report/` 和 `test-results/`。
 
-### Architecture
-- EntityStore / SpatialHash 负责生物身份与邻域候选；DropSystem、ExperienceOrbSystem、ProjectileSystem 当前保持受控小数组，只有规模数据证明必要时才统一。
-- 生物 AI 固定 10 Hz、视觉按帧插值；当前 16 被动 + 8 敌对以及 48 格回收是浏览器阶段性能边界，不视为最终 Minecraft 规则。
-- 僵尸通过 `onPlayerHit` 请求近战伤害；骷髅通过 `onProjectile` 请求创建箭矢；死亡通过 `onDeath` 请求奖励。AI 模块不直接修改 HUD、背包、经验或投射物物理。
-- 箭矢碰撞按“上一位置→下一位置”的线段处理；玩家 AABB 交点与方块 raycast 距离比较，避免高速终点采样导致穿人或穿墙。
-- Loot/XP roll、经验等级公式、投射物命中和瞄准数学都是纯函数/可注入 RNG 规则，可在 Node 环境单独回归。
-- `totalXp` 是经验的单一持久化真相源，等级和条内进度不重复存档。
+### v0.4.0-dev — 已落库内容
+- `EntityStore` + `SpatialHash` 实体数据/空间索引基础。
+- 牛、羊、猪、鸡被动生物：地表生成、10 Hz 漫游、受击逃跑、距离回收和实体数量上限。
+- `combat.js`：基础攻击冷却、受击无敌窗口、伤害和击退纯规则。
+- 僵尸：夜间生成、追击和近战攻击。
+- 生物死亡奖励：第一批 loot、`ExperienceOrbSystem`、Java 风格经验等级公式、`totalXp` 世界快照。
+- 骷髅：距离控制/侧移 AI、箭矢远程攻击。
+- `ProjectileSystem` + `projectile-rules.js`：重力、方块阻挡、线段/AABB 玩家命中和瞄准初速度。
+- 苦力怕：敌对生成池、接近、引信、取消范围和爆炸事件。
+- `ExplosionSystem` + `explosion-rules.js`：基础距离伤害、击退和附近地形破坏。
+- 修正 Creeper 加入 `HOSTILE_MOBS` 后测试仍只期望 zombie/skeleton 的回归错误；补充 Creeper 选择、fuse/explosion、loot 与 XP 断言。
 
-### Known limitations
-- 僵尸和骷髅都没有完整寻路、日照燃烧、精确视线/亮度生成、装备或门交互。
-- 骷髅目前不会先判断攻击视线；它可能向墙后玩家射击，但箭会在 ProjectileSystem 中撞墙。
-- 当前只实现敌对骷髅箭矢，没有玩家弓、蓄力、箭插墙、箭回收、实体间互伤、附魔或真实箭矢模型。
-- 当前战斗没有 Java 版完整攻击强度、暴击、扫击、护甲或附魔规则。
-- Loot 是简化静态表，没有 Looting、火焰击杀熟食、幼体差异、稀有掉落或完整条件化 loot table。
-- 玩家死亡不会掉落背包，也不会丢失/散落已有经验；没有死亡界面和死亡统计。
-- 生物、掉落物、经验球和投射物本身都尚未跨世界重载持久化。
-- loot/骨头/箭的内联 SVG 色块只是功能占位，不是正式 Minecraft 风格美术。
+### Documentation
+- README 明确区分稳定基线 `v0.3.0` 与 `main` 的 `v0.4.0-dev`，不再把未落库功能计入完成度。
+- `docs/PROGRESS.md`、`docs/TESTING.md`、`docs/FILE_MANIFEST.md` 与远端实际代码/CI 对齐。
+
+### Current limitations
+- `v0.4.0` 尚未封版：蜘蛛、护甲、完整死亡规则、水/氧气、天气粒子等仍未完成。
+- 当前 Three.js 仍由运行时 jsDelivr URL 加载；CDN 失败会同时影响网站和 browser smoke，后续应本地 vendor / 构建锁定。
+- browser smoke 只覆盖“页面可启动并能创建/保存世界”的最低集成链，不等价于战斗/存档/键鼠玩法完整 E2E。
 
 ## [0.3.0] - 2026-08-11
 
@@ -63,7 +51,6 @@
 - `scripts/check.mjs` 核心逻辑/Worker 回归检查。
 - `.github/workflows/quality.yml` GitHub Actions 质量门。
 - `docs/TESTING.md` 自动测试能力和浏览器端验证边界记录。
-- 用户资源中的工作台、圆石、木棍、木镐纹理接入当前资源集。
 
 ### Changed
 - IndexedDB 存档版本升级为 v3，加入背包、时间、天气和视角状态。
@@ -72,9 +59,8 @@
 
 ### Known limitations
 - 工作台正面目前仍按统一 side 纹理渲染，没有方块朝向 blockstate。
-- 木镐耐久元数据尚未进入物品栈；战斗、实体 AI、盔甲和经验玩法尚未实现。
+- 木镐耐久元数据尚未进入物品栈。
 - `/weather rain` 目前只改变环境光和天空，没有降雨粒子/湿润效果。
-- 完整浏览器端 Pointer Lock/WebGL/IndexedDB E2E 仍需 Pages 实机检查。
 
 ## [0.2.0] - 2026-08-11
 
