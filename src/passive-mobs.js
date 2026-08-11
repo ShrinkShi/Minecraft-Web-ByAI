@@ -24,8 +24,8 @@ function createTemplate(def,resources){
 }
 
 export class PassiveMobSystem{
-  constructor(scene,world,{maxEntities=16,cellSize=8}={}){
-    this.scene=scene;this.world=world;this.maxEntities=maxEntities;this.store=new EntityStore({cellSize});this.visuals=new Map();this.spawnTimer=.5;this.aiAccumulator=0;
+  constructor(scene,world,{maxEntities=16,cellSize=8,onDeath=()=>{}}={}){
+    this.scene=scene;this.world=world;this.maxEntities=maxEntities;this.onDeath=onDeath;this.store=new EntityStore({cellSize});this.visuals=new Map();this.spawnTimer=.5;this.aiAccumulator=0;
     this.resources={geometries:new Set(),materials:new Set()};this.templates=new Map();
     for(const[type,def]of Object.entries(PASSIVE_MOBS))this.templates.set(type,createTemplate(def,this.resources));
   }
@@ -54,7 +54,7 @@ export class PassiveMobSystem{
     const result=applyDamage(record.components,amount,now,{maxHp:def.hp});if(!result.applied)return result;
     const state=record.components;state.fleeTimer=3;state.hurtPulse=.12;
     if(sourcePosition){state.fleeX=sourcePosition.x;state.fleeZ=sourcePosition.z;const direction=knockbackDirection(sourcePosition.x,sourcePosition.z,position.x,position.z);state.pushX+=direction.x*3.8;state.pushZ+=direction.z*3.8;}
-    if(result.dead)this.despawn(record.id);return result;
+    if(result.dead){this.onDeath({type:record.type,position:{...position},entity:record});this.despawn(record.id);}return result;
   }
 
   trySpawnAround(player){
