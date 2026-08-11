@@ -8,10 +8,10 @@
 - 新增 `scripts/serve.mjs` 跨平台静态 HTTP server，作为本地/CI 浏览器测试统一入口。
 - 新增 `playwright.config.mjs` 和 `tests/e2e/smoke.spec.mjs`。
 - `Repository quality` 从单一 Node job 扩展为两层质量门：`static-checks` 成功后，再运行 Chromium `browser-smoke`。
-- `Repository quality` 增加按 `github.ref` 分组的 `cancel-in-progress`，同一 PR / 分支的新 push 会取消过时的未完成质量 run，避免异常 runner 或旧 HEAD 占用队列。
-- browser smoke 真实验证：主菜单→单人世界→创建世界→HUD/Canvas→暂停→IndexedDB 世界记录，并捕获 page/console error。
+- `Repository quality` 增加按 `github.ref` 分组的 `cancel-in-progress`，同一 PR / 分支的新 push 会取消过时的未完成质量 run。
+- browser smoke 当前真实验证：生存世界创建→HUD/Canvas→`/give`→`/tp` 虚空死亡→重生→暂停→IndexedDB 背包/经验/位置状态，并捕获 page/console error。
 - 浏览器测试失败时上传 trace / screenshot / HTML report 目录作为定位工件。
-- GitHub Actions checkout/setup-node 更新到 v6；浏览器 CI 只安装 Chromium，避免无用浏览器下载。
+- GitHub Actions checkout/setup-node 更新到 v6；浏览器 CI 当前只安装 Chromium。
 - `.gitignore` 增加 `playwright-report/` 和 `test-results/`。
 
 ### v0.4.0-dev — 已落库内容
@@ -24,21 +24,29 @@
 - `ProjectileSystem` + `projectile-rules.js`：重力、方块阻挡、线段/AABB 玩家命中和瞄准初速度。
 - 苦力怕：敌对生成池、接近、引信、取消范围和爆炸事件。
 - `ExplosionSystem` + `explosion-rules.js`：基础距离伤害、击退和附近地形破坏。
-- 蜘蛛：加入第四种敌对生物，16 HP、近战追击、独立宽体低矮占位模型、线掉落和基础经验。
-- 新增 `spider-rules.js`：把局部攀爬从渲染/AI 分支中抽成纯规则；最多约 3 格向上高度差，超过 2 格向下落差拒绝前进。
-- 蜘蛛攀爬只在当前 X/Z 上升到前方地形柱顶面后才允许水平推进，避免把视觉/实体中心直接移动进固体柱。
-- 修正 Creeper 加入 `HOSTILE_MOBS` 后测试仍只期望 zombie/skeleton 的回归错误；补充 Creeper 选择、fuse/explosion、loot 与 XP 断言。
-- 扩展 hostile selection / loot / XP 回归到 zombie、skeleton、creeper、spider 四种敌对生物。
+- 蜘蛛：第四种敌对生物，16 HP、近战追击、独立宽体低矮占位模型、线掉落和基础经验。
+- `spider-rules.js`：局部有界攀爬；最多约 3 格向上高度差，超过 2 格向下落差拒绝前进。
+- `death-rules.js`：把 survival/adventure 与 creative/spectator 的死亡损失、死亡 XP 和虚空判断从主循环中拆成纯规则。
+- `Inventory.drain()` 与 `CraftingGrid.drain()`：死亡时无副作用抽空 36 格、cursor 和 2×2/3×3 合成输入。
+- 普通生存/冒险死亡在原死亡点生成物品，并生成 `min(100, 当前等级 × 7)` 点经验球后清零 `totalXp`。
+- `y < -10` 虚空死亡不创建不可回收的 drop/orb 实体，携带物品与经验直接损失。
+- 创造/旁观不执行上述死亡损失。
+- 世界启动聊天修正为四种敌对生物，包含已经落库的蜘蛛。
+- Chromium E2E 加入真实 `/give oak_log 3` → `/tp 0 -20 0` → 虚空死亡/重生 → IndexedDB 断言，确保跨模块死亡链不是只靠纯函数测试。
+- 修正 Creeper 加入 `HOSTILE_MOBS` 后测试仍只期望 zombie/skeleton 的回归错误。
+- 回归测试覆盖 hostile selection、loot/XP、蜘蛛攀爬、Inventory death drain、死亡模式策略、XP 上限和虚空边界。
 
 ### Documentation
-- README 明确区分稳定基线 `v0.3.0` 与 `main` 的 `v0.4.0-dev`，不再把未落库功能计入完成度。
-- `docs/PROGRESS.md`、`docs/TESTING.md`、`docs/FILE_MANIFEST.md` 与远端实际代码/CI 对齐。
+- README 明确区分稳定基线 `v0.3.0` 与 `main` 的 `v0.4.0-dev`。
+- `docs/ARCHITECTURE.md` 重写 v0.4 数据流，补齐四种敌对生物、死亡策略与系统边界。
+- `docs/PROGRESS.md`、`docs/TESTING.md`、`docs/FILE_MANIFEST.md` 与实际代码/CI 对齐。
 
 ### Current limitations
-- `v0.4.0` 尚未封版：护甲、完整死亡规则、水/氧气、天气粒子等仍未完成。
-- 蜘蛛当前只有基于前方地形柱高度的局部攀升，不支持任意墙面附着、天花板移动或全局路径搜索。
-- 当前 Three.js 仍由运行时 jsDelivr URL 加载；CDN 失败会同时影响网站和 browser smoke，后续应本地 vendor / 构建锁定。
-- browser smoke 只覆盖“页面可启动并能创建/保存世界”的最低集成链，不等价于战斗/存档/键鼠玩法完整 E2E。
+- `v0.4.0` 尚未封版：死亡界面/统计/床重生、护甲、水/氧气、天气粒子等仍未完成。
+- 普通可恢复死亡的物品/经验实体生成与重新拾回尚未进入 browser E2E；当前自动浏览器链覆盖的是虚空直接损失。
+- 死亡掉落与经验球当前不持久化；页面重载会丢失尚未回收的死亡实体。
+- 蜘蛛当前只有局部攀升，不支持任意墙面附着、天花板移动或全局路径搜索。
+- Three.js 仍由运行时 jsDelivr URL 加载；CDN 失败会影响网站和 browser smoke，后续应本地 vendor / 构建锁定。
 
 ## [0.3.0] - 2026-08-11
 

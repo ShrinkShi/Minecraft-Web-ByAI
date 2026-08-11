@@ -2,173 +2,172 @@
 
 ## 设计原则
 
-1. **不复制 Java 版技术债。** 浏览器项目不会模拟单线程世界生成、每方块对象模型或无边界常驻内存。
-2. **数据优先。** 区块以紧凑 TypedArray 保存；背包/配方也是纯数据模型，不把 DOM 当游戏状态。
-3. **并行优先。** 地形生成和区块网格计算分别运行在独立 Web Worker；主线程主要负责输入、状态协调与 GPU 对象安装。
-4. **渲染批处理。** 每个区块生成一个合并 `BufferGeometry`，只提交暴露面。
-5. **资源生命周期显式管理。** 区块、掉落物、经验球、投射物、玩家和生物视觉对象都有明确销毁路径；世界退出终止 Worker 并释放共享资源。
-6. **存档保存差异。** 程序化区块由 seed 可重建，因此 IndexedDB 只记录玩家/背包/经验状态和被修改 voxel index。
-7. **固定系统边界。** World / Player / Inventory / Crafting / Storage / UI / Commands / Entities / Combat / Projectiles / Rewards 分层，避免把玩法塞进渲染循环。
-8. **规则逻辑可离线测试。** Inventory、Recipe、Command、Entity、Combat、Projectile、Loot、Experience、Worker 等核心规则应能在没有 WebGL 的 Node 环境验证关键不变量。
-9. **实体查询不能依赖全表两两扫描。** 实体身份、位置和玩法组件由独立数据层维护；邻域交互先经过 Spatial Hash 缩小候选集合，再做精确规则判断。
-10. **战斗/投射物/奖励与 AI 解耦。** AI 只决定“何时攻击”；伤害、轨迹碰撞、loot roll 和等级公式由独立规则/运行时处理。
+1. **不复制 Java 版技术债。** 不模拟单线程世界生成、每方块对象模型或无边界常驻内存。
+2. **数据优先。** 区块用紧凑 TypedArray；背包、配方、战斗、死亡规则是纯数据/纯逻辑，不把 DOM 当游戏状态。
+3. **并行优先。** terrain 和 mesh 分别运行在 Web Worker；主线程主要处理输入、状态协调和 GPU 对象安装。
+4. **渲染批处理。** 每个区块只生成暴露面并合并为 `BufferGeometry`，而不是每方块一个 Mesh。
+5. **资源生命周期显式管理。** chunk geometry、掉落、经验球、投射物和生物视觉都有销毁路径；退出世界终止 Worker 并释放共享 GPU 资源。
+6. **存档保存差异。** 程序化区块按 seed 重建，IndexedDB 只保存玩家/背包/经验快照和 voxel edits。
+7. **系统边界固定。** World / Player / Inventory / Crafting / Storage / UI / Commands / Entities / Combat / Projectiles / Rewards / Death Rules 分层。
+8. **规则可离线测试。** 不依赖 WebGL 的核心规则必须能在 Node 22 中验证关键不变量。
+9. **实体查询不做全表两两扫描。** EntityStore 管身份/组件，SpatialHash 先缩小 X/Z 邻域候选，再做精确判断。
+10. **AI 不直接修改核心状态。** 生物 AI 只发伤害、投射物、爆炸、死亡事件；主编排层和独立规则模块负责结算。
+11. **版本完成度以远端证据为准。** 只有进入 GitHub `main` 且通过质量门的实现才算完成。
 
-## v0.4 实体、战斗、投射物与奖励基础
+## 当前 v0.4 数据流
 
 ```text
-Input / AI
+Input / Commands / AI
+        │
+        ├────> combat.js ──────────────> damage / cooldown / knockback
+        │
+        ▼
+PassiveMobSystem / HostileMobSystem
+        │               │
+        │ movement      ├── onProjectile ──> ProjectileSystem ──> Player
+        │               ├── onExplosion ───> ExplosionSystem ───> Player / World
+        │               └── onDeath ───────> Reward orchestration
+        ▼                                           │
+ EntityStore ──> SpatialHash                        ├──> DropSystem
+                                                    └──> ExperienceOrbSystem
+                                                               │
+                                                               ▼
+                                                          totalXp
+
+Player death
+    │ capture death position
+    ▼
+death-rules.js ── mode / XP / void policy
     │
-    ├────> combat.js ─────────────> damage / cooldown / knockback
+    ├── Inventory.drain()
+    ├── CraftingGrid.drain() x2
+    │
+    ├── recoverable ──> DropSystem + ExperienceOrbSystem at death point
+    └── void ─────────> discard without spawning unreachable entities
     │
     ▼
-PassiveMobSystem / HostileMobSystem
-    │                │            │
-    │ movement       │            └── onProjectile(...)
-    ▼                │                        │
-EntityStore ──> SpatialHash                  ▼
-                     │                ProjectileSystem
-                     │                        │ hit
-                     │                        ▼
-                     └──────────────> PlayerController
-
-Mob death ── onDeath(type, position)
-                    │
-                    ▼
-             Reward orchestration
-                    │
-       ┌────────────┴────────────┐
-       ▼                         ▼
-  DropSystem             ExperienceOrbSystem
-                                  │ pickup
-                                  ▼
-                           experience.js
-                                  │
-                                  ▼
-                              totalXp
+Player.respawn()
 ```
 
-### EntityStore / SpatialHash
+## World / Worker
 
-- 实体由单调递增 ID 标识；类型和玩法组件记录在 `records` 中，位置独立保存在 `positions`。
-- 外部位置读取返回副本；移动必须经 `setPosition()`，从而同步 Spatial Hash 所在桶。
-- `despawn()` / `clear()` 同时清理 record、position 和空间索引，不允许孤儿索引。
-- Spatial Hash 当前按 X/Z 平面分桶，默认 cell size 为 8；只负责候选缩减，不替代 Y 轴、碰撞体、视线或阵营精确判断。
-- 该数据层不引用 DOM / Three.js，可直接由 Node 回归测试验证。
+- `world-worker.js`：程序化 chunk 生成；主线程通过 Transferable 接收紧凑方块数据。
+- `mesh-worker.js`：暴露面扫描、顶点/法线/UV/索引构建；返回精确长度 TypedArray。
+- `VoxelWorld`：玩家位置驱动 chunk streaming；当前 `renderDistance=3`、额外一圈卸载滞回。
+- chunk 卸载必须 `geometry.dispose()`；世界退出时终止 Worker、释放材质/纹理。
+- IndexedDB 当前只保存世界增量 edits 和玩家快照，不保存完整程序化 chunk。
 
-### PassiveMobSystem
+## Inventory / Crafting / Drops
 
-- 管理牛、羊、猪、鸡；静态规则与运行时状态分离，Three.js 对象只作为视觉映射。
-- 默认在玩家 12~30 格外草方块/泥土地表尝试生成；当前最多 16 只，离玩家超过 48 格回收。
-- AI 固定 10 Hz 执行漫游、受击逃跑和地表步进；视觉按渲染帧插值。
-- 受击使用公共 combat 规则；死亡只发 `onDeath`，不直接操作背包、掉落或经验系统。
+- `Inventory` 固定 36 格，快捷栏是 `slots[27..35]` 的视图；cursor 独立存在。
+- `CraftingGrid` 独立维护 2×2 / 3×3 输入；普通关闭 GUI 时通过 `clearTo()` 回收到背包。
+- 死亡不能复用普通 `closePanels()`：背包满时普通关闭会产生 overflow world drop，虚空死亡会因此提前制造不可回收实体。
+- 因此死亡路径使用 `Inventory.drain()` + `CraftingGrid.drain()`，先无副作用抽空所有携带/临时输入，再由 death plan 决定是否生成世界掉落。
+- `DropSystem` 当前使用受控数组；方块掉落复用方块材质，非方块物品可使用纹理 Sprite 或临时纯色图标。
+- DropSystem / ExperienceOrbSystem / ProjectileSystem 尚未统一进 EntityStore；只有规模数据证明线性更新成为瓶颈时才迁移，避免过早抽象。
 
-### Combat
+## EntityStore / SpatialHash
 
-- `combat.js` 不引用 DOM / Three.js；当前提供 600 ms 基础攻击冷却、500 ms 默认受击无敌窗口、伤害结算和二维击退方向。
-- 时间基准使用毫秒时间，不绑定渲染帧数。
-- `PlayerController.takeDamage()` 负责创造/旁观免伤边界，并把成功伤害转成 HP 和速度脉冲。
-- 玩家 0 HP 或掉出世界后由编排层调用 `respawn()`；当前死亡不掉背包、不损失经验，也没有死亡界面。
-- 普通攻击基础伤害 1，木镐暂设 2；并不等于完整 Java 版攻击强度、暴击或武器平衡。
+- 实体用单调递增 ID；类型/组件与 position 分开维护。
+- 外部读取位置返回副本；移动必须经 `setPosition()`，保证 SpatialHash 桶同步。
+- `despawn()` / `clear()` 同时清理 record、position、空间索引。
+- SpatialHash 当前只按 X/Z 分桶，默认 cell size 8；它只做候选缩减，不替代 Y 轴、碰撞体、视线或阵营规则。
+- 这层不引用 DOM / Three.js，可在 Node 中独立回归。
 
-### HostileMobSystem / Zombie / Skeleton
+## 生物与 AI
 
-- 敌对生物仍统一使用 `EntityStore` / `SpatialHash`，夜间生成池当前包含僵尸和骷髅；总上限 8，超过 48 格回收。
-- 僵尸固定 10 Hz 直接追踪玩家，在约 1.55 格内通过 `onPlayerHit` 发出近战伤害请求。
-- 骷髅使用 ranged attack style：远于理想距离时靠近、过近时后退、中距离进行轻量侧移；达到攻击冷却后通过 `onProjectile` 发出箭矢创建请求。
-- `HostileMobSystem` 不直接创建箭矢，也不直接修改玩家 HP；这样远程 AI、投射物物理和伤害结算不会耦合成一层。
-- 两种敌人目前都没有 A* / 导航网格、视线规划、日照燃烧、门交互、装备或精确亮度生成规则。
+### 被动生物
 
-### Projectile rules / ProjectileSystem
+- 牛、羊、猪、鸡由 `PassiveMobSystem` 管理。
+- 静态属性在 `mobs.js`；运行时状态在 EntityStore；Three.js 对象只做视觉映射。
+- AI 固定 10 Hz：地表生成、漫游、受击逃跑、距离回收。
+- 死亡只发事件，不直接操作背包/经验/存档。
 
-- `projectile-rules.js` 是纯逻辑模块：`segmentAabbIntersectionT()` 用 slab 法求线段第一次进入 AABB 的参数 `t`；`aimVelocity()` 根据目标距离、速度和重力给出第一版抛物线补偿初速度。
-- 箭矢每帧按速度/重力积分，但碰撞不是只看终点：使用“上一位置→下一位置”的线段同时检测玩家 AABB 与方块 raycast，避免高速箭矢穿过玩家。
-- 当同一帧线段既可能命中玩家又可能命中方块时，以碰撞距离比较决定更靠前的命中对象，墙体可以实际挡箭。
-- `ProjectileSystem` 共享一份低多边形箭矢 geometry/material；箭矢有 8 秒生命周期，离开世界时显式 `dispose()`。
-- 创造/旁观玩家当前不会被敌对箭矢判定命中；生存/冒险进入玩家伤害链。
-- 当前箭矢只属于敌对 AI：没有玩家弓、蓄力、箭插墙、箭回收、实体间互伤、附魔或真实箭矢模型。
+### 敌对生物
 
-### Loot 与死亡事件
+当前夜间生成池：
 
-- Loot 表定义在 `mobs.js` 静态规则中；运行时死亡只发 `{type, position, entity}`，主编排层调用 `rollMobLoot()` / `rollMobXp()`。
-- roll 函数支持注入 RNG，因此 min/max 和零掉落边界可确定性测试。
-- 当前基础奖励：牛→生牛肉/皮革，羊→羊毛/生羊肉，猪→生猪排，鸡→生鸡肉/羽毛，僵尸→腐肉，骷髅→骨头/箭。
-- Looting、火焰击杀熟食、幼体差异、稀有掉落和完整条件化 loot table 仍未实现。
-- 缺少正式素材的 loot 使用内联 SVG 色块图标；`DropSystem` 保留 `color` Sprite fallback，避免“有数据但无法生成世界视觉实体”。
+- 僵尸：直接地表追击 + 近战。
+- 骷髅：距离控制/侧移 + `onProjectile` 发射箭矢请求。
+- 苦力怕：接近、fuse、取消范围 + `onExplosion`。
+- 蜘蛛：独立低矮宽体占位模型、近战追击、有限局部攀爬。
 
-### Experience
+敌对总量当前有硬上限并按距离回收。尚没有完整 A*、导航网格、标准亮度生成、日照燃烧、门交互或装备系统。
 
-- `experience.js` 提供 `xpToNextLevel()`、`totalXpForLevel()`、`levelForTotalXp()` 和 `experienceState()`；边界测试覆盖 16/17、31/32 级公式切换。
-- 只持久化 `totalXp`，level 和条内进度按公式派生，避免重复真相源。
-- 世界快照逻辑版本为 v4；IndexedDB 仍是通用 `worlds` object store，不需要提升 DB schema version。
-- `ExperienceOrbSystem` 使用共享低面数球体/材质，包含重力、弹跳、6 格内吸附、拾取和 300 秒销毁；经验球本身不持久化。
+### 蜘蛛局部攀爬
 
-## v0.3 生存闭环
+- `spider-rules.js` 是纯规则，不依赖 Three.js。
+- 1 格左右普通台阶直接通过；约 1~3 格上升时先保持 X/Z，逐步把 Y 提升到前方地形柱顶面，再水平推进。
+- 超过最大攀爬高度或超过 2 格向下落差视为阻挡。
+- 这不是任意墙面附着、天花板移动或全局寻路。
 
-```text
-                         ┌──────────────┐
-             左/右/Shift │ Inventory UI │
-                         └──────┬───────┘
-                                ▼
-                         ┌──────────────┐
-                         │ Inventory(36)│◄──────────────┐
-                         └───┬──────┬───┘               │
-                             │      │                    │拾取
-                     Crafting│      │hotbar              │
-                             ▼      ▼                    │
-                    ┌──────────┐  Player ──破坏──> DropSystem
-                    │Recipes 2/3│        Q ────────> DropSystem
-                    └──────────┘
+## Combat / Projectiles / Explosions
 
-Chat ──> Commands ──context──> Player / Inventory / Time / Weather
-```
+- `combat.js`：基础攻击冷却、受击无敌窗口、伤害和二维击退方向；以时间而不是帧数为基准。
+- `PlayerController.takeDamage()` 负责创造/旁观免伤边界和受击速度脉冲。
+- `projectile-rules.js` 用线段/AABB 和方块 raycast 避免高速箭矢只检查终点产生穿透。
+- `ProjectileSystem` 当前共享箭矢 geometry/material；敌对箭矢有有限生命周期。
+- `ExplosionSystem` 处理苦力怕基础距离伤害、击退和附近地形破坏；暂未做完整遮挡射线、TNT、火焰和实体连锁爆炸。
+- 当前战斗仍不是完整 Java 版公式：缺攻击强度曲线、暴击、扫击、护甲、韧性、药水、附魔等。
 
-- 36 个 slot 存在 `Inventory` 中，快捷栏只是 `slots[27..35]` 的视图。
-- 合成输入使用独立 `CraftingGrid`；关闭 GUI 时输入和 cursor 回收到 Inventory，溢出项通过 DropSystem 返回世界。
-- 破坏方块和生物死亡都通过 world drop 实体进入拾取链，而不是直接塞进背包。
-- `DropSystem`、`ExperienceOrbSystem`、`ProjectileSystem` 当前仍是受控小数组；只有实体规模证明线性更新成为瓶颈时，再迁移到统一 EntityStore / SpatialHash。
+## Loot / Experience
 
-## v0.2 世界与 Worker 数据流
+- `mobs.js` 保存 loot/xp 静态规则，roll 函数支持注入 RNG 以便确定性测试。
+- 当前基础 loot 包括牛/羊/猪/鸡、腐肉、骨头/箭、火药、线。
+- `experience.js` 只把 `totalXp` 作为真相源，level 和条内进度派生；覆盖 16/17、31/32 级公式边界。
+- `ExperienceOrbSystem` 负责重力、弹跳、吸附、拾取和销毁；经验球本身当前不持久化。
+- 世界快照逻辑版本为 v4；IndexedDB schema 仍是单一通用 `worlds` store，因此死亡规则不需要迁移 DB schema。
 
-```text
-                  ┌──────────────────────┐
-                  │      main thread     │
-输入 ────────────>│ Player / World / UI  │──────> Three.js / GPU
-                  └─────┬──────────┬─────┘
-                        │          │
-               chunk请求│          │mesh请求
-                        ▼          ▼
-               ┌────────────┐  ┌────────────┐
-               │ terrain    │  │ mesh       │
-               │ worker     │  │ worker     │
-               └─────┬──────┘  └─────┬──────┘
-                     │ Transferable    │ Transferable
-                     └────────┬────────┘
-                              ▼
-                    区块数据 / 顶点缓冲
+## 玩家死亡结算
 
-主线程 ──增量 edits + player/inventory/xp snapshot──> IndexedDB
-```
+`death-rules.js` 只输出策略，不直接修改世界：
 
-- `renderDistance=3`，`unloadDistance=4` 提供一圈卸载滞回。
-- 程序化区块按 seed 可重建；存档只保存修改差异。
-- `mesh-worker.js` 两遍扫描生成精确长度 TypedArray，通过 Transferable 返回。
-- 区块卸载必须释放 `BufferGeometry`，世界退出终止 Worker 并释放共享材质/纹理。
+- survival / adventure：执行物品和经验损失。
+- creative / spectator：不执行这套损失规则。
+- 死亡经验：`min(100, currentLevel × 7)`。
+- `y >= -10`：可恢复死亡，在原死亡点生成背包/cursor/合成输入掉落和经验球。
+- `y < -10`：虚空死亡，直接清空携带内容和总经验，不生成位于世界底部的不可回收实体。
 
-## 当前仍存在的技术债
+主编排顺序固定为：
 
-- terrain / mesh 各只有 1 个 Worker；高速移动或大面积编辑最终需要 Worker pool、优先级和取消机制。
+1. 复制死亡位置与原 total XP；
+2. 生成 death plan；
+3. 抽空 CraftingGrid、Inventory、cursor；
+4. 若可恢复则在死亡位置生成世界实体；
+5. 清零 total XP；
+6. 调 `Player.respawn()`；
+7. 标记存档 dirty。
+
+当前仍没有死亡界面、死亡统计、床/重生点、`keepInventory`，死亡掉落/经验实体也不会跨页面重载持久化。
+
+## Storage
+
+- IndexedDB 当前以 world record 保存玩家状态、36 格背包快照、`totalXp`、时间/天气和 voxel edits。
+- 程序化世界可由 seed 重建，所以不存完整 chunk。
+- 长期大世界中单 record 写回全部 edits 会膨胀，后续应按 chunk 拆 object store / page。
+
+## CI / Browser integration
+
+`Repository quality` 两层：
+
+1. `static-checks`：Node 22 语法 + `scripts/check.mjs` 规则/Worker 回归。
+2. `browser-smoke`：Chromium 实际创建世界，确认 HUD、Canvas、暂停和 IndexedDB 基础链。
+
+同一 `github.ref` 使用 `cancel-in-progress`，新 push 会取消旧质量 run，避免陈旧 HEAD 占用 runner。GitHub Pages 由独立 workflow 从 `main` 部署。
+
+## 当前技术债
+
+- Three.js 仍从 jsDelivr runtime import；应 vendor/pin 或引入构建产物，避免 CDN 成为运行时单点依赖。
+- terrain / mesh 各只有 1 个 Worker；高速移动/大范围编辑最终需要 Worker pool、优先级和取消机制。
 - 水仍与实体方块共用不透明材质，没有独立透明 pass、流体、氧气和水下介质。
-- IndexedDB 仍以单 world record 写回全部 edits；长期大世界应拆按 chunk object store。
-- UI 仍通过重建 slot DOM 保证简单正确，后续应局部更新减少 GC/布局。
-- DropSystem / ExperienceOrbSystem / ProjectileSystem 尚未使用 EntityStore / SpatialHash；当前数量受控，但规模扩大后线性扫描会成为技术债。
-- 生物没有按 chunk 激活/持久化、群系/亮度/容量规则、标准动画和精确碰撞；16 被动 + 8 敌对与 48 格回收仍是临时浏览器预算。
-- 僵尸/骷髅导航只是直接地表步进，不具备真正寻路；复杂悬崖、建筑和迷宫行为会失真。
-- 骷髅目前不做攻击视线预判；它可以向墙后玩家发射箭，但箭会在物理层撞墙。这是“行为不聪明”，不是“箭穿墙”。
-- EntityStore 仍使用 Map + 普通对象组件；只有规模数据证明需要时再评估热组件 SoA TypedArray。
-- 玩家/生物模型和箭矢都是几何占位，尚未使用标准 skin UV、骨骼动画或正式像素素材。
+- IndexedDB edits 仍集中在单 world record。
+- UI 通过重建 slot DOM 保证简单正确；物品规模增加后需局部更新减少 GC/布局。
+- 生物没有 chunk 持久化、群系/亮度/容量标准规则、正式动画/碰撞。
+- 僵尸/骷髅/蜘蛛只做局部地形移动，没有完整寻路。
+- 骷髅不做攻击前视线规划；箭矢物理可以撞墙，但 AI 仍可能向墙后玩家射击。
+- 玩家/生物/箭矢仍是几何占位，尚未进入标准 skin UV、骨骼动画或正式像素素材管线。
 - 工具 durability/NBT/附魔尚未进入 item stack schema。
-- 战斗/死亡仍缺攻击强度曲线、暴击、护甲、药水、附魔、死亡掉落和经验损失。
 - Loot 仍是简化静态表，没有完整条件化 loot table。
-- 当前 Three.js 仍从 CDN import；长期应 vendor/pin 或引入构建产物，避免运行时第三方 CDN 依赖。
+- 死亡掉落与经验球不持久化；页面刷新可使尚未回收的死亡实体消失。
 
 这些项目必须继续拆除，不能因为“已经能跑”就固化成长期架构。

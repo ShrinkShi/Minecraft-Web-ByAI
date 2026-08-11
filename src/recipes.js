@@ -62,6 +62,13 @@ export class CraftingGrid{
     for(const index of this.match.used){const slot=this.slots[index];if(slot){slot.count--;if(slot.count<=0)this.slots[index]=null;}}
     this.refresh();return output;
   }
+  drain(){
+    const stacks=[];
+    for(let i=0;i<this.slots.length;i++){
+      const slot=this.slots[i];if(slot)stacks.push({id:slot.id,count:slot.count});this.slots[i]=null;
+    }
+    this.refresh();return stacks;
+  }
   clearTo(inventory){
     const overflow=[];
     for(let i=0;i<this.slots.length;i++){
