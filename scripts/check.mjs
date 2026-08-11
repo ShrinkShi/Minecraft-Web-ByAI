@@ -4,7 +4,8 @@ import {CraftingGrid} from '../src/recipes.js';
 import {executeCommand} from '../src/commands.js';
 import {SpatialHash} from '../src/spatial-hash.js';
 import {EntityStore} from '../src/entity-store.js';
-import {PASSIVE_MOBS,choosePassiveMob} from '../src/mobs.js';
+import {PASSIVE_MOBS,HOSTILE_MOBS,choosePassiveMob,isNightTime} from '../src/mobs.js';
+import {canAttack,applyDamage,knockbackDirection} from '../src/combat.js';
 
 function testInventoryAndCrafting(){
   const inv=new Inventory('survival');assert.equal(inv.add('block:6',5),0);assert.equal(inv.slots[0].count,5);
@@ -47,10 +48,19 @@ function testEntityStore(){
   assert.equal(store.setPosition(999,{x:0,y:0,z:0}),false);store.clear();assert.equal(store.size,0);assert.equal(store.spatial.size,0);
 }
 
-function testPassiveMobRules(){
-  assert.deepEqual(Object.keys(PASSIVE_MOBS),['cow','sheep','pig','chicken']);
-  for(const def of Object.values(PASSIVE_MOBS)){assert.ok(def.hp>0);assert.ok(def.speed>0);assert.ok(def.width>0&&def.height>0);}
+function testMobRules(){
+  assert.deepEqual(Object.keys(PASSIVE_MOBS),['cow','sheep','pig','chicken']);for(const def of Object.values(PASSIVE_MOBS)){assert.ok(def.hp>0);assert.ok(def.speed>0);assert.ok(def.width>0&&def.height>0);}
   assert.equal(choosePassiveMob(()=>0),'cow');assert.equal(choosePassiveMob(()=>.26),'sheep');assert.equal(choosePassiveMob(()=>.51),'pig');assert.equal(choosePassiveMob(()=>.99),'chicken');
+  assert.deepEqual(Object.keys(HOSTILE_MOBS),['zombie']);assert.equal(HOSTILE_MOBS.zombie.hp,20);assert.ok(HOSTILE_MOBS.zombie.attackDamage>0);assert.ok(HOSTILE_MOBS.zombie.attackRange>0);
+  assert.equal(isNightTime(12000),false);assert.equal(isNightTime(13000),true);assert.equal(isNightTime(22999),true);assert.equal(isNightTime(23000),false);assert.equal(isNightTime(37000),true);
+}
+
+function testCombatRules(){
+  assert.equal(canAttack(-Infinity,1000),true);assert.equal(canAttack(1000,1599),false);assert.equal(canAttack(1000,1600),true);
+  const state={hp:20,hurtUntil:-Infinity};let result=applyDamage(state,3,1000);assert.equal(result.applied,true);assert.equal(state.hp,17);assert.equal(state.hurtUntil,1500);
+  result=applyDamage(state,8,1200);assert.equal(result.applied,false);assert.equal(state.hp,17);result=applyDamage(state,20,1500);assert.equal(result.dead,true);assert.equal(state.hp,0);
+  const k=knockbackDirection(0,0,3,4);assert.ok(Math.abs(k.x-.6)<1e-9);assert.ok(Math.abs(k.z-.8)<1e-9);assert.deepEqual(knockbackDirection(1,1,1,1),{x:0,z:1});
+  assert.throws(()=>applyDamage({},0,0),RangeError);assert.throws(()=>canAttack(0,0,-1),RangeError);
 }
 
 async function testMeshWorker(){
@@ -66,4 +76,4 @@ async function testTerrainWorker(){
   self.onmessage({data:{type:'init',seed:'test-seed',prompt:'森林丘陵'}});assert.equal(messages.shift().type,'ready');self.onmessage({data:{type:'generate',cx:0,cz:0}});const out=messages.shift(),data=new Uint8Array(out.data);assert.equal(data.length,16*16*64);assert.ok(data.some(v=>v===3));assert.ok(data.some(v=>v===1||v===4));
 }
 
-testInventoryAndCrafting();testCommands();testSpatialHash();testEntityStore();testPassiveMobRules();await testMeshWorker();await testTerrainWorker();console.log('logic + worker checks: PASS');
+testInventoryAndCrafting();testCommands();testSpatialHash();testEntityStore();testMobRules();testCombatRules();await testMeshWorker();await testTerrainWorker();console.log('logic + worker checks: PASS');
