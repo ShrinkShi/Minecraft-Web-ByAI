@@ -1,0 +1,21 @@
+name: Repository quality
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: JavaScript syntax
+        run: |
+          set -e
+          for file in src/*.js; do node --check "$file"; done
+      - name: Logic and worker regression checks
+        run: node scripts/check.mjs

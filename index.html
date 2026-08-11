@@ -29,7 +29,7 @@
 
     <section id="world-menu" class="screen">
       <div class="world-card">
-        <h1>创建新的世界</h1>
+        <h1>创建 / 进入世界</h1>
         <label>世界名称<input id="world-name" value="新的世界" maxlength="40" /></label>
         <label>种子<input id="world-seed" value="ShrinkCraft-2026" maxlength="80" /></label>
         <label>游戏模式
@@ -39,7 +39,7 @@
           <textarea id="terrain-prompt">温带森林，起伏丘陵，河谷与少量沙地</textarea>
         </label>
         <div class="button-row">
-          <button class="mc-button" data-action="create-world">创建世界</button>
+          <button class="mc-button" data-action="create-world">创建 / 进入</button>
           <button class="mc-button" data-action="back-main">取消</button>
         </div>
       </div>
@@ -61,12 +61,10 @@
     <div id="hud" class="hud hidden">
       <div id="crosshair" class="crosshair"></div>
       <div id="debug" class="debug"></div>
+      <div id="chat-log" class="chat-log"></div>
       <div class="status-stack">
         <div id="armor-row" class="icon-row armor-row"></div>
-        <div class="status-row">
-          <div id="hearts" class="icon-row hearts"></div>
-          <div id="hunger" class="icon-row hunger"></div>
-        </div>
+        <div class="status-row"><div id="hearts" class="icon-row hearts"></div><div id="hunger" class="icon-row hunger"></div></div>
         <div class="xp-wrap"><div id="xp-bar" class="xp-bar"></div><span id="xp-level">0</span></div>
         <div id="hotbar" class="hotbar"></div>
       </div>
@@ -78,11 +76,26 @@
     <section id="inventory" class="inventory hidden" aria-label="物品栏">
       <div class="inventory-panel">
         <div class="inventory-title">物品栏</div>
-        <div class="inventory-top"><div class="player-preview">玩家</div><div class="crafting-mini"><span>2 × 2 合成</span><div class="craft-grid mini"></div></div></div>
+        <div class="inventory-top">
+          <div class="player-preview">玩家</div>
+          <div class="crafting-area"><span>2 × 2 合成</span><div class="crafting-line"><div id="craft-grid-2" class="craft-grid grid-2"></div><b>→</b><div id="craft-result-2" class="craft-result"></div></div></div>
+        </div>
         <div id="inventory-grid" class="inventory-grid"></div>
         <div id="inventory-hotbar" class="inventory-grid inventory-hotbar"></div>
       </div>
     </section>
+
+    <section id="workbench" class="inventory hidden" aria-label="工作台">
+      <div class="inventory-panel workbench-panel">
+        <div class="inventory-title">工作台</div>
+        <div class="workbench-craft"><div id="craft-grid-3" class="craft-grid grid-3"></div><b>→</b><div id="craft-result-3" class="craft-result"></div></div>
+        <div id="workbench-grid" class="inventory-grid"></div>
+        <div id="workbench-hotbar" class="inventory-grid inventory-hotbar"></div>
+      </div>
+    </section>
+
+    <div id="cursor-stack" class="cursor-stack hidden"></div>
+    <div id="chat-input-wrap" class="chat-input-wrap hidden"><input id="chat-input" autocomplete="off" spellcheck="false" maxlength="256" /></div>
   </div>
   <script type="module" src="./src/main.js"></script>
 </body>
