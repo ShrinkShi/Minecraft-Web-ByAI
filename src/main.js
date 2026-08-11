@@ -5,6 +5,8 @@ import {UI} from './ui.js';
 import {BLOCKS} from './blocks.js';
 import {ITEMS} from './items.js';
 import {Inventory} from './inventory.js';
+import {Equipment} from './equipment.js';
+import {mitigateArmorDamage} from './armor-rules.js';
 import {DropSystem} from './drops.js';
 import {WorldStorage,worldIdFor} from './storage.js';
 import {executeCommand} from './commands.js';
@@ -32,7 +34,7 @@ const hemi=new THREE.HemisphereLight(0xbfe4ff,0x6a5a42,2.4);scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xfff1c2,2.1);sun.position.set(80,120,60);scene.add(sun);
 
 const ui=new UI(),storage=new WorldStorage();
-let world=null,player=null,inventory=null,drops=null,experienceOrbs=null,projectiles=null,explosions=null,passiveMobs=null,hostileMobs=null;
+let world=null,player=null,inventory=null,equipment=null,drops=null,experienceOrbs=null,projectiles=null,explosions=null,passiveMobs=null,hostileMobs=null;
 let running=false,paused=false,last=performance.now(),selectedTarget=null,breakStart=0,lastSecond=0,frames=0,fps=0,worldInfo=null,lastAttackAt=-Infinity;
 let saveDirty=false,saveInFlight=null,saveAgain=false,lastSaveAt=0,lastSavedPosition=null,gameTime=6000,weather='clear',totalXp=0;
 
@@ -40,18 +42,18 @@ function modeScreen(name){ui.showScreen(name==='main'?ui.main:name==='world'?ui.
 function pointer(){if(running&&!paused&&!ui.hasOpenPanel()&&!ui.isChatOpen())canvas.requestPointerLock().catch(()=>{});}
 function canControl(){return running&&!paused&&!ui.hasOpenPanel()&&!ui.isChatOpen()&&document.pointerLockElement===canvas;}
 function markSaveDirty(){saveDirty=true;}
-function renderPlayerStatus(){if(!player)return;const xp=experienceState(totalXp);ui.renderStatus(player.hp,player.hunger,xp.progress*100,xp.level);}
+function renderPlayerStatus(){if(!player)return;const xp=experienceState(totalXp);ui.renderStatus(player.hp,player.hunger,xp.progress*100,xp.level,equipment?.armorPoints()||0);}
 
 function disposeWorld(){
   running=false;document.exitPointerLock?.();ui.closeChat();ui.inventory.classList.add('hidden');ui.workbench.classList.add('hidden');
   explosions?.dispose();projectiles?.dispose();hostileMobs?.dispose();passiveMobs?.dispose();experienceOrbs?.dispose();drops?.dispose();player?.dispose();world?.dispose();
-  explosions=null;projectiles=null;hostileMobs=null;passiveMobs=null;experienceOrbs=null;drops=null;player=null;world=null;inventory=null;worldInfo=null;saveDirty=false;lastSavedPosition=null;lastAttackAt=-Infinity;totalXp=0;
+  explosions=null;projectiles=null;hostileMobs=null;passiveMobs=null;experienceOrbs=null;drops=null;player=null;world=null;inventory=null;equipment=null;worldInfo=null;saveDirty=false;lastSavedPosition=null;lastAttackAt=-Infinity;totalXp=0;
 }
 
 async function persistWorld(force=false){
-  if(!world||!player||!worldInfo||!inventory)return;
+  if(!world||!player||!worldInfo||!inventory||!equipment)return;
   if(saveInFlight){saveAgain=true;return saveInFlight;}if(!force&&!saveDirty)return;
-  const record={id:worldInfo.id,name:worldInfo.name,seed:worldInfo.seed,prompt:worldInfo.prompt,mode:player.mode,updatedAt:Date.now(),player:player.snapshot(),inventory:inventory.snapshot(),edits:world.exportEdits(),gameTime,weather,totalXp,version:4};
+  const record={id:worldInfo.id,name:worldInfo.name,seed:worldInfo.seed,prompt:worldInfo.prompt,mode:player.mode,updatedAt:Date.now(),player:player.snapshot(),inventory:inventory.snapshot(),equipment:equipment.snapshot(),edits:world.exportEdits(),gameTime,weather,totalXp,version:5};
   saveDirty=false;saveAgain=false;
   saveInFlight=storage.putWorld(record).then(()=>{lastSaveAt=performance.now();lastSavedPosition=player?.position.clone()||null;}).catch(error=>{saveDirty=true;console.error('世界存档失败',error);ui.showToast('世界存档失败：IndexedDB 不可用');}).finally(async()=>{saveInFlight=null;if(saveAgain&&world&&player)await persistWorld(true);});
   return saveInFlight;
@@ -60,7 +62,7 @@ async function persistWorld(force=false){
 function spawnOverflow(stacks){if(!drops||!player)return;const origin=player.position.clone().add(new THREE.Vector3(0,1,0));for(const stack of stacks)drops.spawn(stack.id,stack.count,origin.clone());}
 
 function drainDeathStacks(){
-  if(!inventory)return[];const stacks=[...ui.craft2.drain(),...ui.craft3.drain(),...inventory.drain()];ui.inventory.classList.add('hidden');ui.workbench.classList.add('hidden');ui.closeChat();ui.refreshInventory();return stacks;
+  if(!inventory)return[];const stacks=[...ui.craft2.drain(),...ui.craft3.drain(),...(equipment?.drain()||[]),...inventory.drain()];ui.inventory.classList.add('hidden');ui.workbench.classList.add('hidden');ui.closeChat();ui.refreshInventory();return stacks;
 }
 
 function respawnPlayer(reason='你死了'){
@@ -76,12 +78,14 @@ function respawnPlayer(reason='你死了'){
   player.keys.clear();player.respawn(0,0);lastAttackAt=-Infinity;renderPlayerStatus();ui.showToast(`${reason}，已在出生点重生${lossMessage}`);markSaveDirty();
 }
 
+function protectedDamage(amount){return mitigateArmorDamage(amount,equipment?.armorPoints()||0);}
+
 function handlePlayerHit({amount,source}){
-  if(!player)return;const result=player.takeDamage(amount,performance.now(),source);if(!result.applied)return;markSaveDirty();renderPlayerStatus();if(result.dead)respawnPlayer();
+  if(!player)return;const result=player.takeDamage(protectedDamage(amount),performance.now(),source);if(!result.applied)return;markSaveDirty();renderPlayerStatus();if(result.dead)respawnPlayer();
 }
 
 function handlePlayerBlast({amount,source,knockback}){
-  if(!player)return;const result=player.takeDamage(amount,performance.now(),null);if(!result.applied)return;
+  if(!player)return;const result=player.takeDamage(protectedDamage(amount),performance.now(),null);if(!result.applied)return;
   if(source&&Number.isFinite(knockback)&&knockback>0)player.knockbackFrom(source.x,source.z,Math.max(.25,knockback),Math.min(.55,.18+knockback*.3));markSaveDirty();renderPlayerStatus();if(result.dead)respawnPlayer('你被爆炸击倒了');
 }
 
@@ -107,9 +111,9 @@ async function startWorld(){
   const mode=saved?.mode||selectedMode;worldInfo={id,seed:saved?.seed||seed,prompt:saved?.prompt||prompt,mode,name:saved?.name||name};gameTime=Number.isFinite(saved?.gameTime)?saved.gameTime:6000;weather=saved?.weather||'clear';totalXp=Number.isFinite(saved?.totalXp)?Math.max(0,Math.floor(saved.totalXp)):0;
   const startPosition=saved?.player?.position,centerX=Number.isFinite(startPosition?.x)?startPosition.x:0,centerZ=Number.isFinite(startPosition?.z)?startPosition.z:0;modeScreen(null);ui.showLoading(true,saved?'读取世界存档':'启动地形 Worker',2);
   world=new VoxelWorld(scene,{seed:worldInfo.seed,prompt:worldInfo.prompt,renderDistance:3,savedEdits:saved?.edits||{},onEdit:markSaveDirty,onProgress:(done,total)=>ui.showLoading(true,`生成区块 ${done}/${total}`,total?Math.round(done/total*100):100)});await world.generateArea(centerX,centerZ);
-  inventory=new Inventory(mode,saved?.inventory||null);player=new PlayerController(camera,canvas,world,scene);player.setMode(mode);const restored=saved?.player?player.restore(saved.player):false;if(!restored)player.spawn(centerX,centerZ);if(player.hp<=0)player.respawn(0,0);
+  inventory=new Inventory(mode,saved?.inventory||null);equipment=new Equipment(saved?.equipment||null);player=new PlayerController(camera,canvas,world,scene);player.setMode(mode);const restored=saved?.player?player.restore(saved.player):false;if(!restored)player.spawn(centerX,centerZ);if(player.hp<=0)player.respawn(0,0);
   drops=new DropSystem(scene,world,inventory,()=>{ui.refreshInventory();markSaveDirty();});experienceOrbs=new ExperienceOrbSystem(scene,world,addExperience);projectiles=new ProjectileSystem(scene,world,{onPlayerHit:handlePlayerHit});explosions=new ExplosionSystem(scene,world,{onPlayerBlast:handlePlayerBlast});passiveMobs=new PassiveMobSystem(scene,world,{onDeath:handleMobDeath});hostileMobs=new HostileMobSystem(scene,world,{onPlayerHit:handlePlayerHit,onProjectile:handleHostileProjectile,onExplosion:handleHostileExplosion,onDeath:handleMobDeath});
-  ui.bindInventory(inventory,{onChanged:markSaveDirty,onOverflow:spawnOverflow});running=true;paused=false;saveDirty=!saved;lastSavedPosition=player.position.clone();lastAttackAt=-Infinity;ui.hud.classList.remove('hidden');ui.showLoading(false);renderPlayerStatus();applySky();ui.chatMessage('夜间敌对池现在包括僵尸、骷髅、苦力怕和蜘蛛；苦力怕会引爆地形，蜘蛛具备有限局部攀爬。');ui.showToast(saved?'已从浏览器存档恢复世界':mode==='creative'?'创造模式':'生存模式');pointer();
+  ui.bindInventory(inventory,{equipment,onChanged:()=>{markSaveDirty();renderPlayerStatus();},onOverflow:spawnOverflow});running=true;paused=false;saveDirty=!saved;lastSavedPosition=player.position.clone();lastAttackAt=-Infinity;ui.hud.classList.remove('hidden');ui.showLoading(false);renderPlayerStatus();applySky();ui.chatMessage('夜间敌对池现在包括僵尸、骷髅、苦力怕和蜘蛛；苦力怕会引爆地形，蜘蛛具备有限局部攀爬。');ui.showToast(saved?'已从浏览器存档恢复世界':mode==='creative'?'创造模式':'生存模式');pointer();
 }
 
 function pauseGame(){if(!running)return;paused=true;player?.keys.clear();document.exitPointerLock?.();modeScreen('pause');persistWorld();}
@@ -143,7 +147,7 @@ function applySky(){const angle=(gameTime-6000)/24000*Math.PI*2,sunHeight=Math.c
 
 function animate(now){
   requestAnimationFrame(animate);const dt=Math.min((now-last)/1000,.05);last=now;frames++;if(now-lastSecond>1000){fps=frames;frames=0;lastSecond=now;}
-  if(running&&!paused&&player){if(!ui.hasOpenPanel()&&!ui.isChatOpen())player.update(dt);if(player.hp<=0)respawnPlayer('你死了');world.ensureAround(player.position.x,player.position.z);interaction(now);updateSurvival(dt);drops?.update(dt,player);experienceOrbs?.update(dt,player);passiveMobs?.update(dt,player);hostileMobs?.update(dt,player,gameTime);projectiles?.update(dt,player);explosions?.update(dt);updateAutosave(now);gameTime=(gameTime+dt*20)%24000;applySky();const p=player.position,xp=experienceState(totalXp);ui.debug.textContent=`Minecraft Web By AI v0.4-dev\nFPS ${fps} · WebGL ${renderer.capabilities.isWebGL2?'2':'1'}\nXYZ ${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}\nChunks ${world.chunks.size} · Meshes ${world.meshes.size} · MeshQ ${world.meshQueue.size}\nPassive ${passiveMobs?.size||0} · Hostile ${hostileMobs?.size||0} · Projectiles ${projectiles?.size||0} · FX ${explosions?.size||0}\nDrops ${drops?.drops.length||0} · XPOrbs ${experienceOrbs?.size||0} · XP ${xp.total} / Lv.${xp.level}\nHP ${player.hp.toFixed(1)} · Time ${Math.floor(gameTime)} · ${weather}\n模式 ${player.mode} · Seed ${worldInfo?.seed}`;}
+  if(running&&!paused&&player){if(!ui.hasOpenPanel()&&!ui.isChatOpen())player.update(dt);if(player.hp<=0)respawnPlayer('你死了');world.ensureAround(player.position.x,player.position.z);interaction(now);updateSurvival(dt);drops?.update(dt,player);experienceOrbs?.update(dt,player);passiveMobs?.update(dt,player);hostileMobs?.update(dt,player,gameTime);projectiles?.update(dt,player);explosions?.update(dt);updateAutosave(now);gameTime=(gameTime+dt*20)%24000;applySky();const p=player.position,xp=experienceState(totalXp),armor=equipment?.armorPoints()||0;ui.debug.textContent=`Minecraft Web By AI v0.4-dev\nFPS ${fps} · WebGL ${renderer.capabilities.isWebGL2?'2':'1'}\nXYZ ${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}\nChunks ${world.chunks.size} · Meshes ${world.meshes.size} · MeshQ ${world.meshQueue.size}\nPassive ${passiveMobs?.size||0} · Hostile ${hostileMobs?.size||0} · Projectiles ${projectiles?.size||0} · FX ${explosions?.size||0}\nDrops ${drops?.drops.length||0} · XPOrbs ${experienceOrbs?.size||0} · XP ${xp.total} / Lv.${xp.level}\nHP ${player.hp.toFixed(1)} · Armor ${armor} · Time ${Math.floor(gameTime)} · ${weather}\n模式 ${player.mode} · Seed ${worldInfo?.seed}`;}
   renderer.render(scene,camera);
 }
 requestAnimationFrame(animate);

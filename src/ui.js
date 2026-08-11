@@ -1,35 +1,39 @@
 import {ATLAS_COLS,ATLAS_ROWS} from './blocks.js';
 import {ITEMS,maxStack} from './items.js';
 import {CraftingGrid} from './recipes.js';
+import {EQUIPMENT_SLOTS} from './equipment.js';
 
 export class UI{
   constructor(){
     this.main=document.querySelector('#main-menu');this.worldMenu=document.querySelector('#world-menu');this.pause=document.querySelector('#pause-menu');
     this.hud=document.querySelector('#hud');this.inventory=document.querySelector('#inventory');this.workbench=document.querySelector('#workbench');this.loading=document.querySelector('#loading');
-    this.hotbar=document.querySelector('#hotbar');this.invGrid=document.querySelector('#inventory-grid');this.invHotbar=document.querySelector('#inventory-hotbar');
+    this.hotbar=document.querySelector('#hotbar');this.invGrid=document.querySelector('#inventory-grid');this.invHotbar=document.querySelector('#inventory-hotbar');this.equipmentSlots=document.querySelector('#equipment-slots');
     this.workbenchGrid=document.querySelector('#workbench-grid');this.workbenchHotbar=document.querySelector('#workbench-hotbar');
     this.craftGrid2=document.querySelector('#craft-grid-2');this.craftResult2=document.querySelector('#craft-result-2');this.craftGrid3=document.querySelector('#craft-grid-3');this.craftResult3=document.querySelector('#craft-result-3');
-    this.cursorStack=document.querySelector('#cursor-stack');this.hearts=document.querySelector('#hearts');this.hunger=document.querySelector('#hunger');this.xp=document.querySelector('#xp-bar');this.level=document.querySelector('#xp-level');
+    this.cursorStack=document.querySelector('#cursor-stack');this.hearts=document.querySelector('#hearts');this.hunger=document.querySelector('#hunger');this.armorRow=document.querySelector('#armor-row');this.xp=document.querySelector('#xp-bar');this.level=document.querySelector('#xp-level');
     this.debug=document.querySelector('#debug');this.toast=document.querySelector('#toast');this.breakMeter=document.querySelector('#break-meter');this.loadingBar=document.querySelector('#loading-bar');this.loadingDetail=document.querySelector('#loading-detail');
     this.chatLog=document.querySelector('#chat-log');this.chatWrap=document.querySelector('#chat-input-wrap');this.chatInput=document.querySelector('#chat-input');
-    this.selected=0;this.inventoryModel=null;this.craft2=new CraftingGrid(2);this.craft3=new CraftingGrid(3);this.onChanged=()=>{};this.onOverflow=()=>{};
-    this.renderStatus(20,20,0,0);this.bindSlotEvents();this.renderHotbar();
+    this.selected=0;this.inventoryModel=null;this.equipmentModel=null;this.craft2=new CraftingGrid(2);this.craft3=new CraftingGrid(3);this.onChanged=()=>{};this.onOverflow=()=>{};
+    this.renderStatus(20,20,0,0,0);this.bindSlotEvents();this.renderHotbar();
   }
 
   showScreen(el){for(const s of document.querySelectorAll('.screen'))s.classList.remove('active');if(el)el.classList.add('active');}
 
-  bindInventory(model,{onChanged=()=>{},onOverflow=()=>{}}={}){
-    this.inventoryModel=model;this.onChanged=onChanged;this.onOverflow=onOverflow;this.refreshInventory();
+  bindInventory(model,{equipment=null,onChanged=()=>{},onOverflow=()=>{}}={}){
+    this.inventoryModel=model;this.equipmentModel=equipment;this.onChanged=onChanged;this.onOverflow=onOverflow;this.refreshInventory();
   }
 
   bindSlotEvents(){
     document.addEventListener('pointerdown',e=>{
-      const slot=e.target.closest('[data-inv-index],[data-craft-index],[data-craft-result]');
+      const slot=e.target.closest('[data-inv-index],[data-equipment-slot],[data-craft-index],[data-craft-result]');
       if(!slot||!this.inventoryModel)return;
       if(e.button!==0&&e.button!==2)return;
       e.preventDefault();
       if(slot.dataset.invIndex!==undefined){
         const changed=this.inventoryModel.click(Number(slot.dataset.invIndex),e.button,e.shiftKey);
+        if(changed)this.changed();
+      }else if(slot.dataset.equipmentSlot!==undefined){
+        const changed=this.equipmentModel?.click(slot.dataset.equipmentSlot,this.inventoryModel,e.button)||false;
         if(changed)this.changed();
       }else if(slot.dataset.craftIndex!==undefined){
         const grid=slot.dataset.craftSize==='3'?this.craft3:this.craft2;
@@ -91,9 +95,10 @@ export class UI{
     const img=document.createElement('img');img.className='item-icon';img.src=def.texture;img.alt=def.name;return img;
   }
 
-  makeSlot(stack,{key=null,index=null,craftIndex=null,craftSize=null,result=null,hud=false}={}){
-    const s=document.createElement(hud?'div':'button');s.className=hud?'inv-slot hotbar-slot':'inv-slot';if(s.tagName==='BUTTON')s.type='button';
+  makeSlot(stack,{key=null,index=null,equipmentSlot=null,craftIndex=null,craftSize=null,result=null,hud=false}={}){
+    const s=document.createElement(hud?'div':'button');s.className=hud?'inv-slot hotbar-slot':'inv-slot';if(equipmentSlot!==null)s.classList.add('equipment-slot');if(s.tagName==='BUTTON')s.type='button';
     if(index!==null)s.dataset.invIndex=index;
+    if(equipmentSlot!==null)s.dataset.equipmentSlot=equipmentSlot;
     if(craftIndex!==null){s.dataset.craftIndex=craftIndex;s.dataset.craftSize=craftSize;}
     if(result!==null)s.dataset.craftResult=result;
     if(stack){s.append(this.makeIcon(stack.id));const c=document.createElement('span');c.className='slot-count';if(stack.count>1)c.textContent=stack.count;s.append(c);s.title=ITEMS[stack.id]?.name||stack.id;}
@@ -101,7 +106,7 @@ export class UI{
     return s;
   }
 
-  refreshInventory(){this.renderHotbar();this.renderInventoryPanels();this.renderCrafting();this.renderCursor();}
+  refreshInventory(){this.renderHotbar();this.renderInventoryPanels();this.renderEquipment();this.renderCrafting();this.renderCursor();}
 
   renderHotbar(){
     this.hotbar.textContent='';
@@ -117,6 +122,11 @@ export class UI{
       for(let i=27;i<36;i++)hot.append(this.makeSlot(this.inventoryModel?.slots[i],{index:i}));
     };
     build(this.invGrid,this.invHotbar);build(this.workbenchGrid,this.workbenchHotbar);
+  }
+
+  renderEquipment(){
+    if(!this.equipmentSlots)return;this.equipmentSlots.textContent='';
+    for(const slot of EQUIPMENT_SLOTS)this.equipmentSlots.append(this.makeSlot(this.equipmentModel?.get(slot)||null,{equipmentSlot:slot}));
   }
 
   renderCrafting(){
@@ -156,11 +166,12 @@ export class UI{
     clearTimeout(line._timer);line._timer=setTimeout(()=>line.classList.add('faded'),9000);
   }
 
-  renderStatus(hp,hunger,xp,level){
-    this.hearts.textContent='';this.hunger.textContent='';
+  renderStatus(hp,hunger,xp,level,armorPoints=0){
+    this.hearts.textContent='';this.hunger.textContent='';this.armorRow.textContent='';
     for(let i=0;i<10;i++){
       const h=document.createElement('i');h.className='heart'+(hp>=i*2+1?'':' empty');this.hearts.append(h);
       const f=document.createElement('i');f.className='food'+(hunger>=i*2+1?'':' empty');this.hunger.append(f);
+      const a=document.createElement('i'),remaining=armorPoints-i*2;a.className='armor-icon'+(remaining>=2?' full':remaining>=1?' half':'');this.armorRow.append(a);
     }
     this.xp.style.width=`${Math.max(0,Math.min(100,xp))}%`;this.level.textContent=level;
   }

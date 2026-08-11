@@ -3,15 +3,11 @@
   "version": "0.4.0-dev",
   "private": true,
   "type": "module",
-  "engines": {
-    "node": ">=22"
-  },
+  "engines": {"node": ">=22"},
   "scripts": {
     "serve": "node scripts/serve.mjs",
-    "test:logic": "node scripts/check.mjs",
+    "test:logic": "node scripts/check.mjs && node scripts/check-armor.mjs",
     "test:e2e": "playwright test"
   },
-  "devDependencies": {
-    "@playwright/test": "1.62.0"
-  }
+  "devDependencies": {"@playwright/test": "1.62.0"}
 }
