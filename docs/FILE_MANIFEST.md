@@ -8,24 +8,26 @@
 | `styles.css` | 像素风界面与 HUD 样式 | 避免逐帧触发布局 |
 | `src/main.js` | 应用状态机、Three.js 场景、系统编排、交互、自动保存 | 不执行区块生成和网格重计算重活 |
 | `src/blocks.js` | 方块 ID、属性、atlas 索引、基础掉落约束 | 数据定义保持可序列化 |
-| `src/items.js` | 物品定义、方块物品映射、基础工具元数据 | 不保存运行时实例状态 |
+| `src/items.js` | 物品定义、方块物品映射、基础工具与攻击元数据 | 不保存运行时实例状态 |
 | `src/inventory.js` | 36 格库存、cursor、堆叠、Shift 移动 | 与 UI 分离，可单测/序列化 |
 | `src/recipes.js` | 2×2 / 3×3 shaped + shapeless 配方匹配 | 纯逻辑，无 DOM / Three.js 依赖 |
 | `src/drops.js` | 世界掉落物视觉、重力、拾取、销毁 | 共享 block geometry/material；退出世界显式释放 |
 | `src/commands.js` | 聊天指令解析与参数验证 | 通过 context 调系统，不直接引用 DOM |
 | `src/spatial-hash.js` | X/Z 平面实体空间分桶与半径/AABB 邻域候选查询 | 插入/移动/删除保持索引一致；查询不做全实体扫描 |
 | `src/entity-store.js` | 实体 ID、类型、组件数据、位置与 SpatialHash 生命周期协调 | 无 DOM/Three.js 依赖；位置修改必须经 `setPosition()` |
-| `src/mobs.js` | 牛/羊/猪/鸡的被动生物静态规则和选择逻辑 | 只保存可测试定义，不保存运行时实体状态 |
-| `src/passive-mobs.js` | 被动生物生成、10 Hz 漫游/逃跑、命中、视觉映射与回收 | 使用 EntityStore/SpatialHash；共享几何/材质；退出世界显式释放 |
+| `src/combat.js` | 攻击冷却、伤害无敌窗口、伤害结算与击退方向 | 纯逻辑、毫秒时间基准、无 Three.js/DOM 依赖 |
+| `src/mobs.js` | 被动生物与僵尸静态规则、夜间判定、随机被动生物选择 | 只保存可测试定义，不保存运行时实体状态 |
+| `src/passive-mobs.js` | 被动生物生成、10 Hz 漫游/逃跑、命中、公共伤害/击退、视觉映射与回收 | 使用 EntityStore/SpatialHash；共享几何/材质；退出世界显式释放 |
+| `src/hostile-mobs.js` | 僵尸夜间生成、10 Hz 追击/近战、命中、伤害/击退与视觉生命周期 | 使用 EntityStore/SpatialHash；通过回调请求玩家伤害，不直接改 UI |
 | `src/world-worker.js` | 程序化地形生成 | Worker 线程；Transferable 返回区块 |
 | `src/mesh-worker.js` | 可见面判定与区块 Buffer 数据构建 | Worker 线程；精确 TypedArray；Transferable 返回 |
 | `src/world.js` | 区块流式生命周期、方块查询/编辑、GPU mesh 安装 | 卸载区块必须 `geometry.dispose()`；不为方块创建独立 Mesh |
-| `src/player.js` | 输入、AABB 碰撞、视角、玩家快照和第三人称占位模型 | 固定小对象集，不与区块数量线性增长 |
+| `src/player.js` | 输入、AABB 碰撞、视角、玩家快照、受伤/击退/重生和第三人称占位模型 | 固定小对象集；水平击退速度需衰减；不与区块数量线性增长 |
 | `src/storage.js` | IndexedDB 世界记录、玩家/背包状态和增量编辑 | 不保存完整程序化区块，只保存修改差异 |
 | `src/ui.js` | HUD、背包/合成 UI、聊天、加载反馈 | 数据源来自 Inventory/Crafting，不自行维护第二套背包真相 |
 | `assets/textures/atlas.png` | 基础方块纹理 atlas | 共享单纹理，减少材质/纹理切换 |
 | `assets/items/*.png` | 非方块物品图标 | 目前仅必要最小集合 |
-| `scripts/check.mjs` | Inventory/Recipes/Commands/EntityStore/SpatialHash/PassiveMob rules/Workers 回归检查 | Node 22，无外部测试依赖 |
+| `scripts/check.mjs` | Inventory/Recipes/Commands/Entity/Combat/Mob rules/Workers 回归检查 | Node 22，无外部测试依赖 |
 | `.github/workflows/quality.yml` | 语法与核心回归检查 | main push / PR 自动执行 |
 | `.github/workflows/pages.yml` | GitHub Pages 自动部署 | main 更新触发 |
 | `docs/ARCHITECTURE.md` | 架构决策、技术债与性能原则 | 每次架构变化同步更新 |
