@@ -9,6 +9,8 @@ import {DropSystem} from './drops.js';
 import {WorldStorage,worldIdFor} from './storage.js';
 import {executeCommand} from './commands.js';
 import {PassiveMobSystem} from './passive-mobs.js';
+import {HostileMobSystem} from './hostile-mobs.js';
+import {canAttack} from './combat.js';
 
 const canvas=document.querySelector('#game-canvas');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:false,powerPreference:'high-performance'});
@@ -24,8 +26,8 @@ const hemi=new THREE.HemisphereLight(0xbfe4ff,0x6a5a42,2.4);scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xfff1c2,2.1);sun.position.set(80,120,60);scene.add(sun);
 
 const ui=new UI(),storage=new WorldStorage();
-let world=null,player=null,inventory=null,drops=null,passiveMobs=null;
-let running=false,paused=false,last=performance.now(),selectedTarget=null,breakStart=0,lastSecond=0,frames=0,fps=0,worldInfo=null;
+let world=null,player=null,inventory=null,drops=null,passiveMobs=null,hostileMobs=null;
+let running=false,paused=false,last=performance.now(),selectedTarget=null,breakStart=0,lastSecond=0,frames=0,fps=0,worldInfo=null,lastAttackAt=-Infinity;
 let saveDirty=false,saveInFlight=null,saveAgain=false,lastSaveAt=0,lastSavedPosition=null,gameTime=6000,weather='clear';
 
 function modeScreen(name){ui.showScreen(name==='main'?ui.main:name==='world'?ui.worldMenu:name==='pause'?ui.pause:null);}
@@ -35,7 +37,8 @@ function markSaveDirty(){saveDirty=true;}
 
 function disposeWorld(){
   running=false;document.exitPointerLock?.();ui.closeChat();ui.inventory.classList.add('hidden');ui.workbench.classList.add('hidden');
-  passiveMobs?.dispose();drops?.dispose();player?.dispose();world?.dispose();passiveMobs=null;drops=null;player=null;world=null;inventory=null;worldInfo=null;saveDirty=false;lastSavedPosition=null;
+  hostileMobs?.dispose();passiveMobs?.dispose();drops?.dispose();player?.dispose();world?.dispose();
+  hostileMobs=null;passiveMobs=null;drops=null;player=null;world=null;inventory=null;worldInfo=null;saveDirty=false;lastSavedPosition=null;lastAttackAt=-Infinity;
 }
 
 async function persistWorld(force=false){
@@ -51,6 +54,14 @@ function spawnOverflow(stacks){
   if(!drops||!player)return;
   const origin=player.position.clone().add(new THREE.Vector3(0,1,0));
   for(const stack of stacks)drops.spawn(stack.id,stack.count,origin.clone());
+}
+
+function respawnPlayer(reason='你死了'){
+  if(!player)return;player.respawn(0,0);lastAttackAt=-Infinity;ui.renderStatus(player.hp,player.hunger,0,0);ui.showToast(`${reason}，已在出生点重生`);markSaveDirty();
+}
+
+function handlePlayerHit({amount,source}){
+  if(!player)return;const result=player.takeDamage(amount,performance.now(),source);if(!result.applied)return;markSaveDirty();ui.renderStatus(player.hp,player.hunger,0,0);if(result.dead)respawnPlayer();
 }
 
 async function startWorld(){
@@ -71,13 +82,14 @@ async function startWorld(){
   await world.generateArea(centerX,centerZ);
   inventory=new Inventory(mode,saved?.inventory||null);
   player=new PlayerController(camera,canvas,world,scene);player.setMode(mode);
-  const restored=saved?.player?player.restore(saved.player):false;if(!restored)player.spawn(centerX,centerZ);
+  const restored=saved?.player?player.restore(saved.player):false;if(!restored)player.spawn(centerX,centerZ);if(player.hp<=0)player.respawn(0,0);
   drops=new DropSystem(scene,world,inventory,()=>{ui.refreshInventory();markSaveDirty();});
   passiveMobs=new PassiveMobSystem(scene,world);
+  hostileMobs=new HostileMobSystem(scene,world,{onPlayerHit:handlePlayerHit});
   ui.bindInventory(inventory,{onChanged:markSaveDirty,onOverflow:spawnOverflow});
-  running=true;paused=false;saveDirty=!saved;lastSavedPosition=player.position.clone();
+  running=true;paused=false;saveDirty=!saved;lastSavedPosition=player.position.clone();lastAttackAt=-Infinity;
   ui.hud.classList.remove('hidden');ui.showLoading(false);ui.renderStatus(player.hp,player.hunger,0,0);applySky();
-  ui.chatMessage('按 T 聊天，按 / 直接输入指令；F5 切换视角。世界中会生成牛、羊、猪和鸡。');
+  ui.chatMessage('按 T 聊天，按 / 直接输入指令；F5 切换视角。夜间会出现第一批僵尸。');
   ui.showToast(saved?'已从浏览器存档恢复世界':mode==='creative'?'创造模式':'生存模式');pointer();
 }
 
@@ -130,7 +142,9 @@ canvas.addEventListener('mousedown',e=>{
   if(e.button===0&&player.mode!=='spectator'){
     const entityHit=aimEntity(),blockHit=aim();
     if(entityHit&&(!blockHit||entityHit.distance<=blockHit.distance)){
-      const damage=player.mode==='creative'?100:1;passiveMobs.hurt(entityHit.entity,damage,player.position);breakStart=0;ui.setBreak(0);return;
+      const now=performance.now();breakStart=0;ui.setBreak(0);
+      if(player.mode!=='creative'&&!canAttack(lastAttackAt,now))return;
+      lastAttackAt=now;const selected=ui.selectedItem(),damage=player.mode==='creative'?100:(ITEMS[selected?.id]?.attackDamage||1);entityHit.system.hurt(entityHit.entity,damage,player.position,now);return;
     }
     if(player.mode!=='adventure')breakStart=performance.now();
   }
@@ -153,7 +167,12 @@ function playerOccupies(x,y,z){
 }
 
 function aim(){if(!player)return null;const dir=player.lookDirection(new THREE.Vector3()),origin=player.eyePosition(new THREE.Vector3());return world?.raycast(origin,dir,6);}
-function aimEntity(){if(!player||!passiveMobs)return null;const dir=player.lookDirection(new THREE.Vector3()),origin=player.eyePosition(new THREE.Vector3());return passiveMobs.raycast(origin,dir,4.5);}
+function aimEntity(){
+  if(!player)return null;const dir=player.lookDirection(new THREE.Vector3()),origin=player.eyePosition(new THREE.Vector3()),hits=[];
+  if(passiveMobs){const hit=passiveMobs.raycast(origin,dir,4.5);if(hit)hits.push({...hit,system:passiveMobs});}
+  if(hostileMobs){const hit=hostileMobs.raycast(origin,dir,4.5);if(hit)hits.push({...hit,system:hostileMobs});}
+  hits.sort((a,b)=>a.distance-b.distance);return hits[0]||null;
+}
 
 function toolMultiplier(blockId){
   const block=BLOCKS[blockId],selected=ui.selectedItem(),tool=ITEMS[selected?.id]?.tool;if(!tool)return 1;
@@ -211,13 +230,14 @@ function applySky(){
 function animate(now){
   requestAnimationFrame(animate);const dt=Math.min((now-last)/1000,.05);last=now;frames++;if(now-lastSecond>1000){fps=frames;frames=0;lastSecond=now;}
   if(running&&!paused&&player){
-    if(!ui.hasOpenPanel()&&!ui.isChatOpen())player.update(dt);world.ensureAround(player.position.x,player.position.z);interaction(now);updateSurvival(dt);drops?.update(dt,player);passiveMobs?.update(dt,player);updateAutosave(now);gameTime=(gameTime+dt*20)%24000;applySky();
+    if(!ui.hasOpenPanel()&&!ui.isChatOpen())player.update(dt);if(player.hp<=0)respawnPlayer('你死了');
+    world.ensureAround(player.position.x,player.position.z);interaction(now);updateSurvival(dt);drops?.update(dt,player);passiveMobs?.update(dt,player);hostileMobs?.update(dt,player,gameTime);updateAutosave(now);gameTime=(gameTime+dt*20)%24000;applySky();
     const p=player.position;ui.debug.textContent=`Minecraft Web By AI v0.4-dev
 FPS ${fps} · WebGL ${renderer.capabilities.isWebGL2?'2':'1'}
 XYZ ${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}
 Chunks ${world.chunks.size} · Meshes ${world.meshes.size} · MeshQ ${world.meshQueue.size}
-Passive mobs ${passiveMobs?.size||0} · Drops ${drops?.drops.length||0}
-Time ${Math.floor(gameTime)} · ${weather}
+Passive ${passiveMobs?.size||0} · Hostile ${hostileMobs?.size||0} · Drops ${drops?.drops.length||0}
+HP ${player.hp.toFixed(1)} · Time ${Math.floor(gameTime)} · ${weather}
 模式 ${player.mode} · Seed ${worldInfo?.seed}`;
   }
   renderer.render(scene,camera);

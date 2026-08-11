@@ -1,12 +1,13 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
 import {BLOCKS} from './blocks.js';
+import {applyDamage,knockbackDirection} from './combat.js';
 
 export class PlayerController{
   constructor(camera,canvas,world,scene){
     this.camera=camera;this.canvas=canvas;this.world=world;this.scene=scene;
     this.position=new THREE.Vector3(0,40,0);this.velocity=new THREE.Vector3();
     this.yaw=0;this.pitch=0;this.keys=new Set();this.grounded=false;this.flying=false;this.viewMode=0;
-    this.mode='survival';this.hp=20;this.hunger=20;this.saturation=5;
+    this.mode='survival';this.hp=20;this.hunger=20;this.saturation=5;this.hurtUntil=-Infinity;
     this.eye=1.62;this.height=1.8;this.radius=.3;this.walk=4.3;this.sprint=5.6;
     this.avatar=this.createAvatar();this.bind();
   }
@@ -31,15 +32,28 @@ export class PlayerController{
   cycleView(){this.viewMode=(this.viewMode+1)%3;this.syncCamera();return this.viewMode;}
 
   spawn(x,z){const y=this.world.highestSolid(x,z)+1.001;this.position.set(x+.5,y,z+.5);this.velocity.set(0,0,0);this.syncCamera();}
+  respawn(x=0,z=0){this.hp=20;this.hunger=20;this.saturation=5;this.hurtUntil=-Infinity;this.spawn(x,z);}
 
   restore(snapshot){
     if(!snapshot)return false;const p=snapshot.position;if(!p||![p.x,p.y,p.z].every(Number.isFinite))return false;
     this.position.set(p.x,p.y,p.z);this.velocity.set(0,0,0);this.yaw=Number.isFinite(snapshot.yaw)?snapshot.yaw:0;this.pitch=Number.isFinite(snapshot.pitch)?snapshot.pitch:0;
-    this.hp=Number.isFinite(snapshot.hp)?Math.max(0,Math.min(20,snapshot.hp)):20;this.hunger=Number.isFinite(snapshot.hunger)?Math.max(0,Math.min(20,snapshot.hunger)):20;this.saturation=Number.isFinite(snapshot.saturation)?Math.max(0,Math.min(20,snapshot.saturation)):5;
+    this.hp=Number.isFinite(snapshot.hp)?Math.max(0,Math.min(20,snapshot.hp)):20;this.hunger=Number.isFinite(snapshot.hunger)?Math.max(0,Math.min(20,snapshot.hunger)):20;this.saturation=Number.isFinite(snapshot.saturation)?Math.max(0,Math.min(20,snapshot.saturation)):5;this.hurtUntil=-Infinity;
     this.viewMode=Number.isInteger(snapshot.viewMode)?((snapshot.viewMode%3)+3)%3:0;if(this.collides(this.position)&&this.mode!=='spectator')return false;this.syncCamera();return true;
   }
 
   snapshot(){return{position:{x:this.position.x,y:this.position.y,z:this.position.z},yaw:this.yaw,pitch:this.pitch,hp:this.hp,hunger:this.hunger,saturation:this.saturation,mode:this.mode,viewMode:this.viewMode};}
+
+  takeDamage(amount,now,source=null){
+    if(this.mode==='creative'||this.mode==='spectator')return{applied:false,damage:0,hp:this.hp,dead:false};
+    const result=applyDamage(this,amount,now,{maxHp:20});
+    if(result.applied&&source&&Number.isFinite(source.x)&&Number.isFinite(source.z))this.knockbackFrom(source.x,source.z,.52,.24);
+    return result;
+  }
+
+  knockbackFrom(sourceX,sourceZ,strength=.45,vertical=.2){
+    const direction=knockbackDirection(sourceX,sourceZ,this.position.x,this.position.z);
+    this.velocity.x+=direction.x*strength*7;this.velocity.z+=direction.z*strength*7;this.velocity.y=Math.max(this.velocity.y,vertical*7);
+  }
 
   collides(pos){
     if(this.mode==='spectator')return false;
@@ -52,7 +66,12 @@ export class PlayerController{
   update(dt){
     dt=Math.min(dt,.05);const forward=(this.keys.has('KeyW')?1:0)-(this.keys.has('KeyS')?1:0),side=(this.keys.has('KeyD')?1:0)-(this.keys.has('KeyA')?1:0),sprint=this.keys.has('ControlLeft')||this.keys.has('ControlRight'),sneak=this.keys.has('ShiftLeft')||this.keys.has('ShiftRight');
     const speed=(sprint?this.sprint:this.walk)*(sneak ? .35 : 1),dir=new THREE.Vector3();if(forward||side)dir.set(Math.sin(this.yaw)*forward+Math.cos(this.yaw)*side,0,-Math.cos(this.yaw)*forward+Math.sin(this.yaw)*side).normalize().multiplyScalar(speed*dt);
-    if(this.flying){const vertical=((this.keys.has('Space')?1:0)-(sneak?1:0))*7*dt;this.moveAxis('x',dir.x);this.moveAxis('z',dir.z);this.moveAxis('y',vertical);this.velocity.set(0,0,0);}else{this.grounded=false;this.velocity.y-=24*dt;if(this.keys.has('Space')&&this.isGroundedProbe())this.velocity.y=8.2;this.moveAxis('x',dir.x);this.moveAxis('z',dir.z);this.moveAxis('y',this.velocity.y*dt);if(this.position.y<-10){this.hp=Math.max(0,this.hp-5);this.spawn(0,0);}}
+    if(this.flying){const vertical=((this.keys.has('Space')?1:0)-(sneak?1:0))*7*dt;this.moveAxis('x',dir.x);this.moveAxis('z',dir.z);this.moveAxis('y',vertical);this.velocity.set(0,0,0);}else{
+      this.grounded=false;this.velocity.y-=24*dt;if(this.keys.has('Space')&&this.isGroundedProbe())this.velocity.y=8.2;
+      this.moveAxis('x',dir.x+this.velocity.x*dt);this.moveAxis('z',dir.z+this.velocity.z*dt);this.moveAxis('y',this.velocity.y*dt);
+      const drag=Math.exp(-8*dt);this.velocity.x*=drag;this.velocity.z*=drag;
+      if(this.position.y<-10)this.hp=0;
+    }
     this.syncCamera();
   }
 
