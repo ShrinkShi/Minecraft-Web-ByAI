@@ -25,6 +25,18 @@ export class Inventory{
     return true;
   }
 
+  drain(){
+    const stacks=[];
+    for(let i=0;i<this.slots.length;i++){
+      const stack=this.slots[i];
+      if(stack)stacks.push(cloneStack(stack));
+      this.slots[i]=null;
+    }
+    if(this.cursor)stacks.push(cloneStack(this.cursor));
+    this.cursor=null;
+    return stacks;
+  }
+
   hotbar(index){return this.slots[27+index]||null;}
 
   capacityFor(itemId){
