@@ -9,7 +9,7 @@
 - 新增 `playwright.config.mjs` 和 `tests/e2e/smoke.spec.mjs`。
 - `Repository quality` 从单一 Node job 扩展为两层质量门：`static-checks` 成功后，再运行 Chromium `browser-smoke`。
 - `Repository quality` 增加按 `github.ref` 分组的 `cancel-in-progress`，同一 PR / 分支的新 push 会取消过时的未完成质量 run。
-- browser smoke 验证主菜单→单人世界→创建世界→HUD/Canvas→暂停→IndexedDB 世界记录，并捕获 page/console error。
+- browser smoke 当前真实验证：生存世界创建→HUD/Canvas→`/give`→`/tp` 虚空死亡→重生→暂停→IndexedDB 背包/经验/位置状态，并捕获 page/console error。
 - 浏览器测试失败时上传 trace / screenshot / HTML report 目录作为定位工件。
 - GitHub Actions checkout/setup-node 更新到 v6；浏览器 CI 当前只安装 Chromium。
 - `.gitignore` 增加 `playwright-report/` 和 `test-results/`。
@@ -32,6 +32,7 @@
 - `y < -10` 虚空死亡不创建不可回收的 drop/orb 实体，携带物品与经验直接损失。
 - 创造/旁观不执行上述死亡损失。
 - 世界启动聊天修正为四种敌对生物，包含已经落库的蜘蛛。
+- Chromium E2E 加入真实 `/give oak_log 3` → `/tp 0 -20 0` → 虚空死亡/重生 → IndexedDB 断言，确保跨模块死亡链不是只靠纯函数测试。
 - 修正 Creeper 加入 `HOSTILE_MOBS` 后测试仍只期望 zombie/skeleton 的回归错误。
 - 回归测试覆盖 hostile selection、loot/XP、蜘蛛攀爬、Inventory death drain、死亡模式策略、XP 上限和虚空边界。
 
@@ -42,10 +43,10 @@
 
 ### Current limitations
 - `v0.4.0` 尚未封版：死亡界面/统计/床重生、护甲、水/氧气、天气粒子等仍未完成。
+- 普通可恢复死亡的物品/经验实体生成与重新拾回尚未进入 browser E2E；当前自动浏览器链覆盖的是虚空直接损失。
 - 死亡掉落与经验球当前不持久化；页面重载会丢失尚未回收的死亡实体。
 - 蜘蛛当前只有局部攀升，不支持任意墙面附着、天花板移动或全局路径搜索。
 - Three.js 仍由运行时 jsDelivr URL 加载；CDN 失败会影响网站和 browser smoke，后续应本地 vendor / 构建锁定。
-- browser smoke 只覆盖页面启动/创建/基础存档，不等价于战斗和死亡完整 E2E。
 
 ## [0.3.0] - 2026-08-11
 
