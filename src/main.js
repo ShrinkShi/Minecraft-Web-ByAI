@@ -16,6 +16,7 @@ import {experienceState} from './experience.js';
 import {rollMobLoot,rollMobXp} from './mobs.js';
 import {ProjectileSystem} from './projectiles.js';
 import {ExplosionSystem} from './explosions.js';
+import {deathLossPlan} from './death-rules.js';
 
 const canvas=document.querySelector('#game-canvas');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:false,powerPreference:'high-performance'});
@@ -58,7 +59,22 @@ async function persistWorld(force=false){
 
 function spawnOverflow(stacks){if(!drops||!player)return;const origin=player.position.clone().add(new THREE.Vector3(0,1,0));for(const stack of stacks)drops.spawn(stack.id,stack.count,origin.clone());}
 
-function respawnPlayer(reason='你死了'){if(!player)return;player.respawn(0,0);lastAttackAt=-Infinity;renderPlayerStatus();ui.showToast(`${reason}，已在出生点重生`);markSaveDirty();}
+function drainDeathStacks(){
+  if(!inventory)return[];const stacks=[...ui.craft2.drain(),...ui.craft3.drain(),...inventory.drain()];ui.inventory.classList.add('hidden');ui.workbench.classList.add('hidden');ui.closeChat();ui.refreshInventory();return stacks;
+}
+
+function respawnPlayer(reason='你死了'){
+  if(!player)return;const deathPosition=player.position.clone(),previousXp=totalXp,plan=deathLossPlan({mode:player.mode,totalXp:previousXp,position:deathPosition}),stacks=plan.losesInventory?drainDeathStacks():[];let lossMessage='';
+  if(plan.losesInventory){
+    const itemCount=stacks.reduce((sum,stack)=>sum+stack.count,0);
+    if(plan.recoverable){
+      const origin=deathPosition.clone().add(new THREE.Vector3(0,.5,0));for(const stack of stacks)drops?.spawn(stack.id,stack.count,origin.clone());if(plan.droppedXp>0)experienceOrbs?.spawn(plan.droppedXp,origin.clone().add(new THREE.Vector3(0,.2,0)));
+      const parts=[];if(itemCount>0)parts.push(`${itemCount} 个物品`);if(plan.droppedXp>0)parts.push(`${plan.droppedXp} 点经验`);if(parts.length)lossMessage=`；${parts.join('、')}已掉落在死亡点`;
+    }else if(itemCount>0||previousXp>0)lossMessage='；虚空死亡使携带物品和经验无法回收';
+    if(plan.clearsExperience)totalXp=0;
+  }
+  player.keys.clear();player.respawn(0,0);lastAttackAt=-Infinity;renderPlayerStatus();ui.showToast(`${reason}，已在出生点重生${lossMessage}`);markSaveDirty();
+}
 
 function handlePlayerHit({amount,source}){
   if(!player)return;const result=player.takeDamage(amount,performance.now(),source);if(!result.applied)return;markSaveDirty();renderPlayerStatus();if(result.dead)respawnPlayer();
@@ -93,7 +109,7 @@ async function startWorld(){
   world=new VoxelWorld(scene,{seed:worldInfo.seed,prompt:worldInfo.prompt,renderDistance:3,savedEdits:saved?.edits||{},onEdit:markSaveDirty,onProgress:(done,total)=>ui.showLoading(true,`生成区块 ${done}/${total}`,total?Math.round(done/total*100):100)});await world.generateArea(centerX,centerZ);
   inventory=new Inventory(mode,saved?.inventory||null);player=new PlayerController(camera,canvas,world,scene);player.setMode(mode);const restored=saved?.player?player.restore(saved.player):false;if(!restored)player.spawn(centerX,centerZ);if(player.hp<=0)player.respawn(0,0);
   drops=new DropSystem(scene,world,inventory,()=>{ui.refreshInventory();markSaveDirty();});experienceOrbs=new ExperienceOrbSystem(scene,world,addExperience);projectiles=new ProjectileSystem(scene,world,{onPlayerHit:handlePlayerHit});explosions=new ExplosionSystem(scene,world,{onPlayerBlast:handlePlayerBlast});passiveMobs=new PassiveMobSystem(scene,world,{onDeath:handleMobDeath});hostileMobs=new HostileMobSystem(scene,world,{onPlayerHit:handlePlayerHit,onProjectile:handleHostileProjectile,onExplosion:handleHostileExplosion,onDeath:handleMobDeath});
-  ui.bindInventory(inventory,{onChanged:markSaveDirty,onOverflow:spawnOverflow});running=true;paused=false;saveDirty=!saved;lastSavedPosition=player.position.clone();lastAttackAt=-Infinity;ui.hud.classList.remove('hidden');ui.showLoading(false);renderPlayerStatus();applySky();ui.chatMessage('夜间敌对池现在包括僵尸、骷髅和苦力怕；苦力怕接近后会进入引信并破坏附近地形。');ui.showToast(saved?'已从浏览器存档恢复世界':mode==='creative'?'创造模式':'生存模式');pointer();
+  ui.bindInventory(inventory,{onChanged:markSaveDirty,onOverflow:spawnOverflow});running=true;paused=false;saveDirty=!saved;lastSavedPosition=player.position.clone();lastAttackAt=-Infinity;ui.hud.classList.remove('hidden');ui.showLoading(false);renderPlayerStatus();applySky();ui.chatMessage('夜间敌对池现在包括僵尸、骷髅、苦力怕和蜘蛛；苦力怕会引爆地形，蜘蛛具备有限局部攀爬。');ui.showToast(saved?'已从浏览器存档恢复世界':mode==='creative'?'创造模式':'生存模式');pointer();
 }
 
 function pauseGame(){if(!running)return;paused=true;player?.keys.clear();document.exitPointerLock?.();modeScreen('pause');persistWorld();}
@@ -127,14 +143,7 @@ function applySky(){const angle=(gameTime-6000)/24000*Math.PI*2,sunHeight=Math.c
 
 function animate(now){
   requestAnimationFrame(animate);const dt=Math.min((now-last)/1000,.05);last=now;frames++;if(now-lastSecond>1000){fps=frames;frames=0;lastSecond=now;}
-  if(running&&!paused&&player){if(!ui.hasOpenPanel()&&!ui.isChatOpen())player.update(dt);if(player.hp<=0)respawnPlayer('你死了');world.ensureAround(player.position.x,player.position.z);interaction(now);updateSurvival(dt);drops?.update(dt,player);experienceOrbs?.update(dt,player);passiveMobs?.update(dt,player);hostileMobs?.update(dt,player,gameTime);projectiles?.update(dt,player);explosions?.update(dt);updateAutosave(now);gameTime=(gameTime+dt*20)%24000;applySky();const p=player.position,xp=experienceState(totalXp);ui.debug.textContent=`Minecraft Web By AI v0.4-dev
-FPS ${fps} · WebGL ${renderer.capabilities.isWebGL2?'2':'1'}
-XYZ ${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}
-Chunks ${world.chunks.size} · Meshes ${world.meshes.size} · MeshQ ${world.meshQueue.size}
-Passive ${passiveMobs?.size||0} · Hostile ${hostileMobs?.size||0} · Projectiles ${projectiles?.size||0} · FX ${explosions?.size||0}
-Drops ${drops?.drops.length||0} · XPOrbs ${experienceOrbs?.size||0} · XP ${xp.total} / Lv.${xp.level}
-HP ${player.hp.toFixed(1)} · Time ${Math.floor(gameTime)} · ${weather}
-模式 ${player.mode} · Seed ${worldInfo?.seed}`;}
+  if(running&&!paused&&player){if(!ui.hasOpenPanel()&&!ui.isChatOpen())player.update(dt);if(player.hp<=0)respawnPlayer('你死了');world.ensureAround(player.position.x,player.position.z);interaction(now);updateSurvival(dt);drops?.update(dt,player);experienceOrbs?.update(dt,player);passiveMobs?.update(dt,player);hostileMobs?.update(dt,player,gameTime);projectiles?.update(dt,player);explosions?.update(dt);updateAutosave(now);gameTime=(gameTime+dt*20)%24000;applySky();const p=player.position,xp=experienceState(totalXp);ui.debug.textContent=`Minecraft Web By AI v0.4-dev\nFPS ${fps} · WebGL ${renderer.capabilities.isWebGL2?'2':'1'}\nXYZ ${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}\nChunks ${world.chunks.size} · Meshes ${world.meshes.size} · MeshQ ${world.meshQueue.size}\nPassive ${passiveMobs?.size||0} · Hostile ${hostileMobs?.size||0} · Projectiles ${projectiles?.size||0} · FX ${explosions?.size||0}\nDrops ${drops?.drops.length||0} · XPOrbs ${experienceOrbs?.size||0} · XP ${xp.total} / Lv.${xp.level}\nHP ${player.hp.toFixed(1)} · Time ${Math.floor(gameTime)} · ${weather}\n模式 ${player.mode} · Seed ${worldInfo?.seed}`;}
   renderer.render(scene,camera);
 }
 requestAnimationFrame(animate);
