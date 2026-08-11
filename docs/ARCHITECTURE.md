@@ -10,6 +10,40 @@
 6. **存档保存差异。** 程序化区块由 seed 可重建，因此 IndexedDB 只记录玩家/背包状态和被修改 voxel index。
 7. **固定系统边界。** World / Player / Inventory / Crafting / Storage / UI / Commands 分层，避免把玩法塞进渲染循环。
 8. **规则逻辑可离线测试。** Inventory、Recipe、Command、Worker 都应能在没有 WebGL 的 Node 环境验证关键不变量。
+9. **实体查询不能依赖全表两两扫描。** 实体身份、位置和玩法组件由独立数据层维护；邻域交互先经过 Spatial Hash 缩小候选集合，再做精确规则判断。
+
+## v0.4 实体基础
+
+当前 v0.4 先建立不依赖 Three.js 的实体数据层，避免直接把 AI、Mesh、掉落和战斗全部绑进 `main.js`。
+
+```text
+Gameplay / AI / Combat
+        │
+        ▼
+  ┌───────────────┐
+  │  EntityStore  │──────> records / components
+  └──────┬────────┘
+         │ position changes
+         ▼
+  ┌───────────────┐
+  │  SpatialHash  │──────> nearby radius / AABB candidates
+  └───────────────┘
+```
+
+### EntityStore 不变量
+
+- 实体由单调递增 ID 标识；类型和玩法组件记录在 `records` 中。
+- 位置单独保存在 `positions`，外部读取返回副本，避免绕过空间索引直接修改坐标造成不同步。
+- `setPosition()` 是移动实体的唯一数据层入口，并同步更新 Spatial Hash 所在桶。
+- `despawn()` / `clear()` 必须同时清理 record、position 和空间索引，不允许留下孤儿索引。
+- 该层不引用 DOM / Three.js，因此可由 Node 回归测试直接验证。
+
+### Spatial Hash 约束
+
+- 当前按 X/Z 平面分桶，默认 cell size 为 8；适用于地面生物邻域、近战目标、拾取等二维候选过滤。
+- `queryRadius()` 和 `queryAabb()` 只访问覆盖查询范围的桶，不扫描所有实体。
+- 空间索引只负责候选缩减，不替代 Y 轴、碰撞体、视线、阵营等精确判定。
+- 插入、移动、删除都维护桶与 entry 双向一致性，并对非法数值参数直接报错，防止 NaN 污染索引。
 
 ## v0.3 生存闭环
 
@@ -42,7 +76,7 @@ Chat ──> Commands ──context──> Player / Inventory / Time / Weather
 
 - 破坏方块后生成 world entity，而不是直接把产物塞进背包。
 - 方块型掉落共享世界 atlas 材质，仅按 tile 缓存小型 BoxGeometry；非方块物品按 item texture 缓存 SpriteMaterial。
-- 当前 DropSystem 是紧凑数组线性更新；在 v0.4 生物/实体数量扩大前必须引入 Spatial Hash / ECS，不能让实体交互演变成任意两两 O(n²)。
+- 当前 DropSystem 仍是紧凑数组线性更新；v0.4 已提供通用 EntityStore / SpatialHash 基础，但掉落物尚未迁移，不能把“有空间索引模块”等同于全部实体系统已经统一。
 
 ## v0.2 数据流
 
@@ -88,7 +122,8 @@ Chat ──> Commands ──context──> Player / Inventory / Time / Weather
 - 水仍与实体方块共用不透明材质，没有透明 pass、流体、氧气和水下介质效果。
 - IndexedDB 仍以单 world record 写回全部 edits；长期大世界应拆成按 chunk object store。
 - UI 当前通过重建 slot DOM 保证简单正确，后续应局部更新减少 GC/布局。
-- DropSystem 当前线性扫描；生物系统上线前应统一实体 ECS + Spatial Hash。
+- DropSystem 尚未迁移到 EntityStore / SpatialHash；当前空间索引只是一致性已测试的基础层。
+- EntityStore 当前仍使用 Map + 普通对象组件；如果实体规模明显扩大，再评估按热组件拆成 SoA TypedArray，不能提前为了“ECS 名字”做无收益复杂化。
 - 第三人称玩家模型只是几何占位，尚未使用标准 skin UV/骨骼动画。
 - 工具 durability/NBT/附魔没有进入 item stack schema。
 - 生存数值、伤害、经验、护甲和食物规则仍未达到 Java 版精确度。
