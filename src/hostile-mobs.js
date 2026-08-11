@@ -3,6 +3,7 @@ import {BLOCK} from './blocks.js';
 import {EntityStore} from './entity-store.js';
 import {HOSTILE_MOBS,chooseHostileMob,isNightTime} from './mobs.js';
 import {applyDamage,knockbackDirection} from './combat.js';
+import {resolveSpiderClimb} from './spider-rules.js';
 
 const tempA=new THREE.Vector3(),tempB=new THREE.Vector3(),SPAWN_GROUND=new Set([BLOCK.GRASS,BLOCK.DIRT,BLOCK.STONE,BLOCK.SAND,BLOCK.COBBLESTONE]);
 
@@ -11,11 +12,18 @@ function createHumanoidTemplate(def,resources){
   const group=new THREE.Group(),body=new THREE.MeshLambertMaterial({color:def.color}),accent=new THREE.MeshLambertMaterial({color:def.accent});resources.materials.add(body);resources.materials.add(accent);
   const scale=def.height/1.8;addBox(group,resources,body,.52,.52,.52,0,1.55*scale,0);addBox(group,resources,accent,.58,.68,.3,0,1.04*scale,0);addBox(group,resources,body,.18,.72,.2,-.39,1.08*scale,-.08);addBox(group,resources,body,.18,.72,.2,.39,1.08*scale,-.08);addBox(group,resources,accent,.22,.74,.24,-.15,.37*scale,0);addBox(group,resources,accent,.22,.74,.24,.15,.37*scale,0);return group;
 }
+function createSpiderTemplate(def,resources){
+  const group=new THREE.Group(),body=new THREE.MeshLambertMaterial({color:def.color}),accent=new THREE.MeshLambertMaterial({color:def.accent});resources.materials.add(body);resources.materials.add(accent);
+  addBox(group,resources,body,.82,.38,.95,0,.42,.2);addBox(group,resources,body,.76,.48,.78,0,.46,.72);addBox(group,resources,body,.58,.36,.52,0,.42,-.52);addBox(group,resources,accent,.34,.12,.04,0,.47,-.79);
+  const legZ=[-.38,-.12,.18,.46];for(const side of[-1,1])for(let i=0;i<4;i++){const leg=addBox(group,resources,body,.78,.1,.1,side*.68,.34,legZ[i]);leg.rotation.z=-side*.32;leg.rotation.y=side*(i<2?.22:-.22);}
+  return group;
+}
+function createMobTemplate(def,resources){return def.model==='spider'?createSpiderTemplate(def,resources):createHumanoidTemplate(def,resources);}
 
 export class HostileMobSystem{
   constructor(scene,world,{maxEntities=8,cellSize=8,onPlayerHit=()=>{},onProjectile=()=>{},onExplosion=()=>{},onDeath=()=>{}}={}){
     this.scene=scene;this.world=world;this.maxEntities=maxEntities;this.onPlayerHit=onPlayerHit;this.onProjectile=onProjectile;this.onExplosion=onExplosion;this.onDeath=onDeath;this.store=new EntityStore({cellSize});this.visuals=new Map();this.spawnTimer=.7;this.aiAccumulator=0;
-    this.resources={geometries:new Set(),materials:new Set()};this.templates=new Map();for(const[type,def]of Object.entries(HOSTILE_MOBS))this.templates.set(type,createHumanoidTemplate(def,this.resources));
+    this.resources={geometries:new Set(),materials:new Set()};this.templates=new Map();for(const[type,def]of Object.entries(HOSTILE_MOBS))this.templates.set(type,createMobTemplate(def,this.resources));
   }
 
   spawn(type,position){
@@ -69,7 +77,14 @@ export class HostileMobSystem{
     const def=HOSTILE_MOBS[record.type],state=record.components,position=this.store.getPosition(record.id);if(!def||!position)return;state.attackTimer=Math.max(0,state.attackTimer-dt);state.hurtPulse=Math.max(0,state.hurtPulse-dt);
     const toX=player.position.x-position.x,toZ=player.position.z-position.z,planar=Math.hypot(toX,toZ),vertical=Math.abs(player.position.y-position.y);if(this.updateFuse(record,def,state,position,planar,vertical,dt))return;
     let{vx,vz}=this.desiredVelocity(def,state,position,player,planar,vertical,dt);const pushDrag=Math.exp(-8*dt);state.pushX*=pushDrag;state.pushZ*=pushDrag;const length=Math.hypot(vx,vz);
-    if(length>0){const maxSpeed=def.speed+4.5,scale=length>maxSpeed?maxSpeed/length:1,nx=position.x+vx*scale*dt,nz=position.z+vz*scale*dt,nextY=this.world.highestSolid(nx,nz)+1,ground=this.world.getBlock(Math.floor(nx),Math.floor(nextY-1),Math.floor(nz));if(nextY>1&&nextY-position.y<=1.05&&position.y-nextY<=2&&ground!==BLOCK.WATER){position.x=nx;position.y=nextY;position.z=nz;this.store.setPosition(record.id,position);}}
+    if(length>0){
+      const maxSpeed=def.speed+4.5,scale=length>maxSpeed?maxSpeed/length:1,nx=position.x+vx*scale*dt,nz=position.z+vz*scale*dt,nextY=this.world.highestSolid(nx,nz)+1,ground=this.world.getBlock(Math.floor(nx),Math.floor(nextY-1),Math.floor(nz));
+      if(nextY>1&&ground!==BLOCK.WATER){
+        const rise=nextY-position.y,drop=position.y-nextY;
+        if(def.model==='spider'&&rise>1.05){const climb=resolveSpiderClimb(position.y,nextY,dt,{climbRate:def.climbRate,maxClimbHeight:def.maxClimbHeight});if(!climb.blocked){position.y=climb.y;if(climb.canAdvance){position.x=nx;position.z=nz;}this.store.setPosition(record.id,position);}}
+        else if(rise<=1.05&&drop<=2){position.x=nx;position.y=nextY;position.z=nz;this.store.setPosition(record.id,position);}
+      }
+    }
     const visual=this.visuals.get(record.id);if(visual){if((def.attackStyle==='ranged'||def.attackStyle==='fuse')&&planar>.01)visual.rotation.y=Math.atan2(toX,toZ);else if(length>0)visual.rotation.y=Math.atan2(vx,vz);}this.attack(record,def,state,position,player,planar,vertical);
   }
 
