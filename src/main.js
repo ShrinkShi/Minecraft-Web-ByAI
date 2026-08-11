@@ -11,6 +11,9 @@ import {executeCommand} from './commands.js';
 import {PassiveMobSystem} from './passive-mobs.js';
 import {HostileMobSystem} from './hostile-mobs.js';
 import {canAttack} from './combat.js';
+import {ExperienceOrbSystem} from './experience-orbs.js';
+import {experienceState} from './experience.js';
+import {rollMobLoot,rollMobXp} from './mobs.js';
 
 const canvas=document.querySelector('#game-canvas');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:false,powerPreference:'high-performance'});
@@ -26,25 +29,26 @@ const hemi=new THREE.HemisphereLight(0xbfe4ff,0x6a5a42,2.4);scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xfff1c2,2.1);sun.position.set(80,120,60);scene.add(sun);
 
 const ui=new UI(),storage=new WorldStorage();
-let world=null,player=null,inventory=null,drops=null,passiveMobs=null,hostileMobs=null;
+let world=null,player=null,inventory=null,drops=null,experienceOrbs=null,passiveMobs=null,hostileMobs=null;
 let running=false,paused=false,last=performance.now(),selectedTarget=null,breakStart=0,lastSecond=0,frames=0,fps=0,worldInfo=null,lastAttackAt=-Infinity;
-let saveDirty=false,saveInFlight=null,saveAgain=false,lastSaveAt=0,lastSavedPosition=null,gameTime=6000,weather='clear';
+let saveDirty=false,saveInFlight=null,saveAgain=false,lastSaveAt=0,lastSavedPosition=null,gameTime=6000,weather='clear',totalXp=0;
 
 function modeScreen(name){ui.showScreen(name==='main'?ui.main:name==='world'?ui.worldMenu:name==='pause'?ui.pause:null);}
 function pointer(){if(running&&!paused&&!ui.hasOpenPanel()&&!ui.isChatOpen())canvas.requestPointerLock().catch(()=>{});}
 function canControl(){return running&&!paused&&!ui.hasOpenPanel()&&!ui.isChatOpen()&&document.pointerLockElement===canvas;}
 function markSaveDirty(){saveDirty=true;}
+function renderPlayerStatus(){if(!player)return;const xp=experienceState(totalXp);ui.renderStatus(player.hp,player.hunger,xp.progress*100,xp.level);}
 
 function disposeWorld(){
   running=false;document.exitPointerLock?.();ui.closeChat();ui.inventory.classList.add('hidden');ui.workbench.classList.add('hidden');
-  hostileMobs?.dispose();passiveMobs?.dispose();drops?.dispose();player?.dispose();world?.dispose();
-  hostileMobs=null;passiveMobs=null;drops=null;player=null;world=null;inventory=null;worldInfo=null;saveDirty=false;lastSavedPosition=null;lastAttackAt=-Infinity;
+  hostileMobs?.dispose();passiveMobs?.dispose();experienceOrbs?.dispose();drops?.dispose();player?.dispose();world?.dispose();
+  hostileMobs=null;passiveMobs=null;experienceOrbs=null;drops=null;player=null;world=null;inventory=null;worldInfo=null;saveDirty=false;lastSavedPosition=null;lastAttackAt=-Infinity;totalXp=0;
 }
 
 async function persistWorld(force=false){
   if(!world||!player||!worldInfo||!inventory)return;
   if(saveInFlight){saveAgain=true;return saveInFlight;}if(!force&&!saveDirty)return;
-  const record={id:worldInfo.id,name:worldInfo.name,seed:worldInfo.seed,prompt:worldInfo.prompt,mode:player.mode,updatedAt:Date.now(),player:player.snapshot(),inventory:inventory.snapshot(),edits:world.exportEdits(),gameTime,weather,version:3};
+  const record={id:worldInfo.id,name:worldInfo.name,seed:worldInfo.seed,prompt:worldInfo.prompt,mode:player.mode,updatedAt:Date.now(),player:player.snapshot(),inventory:inventory.snapshot(),edits:world.exportEdits(),gameTime,weather,totalXp,version:4};
   saveDirty=false;saveAgain=false;
   saveInFlight=storage.putWorld(record).then(()=>{lastSaveAt=performance.now();lastSavedPosition=player?.position.clone()||null;}).catch(error=>{saveDirty=true;console.error('世界存档失败',error);ui.showToast('世界存档失败：IndexedDB 不可用');}).finally(async()=>{saveInFlight=null;if(saveAgain&&world&&player)await persistWorld(true);});
   return saveInFlight;
@@ -57,11 +61,21 @@ function spawnOverflow(stacks){
 }
 
 function respawnPlayer(reason='你死了'){
-  if(!player)return;player.respawn(0,0);lastAttackAt=-Infinity;ui.renderStatus(player.hp,player.hunger,0,0);ui.showToast(`${reason}，已在出生点重生`);markSaveDirty();
+  if(!player)return;player.respawn(0,0);lastAttackAt=-Infinity;renderPlayerStatus();ui.showToast(`${reason}，已在出生点重生`);markSaveDirty();
 }
 
 function handlePlayerHit({amount,source}){
-  if(!player)return;const result=player.takeDamage(amount,performance.now(),source);if(!result.applied)return;markSaveDirty();ui.renderStatus(player.hp,player.hunger,0,0);if(result.dead)respawnPlayer();
+  if(!player)return;const result=player.takeDamage(amount,performance.now(),source);if(!result.applied)return;markSaveDirty();renderPlayerStatus();if(result.dead)respawnPlayer();
+}
+
+function addExperience(value){
+  if(!Number.isFinite(value)||value<=0)return;const before=experienceState(totalXp);totalXp+=Math.floor(value);const after=experienceState(totalXp);renderPlayerStatus();markSaveDirty();if(after.level>before.level)ui.showToast(`经验等级提升至 ${after.level}`);
+}
+
+function handleMobDeath({type,position}){
+  if(!drops||!experienceOrbs||!position)return;const origin=new THREE.Vector3(position.x,position.y+.45,position.z);
+  for(const stack of rollMobLoot(type))drops.spawn(stack.id,stack.count,origin.clone());
+  const xp=rollMobXp(type);if(xp>0)experienceOrbs.spawn(xp,origin.clone().add(new THREE.Vector3(0,.18,0)));
 }
 
 async function startWorld(){
@@ -75,7 +89,7 @@ async function startWorld(){
   try{saved=await storage.getWorld(id);}catch(error){console.warn('无法读取 IndexedDB 存档，将启动无持久化会话',error);}
   const mode=saved?.mode||selectedMode;
   worldInfo={id,seed:saved?.seed||seed,prompt:saved?.prompt||prompt,mode,name:saved?.name||name};
-  gameTime=Number.isFinite(saved?.gameTime)?saved.gameTime:6000;weather=saved?.weather||'clear';
+  gameTime=Number.isFinite(saved?.gameTime)?saved.gameTime:6000;weather=saved?.weather||'clear';totalXp=Number.isFinite(saved?.totalXp)?Math.max(0,Math.floor(saved.totalXp)):0;
   const startPosition=saved?.player?.position,centerX=Number.isFinite(startPosition?.x)?startPosition.x:0,centerZ=Number.isFinite(startPosition?.z)?startPosition.z:0;
   modeScreen(null);ui.showLoading(true,saved?'读取世界存档':'启动地形 Worker',2);
   world=new VoxelWorld(scene,{seed:worldInfo.seed,prompt:worldInfo.prompt,renderDistance:3,savedEdits:saved?.edits||{},onEdit:markSaveDirty,onProgress:(done,total)=>ui.showLoading(true,`生成区块 ${done}/${total}`,total?Math.round(done/total*100):100)});
@@ -84,12 +98,13 @@ async function startWorld(){
   player=new PlayerController(camera,canvas,world,scene);player.setMode(mode);
   const restored=saved?.player?player.restore(saved.player):false;if(!restored)player.spawn(centerX,centerZ);if(player.hp<=0)player.respawn(0,0);
   drops=new DropSystem(scene,world,inventory,()=>{ui.refreshInventory();markSaveDirty();});
-  passiveMobs=new PassiveMobSystem(scene,world);
-  hostileMobs=new HostileMobSystem(scene,world,{onPlayerHit:handlePlayerHit});
+  experienceOrbs=new ExperienceOrbSystem(scene,world,addExperience);
+  passiveMobs=new PassiveMobSystem(scene,world,{onDeath:handleMobDeath});
+  hostileMobs=new HostileMobSystem(scene,world,{onPlayerHit:handlePlayerHit,onDeath:handleMobDeath});
   ui.bindInventory(inventory,{onChanged:markSaveDirty,onOverflow:spawnOverflow});
   running=true;paused=false;saveDirty=!saved;lastSavedPosition=player.position.clone();lastAttackAt=-Infinity;
-  ui.hud.classList.remove('hidden');ui.showLoading(false);ui.renderStatus(player.hp,player.hunger,0,0);applySky();
-  ui.chatMessage('按 T 聊天，按 / 直接输入指令；F5 切换视角。夜间会出现第一批僵尸。');
+  ui.hud.classList.remove('hidden');ui.showLoading(false);renderPlayerStatus();applySky();
+  ui.chatMessage('实体死亡现在会掉落战利品和经验球；经验等级会随世界存档保存。');
   ui.showToast(saved?'已从浏览器存档恢复世界':mode==='creative'?'创造模式':'生存模式');pointer();
 }
 
@@ -204,7 +219,7 @@ function dropSelected(){
 }
 
 function updateSurvival(dt){
-  if(player.mode!=='survival')return;player.saturation=Math.max(0,player.saturation-dt*.012);if(player.saturation===0)player.hunger=Math.max(0,player.hunger-dt*.007);if(player.hunger>=18&&player.hp<20)player.hp=Math.min(20,player.hp+dt*.08);ui.renderStatus(player.hp,player.hunger,0,0);
+  if(player.mode!=='survival')return;player.saturation=Math.max(0,player.saturation-dt*.012);if(player.saturation===0)player.hunger=Math.max(0,player.hunger-dt*.007);if(player.hunger>=18&&player.hp<20)player.hp=Math.min(20,player.hp+dt*.08);renderPlayerStatus();
 }
 
 function updateAutosave(now){if(!player||!world)return;if(!lastSavedPosition||player.position.distanceToSquared(lastSavedPosition)>.5)saveDirty=true;if(saveDirty&&now-lastSaveAt>5000)persistWorld();}
@@ -231,13 +246,13 @@ function animate(now){
   requestAnimationFrame(animate);const dt=Math.min((now-last)/1000,.05);last=now;frames++;if(now-lastSecond>1000){fps=frames;frames=0;lastSecond=now;}
   if(running&&!paused&&player){
     if(!ui.hasOpenPanel()&&!ui.isChatOpen())player.update(dt);if(player.hp<=0)respawnPlayer('你死了');
-    world.ensureAround(player.position.x,player.position.z);interaction(now);updateSurvival(dt);drops?.update(dt,player);passiveMobs?.update(dt,player);hostileMobs?.update(dt,player,gameTime);updateAutosave(now);gameTime=(gameTime+dt*20)%24000;applySky();
-    const p=player.position;ui.debug.textContent=`Minecraft Web By AI v0.4-dev
+    world.ensureAround(player.position.x,player.position.z);interaction(now);updateSurvival(dt);drops?.update(dt,player);experienceOrbs?.update(dt,player);passiveMobs?.update(dt,player);hostileMobs?.update(dt,player,gameTime);updateAutosave(now);gameTime=(gameTime+dt*20)%24000;applySky();
+    const p=player.position,xp=experienceState(totalXp);ui.debug.textContent=`Minecraft Web By AI v0.4-dev
 FPS ${fps} · WebGL ${renderer.capabilities.isWebGL2?'2':'1'}
 XYZ ${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}
 Chunks ${world.chunks.size} · Meshes ${world.meshes.size} · MeshQ ${world.meshQueue.size}
-Passive ${passiveMobs?.size||0} · Hostile ${hostileMobs?.size||0} · Drops ${drops?.drops.length||0}
-HP ${player.hp.toFixed(1)} · Time ${Math.floor(gameTime)} · ${weather}
+Passive ${passiveMobs?.size||0} · Hostile ${hostileMobs?.size||0} · Drops ${drops?.drops.length||0} · XPOrbs ${experienceOrbs?.size||0}
+HP ${player.hp.toFixed(1)} · XP ${xp.total} / Lv.${xp.level} · Time ${Math.floor(gameTime)} · ${weather}
 模式 ${player.mode} · Seed ${worldInfo?.seed}`;
   }
   renderer.render(scene,camera);
