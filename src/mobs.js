@@ -8,15 +8,16 @@ export const PASSIVE_MOBS=Object.freeze({
 });
 
 export const HOSTILE_MOBS=Object.freeze({
-  zombie:Object.freeze({name:'僵尸',hp:20,speed:1.65,width:.6,height:1.8,color:0x4f8d4b,accent:0x365b8c,followRange:24,attackRange:1.55,attackDamage:3,attackCooldown:1.0,loot:Object.freeze([loot('rotten_flesh',0,2)]),xp:[5,5]})
+  zombie:Object.freeze({name:'僵尸',hp:20,speed:1.65,width:.6,height:1.8,color:0x4f8d4b,accent:0x365b8c,followRange:24,attackStyle:'melee',attackRange:1.55,attackDamage:3,attackCooldown:1.0,loot:Object.freeze([loot('rotten_flesh',0,2)]),xp:[5,5]}),
+  skeleton:Object.freeze({name:'骷髅',hp:20,speed:1.5,width:.6,height:1.99,color:0xd7d5ca,accent:0xa4a39c,followRange:20,attackStyle:'ranged',idealRange:11,minRange:6,attackDamage:2,attackCooldown:1.6,projectileSpeed:15,loot:Object.freeze([loot('bone',0,2),loot('arrow',0,2)]),xp:[5,5]})
 });
 
 export const PASSIVE_MOB_IDS=Object.freeze(Object.keys(PASSIVE_MOBS));
+export const HOSTILE_MOB_IDS=Object.freeze(Object.keys(HOSTILE_MOBS));
 
-export function choosePassiveMob(rng=Math.random){
-  const value=Math.max(0,Math.min(.999999999,Number(rng())||0));
-  return PASSIVE_MOB_IDS[Math.floor(value*PASSIVE_MOB_IDS.length)];
-}
+function chooseFrom(ids,rng){const value=Math.max(0,Math.min(.999999999,Number(rng())||0));return ids[Math.floor(value*ids.length)];}
+export function choosePassiveMob(rng=Math.random){return chooseFrom(PASSIVE_MOB_IDS,rng);}
+export function chooseHostileMob(rng=Math.random){return chooseFrom(HOSTILE_MOB_IDS,rng);}
 
 export function isNightTime(gameTime){
   if(!Number.isFinite(gameTime))return false;
