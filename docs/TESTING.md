@@ -11,14 +11,15 @@ PR 必须先通过 `static-checks`，随后才运行 `browser-smoke`。浏览器
 
 ## Node / Worker 自动检查
 
-仓库内 `scripts/check.mjs` 不依赖浏览器和第三方测试框架，覆盖当前最容易出现静默回归的纯逻辑与 Worker 路径：
+仓库内 `scripts/check.mjs` 不依赖浏览器测试框架，覆盖当前最容易出现静默回归的纯逻辑与 Worker 路径：
 
 - Inventory：堆叠、右键拆半、单个放置、cursor 回收。
 - Crafting：原木→木板、2×2 工作台、3×3 木镐。
 - Commands：`/gamemode`、`/give`、相对坐标 `/tp`、`/time set`、`/weather`。
 - SpatialHash / EntityStore：负坐标分桶、跨 cell 移动、邻域查询、删除清理和位置封装。
-- Mob rules：牛/羊/猪/鸡选择；僵尸/骷髅/苦力怕敌对选择；夜间窗口；loot min/max、零掉落、未知实体奖励和 XP roll。
+- Mob rules：牛/羊/猪/鸡选择；僵尸/骷髅/苦力怕/蜘蛛敌对选择；夜间窗口；loot min/max、零掉落、未知实体奖励和 XP roll。
 - Creeper rules：fuse / explosion 关键字段和火药/经验回归。
+- Spider rules：宽体/低矮模型标识、16 HP、近战/攀爬参数、线掉落，以及正常台阶、逐步攀爬、超高阻挡和非法参数。
 - Combat：攻击冷却边界、受击无敌窗口、致死伤害和击退方向。
 - Projectile rules：线段/AABB 命中与首次交点 `t`、平行 miss、起点位于碰撞箱内，以及有/无重力的瞄准初速度。
 - Experience：Java 风格下一等级需求、累计总经验、total XP→level 反查，以及 16/17、31/32 级公式切换边界。
@@ -66,7 +67,7 @@ CI 中固定 `workers=1`，优先稳定性而非并行吞吐；只安装 Chromiu
 3. 上传 Pages artifact；
 4. `actions/deploy-pages` 成功完成。
 
-2026-08-12 已验证一次从 `main` 触发的完整 Pages Deployment 为 `success`。在线地址：
+2026-08-12 已验证 `main` 的完整 Pages Deployment 为 `success`。在线地址：
 
 `https://shrinkshi.github.io/Minecraft-Web-ByAI/`
 
@@ -76,7 +77,8 @@ browser smoke 只证明“核心页面可启动并能创建/保存世界”，**
 
 - Pointer Lock 的真实键鼠输入组合、F5 三视角和持续移动。
 - WebGL 材质/纹理完整性，以及不同 GPU/浏览器驱动下的兼容性。
-- 被动生物、僵尸、骷髅、苦力怕在真实地形上的视觉/AI表现。
+- 被动生物、僵尸、骷髅、苦力怕、蜘蛛在真实地形上的视觉/AI表现。
+- 蜘蛛当前攀爬是基于下一地形柱高度的局部规则；没有任意墙面附着、天花板移动或全局寻路。
 - 骷髅发射→箭矢轨迹→方块阻挡→玩家受伤完整链。
 - 苦力怕引信取消/完成→爆炸→伤害/击退/地形修改完整链。
 - 掉落物和经验球大量存在时的帧率、拾取与销毁。
@@ -88,4 +90,4 @@ browser smoke 只证明“核心页面可启动并能创建/保存世界”，**
 
 1. 世界创建→修改方块/获得物品→保存→重载恢复。
 2. `/time set night`→生成敌对生物→战斗→奖励。
-3. 骷髅箭矢和苦力怕爆炸两条完整伤害链。
+3. 骷髅箭矢、苦力怕爆炸与蜘蛛追击三条真实地形链。
