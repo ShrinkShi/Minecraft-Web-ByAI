@@ -11,7 +11,15 @@ export const ITEMS={
   'block:9':{name:'工作台',stack:64,blockId:9,tile:10},
   'block:10':{name:'圆石',stack:64,blockId:10,tile:13},
   stick:{name:'木棍',stack:64,texture:'./assets/items/stick.png'},
-  wooden_pickaxe:{name:'木镐',stack:1,texture:'./assets/items/wooden_pickaxe.png',attackDamage:2,tool:{kind:'pickaxe',tier:'wood',speed:2,durability:59}}
+  wooden_pickaxe:{name:'木镐',stack:1,texture:'./assets/items/wooden_pickaxe.png',attackDamage:2,tool:{kind:'pickaxe',tier:'wood',speed:2,durability:59}},
+  raw_beef:{name:'生牛肉',stack:64,color:0xb7473f},
+  leather:{name:'皮革',stack:64,color:0x8b5a2b},
+  white_wool:{name:'白色羊毛',stack:64,color:0xf0eee7},
+  raw_mutton:{name:'生羊肉',stack:64,color:0xc96868},
+  raw_porkchop:{name:'生猪排',stack:64,color:0xe68f93},
+  raw_chicken:{name:'生鸡肉',stack:64,color:0xe5c39f},
+  feather:{name:'羽毛',stack:64,color:0xf1f1ed},
+  rotten_flesh:{name:'腐肉',stack:64,color:0x8d613a}
 };
 
 export const CREATIVE_START=['block:1','block:2','block:3','block:4','block:5','block:6','block:7','block:9','wooden_pickaxe'];
