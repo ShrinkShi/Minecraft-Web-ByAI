@@ -19,8 +19,8 @@ function createZombieTemplate(def,resources){
 }
 
 export class HostileMobSystem{
-  constructor(scene,world,{maxEntities=8,cellSize=8,onPlayerHit=()=>{}}={}){
-    this.scene=scene;this.world=world;this.maxEntities=maxEntities;this.onPlayerHit=onPlayerHit;this.store=new EntityStore({cellSize});this.visuals=new Map();this.spawnTimer=.7;this.aiAccumulator=0;
+  constructor(scene,world,{maxEntities=8,cellSize=8,onPlayerHit=()=>{},onDeath=()=>{}}={}){
+    this.scene=scene;this.world=world;this.maxEntities=maxEntities;this.onPlayerHit=onPlayerHit;this.onDeath=onDeath;this.store=new EntityStore({cellSize});this.visuals=new Map();this.spawnTimer=.7;this.aiAccumulator=0;
     this.resources={geometries:new Set(),materials:new Set()};this.templates=new Map();
     for(const[type,def]of Object.entries(HOSTILE_MOBS))this.templates.set(type,createZombieTemplate(def,this.resources));
   }
@@ -49,7 +49,7 @@ export class HostileMobSystem{
     const result=applyDamage(record.components,amount,now,{maxHp:def.hp});if(!result.applied)return result;
     record.components.hurtPulse=.12;
     if(sourcePosition){const direction=knockbackDirection(sourcePosition.x,sourcePosition.z,position.x,position.z);record.components.pushX+=direction.x*4.1;record.components.pushZ+=direction.z*4.1;}
-    if(result.dead)this.despawn(record.id);return result;
+    if(result.dead){this.onDeath({type:record.type,position:{...position},entity:record});this.despawn(record.id);}return result;
   }
 
   trySpawnAround(player,gameTime){
