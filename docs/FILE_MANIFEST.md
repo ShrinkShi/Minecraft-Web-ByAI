@@ -6,11 +6,12 @@
 | --- | --- | --- |
 | `index.html` | 菜单、HUD、背包、工作台、聊天 DOM 壳层 | 不承载游戏逻辑 |
 | `styles.css` | 像素风界面与 HUD 样式 | 避免逐帧触发布局 |
-| `src/main.js` | 应用状态机、Three.js 场景、系统编排、交互、投射物/奖励接线与自动保存 | 不执行区块生成和网格重计算重活 |
+| `src/main.js` | 应用状态机、Three.js 场景、系统编排、交互、投射物/奖励/死亡结算接线与自动保存 | 不执行区块生成和网格重计算重活；死亡先结算原坐标内容再重生 |
 | `src/blocks.js` | 方块 ID、属性、atlas 索引、基础掉落约束 | 数据定义保持可序列化 |
 | `src/items.js` | 物品定义、方块物品映射、基础工具/攻击元数据和临时 loot 图标 | 不保存运行时实例状态；色块图标后续替换真实素材 |
-| `src/inventory.js` | 36 格库存、cursor、堆叠、Shift 移动 | 与 UI 分离，可单测/序列化 |
-| `src/recipes.js` | 2×2 / 3×3 shaped + shapeless 配方匹配 | 纯逻辑，无 DOM / Three.js 依赖 |
+| `src/inventory.js` | 36 格库存、cursor、堆叠、Shift 移动、死亡 `drain()` | 与 UI 分离，可单测/序列化；drain 必须复制后清空 cursor 与全部 slot |
+| `src/recipes.js` | 2×2 / 3×3 shaped + shapeless 配方匹配，以及合成输入 `drain()` | 纯逻辑，无 DOM / Three.js 依赖；死亡清算不得先回填背包制造 overflow 副作用 |
+| `src/death-rules.js` | 模式死亡损失策略、死亡经验公式和虚空/可恢复位置判断 | 纯逻辑；不生成实体、不操作 UI/存档；`y < -10` 与 Player 虚空死亡阈值保持一致 |
 | `src/drops.js` | 世界掉落物视觉、重力、拾取、销毁 | 共享 block geometry/material；支持纹理/纯色 Sprite；退出世界显式释放 |
 | `src/experience.js` | 经验等级阈值、总经验↔等级换算和 HUD 进度派生 | 纯逻辑；只以 total XP 为单一真相源 |
 | `src/experience-orbs.js` | 经验球视觉、重力/弹跳、吸附、拾取和销毁 | 共享低面数 geometry/material；当前小数组更新；退出世界显式释放 |
@@ -30,16 +31,16 @@
 | `src/mesh-worker.js` | 可见面判定与区块 Buffer 数据构建 | Worker 线程；精确 TypedArray；Transferable 返回 |
 | `src/world.js` | 区块流式生命周期、方块查询/编辑、GPU mesh 安装 | 卸载区块必须 `geometry.dispose()`；raycast 是投射物方块阻挡的当前基础 |
 | `src/player.js` | 输入、AABB 碰撞、视角、玩家快照、受伤/击退/重生和第三人称占位模型 | 固定小对象集；水平击退速度需衰减；不与区块数量线性增长 |
-| `src/storage.js` | IndexedDB 通用 world record 存取 | DB schema 仍 v1；逻辑快照可独立版本化，不保存完整程序化区块 |
+| `src/storage.js` | IndexedDB 通用 world record 存取 | DB schema 仍 v1；逻辑快照可独立版本化，不保存完整程序化区块或掉落实体 |
 | `src/ui.js` | HUD、背包/合成 UI、聊天、加载反馈 | 数据源来自 Inventory/Crafting；经验只接收派生后的进度/等级 |
 | `assets/textures/atlas.png` | 基础方块纹理 atlas | 共享单纹理，减少材质/纹理切换 |
 | `assets/items/*.png` | 已有非方块物品真实图标 | loot 临时色块当前使用内联 SVG，不伪装成正式素材 |
-| `scripts/check.mjs` | Inventory/Recipes/Commands/Entity/Combat/Projectile/Mob/Spider/Loot/Experience/Workers 回归检查 | Node 22，无浏览器依赖 |
+| `scripts/check.mjs` | Inventory/Recipes/Commands/Entity/Combat/Projectile/Mob/Spider/Death/Loot/Experience/Workers 回归检查 | Node 22，无浏览器依赖 |
 | `scripts/serve.mjs` | Playwright / 本地开发共用的跨平台静态 HTTP server | 只服务仓库根目录；阻止 path traversal；测试时 no-store |
 | `tests/e2e/smoke.spec.mjs` | Chromium 页面启动、世界创建、HUD/Canvas、暂停和 IndexedDB 基础集成验证 | 固定 seed；不依赖随机战斗结果；失败必须可通过 trace 定位 |
 | `playwright.config.mjs` | 浏览器测试超时、单 worker、Chromium/WebGL 启动、静态服务器和失败工件策略 | CI 优先可重复性，不追求并行吞吐 |
 | `package.json` | Node 22+ 测试脚本与固定 Playwright 版本 | 不是游戏运行时必需依赖；纯静态 Pages 仍可直接运行 |
-| `.github/workflows/quality.yml` | Node 静态/逻辑检查 + Chromium browser smoke 两层质量门 | main push / PR 自动执行；browser job 依赖 static job |
+| `.github/workflows/quality.yml` | Node 静态/逻辑检查 + Chromium browser smoke 两层质量门 | main push / PR 自动执行；browser job 依赖 static job；同 ref 新 push 取消旧 run |
 | `.github/workflows/pages.yml` | GitHub Pages 自动部署 | main 更新触发；仓库 Pages Source 必须为 GitHub Actions |
 | `docs/ARCHITECTURE.md` | 架构决策、技术债与性能原则 | 每次架构变化同步更新 |
 | `docs/PROGRESS.md` | 功能完成状态与下一阶段 | 只勾选实际落库且验证过的功能 |
