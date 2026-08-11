@@ -9,6 +9,7 @@ import {canAttack,applyDamage,knockbackDirection} from '../src/combat.js';
 import {xpToNextLevel,totalXpForLevel,levelForTotalXp,experienceState} from '../src/experience.js';
 import {segmentAabbIntersectionT,segmentIntersectsAabb,aimVelocity} from '../src/projectile-rules.js';
 import {resolveSpiderClimb} from '../src/spider-rules.js';
+import {losesInventoryOnDeath,xpDropForDeath,isRecoverableDeathPosition,deathLossPlan} from '../src/death-rules.js';
 
 function testInventoryAndCrafting(){
   const inv=new Inventory('survival');assert.equal(inv.add('block:6',5),0);assert.equal(inv.slots[0].count,5);
@@ -16,6 +17,12 @@ function testInventoryAndCrafting(){
   const g2=new CraftingGrid(2);g2.slots[0]={id:'block:6',count:1};let result=g2.refresh();assert.deepEqual(result,{id:'block:5',count:4});g2.consume();assert.equal(g2.slots[0],null);
   g2.slots=[{id:'block:5',count:1},{id:'block:5',count:1},{id:'block:5',count:1},{id:'block:5',count:1}];result=g2.refresh();assert.equal(result.id,'block:9');
   const g3=new CraftingGrid(3);g3.slots=[{id:'block:5',count:1},{id:'block:5',count:1},{id:'block:5',count:1},null,{id:'stick',count:1},null,null,{id:'stick',count:1},null];result=g3.refresh();assert.equal(result.id,'wooden_pickaxe');
+}
+
+function testInventoryDrain(){
+  const inv=new Inventory('survival');inv.slots[0]={id:'block:6',count:3};inv.slots[35]={id:'stick',count:5};inv.cursor={id:'wooden_pickaxe',count:1};
+  const drained=inv.drain();assert.deepEqual(drained,[{id:'block:6',count:3},{id:'stick',count:5},{id:'wooden_pickaxe',count:1}]);assert.ok(inv.slots.every(slot=>slot===null));assert.equal(inv.cursor,null);
+  drained[0].count=99;assert.ok(inv.slots.every(slot=>slot===null));assert.deepEqual(inv.drain(),[]);
 }
 
 function testCommands(){
@@ -48,9 +55,16 @@ function testMobRules(){
 function testSpiderRules(){
   assert.deepEqual(resolveSpiderClimb(64,65,.1),{blocked:false,climbing:false,y:65,canAdvance:true});
   const climb=resolveSpiderClimb(64,66.5,.1,{climbRate:3,maxClimbHeight:3});assert.equal(climb.blocked,false);assert.equal(climb.climbing,true);assert.ok(Math.abs(climb.y-64.3)<1e-9);assert.equal(climb.canAdvance,false);
-  assert.deepEqual(resolveSpiderClimb(64,68,.1,{climbRate:3,maxClimbHeight:3}),{blocked:true,climbing:false,y:64,canAdvance:false});
+  assert.deepEqual(resolveSpiderClimb(64,68,.1,{climbRate:3,maxClimbHeight:3}),{blocked:true,climbing:false,y:64,canAdvance:false});assert.deepEqual(resolveSpiderClimb(64,61,.1),{blocked:true,climbing:false,y:64,canAdvance:false});
   const finish=resolveSpiderClimb(65.8,66,.1,{climbRate:3,maxClimbHeight:3});assert.deepEqual(finish,{blocked:false,climbing:false,y:66,canAdvance:true});
   assert.throws(()=>resolveSpiderClimb(64,66,-.1),RangeError);assert.throws(()=>resolveSpiderClimb(64,66,.1,{climbRate:0,maxClimbHeight:3}),RangeError);
+}
+
+function testDeathRules(){
+  assert.equal(losesInventoryOnDeath('survival'),true);assert.equal(losesInventoryOnDeath('adventure'),true);assert.equal(losesInventoryOnDeath('creative'),false);assert.equal(losesInventoryOnDeath('spectator'),false);
+  assert.equal(xpDropForDeath(0),0);assert.equal(xpDropForDeath(7),7);assert.equal(xpDropForDeath(352),100);assert.equal(xpDropForDeath(1628),100);assert.throws(()=>xpDropForDeath(-1),RangeError);
+  assert.equal(isRecoverableDeathPosition({x:0,y:64,z:0}),true);assert.equal(isRecoverableDeathPosition({x:0,y:-10,z:0}),true);assert.equal(isRecoverableDeathPosition({x:0,y:-10.01,z:0}),false);assert.equal(isRecoverableDeathPosition({x:0,y:NaN,z:0}),false);
+  assert.deepEqual(deathLossPlan({mode:'survival',totalXp:7,position:{x:1,y:65,z:2}}),{losesInventory:true,clearsExperience:true,droppedXp:7,recoverable:true});assert.deepEqual(deathLossPlan({mode:'survival',totalXp:352,position:{x:1,y:-11,z:2}}),{losesInventory:true,clearsExperience:true,droppedXp:100,recoverable:false});assert.deepEqual(deathLossPlan({mode:'creative',totalXp:352,position:{x:1,y:65,z:2}}),{losesInventory:false,clearsExperience:false,droppedXp:0,recoverable:false});
 }
 
 function testCombatRules(){
@@ -74,4 +88,4 @@ async function testTerrainWorker(){
   const messages=[];globalThis.self={postMessage:m=>messages.push(m)};await import(`../src/world-worker.js?test=${Date.now()+1}`);self.onmessage({data:{type:'init',seed:'test-seed',prompt:'森林丘陵'}});assert.equal(messages.shift().type,'ready');self.onmessage({data:{type:'generate',cx:0,cz:0}});const out=messages.shift(),data=new Uint8Array(out.data);assert.equal(data.length,16*16*64);assert.ok(data.some(v=>v===3));assert.ok(data.some(v=>v===1||v===4));
 }
 
-testInventoryAndCrafting();testCommands();testSpatialHash();testEntityStore();testMobRules();testSpiderRules();testCombatRules();testExperienceRules();testProjectileRules();await testMeshWorker();await testTerrainWorker();console.log('logic + worker checks: PASS');
+testInventoryAndCrafting();testInventoryDrain();testCommands();testSpatialHash();testEntityStore();testMobRules();testSpiderRules();testDeathRules();testCombatRules();testExperienceRules();testProjectileRules();await testMeshWorker();await testTerrainWorker();console.log('logic + worker checks: PASS');
