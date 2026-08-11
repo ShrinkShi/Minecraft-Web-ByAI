@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import {Inventory} from '../src/inventory.js';
 import {CraftingGrid} from '../src/recipes.js';
 import {executeCommand} from '../src/commands.js';
+import {SpatialHash} from '../src/spatial-hash.js';
+import {EntityStore} from '../src/entity-store.js';
 
 function testInventoryAndCrafting(){
   const inv=new Inventory('survival');assert.equal(inv.add('block:6',5),0);assert.equal(inv.slots[0].count,5);
@@ -20,6 +22,30 @@ function testCommands(){
   executeCommand('/time set night',ctx);assert.equal(time,13000);executeCommand('/weather rain',ctx);assert.equal(weather,'rain');
 }
 
+function testSpatialHash(){
+  const hash=new SpatialHash(8),a={name:'a'},b={name:'b'},c={name:'c'};
+  hash.insert('a',0,0,a);hash.insert('b',20,0,b);hash.insert('c',-7,-7,c);
+  assert.deepEqual(hash.queryRadius(0,0,7),[a]);
+  assert.deepEqual(new Set(hash.queryAabb(-8,-8,1,1)),new Set([a,c]));
+  assert.equal(hash.update('b',5,0,b),true);assert.equal(hash.queryRadius(0,0,7).length,2);
+  assert.equal(hash.remove('a'),true);assert.deepEqual(hash.queryRadius(0,0,7),[b]);
+  assert.equal(hash.size,2);assert.throws(()=>new SpatialHash(0),RangeError);assert.throws(()=>hash.queryRadius(0,0,-1),RangeError);
+}
+
+function testEntityStore(){
+  const store=new EntityStore({cellSize:8});
+  const cow=store.spawn('cow',{x:1,y:64,z:1},{hp:10,kind:'passive'}),zombie=store.spawn('zombie',{x:20,y:64,z:0},{hp:20,kind:'hostile'});
+  assert.equal(store.size,2);assert.equal(store.get(cow.id).components.hp,10);
+  const copy=store.getPosition(cow.id);copy.x=999;assert.equal(store.getPosition(cow.id).x,1);
+  assert.deepEqual(store.nearby(0,0,6).map(e=>e.id),[cow.id]);
+  assert.equal(store.setPosition(zombie.id,{x:4,y:64,z:0}),true);
+  assert.deepEqual(new Set(store.nearby(0,0,6).map(e=>e.id)),new Set([cow.id,zombie.id]));
+  assert.deepEqual(store.nearby(0,0,6,e=>e.components.kind==='hostile').map(e=>e.id),[zombie.id]);
+  assert.equal(store.patchComponents(cow.id,{hp:7}),true);assert.equal(store.get(cow.id).components.hp,7);
+  assert.equal(store.despawn(cow.id),true);assert.equal(store.has(cow.id),false);assert.equal(store.spatial.size,1);
+  assert.equal(store.setPosition(999,{x:0,y:0,z:0}),false);store.clear();assert.equal(store.size,0);assert.equal(store.spatial.size,0);
+}
+
 async function testMeshWorker(){
   const messages=[];globalThis.self={postMessage:m=>messages.push(m)};await import(`../src/mesh-worker.js?test=${Date.now()}`);
   const S=16,H=64,index=(x,y,z)=>x+S*(z+S*y);let arr=new Uint8Array(S*S*H);arr[index(3,10,4)]=3;
@@ -33,4 +59,4 @@ async function testTerrainWorker(){
   self.onmessage({data:{type:'init',seed:'test-seed',prompt:'森林丘陵'}});assert.equal(messages.shift().type,'ready');self.onmessage({data:{type:'generate',cx:0,cz:0}});const out=messages.shift(),data=new Uint8Array(out.data);assert.equal(data.length,16*16*64);assert.ok(data.some(v=>v===3));assert.ok(data.some(v=>v===1||v===4));
 }
 
-testInventoryAndCrafting();testCommands();await testMeshWorker();await testTerrainWorker();console.log('logic + worker checks: PASS');
+testInventoryAndCrafting();testCommands();testSpatialHash();testEntityStore();await testMeshWorker();await testTerrainWorker();console.log('logic + worker checks: PASS');
