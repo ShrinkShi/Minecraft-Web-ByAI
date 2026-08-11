@@ -8,9 +8,9 @@ export class ExperienceOrbSystem{
   }
 
   spawn(value,position){
-    if(!Number.isFinite(value)||value<=0||!position)return null;
+    if(!Number.isFinite(value)||!position)return null;const amount=Math.floor(value);if(amount<=0)return null;
     const visual=new THREE.Mesh(this.geometry,this.material);visual.position.copy(position);this.scene.add(visual);
-    const orb={value:Math.floor(value),visual,age:0,pickupDelay:.35,velocity:new THREE.Vector3((Math.random()-.5)*1.8,2.6,(Math.random()-.5)*1.8)};this.orbs.push(orb);return orb;
+    const orb={value:amount,visual,age:0,pickupDelay:.35,velocity:new THREE.Vector3((Math.random()-.5)*1.8,2.6,(Math.random()-.5)*1.8)};this.orbs.push(orb);return orb;
   }
 
   remove(orb){const i=this.orbs.indexOf(orb);if(i>=0)this.orbs.splice(i,1);this.scene.remove(orb.visual);}
