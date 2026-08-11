@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Engineering quality
-- GitHub Pages 仓库发布源已设置为 **GitHub Actions**，并于 2026-08-12 验证一次完整 `configure → artifact upload → deploy` 流水线成功。
+- GitHub Pages 仓库发布源已设置为 **GitHub Actions**，并于 2026-08-12 验证完整 `configure → artifact upload → deploy` 流水线成功。
 - 新增 `package.json`，固定 `@playwright/test` `1.62.0`，要求 Node 22+。
 - 新增 `scripts/serve.mjs` 跨平台静态 HTTP server，作为本地/CI 浏览器测试统一入口。
 - 新增 `playwright.config.mjs` 和 `tests/e2e/smoke.spec.mjs`。
@@ -23,14 +23,19 @@
 - `ProjectileSystem` + `projectile-rules.js`：重力、方块阻挡、线段/AABB 玩家命中和瞄准初速度。
 - 苦力怕：敌对生成池、接近、引信、取消范围和爆炸事件。
 - `ExplosionSystem` + `explosion-rules.js`：基础距离伤害、击退和附近地形破坏。
+- 蜘蛛：加入第四种敌对生物，16 HP、近战追击、独立宽体低矮占位模型、线掉落和基础经验。
+- 新增 `spider-rules.js`：把局部攀爬从渲染/AI 分支中抽成纯规则；最多约 3 格向上高度差，超过 2 格向下落差拒绝前进。
+- 蜘蛛攀爬只在当前 X/Z 上升到前方地形柱顶面后才允许水平推进，避免把视觉/实体中心直接移动进固体柱。
 - 修正 Creeper 加入 `HOSTILE_MOBS` 后测试仍只期望 zombie/skeleton 的回归错误；补充 Creeper 选择、fuse/explosion、loot 与 XP 断言。
+- 扩展 hostile selection / loot / XP 回归到 zombie、skeleton、creeper、spider 四种敌对生物。
 
 ### Documentation
 - README 明确区分稳定基线 `v0.3.0` 与 `main` 的 `v0.4.0-dev`，不再把未落库功能计入完成度。
 - `docs/PROGRESS.md`、`docs/TESTING.md`、`docs/FILE_MANIFEST.md` 与远端实际代码/CI 对齐。
 
 ### Current limitations
-- `v0.4.0` 尚未封版：蜘蛛、护甲、完整死亡规则、水/氧气、天气粒子等仍未完成。
+- `v0.4.0` 尚未封版：护甲、完整死亡规则、水/氧气、天气粒子等仍未完成。
+- 蜘蛛当前只有基于前方地形柱高度的局部攀升，不支持任意墙面附着、天花板移动或全局路径搜索。
 - 当前 Three.js 仍由运行时 jsDelivr URL 加载；CDN 失败会同时影响网站和 browser smoke，后续应本地 vendor / 构建锁定。
 - browser smoke 只覆盖“页面可启动并能创建/保存世界”的最低集成链，不等价于战斗/存档/键鼠玩法完整 E2E。
 
