@@ -3,12 +3,12 @@
 ## 设计原则
 
 1. **不复制 Java 版技术债。** 不模拟单线程世界生成、每方块对象模型或无边界常驻内存。
-2. **数据优先。** 区块用紧凑 TypedArray；背包、配方、战斗、死亡规则是纯数据/纯逻辑，不把 DOM 当游戏状态。
+2. **数据优先。** 区块用紧凑 TypedArray；背包、Equipment、配方、战斗、护甲和死亡规则是纯数据/纯逻辑，不把 DOM 当游戏状态。
 3. **并行优先。** terrain 和 mesh 分别运行在 Web Worker；主线程主要处理输入、状态协调和 GPU 对象安装。
 4. **渲染批处理。** 每个区块只生成暴露面并合并为 `BufferGeometry`，而不是每方块一个 Mesh。
 5. **资源生命周期显式管理。** chunk geometry、掉落、经验球、投射物和生物视觉都有销毁路径；退出世界终止 Worker 并释放共享 GPU 资源。
-6. **存档保存差异。** 程序化区块按 seed 重建，IndexedDB 只保存玩家/背包/经验快照和 voxel edits。
-7. **系统边界固定。** World / Player / Inventory / Crafting / Storage / UI / Commands / Entities / Combat / Projectiles / Rewards / Death Rules 分层。
+6. **存档保存差异。** 程序化区块按 seed 重建，IndexedDB 只保存玩家/背包/Equipment/经验快照和 voxel edits。
+7. **系统边界固定。** World / Player / Inventory / Equipment / Crafting / Storage / UI / Commands / Entities / Combat / Armor / Projectiles / Rewards / Death Rules 分层。
 8. **规则可离线测试。** 不依赖 WebGL 的核心规则必须能在 Node 22 中验证关键不变量。
 9. **实体查询不做全表两两扫描。** EntityStore 管身份/组件，SpatialHash 先缩小 X/Z 邻域候选，再做精确判断。
 10. **AI 不直接修改核心状态。** 生物 AI 只发伤害、投射物、爆炸、死亡事件；主编排层和独立规则模块负责结算。
@@ -24,26 +24,30 @@ Input / Commands / AI
         ▼
 PassiveMobSystem / HostileMobSystem
         │               │
-        │ movement      ├── onProjectile ──> ProjectileSystem ──> Player
-        │               ├── onExplosion ───> ExplosionSystem ───> Player / World
-        │               └── onDeath ───────> Reward orchestration
-        ▼                                           │
- EntityStore ──> SpatialHash                        ├──> DropSystem
-                                                    └──> ExperienceOrbSystem
-                                                               │
-                                                               ▼
-                                                          totalXp
+        │ movement      ├── onPlayerHit ──────────────┐
+        │               ├── onProjectile -> Arrow ----┤
+        │               ├── onExplosion -> Explosion -┤
+        │               └── onDeath -> Reward orchestration
+        ▼                                                │
+ EntityStore -> SpatialHash                              ▼
+                                              armor-rules.js <- Equipment.armorPoints()
+                                                        │
+                                                        ▼
+                                                 Player.takeDamage()
+
+Reward orchestration -> DropSystem + ExperienceOrbSystem -> totalXp
 
 Player death
     │ capture death position
     ▼
-death-rules.js ── mode / XP / void policy
+death-rules.js -> mode / XP / void policy
     │
-    ├── Inventory.drain()
     ├── CraftingGrid.drain() x2
+    ├── Equipment.drain()
+    ├── Inventory.drain() + cursor
     │
-    ├── recoverable ──> DropSystem + ExperienceOrbSystem at death point
-    └── void ─────────> discard without spawning unreachable entities
+    ├── recoverable -> DropSystem + ExperienceOrbSystem at death point
+    └── void -------> discard without spawning unreachable entities
     │
     ▼
 Player.respawn()
@@ -55,15 +59,43 @@ Player.respawn()
 - `mesh-worker.js`：暴露面扫描、顶点/法线/UV/索引构建；返回精确长度 TypedArray。
 - `VoxelWorld`：玩家位置驱动 chunk streaming；当前 `renderDistance=3`、额外一圈卸载滞回。
 - chunk 卸载必须 `geometry.dispose()`；世界退出时终止 Worker、释放材质/纹理。
-- IndexedDB 当前只保存世界增量 edits 和玩家快照，不保存完整程序化 chunk。
+- IndexedDB 当前只保存世界增量 edits 和玩家状态，不保存完整程序化 chunk。
 
-## Inventory / Crafting / Drops
+## Inventory / Equipment / Crafting
+
+### Inventory
 
 - `Inventory` 固定 36 格，快捷栏是 `slots[27..35]` 的视图；cursor 独立存在。
+- `Inventory` 不保存护甲槽，避免背包 schema 和装备语义耦合。
+
+### Equipment
+
+- `Equipment` 固定四槽：`head / chest / legs / feet`。
+- 每个槽只接受 `ITEMS` 中 `armorSlot` 与槽位一致、stack=1 的物品。
+- `snapshot()` / `restore()` 独立于 Inventory；旧快照缺 Equipment 时自然得到四个空槽。
+- `restore()` 会拒绝错误部位或非护甲 item，并将合法装备 count 归一为 1，避免恶意/旧数据制造堆叠护甲。
+- `armorPoints()` 只从当前四槽的静态 item metadata 汇总，不缓存派生值，避免装备变化后状态不同步。
+- UI 通过 Inventory cursor 与 Equipment `click()` 交换物品；错误部位不修改任一状态。
+
+### Armor rules
+
+- `armor-rules.js` 与 Equipment/UI/Player 分离。
+- 当前过渡公式：`reduction = min(0.8, armorPoints * 0.04)`。
+- 皮革套 1/3/2/1，共 7 点，即 28% 减伤。
+- Hostile melee、arrow 和 explosion 的 **damage amount** 在进入 `Player.takeDamage()` 前经过该规则。
+- Explosion knockback 暂不按护甲缩放；虚空死亡通过 Player 位置规则直接令 HP=0，也不会被护甲错误保护。
+- 这不是 Java 版正式 armor+toughness/附魔公式；后续替换 `armor-rules.js` 即可，不需要迁移 Equipment 槽结构。
+
+### Crafting / death interaction
+
 - `CraftingGrid` 独立维护 2×2 / 3×3 输入；普通关闭 GUI 时通过 `clearTo()` 回收到背包。
 - 死亡不能复用普通 `closePanels()`：背包满时普通关闭会产生 overflow world drop，虚空死亡会因此提前制造不可回收实体。
-- 因此死亡路径使用 `Inventory.drain()` + `CraftingGrid.drain()`，先无副作用抽空所有携带/临时输入，再由 death plan 决定是否生成世界掉落。
+- 因此死亡路径依次使用 CraftingGrid / Equipment / Inventory 的 `drain()`，先无副作用抽空所有临时/携带状态，再由 death plan 决定是否生成世界掉落。
+
+## Drops / Rewards
+
 - `DropSystem` 当前使用受控数组；方块掉落复用方块材质，非方块物品可使用纹理 Sprite 或临时纯色图标。
+- `ExperienceOrbSystem` 负责经验球重力、吸附、拾取和销毁。
 - DropSystem / ExperienceOrbSystem / ProjectileSystem 尚未统一进 EntityStore；只有规模数据证明线性更新成为瓶颈时才迁移，避免过早抽象。
 
 ## EntityStore / SpatialHash
@@ -92,7 +124,7 @@ Player.respawn()
 - 苦力怕：接近、fuse、取消范围 + `onExplosion`。
 - 蜘蛛：独立低矮宽体占位模型、近战追击、有限局部攀爬。
 
-敌对总量当前有硬上限并按距离回收。尚没有完整 A*、导航网格、标准亮度生成、日照燃烧、门交互或装备系统。
+敌对总量当前有硬上限并按距离回收。尚没有完整 A*、导航网格、标准亮度生成、日照燃烧、门交互或生物装备系统。
 
 ### 蜘蛛局部攀爬
 
@@ -104,11 +136,12 @@ Player.respawn()
 ## Combat / Projectiles / Explosions
 
 - `combat.js`：基础攻击冷却、受击无敌窗口、伤害和二维击退方向；以时间而不是帧数为基准。
-- `PlayerController.takeDamage()` 负责创造/旁观免伤边界和受击速度脉冲。
+- `PlayerController.takeDamage()` 负责创造/旁观免伤边界和受击速度脉冲；它不持有 Equipment。
+- 主编排层在调用 `takeDamage()` 前读取 Equipment 派生护甲点并调用 `mitigateArmorDamage()`。
 - `projectile-rules.js` 用线段/AABB 和方块 raycast 避免高速箭矢只检查终点产生穿透。
 - `ProjectileSystem` 当前共享箭矢 geometry/material；敌对箭矢有有限生命周期。
 - `ExplosionSystem` 处理苦力怕基础距离伤害、击退和附近地形破坏；暂未做完整遮挡射线、TNT、火焰和实体连锁爆炸。
-- 当前战斗仍不是完整 Java 版公式：缺攻击强度曲线、暴击、扫击、护甲、韧性、药水、附魔等。
+- 当前战斗仍不是完整 Java 版公式：缺攻击强度曲线、暴击、扫击、toughness、耐久、药水和附魔。
 
 ## Loot / Experience
 
@@ -116,7 +149,6 @@ Player.respawn()
 - 当前基础 loot 包括牛/羊/猪/鸡、腐肉、骨头/箭、火药、线。
 - `experience.js` 只把 `totalXp` 作为真相源，level 和条内进度派生；覆盖 16/17、31/32 级公式边界。
 - `ExperienceOrbSystem` 负责重力、弹跳、吸附、拾取和销毁；经验球本身当前不持久化。
-- 世界快照逻辑版本为 v4；IndexedDB schema 仍是单一通用 `worlds` store，因此死亡规则不需要迁移 DB schema。
 
 ## 玩家死亡结算
 
@@ -125,14 +157,14 @@ Player.respawn()
 - survival / adventure：执行物品和经验损失。
 - creative / spectator：不执行这套损失规则。
 - 死亡经验：`min(100, currentLevel × 7)`。
-- `y >= -10`：可恢复死亡，在原死亡点生成背包/cursor/合成输入掉落和经验球。
+- `y >= -10`：可恢复死亡，在原死亡点生成背包/cursor/Equipment/合成输入掉落和经验球。
 - `y < -10`：虚空死亡，直接清空携带内容和总经验，不生成位于世界底部的不可回收实体。
 
 主编排顺序固定为：
 
 1. 复制死亡位置与原 total XP；
 2. 生成 death plan；
-3. 抽空 CraftingGrid、Inventory、cursor；
+3. 抽空 CraftingGrid、Equipment、Inventory 和 cursor；
 4. 若可恢复则在死亡位置生成世界实体；
 5. 清零 total XP；
 6. 调 `Player.respawn()`；
@@ -142,7 +174,9 @@ Player.respawn()
 
 ## Storage
 
-- IndexedDB 当前以 world record 保存玩家状态、36 格背包快照、`totalXp`、时间/天气和 voxel edits。
+- IndexedDB 仍使用单一 `worlds` object store，DB schema version 仍为 1。
+- world record 逻辑快照升到 **v5**：玩家状态、36 格 Inventory、Equipment 四槽、`totalXp`、时间/天气和 voxel edits。
+- v4 及更早 world record 没有 `equipment` 字段时，Equipment 构造为空槽，不需要 object-store migration。
 - 程序化世界可由 seed 重建，所以不存完整 chunk。
 - 长期大世界中单 record 写回全部 edits 会膨胀，后续应按 chunk 拆 object store / page。
 
@@ -150,8 +184,8 @@ Player.respawn()
 
 `Repository quality` 两层：
 
-1. `static-checks`：Node 22 语法 + `scripts/check.mjs` 规则/Worker 回归。
-2. `browser-smoke`：Chromium 实际创建世界，确认 HUD、Canvas、暂停和 IndexedDB 基础链。
+1. `static-checks`：Node 22 对 `src/*.js` 和 `scripts/*.mjs` 做语法检查，再执行 `npm run test:logic`（基础套件 + armor suite）。
+2. `browser-smoke`：Chromium 实际创建世界、通过 UI 装备皮革外套、验证 v5 Equipment 快照，然后执行虚空死亡并核对背包/Equipment/XP 全部清空。
 
 同一 `github.ref` 使用 `cancel-in-progress`，新 push 会取消旧质量 run，避免陈旧 HEAD 占用 runner。GitHub Pages 由独立 workflow 从 `main` 部署。
 
@@ -162,6 +196,9 @@ Player.respawn()
 - 水仍与实体方块共用不透明材质，没有独立透明 pass、流体、氧气和水下介质。
 - IndexedDB edits 仍集中在单 world record。
 - UI 通过重建 slot DOM 保证简单正确；物品规模增加后需局部更新减少 GC/布局。
+- Equipment 当前只支持手动 cursor 拖放；Shift-click 自动装备、右键快捷装备未实现。
+- 皮革护甲图标是内联 SVG 占位；没有正式 armor texture、玩家模型穿戴渲染、durability、NBT、附魔或 Armor Trim。
+- 当前护甲公式是过渡规则，不等于 Java armor+toughness；真实敌对攻击的 Chromium HP 差值尚未做自动 E2E。
 - 生物没有 chunk 持久化、群系/亮度/容量标准规则、正式动画/碰撞。
 - 僵尸/骷髅/蜘蛛只做局部地形移动，没有完整寻路。
 - 骷髅不做攻击前视线规划；箭矢物理可以撞墙，但 AI 仍可能向墙后玩家射击。
