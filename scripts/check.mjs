@@ -4,6 +4,7 @@ import {CraftingGrid} from '../src/recipes.js';
 import {executeCommand} from '../src/commands.js';
 import {SpatialHash} from '../src/spatial-hash.js';
 import {EntityStore} from '../src/entity-store.js';
+import {PASSIVE_MOBS,choosePassiveMob} from '../src/mobs.js';
 
 function testInventoryAndCrafting(){
   const inv=new Inventory('survival');assert.equal(inv.add('block:6',5),0);assert.equal(inv.slots[0].count,5);
@@ -46,6 +47,12 @@ function testEntityStore(){
   assert.equal(store.setPosition(999,{x:0,y:0,z:0}),false);store.clear();assert.equal(store.size,0);assert.equal(store.spatial.size,0);
 }
 
+function testPassiveMobRules(){
+  assert.deepEqual(Object.keys(PASSIVE_MOBS),['cow','sheep','pig','chicken']);
+  for(const def of Object.values(PASSIVE_MOBS)){assert.ok(def.hp>0);assert.ok(def.speed>0);assert.ok(def.width>0&&def.height>0);}
+  assert.equal(choosePassiveMob(()=>0),'cow');assert.equal(choosePassiveMob(()=>.26),'sheep');assert.equal(choosePassiveMob(()=>.51),'pig');assert.equal(choosePassiveMob(()=>.99),'chicken');
+}
+
 async function testMeshWorker(){
   const messages=[];globalThis.self={postMessage:m=>messages.push(m)};await import(`../src/mesh-worker.js?test=${Date.now()}`);
   const S=16,H=64,index=(x,y,z)=>x+S*(z+S*y);let arr=new Uint8Array(S*S*H);arr[index(3,10,4)]=3;
@@ -59,4 +66,4 @@ async function testTerrainWorker(){
   self.onmessage({data:{type:'init',seed:'test-seed',prompt:'森林丘陵'}});assert.equal(messages.shift().type,'ready');self.onmessage({data:{type:'generate',cx:0,cz:0}});const out=messages.shift(),data=new Uint8Array(out.data);assert.equal(data.length,16*16*64);assert.ok(data.some(v=>v===3));assert.ok(data.some(v=>v===1||v===4));
 }
 
-testInventoryAndCrafting();testCommands();testSpatialHash();testEntityStore();await testMeshWorker();await testTerrainWorker();console.log('logic + worker checks: PASS');
+testInventoryAndCrafting();testCommands();testSpatialHash();testEntityStore();testPassiveMobRules();await testMeshWorker();await testTerrainWorker();console.log('logic + worker checks: PASS');
