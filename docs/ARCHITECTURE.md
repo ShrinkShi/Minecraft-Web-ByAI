@@ -14,7 +14,7 @@
 
 ## v0.4 实体基础
 
-当前 v0.4 先建立不依赖 Three.js 的实体数据层，避免直接把 AI、Mesh、掉落和战斗全部绑进 `main.js`。
+当前 v0.4 先建立不依赖 Three.js 的实体数据层，再由具体运行时系统组合渲染、AI 和玩法规则，避免把 AI、Mesh、掉落和战斗全部绑进 `main.js`。
 
 ```text
 Gameplay / AI / Combat
@@ -44,6 +44,15 @@ Gameplay / AI / Combat
 - `queryRadius()` 和 `queryAabb()` 只访问覆盖查询范围的桶，不扫描所有实体。
 - 空间索引只负责候选缩减，不替代 Y 轴、碰撞体、视线、阵营等精确判定。
 - 插入、移动、删除都维护桶与 entry 双向一致性，并对非法数值参数直接报错，防止 NaN 污染索引。
+
+### PassiveMobSystem
+
+- `PassiveMobSystem` 是第一层真正接入主循环的实体运行时；牛、羊、猪、鸡的数据定义与运行时状态分离，位置和组件由 `EntityStore` 持有，Three.js 对象只作为视觉映射。
+- 生物默认在玩家 12~30 格外的草方块/泥土地表尝试生成；当前最多 16 只，离玩家超过 48 格会回收。这是浏览器阶段的性能边界，不等同于 Java 版完整实体持久化规则。
+- AI 使用固定 10 Hz tick 执行漫游、地表高度查询、受击逃跑和距离回收；视觉位置按渲染帧插值，避免把地形查询强行提升到显示帧率。
+- 玩家实体瞄准先使用 Spatial Hash 缩小候选，再执行三维近似命中测试；与方块 raycast 比较距离后只选择更靠前的目标。
+- 被动生物视觉当前是共享材质/几何的彩色方块占位模型，尚未接标准生物纹理、骨骼动画或精确碰撞箱。
+- 当前受击仅有基础伤害、短暂无敌和逃跑状态；死亡掉落、经验、繁殖、持久化以及完整玩家战斗结算仍明确后置。
 
 ## v0.3 生存闭环
 
@@ -76,7 +85,7 @@ Chat ──> Commands ──context──> Player / Inventory / Time / Weather
 
 - 破坏方块后生成 world entity，而不是直接把产物塞进背包。
 - 方块型掉落共享世界 atlas 材质，仅按 tile 缓存小型 BoxGeometry；非方块物品按 item texture 缓存 SpriteMaterial。
-- 当前 DropSystem 仍是紧凑数组线性更新；v0.4 已提供通用 EntityStore / SpatialHash 基础，但掉落物尚未迁移，不能把“有空间索引模块”等同于全部实体系统已经统一。
+- 当前 DropSystem 仍是紧凑数组线性更新；v0.4 的被动生物已经使用 EntityStore / SpatialHash，但掉落物尚未迁移，不能把被动生物接入误标成全部实体统一完成。
 
 ## v0.2 数据流
 
@@ -122,7 +131,8 @@ Chat ──> Commands ──context──> Player / Inventory / Time / Weather
 - 水仍与实体方块共用不透明材质，没有透明 pass、流体、氧气和水下介质效果。
 - IndexedDB 仍以单 world record 写回全部 edits；长期大世界应拆成按 chunk object store。
 - UI 当前通过重建 slot DOM 保证简单正确，后续应局部更新减少 GC/布局。
-- DropSystem 尚未迁移到 EntityStore / SpatialHash；当前空间索引只是一致性已测试的基础层。
+- DropSystem 尚未迁移到 EntityStore / SpatialHash；当前统一实体基础只覆盖被动生物运行时。
+- 被动生物没有按 chunk 激活/持久化、群系/亮度/容量规则、标准动画、精确碰撞和繁殖；当前 16 实体上限与 48 格回收只是临时浏览器预算。
 - EntityStore 当前仍使用 Map + 普通对象组件；如果实体规模明显扩大，再评估按热组件拆成 SoA TypedArray，不能提前为了“ECS 名字”做无收益复杂化。
 - 第三人称玩家模型只是几何占位，尚未使用标准 skin UV/骨骼动画。
 - 工具 durability/NBT/附魔没有进入 item stack schema。
