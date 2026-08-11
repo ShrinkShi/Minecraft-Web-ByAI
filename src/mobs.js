@@ -5,9 +5,19 @@ export const PASSIVE_MOBS=Object.freeze({
   chicken:Object.freeze({name:'鸡',hp:4,speed:1.45,width:.45,height:.75,color:0xf2f0e7,accent:0xe7b53f})
 });
 
+export const HOSTILE_MOBS=Object.freeze({
+  zombie:Object.freeze({name:'僵尸',hp:20,speed:1.65,width:.6,height:1.8,color:0x4f8d4b,accent:0x365b8c,followRange:24,attackRange:1.55,attackDamage:3,attackCooldown:1.0})
+});
+
 export const PASSIVE_MOB_IDS=Object.freeze(Object.keys(PASSIVE_MOBS));
 
 export function choosePassiveMob(rng=Math.random){
   const value=Math.max(0,Math.min(.999999999,Number(rng())||0));
   return PASSIVE_MOB_IDS[Math.floor(value*PASSIVE_MOB_IDS.length)];
+}
+
+export function isNightTime(gameTime){
+  if(!Number.isFinite(gameTime))return false;
+  const time=((gameTime%24000)+24000)%24000;
+  return time>=13000&&time<23000;
 }
