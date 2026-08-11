@@ -21,10 +21,10 @@ export class DropSystem{
 
   materialForItem(itemId){
     if(this.itemMaterials.has(itemId))return this.itemMaterials.get(itemId);
-    const def=ITEMS[itemId];if(!def?.texture)return null;
-    const texture=new THREE.TextureLoader().load(def.texture);texture.magFilter=THREE.NearestFilter;texture.minFilter=THREE.NearestMipmapNearestFilter;texture.colorSpace=THREE.SRGBColorSpace;
-    const material=new THREE.SpriteMaterial({map:texture,transparent:true,alphaTest:.05});
-    this.itemMaterials.set(itemId,material);return material;
+    const def=ITEMS[itemId];if(!def)return null;let material=null;
+    if(def.texture){const texture=new THREE.TextureLoader().load(def.texture);texture.magFilter=THREE.NearestFilter;texture.minFilter=THREE.NearestMipmapNearestFilter;texture.colorSpace=THREE.SRGBColorSpace;material=new THREE.SpriteMaterial({map:texture,transparent:true,alphaTest:.05});}
+    else if(Number.isFinite(def.color))material=new THREE.SpriteMaterial({color:def.color,transparent:false});
+    if(material)this.itemMaterials.set(itemId,material);return material;
   }
 
   createVisual(itemId){
