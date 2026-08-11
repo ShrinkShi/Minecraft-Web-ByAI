@@ -9,10 +9,11 @@
 - 新增 `playwright.config.mjs` 和 `tests/e2e/smoke.spec.mjs`。
 - `Repository quality` 从单一 Node job 扩展为两层质量门：`static-checks` 成功后，再运行 Chromium `browser-smoke`。
 - `Repository quality` 增加按 `github.ref` 分组的 `cancel-in-progress`，同一 PR / 分支的新 push 会取消过时的未完成质量 run。
-- browser smoke 当前真实验证：生存世界创建→HUD/Canvas→`/give`→`/tp` 虚空死亡→重生→暂停→IndexedDB 背包/经验/位置状态，并捕获 page/console error。
+- `static-checks` 现在同时语法检查 `src/*.js` 和 `scripts/*.mjs`，`npm run test:logic` 顺序执行基础回归和 Equipment/Armor 专用回归。
+- browser smoke 当前真实验证：生存世界创建→皮革外套真实拖放→护甲 HUD→v5 IndexedDB 装备快照→虚空死亡→装备/背包/XP 清空，并捕获 page/console error。
 - 浏览器测试失败时上传 trace / screenshot / HTML report 目录作为定位工件。
-- GitHub Actions checkout/setup-node 更新到 v6；浏览器 CI 当前只安装 Chromium。
-- `.gitignore` 增加 `playwright-report/` 和 `test-results/`。
+- GitHub Actions checkout/setup-node 使用 v6；浏览器 CI 当前只安装 Chromium。
+- `.gitignore` 包含 `playwright-report/` 和 `test-results/`。
 
 ### v0.4.0-dev — 已落库内容
 - `EntityStore` + `SpatialHash` 实体数据/空间索引基础。
@@ -29,21 +30,29 @@
 - `death-rules.js`：把 survival/adventure 与 creative/spectator 的死亡损失、死亡 XP 和虚空判断从主循环中拆成纯规则。
 - `Inventory.drain()` 与 `CraftingGrid.drain()`：死亡时无副作用抽空 36 格、cursor 和 2×2/3×3 合成输入。
 - 普通生存/冒险死亡在原死亡点生成物品，并生成 `min(100, 当前等级 × 7)` 点经验球后清零 `totalXp`。
-- `y < -10` 虚空死亡不创建不可回收的 drop/orb 实体，携带物品与经验直接损失。
-- 创造/旁观不执行上述死亡损失。
+- `y < -10` 虚空死亡不创建不可回收的 drop/orb 实体，携带物品与经验直接损失；创造/旁观不执行上述死亡损失。
+- 新增独立 `Equipment` 模型：head/chest/legs/feet 四槽，不占用 36 格 Inventory；支持部位校验、cursor 拖放、快照恢复、护甲点汇总和死亡 `drain()`。
+- 新增皮革帽子、皮革外套、皮革裤子、皮革靴子，护甲点分别为 1/3/2/1，总计 7；`/give` 支持 `minecraft:leather_*` 别名。
+- 新增 `armor-rules.js`：当前过渡公式每护甲点 4%、最高 80%，完整皮革套减伤 28%。
+- 僵尸/蜘蛛近战、骷髅箭矢和苦力怕爆炸的 damage amount 在进入 Player 前经过基础护甲减伤；虚空不受护甲保护。
+- 世界 record 逻辑快照升级到 v5，保存 `equipment`；IndexedDB object-store schema 仍为 v1，无需数据库迁移。
+- 生存/冒险死亡清算现在同时抽空 Equipment；普通死亡会把护甲作为物品掉在死亡点，虚空死亡直接损失。
+- 新增 `armor.css` 和 Inventory 四个护甲槽；HUD armor row 显示 0–20 点护甲。
+- 新增 `scripts/check-armor.mjs`，覆盖槽位兼容、非法快照过滤、drain、7 点=28% 公式和 `/give leather_chestplate`。
+- Chromium E2E 先验证真实装备/存档，再执行虚空死亡并确认 Equipment/Inventory/XP 全部清空。
 - 世界启动聊天修正为四种敌对生物，包含已经落库的蜘蛛。
-- Chromium E2E 加入真实 `/give oak_log 3` → `/tp 0 -20 0` → 虚空死亡/重生 → IndexedDB 断言，确保跨模块死亡链不是只靠纯函数测试。
-- 修正 Creeper 加入 `HOSTILE_MOBS` 后测试仍只期望 zombie/skeleton 的回归错误。
-- 回归测试覆盖 hostile selection、loot/XP、蜘蛛攀爬、Inventory death drain、死亡模式策略、XP 上限和虚空边界。
+- 修正 Creeper 加入 `HOSTILE_MOBS` 后测试仍只期望 zombie/skeleton 的历史回归错误。
 
 ### Documentation
-- README 明确区分稳定基线 `v0.3.0` 与 `main` 的 `v0.4.0-dev`。
-- `docs/ARCHITECTURE.md` 重写 v0.4 数据流，补齐四种敌对生物、死亡策略与系统边界。
+- README 明确区分稳定基线 `v0.3.0` 与 `main` 的 `v0.4.0-dev`，并记录 Equipment/Armor 当前公式与边界。
+- `docs/ARCHITECTURE.md` 将 Equipment 与 armor-rules 纳入伤害、存档和死亡数据流。
 - `docs/PROGRESS.md`、`docs/TESTING.md`、`docs/FILE_MANIFEST.md` 与实际代码/CI 对齐。
 
 ### Current limitations
-- `v0.4.0` 尚未封版：死亡界面/统计/床重生、护甲、水/氧气、天气粒子等仍未完成。
-- 普通可恢复死亡的物品/经验实体生成与重新拾回尚未进入 browser E2E；当前自动浏览器链覆盖的是虚空直接损失。
+- `v0.4.0` 尚未封版：死亡界面/统计/床重生、水/氧气、天气粒子等仍未完成。
+- 当前护甲公式是明确的过渡实现，不等于 Java armor+toughness；暂无耐久、附魔、更多材质、Armor Trim、玩家模型穿戴渲染、自动 Shift-equip 或护甲配方。
+- Chromium 自动化验证了装备/存档/死亡清算，但尚未通过真实敌对攻击测量有/无护甲 HP 差值。
+- 普通可恢复死亡的物品/经验/护甲实体生成与重新拾回尚未进入 browser E2E；当前自动浏览器链覆盖的是虚空直接损失。
 - 死亡掉落与经验球当前不持久化；页面重载会丢失尚未回收的死亡实体。
 - 蜘蛛当前只有局部攀升，不支持任意墙面附着、天花板移动或全局路径搜索。
 - Three.js 仍由运行时 jsDelivr URL 加载；CDN 失败会影响网站和 browser smoke，后续应本地 vendor / 构建锁定。
