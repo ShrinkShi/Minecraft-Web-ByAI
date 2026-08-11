@@ -8,6 +8,7 @@
 - 新增 `scripts/serve.mjs` 跨平台静态 HTTP server，作为本地/CI 浏览器测试统一入口。
 - 新增 `playwright.config.mjs` 和 `tests/e2e/smoke.spec.mjs`。
 - `Repository quality` 从单一 Node job 扩展为两层质量门：`static-checks` 成功后，再运行 Chromium `browser-smoke`。
+- `Repository quality` 增加按 `github.ref` 分组的 `cancel-in-progress`，同一 PR / 分支的新 push 会取消过时的未完成质量 run，避免异常 runner 或旧 HEAD 占用队列。
 - browser smoke 真实验证：主菜单→单人世界→创建世界→HUD/Canvas→暂停→IndexedDB 世界记录，并捕获 page/console error。
 - 浏览器测试失败时上传 trace / screenshot / HTML report 目录作为定位工件。
 - GitHub Actions checkout/setup-node 更新到 v6；浏览器 CI 只安装 Chromium，避免无用浏览器下载。
