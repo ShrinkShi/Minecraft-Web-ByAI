@@ -49,6 +49,7 @@ test('boots, applies survival void death loss and persists the result',async({pa
   expect(canvas.clientWidth).toBeGreaterThan(0);
   expect(canvas.clientHeight).toBeGreaterThan(0);
 
+  const deathPhaseStartedAt=await page.evaluate(()=>Date.now());
   await runCommand(page,'/give oak_log 3');
   await runCommand(page,'/tp 0 -20 0');
   await expect(page.locator('#toast')).toContainText('虚空死亡',{timeout:10_000});
@@ -57,10 +58,10 @@ test('boots, applies survival void death loss and persists the result',async({pa
   await expect(page.locator('#pause-menu')).toHaveClass(/active/);
   await expect.poll(async()=>{
     const worlds=await savedWorlds(page),record=worlds.find(world=>world.name==='CI Browser Smoke');
-    if(!record)return null;
+    if(!record||Number(record.updatedAt)<deathPhaseStartedAt)return null;
     const occupied=record.inventory?.slots?.filter(Boolean).length??-1;
-    return{occupied,totalXp:record.totalXp,respawned:Number(record.player?.position?.y)>-10};
-  },{timeout:10_000,message:'void death should persist an empty survival inventory at a recoverable respawn position'}).toEqual({occupied:0,totalXp:0,respawned:true});
+    return{occupied,totalXp:record.totalXp,respawned:Number(record.player?.position?.y)>-10,fresh:true};
+  },{timeout:10_000,message:'a fresh post-death save should contain an empty survival inventory and a valid respawn position'}).toEqual({occupied:0,totalXp:0,respawned:true,fresh:true});
 
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
