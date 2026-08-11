@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#1a1a1a" />
+  <title>Minecraft Web By AI</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game-canvas" aria-label="3D 游戏画布"></canvas>
+
+    <section id="main-menu" class="screen active">
+      <div class="menu-backdrop"></div>
+      <div class="menu-panel">
+        <div class="mc-logo-text" aria-label="Minecraft">MINECRAFT</div>
+        <div class="splash">Web Edition · 现代浏览器体素引擎</div>
+        <button class="mc-button primary" data-action="singleplayer">单人游戏</button>
+        <button class="mc-button" data-action="multiplayer">多人游戏</button>
+        <button class="mc-button" data-action="realms">Minecraft Realms</button>
+        <div class="button-row">
+          <button class="mc-button" data-action="options">选项</button>
+          <button class="mc-button" data-action="quit">退出游戏</button>
+        </div>
+        <p class="legal-note">Minecraft Web By AI — 学习与技术研究项目。当前演示使用用户提供的资源作为参考。</p>
+      </div>
+    </section>
+
+    <section id="world-menu" class="screen">
+      <div class="world-card">
+        <h1>创建新的世界</h1>
+        <label>世界名称<input id="world-name" value="新的世界" maxlength="40" /></label>
+        <label>种子<input id="world-seed" value="ShrinkCraft-2026" maxlength="80" /></label>
+        <label>游戏模式
+          <select id="game-mode"><option value="survival">生存</option><option value="creative">创造</option></select>
+        </label>
+        <label>AI 地形提示词 <span class="hint">（首版映射到程序化参数，扩散模型接口后续接入）</span>
+          <textarea id="terrain-prompt">温带森林，起伏丘陵，河谷与少量沙地</textarea>
+        </label>
+        <div class="button-row">
+          <button class="mc-button" data-action="create-world">创建世界</button>
+          <button class="mc-button" data-action="back-main">取消</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="pause-menu" class="screen pause-layer">
+      <div class="pause-card">
+        <h2>游戏菜单</h2>
+        <button class="mc-button" data-action="resume">返回游戏</button>
+        <button class="mc-button" data-action="options">选项</button>
+        <button class="mc-button" data-action="save-main">保存并返回标题画面</button>
+      </div>
+    </section>
+
+    <div id="loading" class="loading hidden">
+      <div class="loading-card"><strong id="loading-title">正在生成世界...</strong><div class="progress"><span id="loading-bar"></span></div><small id="loading-detail">准备区块</small></div>
+    </div>
+
+    <div id="hud" class="hud hidden">
+      <div id="crosshair" class="crosshair"></div>
+      <div id="debug" class="debug"></div>
+      <div class="status-stack">
+        <div id="armor-row" class="icon-row armor-row"></div>
+        <div class="status-row">
+          <div id="hearts" class="icon-row hearts"></div>
+          <div id="hunger" class="icon-row hunger"></div>
+        </div>
+        <div class="xp-wrap"><div id="xp-bar" class="xp-bar"></div><span id="xp-level">0</span></div>
+        <div id="hotbar" class="hotbar"></div>
+      </div>
+      <div id="oxygen" class="oxygen hidden"></div>
+      <div id="toast" class="toast hidden"></div>
+      <div id="break-meter" class="break-meter hidden"><span></span></div>
+    </div>
+
+    <section id="inventory" class="inventory hidden" aria-label="物品栏">
+      <div class="inventory-panel">
+        <div class="inventory-title">物品栏</div>
+        <div class="inventory-top"><div class="player-preview">玩家</div><div class="crafting-mini"><span>2 × 2 合成</span><div class="craft-grid mini"></div></div></div>
+        <div id="inventory-grid" class="inventory-grid"></div>
+        <div id="inventory-hotbar" class="inventory-grid inventory-hotbar"></div>
+      </div>
+    </section>
+  </div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
