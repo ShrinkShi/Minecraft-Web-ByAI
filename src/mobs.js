@@ -9,7 +9,8 @@ export const PASSIVE_MOBS=Object.freeze({
 
 export const HOSTILE_MOBS=Object.freeze({
   zombie:Object.freeze({name:'僵尸',hp:20,speed:1.65,width:.6,height:1.8,color:0x4f8d4b,accent:0x365b8c,followRange:24,attackStyle:'melee',attackRange:1.55,attackDamage:3,attackCooldown:1.0,loot:Object.freeze([loot('rotten_flesh',0,2)]),xp:[5,5]}),
-  skeleton:Object.freeze({name:'骷髅',hp:20,speed:1.5,width:.6,height:1.99,color:0xd7d5ca,accent:0xa4a39c,followRange:20,attackStyle:'ranged',idealRange:11,minRange:6,attackDamage:2,attackCooldown:1.6,projectileSpeed:15,loot:Object.freeze([loot('bone',0,2),loot('arrow',0,2)]),xp:[5,5]})
+  skeleton:Object.freeze({name:'骷髅',hp:20,speed:1.5,width:.6,height:1.99,color:0xd7d5ca,accent:0xa4a39c,followRange:20,attackStyle:'ranged',idealRange:11,minRange:6,attackDamage:2,attackCooldown:1.6,projectileSpeed:15,loot:Object.freeze([loot('bone',0,2),loot('arrow',0,2)]),xp:[5,5]}),
+  creeper:Object.freeze({name:'苦力怕',hp:20,speed:1.45,width:.6,height:1.7,color:0x4fae55,accent:0x1f5f2c,followRange:16,attackStyle:'fuse',fuseRange:3,cancelRange:6,fuseTime:1.5,explosionRadius:3,damageRadius:6,maxDamage:12,loot:Object.freeze([loot('gunpowder',0,2)]),xp:[5,5]})
 });
 
 export const PASSIVE_MOB_IDS=Object.freeze(Object.keys(PASSIVE_MOBS));
