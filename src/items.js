@@ -11,7 +11,7 @@ export const ITEMS={
   'block:9':{name:'工作台',stack:64,blockId:9,tile:10},
   'block:10':{name:'圆石',stack:64,blockId:10,tile:13},
   stick:{name:'木棍',stack:64,texture:'./assets/items/stick.png'},
-  wooden_pickaxe:{name:'木镐',stack:1,texture:'./assets/items/wooden_pickaxe.png',tool:{kind:'pickaxe',tier:'wood',speed:2,durability:59}}
+  wooden_pickaxe:{name:'木镐',stack:1,texture:'./assets/items/wooden_pickaxe.png',attackDamage:2,tool:{kind:'pickaxe',tier:'wood',speed:2,durability:59}}
 };
 
 export const CREATIVE_START=['block:1','block:2','block:3','block:4','block:5','block:6','block:7','block:9','wooden_pickaxe'];
