@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import {CONTROL_INTENT_VERSION,CONTROL_ACTIONS,ControlIntentBus,normalizeControlState} from '../src/control-intents.js';
+import {PLAYER_CONTROL_FRAME_VERSION,PLAYER_CONTROL_BUTTONS,encodePlayerControlFrame,decodePlayerControlFrame,isCompatibleControlFrame} from '../src/player-control-frame.js';
 
-assert.equal(CONTROL_INTENT_VERSION,1);
+assert.equal(CONTROL_INTENT_VERSION,1);assert.equal(PLAYER_CONTROL_FRAME_VERSION,1);
+assert.deepEqual(PLAYER_CONTROL_BUTTONS,{jump:1,sneak:2,sprint:4,primary:8});
 const diagonal=normalizeControlState({side:2,forward:2,jump:1});assert.equal(diagonal.version,1);assert.ok(Math.abs(diagonal.side-Math.SQRT1_2)<1e-12);assert.ok(Math.abs(diagonal.forward-Math.SQRT1_2)<1e-12);assert.equal(diagonal.jump,true);assert.equal(diagonal.sneak,false);assert.equal(diagonal.sprint,false);assert.equal(diagonal.primary,false);
 
 const states=[],primaryEdges=[],looks=[],actions=[];
@@ -15,8 +17,15 @@ bus.look('touch',.2,-.1);assert.equal(looks.at(-1).source,'touch');assert.equal(
 assert.ok(CONTROL_ACTIONS.includes('secondary')&&CONTROL_ACTIONS.includes('hotbar-select')&&CONTROL_ACTIONS.includes('pause'));assert.equal(bus.action('desktop','inventory'),true);assert.equal(actions.at(-1).name,'inventory');assert.throws(()=>bus.action('desktop','teleport-hack'),/unknown control action/);
 
 const canonical=input=>{const testBus=new ControlIntentBus();testBus.setMove(input.source,input.side,input.forward);for(const name of ['jump','sneak','sprint','primary'])if(input[name])testBus.setButton(input.source,name,true);const {sequence,...state}=testBus.snapshot();return state;};
-const logical={side:-.25,forward:.8,jump:true,sneak:false,sprint:true,primary:false};assert.deepEqual(canonical({source:'desktop',...logical}),canonical({source:'touch',...logical}));assert.deepEqual(canonical({source:'network-peer',...logical}),canonical({source:'desktop',...logical}),'future network input must use the same gameplay state contract');
+const logical={side:-.25,forward:.8,jump:true,sneak:false,sprint:true,primary:false};
+const desktopState=canonical({source:'desktop',...logical}),touchState=canonical({source:'touch',...logical}),networkState=canonical({source:'network-peer',...logical});
+assert.deepEqual(desktopState,touchState);assert.deepEqual(networkState,desktopState,'future network input must use the same gameplay state contract');
+const desktopFrame=encodePlayerControlFrame(desktopState,42),touchFrame=encodePlayerControlFrame(touchState,42),networkFrame=encodePlayerControlFrame(networkState,42);
+assert.deepEqual(desktopFrame,touchFrame);assert.deepEqual(networkFrame,desktopFrame,'wire frame must not contain device/source identity');
+assert.deepEqual(Object.keys(desktopFrame).sort(),['buttons','move','seq','v']);assert.equal('source' in desktopFrame,false);assert.equal('device' in desktopFrame,false);
+const decoded=decodePlayerControlFrame(desktopFrame);assert.equal(decoded.sequence,42);assert.deepEqual({...decoded,sequence:undefined},{...normalizeControlState(logical),sequence:undefined});assert.equal(isCompatibleControlFrame(desktopFrame),true);
+assert.throws(()=>decodePlayerControlFrame({...desktopFrame,v:99}),/unsupported/);assert.throws(()=>decodePlayerControlFrame({...desktopFrame,buttons:16}),/unknown button bits/);assert.throws(()=>decodePlayerControlFrame({...desktopFrame,seq:-1}),/uint32/);assert.equal(isCompatibleControlFrame({}),false);
 
 bus.resetAll();snapshot=bus.snapshot();assert.deepEqual({...snapshot,sequence:0},{...normalizeControlState(),sequence:0},'shape after reset remains canonical');
 assert.ok(states.length>0);
-console.log('unified control intent contracts: PASS');
+console.log('unified control intent + platform-neutral wire frame contracts: PASS');
