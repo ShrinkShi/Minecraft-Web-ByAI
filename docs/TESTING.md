@@ -85,9 +85,11 @@ npm run test:e2e
 9. WeatherSystem 在上述切换和逐帧 update 期间不得产生 pageerror / console error。
 10. `/give minecraft:leather_chestplate 1`→真实 Equipment 拖放→护甲 HUD。
 11. 暂停读取新鲜 IndexedDB：`version=5`、chest 正确、weather=`clear`，且没有持久化 oxygen。
-12. 恢复→给予原木→传送虚空→死亡/重生。
-13. 新鲜死亡后快照：Inventory=0、Equipment=0、XP=0、位置可恢复。
-14. 全程无 pageerror / console error。
+12. 恢复→给予原木→传送虚空；`#death-menu` 必须进入 active，原因包含“虚空”，损失摘要包含“无法回收”。
+13. 等待约 450 ms 后死亡界面必须仍然 active；发送 Escape 后也必须继续停在死亡界面，`#pause-menu` 不得 active，证明没有自动重生或暂停菜单绕过。
+14. 点击“重生”后死亡界面关闭；随后 Escape 才能打开暂停菜单。
+15. 读取重生后的新鲜 IndexedDB：Inventory=0、Equipment=0、XP=0、Player hp=20，位置回到可恢复出生点。
+16. 全程无 pageerror / console error。
 
 当前天气 browser smoke 验证的是命令→profile→固定池数量→主循环/Three.js 生命周期，不做截图像素比较；屋顶遮雨、雨滴碰撞、透明效果和不同 GPU 的实际像素结果仍是未覆盖边界。
 
@@ -109,5 +111,6 @@ npm run test:e2e
 - 真实敌对生物有/无护甲 HP 差值。
 - Pointer Lock/F5/持续陆地移动的专门 E2E。
 - 普通可恢复死亡的掉落/经验/护甲重新拾取。
+- 死亡界面“返回标题画面”按钮的专门 browser E2E；运行时会 force-save 已结算的 hp=0 状态，重新进入世界时由现有 startup fallback 自动回出生点。
 - 死亡世界实体跨页面持久化、IndexedDB 配额/schema 迁移。
 - Three.js 运行时仍依赖 jsDelivr。

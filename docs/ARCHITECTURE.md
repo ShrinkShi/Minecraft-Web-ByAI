@@ -99,11 +99,15 @@ profile 还提供 fallSpeed、line length、windX/windZ、opacity。thunder 的�
 - melee/arrow/explosion 经过护甲；void/drowning 绕过。
 - v5 world record 保存 Equipment，非法快照过滤。
 
-## Death / Rewards
+## Death / Rewards / Explicit Respawn
 
-- survival/adventure 死亡按 death plan drain Crafting/Equipment/Inventory/cursor；creative/spectator 不损失。
-- 普通死亡在死亡点生成 drops/orbs；`y < -10` 虚空直接损失。
-- 死亡 XP `min(100, currentLevel*7)`。
+- `death-rules.js` 仍只负责策略：survival/adventure 按 death plan drain Crafting/Equipment/Inventory/cursor；creative/spectator 不执行这套损失。
+- `beginPlayerDeath()` 捕获原死亡坐标和旧 totalXp，在**原坐标**完成掉落/经验或虚空直接损失，然后设置 `deathState`、退出 Pointer Lock、写入死亡原因/损失摘要并显示 `DeathScreen`；它不会调用 `Player.respawn()`。
+- 普通死亡在死亡点生成 drops/orbs；`y < -10` 虚空直接损失；死亡 XP 为 `min(100, currentLevel*7)`。
+- deathState 激活时 `pointer()/canControl()/pause/inventory/workbench/key handler` 均有显式 guard，主 animate 的普通世界更新块也停止，避免尸体继续被移动、攻击或自动重生。
+- `completeRespawn()` 只由“重生”按钮调用：`Player.respawn(0,0)` → reset oxygen → 清 deathState → 返回游戏 → 标记存档 dirty。
+- “返回标题画面”会先 force-save 已清算的 hp=0 死亡状态再 dispose world；DeathScreen 本身不持久化。下次载入 hp<=0 的世界时，现有 `startWorld()` fallback 会直接 `player.respawn(0,0)`，因此不会把死亡 UI 跨页面保存。
+- `beginPlayerDeath()` 还会 fire-and-forget 启动一次强制 IndexedDB 保存，降低停留在死亡界面后直接关闭页面造成结算丢失的风险。
 - DropSystem / ExperienceOrbSystem 当前仍不跨页面持久化。
 
 ## Entities / Combat
@@ -140,6 +144,6 @@ Weather browser test 不访问隐藏 WeatherSystem 实例，只读公开 debug H
 - opaque Worker 顶层兼容 buffers 应在消费者迁移后删除。
 - Equipment 无快捷装备、耐久、正式穿戴模型和标准 armor+toughness。
 - 生物无 chunk 持久化、正式寻路/亮度生成/动画。
-- 死亡界面、床/重生点、keepInventory、死亡世界实体持久化尚未完成。
+- 死亡统计、床/重生点、keepInventory、死亡世界实体持久化尚未完成。
 
 这些项目继续按独立可验证单元拆除，不能因为“已经能跑”就固化成长期架构。

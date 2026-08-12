@@ -12,7 +12,7 @@
 - 新增 `scripts/check-swim.mjs`：三点水覆盖率、dry no-op、水平倍率插值、被动浮力、Space 上游、Shift 下潜、垂直限速、冲突输入与参数校验。
 - 新增 `scripts/check-weather.mjs`：clear/rain/thunder 类型、固定池精确预算、雷雨相对雨天的速度/长度/风偏/透明度强度和非法容量。
 - PR #12 首轮静态质量门暴露旧 `scripts/check.mjs` 仍消费 mesh Worker 顶层 `indices`；修复采用 opaque 顶层兼容视图而不是删除旧回归。
-- browser smoke 使用固定 seed + `海` prompt 真实生成水体，验证 Oxygen `data-air`、Space 上游、Shift 下潜；随后实际执行 `/weather rain → thunder → clear` 并要求 `WeatherFX 446 → 720 → 0`，再继续 Equipment/v5 存档和虚空死亡链。
+- browser smoke 使用固定 seed + `海` prompt 真实生成水体，验证 Oxygen `data-air`、Space 上游、Shift 下潜；随后实际执行 `/weather rain → thunder → clear` 并要求 `WeatherFX 446 → 720 → 0`，再继续 Equipment/v5 存档和虚空死亡界面→显式重生链。
 - 浏览器存档断言确认 world record 不含 `oxygen`；`swimCoverage` 同样只存在于 Player 运行时。weather 继续使用既有长期存档字段。
 - 浏览器失败时上传 trace / screenshot / HTML report；当前 CI 只安装 Chromium。
 
@@ -30,6 +30,10 @@
 - `death-rules.js`：survival/adventure 与 creative/spectator 的死亡损失、死亡 XP 和虚空策略。
 - `Inventory.drain()` / `CraftingGrid.drain()` / `Equipment.drain()`：死亡时无副作用抽空携带状态。
 - 普通 survival/adventure 死亡在原点生成物品，并生成 `min(100, 当前等级 × 7)` 经验后清零 totalXp；`y < -10` 虚空死亡直接损失。
+- 新增独立 `DeathScreen`：死亡结算与重生动作拆开，死亡后停留在原因/损失摘要界面，不再自动传送；只有点击“重生”才调用 `Player.respawn(0,0)`。
+- deathState 会阻断 Pointer Lock、暂停/背包/工作台/普通键盘输入和主世界更新；Escape 不能从死亡界面绕入暂停菜单。
+- “返回标题画面”先强制保存 hp=0 的已结算状态再销毁世界；DeathScreen 不持久化，重新进入时由现有 hp<=0 startup fallback 回出生点。
+- Chromium E2E 现在要求虚空死亡界面至少持续约 450 ms、Escape 仍停在死亡界面；点击“重生”后新鲜存档必须 hp=20、Inventory/Equipment/XP 仍清空。
 - `Equipment` 独立 head/chest/legs/feet 四槽；皮革帽子/外套/裤子/靴子护甲点 1/3/2/1。
 - `armor-rules.js`：过渡公式每护甲点 4%、最高 80%，完整皮革套 28%。
 - 僵尸/蜘蛛近战、骷髅箭矢和苦力怕爆炸经过基础护甲减伤；虚空与溺水绕过护甲。
@@ -65,7 +69,7 @@
 - `docs/PROGRESS.md`、`docs/TESTING.md`、`docs/FILE_MANIFEST.md` 与实际代码/CI 对齐。
 
 ### Current limitations
-- `v0.4.0` 尚未封版：死亡界面/统计/床重生、完整流体、水下视觉、自动天气/闪电/雪等仍未完成。
+- `v0.4.0` 尚未封版：死亡统计/床重生/`keepInventory`、完整流体、水下视觉、自动天气/闪电/雪等仍未完成。
 - WeatherSystem 当前只有玩家周围的轻量 rain/thunder 线段 FX：没有自动周期、群系降水、屋顶遮雨/世界碰撞、飞溅/湿润、闪电 flash/bolt/damage/sound 或像素级天气 E2E。
 - Swimming 只是基础直立水中运动：没有冲刺游泳姿态、沿 pitch 三维推进、crawl transition、动画、实体游泳 AI、水流推动、Depth Strider/Dolphin's Grace。
 - 已完成头部浸水→氧气→溺水事件闭环，但没有 Respiration、Water Breathing、Conduit、气泡柱；完整 15 秒真实溺水死亡仍未在 browser E2E 中硬等待。

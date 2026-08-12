@@ -4,11 +4,12 @@
 
 | 路径 | 职责 | 生命周期 / 性能要求 |
 | --- | --- | --- |
-| `index.html` | 菜单、HUD、背包、工作台、聊天、护甲槽和 Oxygen HUD DOM 壳层 | 不承载游戏逻辑 |
+| `index.html` | 菜单、HUD、背包、工作台、聊天、护甲槽、Oxygen HUD 与死亡界面 DOM 壳层 | 不承载游戏逻辑 |
 | `styles.css` | 像素风基础界面与 HUD 样式 | 避免逐帧触发布局 |
 | `armor.css` | Equipment 槽和护甲 HUD 样式 | 只负责表现 |
 | `oxygen.css` | 氧气气泡 HUD 样式 | 只负责表现；空气状态来自 oxygen-rules |
-| `src/main.js` | 应用状态机、Three.js 场景、系统编排、交互、奖励/死亡/护甲/氧气/天气接线与自动保存 | `/weather` 同步 sky + WeatherSystem；不重复积分 Player 位移 |
+| `death.css` | 死亡覆盖层、死亡原因/摘要和重生按钮样式 | 只负责表现，不参与死亡损失/重生规则 |
+| `src/main.js` | 应用状态机、Three.js 场景、系统编排、交互、奖励/死亡/护甲/氧气/天气接线与自动保存 | 死亡先 `beginPlayerDeath()` 清算并进入 deathState；只有显式动作 `completeRespawn()`；死亡时阻断普通世界帧/输入 |
 | `src/blocks.js` | 方块 ID、属性、atlas 索引、基础掉落约束 | `liquid/transparent` 供水 render、oxygen 与 Player water coverage 使用 |
 | `src/items.js` | 物品定义、方块物品映射、工具/攻击/皮革护甲元数据 | 静态数据，不保存运行时状态 |
 | `src/inventory.js` | 36 格库存、cursor、堆叠、Shift 移动、死亡 `drain()` | 与 Equipment 分离，可单测/序列化 |
@@ -20,6 +21,7 @@
 | `src/weather-system.js` | 固定容量降雨 LineSegments 池、动态 TypedArray 更新、玩家周围 respawn/recycle、材质/geometry 生命周期 | 只创建 1 个 LineSegments/Geometry/Material；clear drawRange=0；world teardown 必须 dispose |
 | `src/recipes.js` | 2×2 / 3×3 配方和 CraftingGrid death drain | 纯逻辑，无 DOM/Three.js |
 | `src/death-rules.js` | 模式死亡损失、死亡经验、虚空/可恢复位置判断 | 纯逻辑；不生成实体/不操作 UI |
+| `src/death-screen.js` | 死亡界面 DOM 引用、原因/损失摘要写入和显示状态读取 | 不决定掉落/经验/重生位置；由 main 状态机驱动 |
 | `src/drops.js` | 世界掉落物视觉、重力、拾取、销毁 | 共享资源，退出世界显式释放 |
 | `src/experience.js` | XP 等级阈值、总经验↔等级和 HUD 进度派生 | 只以 totalXp 为真相源 |
 | `src/experience-orbs.js` | 经验球重力、吸附、拾取、销毁 | 共享低面数资源 |
@@ -50,7 +52,7 @@
 | `scripts/check-swim.mjs` | 水覆盖率、dry no-op、速度插值、浮力、上下游、限速回归 | 纯逻辑 |
 | `scripts/check-weather.mjs` | clear/rain/thunder profile、精确池预算、参数强弱和非法输入回归 | 不导入 Three.js；渲染实例由 Chromium 覆盖 |
 | `scripts/serve.mjs` | Playwright / 本地开发共用 HTTP server | 阻止 path traversal；测试 no-store |
-| `tests/e2e/smoke.spec.mjs` | Chromium 世界启动、水体 oxygen/swimming、WeatherFX 切换、护甲存档、虚空死亡 | `/weather` 断言 rain:446/thunder:720/clear:0；全程捕获 page/console error |
+| `tests/e2e/smoke.spec.mjs` | Chromium 世界启动、水体 oxygen/swimming、WeatherFX、护甲存档、死亡界面/显式重生 | 虚空死亡必须停在 death screen；Escape 不得绕过；点击重生后断言 hp=20 和损失状态；全程捕获 page/console error |
 | `playwright.config.mjs` | browser smoke 超时、单 worker、Chromium/WebGL、失败工件 | CI 优先稳定性 |
 | `package.json` | Node 22+ 测试脚本与固定 Playwright | `test:logic` 顺序跑基础/armor/water/oxygen/swim/weather 六套测试 |
 | `.github/workflows/quality.yml` | Node + Chromium 两层质量门 | PR/main 自动执行；同 ref 新 push 取消旧 run |

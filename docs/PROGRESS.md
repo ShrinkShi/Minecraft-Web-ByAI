@@ -11,14 +11,14 @@
 - [x] Node 22 `src/*.js` 与 `scripts/*.mjs` 语法检查。
 - [x] `npm run test:logic`：基础世界/实体/Worker + Equipment/Armor + Water Mesh + Oxygen/Drowning + Swimming/Buoyancy + Weather/Precipitation 回归。
 - [x] GitHub Pages 使用 GitHub Actions，并持续验证真实 Pages Deployment。
-- [x] Playwright Chromium browser smoke：海洋世界→氧气→游泳→rain/thunder/clear WeatherFX→护甲装备/存档→虚空死亡/重生→IndexedDB 核对。
+- [x] Playwright Chromium browser smoke：海洋世界→氧气→游泳→rain/thunder/clear WeatherFX→护甲装备/存档→虚空死亡界面→显式重生→IndexedDB 核对。
 - [x] 浏览器失败保留 Playwright trace / screenshot / report。
 - [ ] 将 Three.js 从运行时 jsDelivr 迁移为版本锁定的本地 vendor / 构建依赖。
 - [ ] 扩展 E2E 到普通死亡掉落/拾回、真实战斗减伤、完整溺水死亡、横向游泳速度、天气像素/遮雨、存档重载。
 
 ## v0.4.0 — 实体、战斗与生存扩展（开发中）
 
-状态：开发中。实体基础、四种敌对生物、奖励闭环、生存死亡损失、第一版护甲、透明水 pass、氧气/溺水、基础游泳/浮力和可见降雨 FX 已落库；死亡界面、完整流体/冲刺游泳、自动天气/闪电/雪、水下视觉和正式 Java 伤害/护甲公式仍未完成。
+状态：开发中。实体基础、四种敌对生物、奖励闭环、生存死亡损失、显式死亡界面/重生、第一版护甲、透明水 pass、氧气/溺水、基础游泳/浮力和可见降雨 FX 已落库；死亡统计/床重生、完整流体/冲刺游泳、自动天气/闪电/雪、水下视觉和正式 Java 伤害/护甲公式仍未完成。
 
 ### 实体 / 战斗 / 奖励
 - [x] `EntityStore` + `SpatialHash` 数据/空间索引基础及 Node 回归
@@ -37,8 +37,10 @@
 - [x] survival/adventure 死亡统一 drain Inventory/cursor/Crafting/Equipment
 - [x] 普通死亡在原地生成物品/经验；`y < -10` 虚空死亡直接损失
 - [x] creative/spectator 不执行上述死亡损失
-- [x] Chromium 虚空死亡 E2E：背包/装备/XP 清空且重生位置有效
-- [ ] 普通死亡浏览器 E2E、死亡界面/统计、床/重生点、`keepInventory`
+- [x] `DeathScreen`：死亡原因/损失摘要、显式“重生”和“返回标题画面”；死亡状态下普通输入和本地世界帧被阻断
+- [x] 死亡结算与重生分离：`beginPlayerDeath()` 先在原位置清算并保存，`completeRespawn()` 仅由显式重生动作调用
+- [x] Chromium 虚空死亡 E2E：死亡界面必须持续存在，Escape 不得打开暂停菜单，点击“重生”后才恢复 hp=20；背包/装备/XP 仍保持清空
+- [ ] 普通死亡浏览器 E2E、死亡统计、床/重生点、`keepInventory`
 - [ ] 死亡掉落/经验球跨页面重载持久化
 
 ### Equipment / Armor
