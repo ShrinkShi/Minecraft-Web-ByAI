@@ -39,9 +39,19 @@ export function bedPartner(cell,id){
   return{x:Math.floor(cell.x)+meta.dx*sign,y:Math.floor(cell.y),z:Math.floor(cell.z)+meta.dz*sign,id:meta.partnerId};
 }
 
-export function bedRespawnAnchor(cell,id){
+function bedFootCell(cell,id){
   const meta=bedBlockMeta(id);if(!meta||!cell||![cell.x,cell.y,cell.z].every(Number.isFinite))return null;
   let x=Math.floor(cell.x),y=Math.floor(cell.y),z=Math.floor(cell.z);
   if(meta.part==='head'){x-=meta.dx;z-=meta.dz;}
-  return{x:x+.5,y:y+1.01,z:z+.5};
+  return{x,y,z};
+}
+
+export function bedSleepCheckPoint(cell,id){
+  const foot=bedFootCell(cell,id);if(!foot)return null;
+  return{x:foot.x+.5,y:foot.y,z:foot.z+.5};
+}
+
+export function bedRespawnAnchor(cell,id){
+  const foot=bedFootCell(cell,id);if(!foot)return null;
+  return{x:foot.x+.5,y:foot.y+1.01,z:foot.z+.5};
 }
