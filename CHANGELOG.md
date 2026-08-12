@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Engineering quality
+- 输入架构收口为单一 `ControlIntentBus v1`：桌面键鼠、手机触控与未来 network/gamepad source 使用同一 gameplay state/action 语义；`PlayerController` 不再直接监听 DOM，也不再保留 mobile-only `virtualInput`。
+- 新增 `DesktopControls` 适配器并重构 `MobileControls`：两者只负责设备事件翻译，primary/secondary/背包/热栏/聊天/暂停/视角等统一进入 `handleControlIntent()`，World/Player/Inventory/存档不按平台分叉。
+- 新增第 11 套 `scripts/check-controls.mjs`，明确验证 `desktop` / `touch` / `network-peer` 的规范化状态等价，为未来 PC↔手机同服联机建立协议前置约束。
 - GitHub Pages 仓库发布源已设置为 **GitHub Actions**，并持续验证完整 `configure → artifact upload → deploy` 流水线。
 - 固定 `@playwright/test` `1.62.0`，要求 Node 22+；`scripts/serve.mjs` 作为本地/CI 浏览器测试统一 HTTP server。
 - `Repository quality` 为两层质量门：`static-checks` 成功后运行 Chromium `browser-smoke`；同 `github.ref` 新 push 会取消旧 run。
