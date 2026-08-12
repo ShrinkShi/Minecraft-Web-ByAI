@@ -26,6 +26,7 @@ scripts/check-bed.mjs
 scripts/check-mobile.mjs
 scripts/check-controls.mjs
 scripts/check-network-view.mjs
+scripts/check-sleep.mjs
 ```
 
 基础套件覆盖 Inventory / Crafting / Commands / EntityStore / SpatialHash / 四种敌对生物 / Combat / Projectile / Experience / Spider / Death / Mesh Worker / Terrain Worker。
@@ -110,6 +111,10 @@ Node 层只验证 profile，不导入 Three.js WeatherSystem；后者由 Chromiu
 
 `scripts/check-bed.mjs` 覆盖 8 个床 voxel ID 的唯一性、四方向 look→facing、foot/head 两端坐标、从任一端解析 partner、两端归一到同一 respawn anchor、BLOCKS/ITEMS/drop/tint 元数据、3×3 `3 wool + 3 planks -> bed` 配方消费，以及真实 sheep loot 的 `white_wool` 来源。2×2 工作区不得误匹配床配方。
 
+### Bed sleep / multiplayer-ready quorum
+
+`scripts/check-sleep.mjs` 覆盖 24000 tick 归一化、晴天 `12542..23459` 与雨天 `12010..23991` 睡眠窗口、雷暴任意时间可睡、清晨目标 1000、非负 32 位 sleeper percentage、超过 100% 的不可达 quorum、单人 ready 与多人 waiting→ready。设备类型不参与 sleeper 计算。
+
 ### Mobile device / input contract
 
 `scripts/check-mobile.mjs` 覆盖桌面 Chrome、Android、iPhone portrait、iPadOS 桌面 UA 回退、带触摸屏 Windows 笔记本 false-positive 保护，以及 `userAgentData.mobile`。静态 contract 同时要求移动端 DOM/CSS、`MobileControls`、`DesktopControls` 与 Player DOM 输入解耦、共享 `ControlIntentBus` 主/副交互和 HUD hotbar touch index 接线存在。
@@ -179,9 +184,10 @@ npm run test:e2e
 1. 在平原世界非原点落地，`/give bed 1` 后按真实 UI 流程打开背包，将主背包槽 0 的床移动到热栏槽 27，并断言 HUD 当前选中物品确实是“床”。
 2. 获取真实 Pointer Lock，用鼠标向下看并右键世界；必须出现“放置 床”，说明运行时确实经过准星 raycast 和 `placeBed()`，不是直接写 voxel。
 3. 再次右键已放置床，必须出现“重生点已设置”。
-4. 暂停后只接受新鲜 v6 world record，并要求 edits 同时包含一对朝北床 ID `11/12`，且 `respawnPoint` 已保存。
-5. 返回游戏后传送到远处 `/kill`，显式“重生”后的公开 debug XYZ 必须回到保存的床锚点。
-6. 全程捕获 pageerror/console error；测试不直接修改 world edits、respawnPoint 或 IndexedDB。
+4. 通过正式 `/time set night` 把共享世界时钟推进到夜间，再次右键同一张床；必须出现“已睡到清晨”，公开 debug `Time` 必须回到约 1000 tick。
+5. 暂停后只接受新鲜 v6 world record，并要求 edits 包含合法 foot/head 配对且 `respawnPoint` 已保存。
+6. 返回游戏后传送到远处 `/kill`，显式“重生”后的公开 debug XYZ 必须回到保存的床锚点。
+7. 全程捕获 pageerror/console error；测试不直接修改 world edits、respawnPoint、gameTime 或 IndexedDB。
 
 ### Android landscape mobile browser regression
 

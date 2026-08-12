@@ -9,7 +9,7 @@
 ## 工程质量基础
 
 - [x] Node 22 `src/*.js` 与 `scripts/*.mjs` 语法检查。
-- [x] `npm run test:logic`：基础世界/实体/Worker + Equipment/Armor + Water Mesh + Oxygen/Drowning + Swimming/Buoyancy + Weather/Precipitation + Death Integration + Custom Respawn + Bed Rules + Mobile Device/Input + Unified Control Intent + Absolute View Frame，共 12 套回归。
+- [x] `npm run test:logic`：基础世界/实体/Worker + Equipment/Armor + Water Mesh + Oxygen/Drowning + Swimming/Buoyancy + Weather/Precipitation + Death Integration + Custom Respawn + Bed Rules + Mobile Device/Input + Unified Control Intent + Absolute View Frame + Bed Sleep/Quorum，共 13 套回归。
 - [x] PC/手机输入统一：`ControlIntentBus` 为唯一 gameplay input contract；Desktop/Touch 只是适配器，Player 不再拥有 DOM 键盘监听或 mobile virtualInput。
 - [x] 联机前置平台约束：同一 World/Player/Inventory/存档/玩法语义，未来 `network-peer` 与本地输入复用相同控制状态，不创建独立 mobile client protocol。
 - [x] `PlayerControlFrame v1`：平台无关连续控制 wire schema；desktop/touch/network-peer 同状态编码一致且不携带设备身份。
@@ -22,7 +22,7 @@
 
 ## v0.4.0 — 实体、战斗与生存扩展（开发中）
 
-状态：开发中。实体基础、四种敌对生物、奖励闭环、生存死亡损失、显式死亡界面/重生、持久化自定义重生点、两格床重生锚点、第一版护甲、透明水 pass、氧气/溺水、基础游泳/浮力、可见降雨 FX 和手机浏览器横屏触控底座已落库；死亡统计/床重生、完整流体/冲刺游泳、自动天气/闪电/雪、水下视觉和正式 Java 伤害/护甲公式仍未完成。
+状态：开发中。实体基础、四种敌对生物、奖励闭环、生存死亡损失、显式死亡界面/重生、持久化自定义重生点、两格床重生锚点与夜间睡眠跳夜、第一版护甲、透明水 pass、氧气/溺水、基础游泳/浮力、可见降雨 FX 和手机浏览器横屏触控底座已落库；死亡统计/床重生、完整流体/冲刺游泳、自动天气/闪电/雪、水下视觉和正式 Java 伤害/护甲公式仍未完成。
 
 ### 实体 / 战斗 / 奖励
 - [x] `EntityStore` + `SpatialHash` 数据/空间索引基础及 Node 回归
@@ -54,8 +54,9 @@
 - [x] `bed-rules.js`：四方向 foot/head 配对、任一端 partner 解析与统一床锚点纯规则
 - [x] 生存床物品/配方：3 白色羊毛 + 3 橡木木板→1 床；羊既有 loot 提供 `white_wool`
 - [x] 两格床 runtime：真实朝向原子放置、任一端右键设置共享 respawnPoint、破坏任一端联动清理并只掉 1 床
-- [x] Chromium 床 E2E：`/give bed`→真实背包槽 0→热栏 27→Pointer Lock/向下看→右键放置→右键床设重生点→v6 同时保存两端 edits/respawnPoint→异地死亡回床锚点
-- [ ] 装备掉落的普通死亡单独拾回断言、死亡统计、床睡眠/跳夜/占用/怪物限制/半高模型、`keepInventory`
+- [x] Chromium 床 E2E：`/give bed`→真实背包槽 0→热栏 27→Pointer Lock/准星→右键放置→右键床设重生点→`/time set night`→再次使用同一床跳到约 1000 tick 清晨→v6 同时保存两端 edits/respawnPoint→异地死亡回床锚点
+- [x] `sleep-rules.js`：晴天/雨天睡眠窗口、雷暴例外、清晨目标和多人 sleeper percentage/quorum 纯规则；当前单人 runtime 使用 1/1 quorum，未来服务端直接传真实睡眠人数
+- [ ] 装备掉落的普通死亡单独拾回断言、死亡统计、床占用/怪物限制/半高模型、`keepInventory`
 - [ ] 死亡掉落/经验球跨页面重载持久化
 
 ### Mobile browser / Landscape touch

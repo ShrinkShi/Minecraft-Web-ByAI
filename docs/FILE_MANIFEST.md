@@ -30,6 +30,7 @@
 | `src/death-rules.js` | 模式死亡损失、死亡经验、虚空/可恢复位置判断 | 纯逻辑；不生成实体/不操作 UI |
 | `src/respawn-rules.js` | 自定义重生点归一化、固定周边候选与 first-safe 解析 | 纯逻辑；不导入 Three.js/World；安全判定由调用方注入 |
 | `src/bed-rules.js` | 四方向两格床 ID、朝向、foot/head partner 与统一床 respawn anchor | 纯逻辑；不读取 World/Three.js；runtime 只消费计划结果 |
+| `src/sleep-rules.js` | 晴天/雨天睡眠窗口、雷暴例外、清晨目标、多人 sleeper percentage/quorum | 纯逻辑；不读取设备/DOM；未来服务器与单机共享同一规则 |
 | `src/death-screen.js` | 死亡界面 DOM 引用、原因/损失摘要写入和显示状态读取 | 不决定掉落/经验/重生位置；由 main 状态机驱动 |
 | `src/drops.js` | 世界掉落物视觉、重力、拾取、销毁 | 共享资源，退出世界显式释放 |
 | `src/experience.js` | XP 等级阈值、总经验↔等级和 HUD 进度派生 | 只以 totalXp 为真相源 |
@@ -63,6 +64,7 @@
 | `scripts/check-death.mjs` | 死亡 DOM/样式、DeathScreen/deathState、显式重生和旧立即重生路径的集成契约 | Node 静态契约；同时拒绝历史一次性 death patch 工具进入交付树 |
 | `scripts/check-respawn.mjs` | respawnPoint 归一化、14 个候选顺序、first-safe 与失败边界 | 纯逻辑；不依赖 Three.js/World |
 | `scripts/check-bed.mjs` | 床朝向/配对/锚点、BLOCKS/ITEMS 元数据、3×3 配方和羊毛 loot 来源 | 纯逻辑/静态数据；不启动浏览器 |
+| `scripts/check-sleep.mjs` | 24000 tick 归一化、晴/雨睡眠窗口、雷暴例外、清晨目标、多人 quorum/percentage | 纯逻辑；第 13 套质量门 |
 | `scripts/check-mobile.mjs` | 手机设备判定、Desktop/Touch 适配器与 Player 输入解耦静态契约 | Node 22；Android Chromium 真实交互另由 mobile E2E 覆盖 |
 | `scripts/check-controls.mjs` | ControlIntent v1、source 合并、primary edge、look/action、desktop/touch/network-peer 等价性 | 纯逻辑；连续控制 wire 协议前置契约 |
 | `scripts/check-network-view.mjs` | 绝对 yaw/pitch canonicalization、strict decoder、device/source 无关性与 malformed view frame 拒绝 | 纯逻辑；未来服务端视线/交互校验前置契约 |
@@ -70,7 +72,7 @@
 | `tests/e2e/smoke.spec.mjs` | Chromium 主世界、普通死亡回收、自定义 `/spawnpoint` 与床重生锚点四世界集成 | 桌面玩法回归；床仍经过真实 raycast/right-click/persist/death/respawn；全程捕获 page/console error |
 | `tests/e2e/mobile.spec.mjs` | Android Mobile UA + touch 的横屏浏览器集成 | 横竖屏检测、无 Pointer Lock、背包/暂停/视角、摇杆位移和触控热栏 |
 | `playwright.config.mjs` | browser smoke 超时、单 worker、Chromium/WebGL、失败工件 | CI 优先稳定性 |
-| `package.json` | Node 22+ 测试脚本与固定 Playwright | `test:logic` 顺序跑基础/armor/water/oxygen/swim/weather/death/respawn/bed/mobile/controls/network-view 十二套测试 |
+| `package.json` | Node 22+ 测试脚本与固定 Playwright | `test:logic` 顺序跑基础/armor/water/oxygen/swim/weather/death/respawn/bed/mobile/controls/network-view/sleep 十三套测试 |
 | `.github/workflows/quality.yml` | Node + Chromium 两层质量门 | PR/main 自动执行；同 ref 新 push 会取消旧 run |
 | `.github/workflows/pages.yml` | GitHub Pages 自动部署 | main 更新触发 |
 | `docs/ARCHITECTURE.md` | 架构决策、数据流、技术债 | 架构变化同步更新 |

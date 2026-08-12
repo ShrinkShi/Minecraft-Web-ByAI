@@ -12,10 +12,11 @@
 - GitHub Pages 仓库发布源已设置为 **GitHub Actions**，并持续验证完整 `configure → artifact upload → deploy` 流水线。
 - 固定 `@playwright/test` `1.62.0`，要求 Node 22+；`scripts/serve.mjs` 作为本地/CI 浏览器测试统一 HTTP server。
 - `Repository quality` 为两层质量门：`static-checks` 成功后运行 Chromium `browser-smoke`；同 `github.ref` 新 push 会取消旧 run。
-- `static-checks` 同时检查 `src/*.js`、`scripts/*.mjs`；`npm run test:logic` 现在顺序执行基础、Equipment/Armor、Water Mesh、Oxygen/Drowning、Swimming/Buoyancy、Weather/Precipitation、Death Integration、Custom Respawn、Bed Rules、Mobile Device/Input、Unified Control Intent、Absolute View Frame 共十二套回归。
+- `static-checks` 同时检查 `src/*.js`、`scripts/*.mjs`；`npm run test:logic` 现在顺序执行基础、Equipment/Armor、Water Mesh、Oxygen/Drowning、Swimming/Buoyancy、Weather/Precipitation、Death Integration、Custom Respawn、Bed Rules、Mobile Device/Input、Unified Control Intent、Absolute View Frame、Bed Sleep/Quorum 共十三套回归。
 - 新增 `scripts/check-death.mjs`：锁定死亡 DOM/样式引用、`DeathScreen`/`deathState`/显式重生接线，禁止旧 `respawnPlayer()` 和一次性 death patch 工具重新进入交付树。
 - 新增 `scripts/check-respawn.mjs`：覆盖自定义重生点归一化、14 个固定候选顺序、first-safe 解析和失败边界。
 - 新增 `scripts/check-bed.mjs`：覆盖 8 个床 ID、四方向朝向、foot/head 配对、统一重生锚点、方块/物品元数据、3×3 床配方和羊毛 loot 来源。
+- 新增第 13 套 `scripts/check-sleep.mjs`：覆盖晴/雨睡眠窗口、雷暴例外、清晨目标和多人 sleeper percentage/quorum；浏览器床用例验证真实夜间用床会把共享 world clock 跳到清晨。
 - 主线 `7e2a4920...` 验收发现 PR #16 的死亡界面曾半落库：`death.css`/`death-screen.js` 存在，但 `index.html` 缺 DOM/样式引用，`main.js` 仍走立即重生且遗留 patch workflow/script；PR #19 将运行时、DOM 与质量门统一恢复，并以两条 Chromium 死亡链重新验收。
 - 新增 `scripts/check-water.mjs`：孤立水、同水内部面、水/实体边界、Transferable buffers、跨 chunk 同水面。
 - 新增 `scripts/check-oxygen.mjs`：15 秒空气、4× 恢复、模式边界、跨 0 点、每秒溺水事件与非法输入。
@@ -58,7 +59,8 @@
 - 新增两格床基础：四方向 foot/head voxel ID，按玩家水平视线原子放置；右键任一端经共享 `setRespawnPoint()` 设置床锚点，破坏任一端会联动删除预期配对端并只掉 1 床。
 - 新增床物品与 3×3 配方：3 `white_wool` + 3 橡木木板→1 床，羊既有 loot 作为真实羊毛来源；床图标为程序化 SVG。
 - `mesh-worker.js` 增加通用 per-block vertex tint；床当前用红色 tint + 现有木板 tile 形成明显占位视觉，仍是两个整格 voxel 的过渡 mesh/collision。
-- 新增第四条 Chromium 床用例：`/give bed` 后真实从背包主区移到热栏，再通过 Pointer Lock + 鼠标视角 + 右键放置/激活；v6 快照必须同时包含两端 bed edits 与 respawnPoint，异地死亡后显式重生回床锚点。
+- 新增第四条 Chromium 床用例：`/give bed` 后真实从背包主区移到热栏，再通过 Pointer Lock + 鼠标视角 + 右键放置/激活；v6 快照必须同时包含两端 bed edits 与 respawnPoint，夜间再次使用同一床必须跳到约 1000 tick 清晨，异地死亡后显式重生仍回床锚点。
+- 新增 `sleep-rules.js`：当前单人 1/1 睡眠立即跳夜并清除降水，同时预先建模未来服务器的 sleepingPlayers/totalPlayers/percentage quorum；PC/手机不拥有各自的睡眠规则。
 - `Equipment` 独立 head/chest/legs/feet 四槽；皮革帽子/外套/裤子/靴子护甲点 1/3/2/1。
 - `armor-rules.js`：过渡公式每护甲点 4%、最高 80%，完整皮革套 28%。
 - 僵尸/蜘蛛近战、骷髅箭矢和苦力怕爆炸经过基础护甲减伤；虚空与溺水绕过护甲。
