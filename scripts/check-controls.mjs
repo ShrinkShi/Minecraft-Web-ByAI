@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import './check-network-view.mjs';
 import {CONTROL_INTENT_VERSION,CONTROL_ACTIONS,ControlIntentBus,normalizeControlState} from '../src/control-intents.js';
 import {PLAYER_CONTROL_FRAME_VERSION,PLAYER_CONTROL_BUTTONS,encodePlayerControlFrame,decodePlayerControlFrame,isCompatibleControlFrame} from '../src/player-control-frame.js';
 
