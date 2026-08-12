@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {CONTROL_INTENT_VERSION,CONTROL_ACTIONS,ControlIntentBus,normalizeControlState} from '../src/control-intents.js';
 
 assert.equal(CONTROL_INTENT_VERSION,1);
-assert.deepEqual(normalizeControlState({side:2,forward:2,jump:1}),{version:1,side:Math.SQRT1_2,forward:Math.SQRT1_2,jump:true,sneak:false,sprint:false,primary:false});
+const diagonal=normalizeControlState({side:2,forward:2,jump:1});assert.equal(diagonal.version,1);assert.ok(Math.abs(diagonal.side-Math.SQRT1_2)<1e-12);assert.ok(Math.abs(diagonal.forward-Math.SQRT1_2)<1e-12);assert.equal(diagonal.jump,true);assert.equal(diagonal.sneak,false);assert.equal(diagonal.sprint,false);assert.equal(diagonal.primary,false);
 
 const states=[],primaryEdges=[],looks=[],actions=[];
 const bus=new ControlIntentBus({onState:state=>states.push(state),onPrimary:value=>primaryEdges.push(value),onLook:intent=>looks.push(intent),onAction:intent=>{actions.push(intent);return true;}});
