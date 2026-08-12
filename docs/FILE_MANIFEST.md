@@ -8,7 +8,7 @@
 | `styles.css` | 像素风基础界面与 HUD 样式 | 避免逐帧触发布局 |
 | `armor.css` | 四个 Equipment 槽和 HUD 护甲图标样式 | 只负责表现；护甲点/槽状态来自 Equipment |
 | `src/main.js` | 应用状态机、Three.js 场景、系统编排、交互、投射物/奖励/死亡/护甲接线与自动保存 | 不执行区块生成和网格重计算重活；护甲只通过规则模块减伤 |
-| `src/blocks.js` | 方块 ID、属性、atlas 索引、基础掉落约束 | 数据定义保持可序列化 |
+| `src/blocks.js` | 方块 ID、属性、atlas 索引、基础掉落约束 | 水通过 `liquid/transparent` 元数据参与 mesh pass 分类；数据定义保持可序列化 |
 | `src/items.js` | 物品定义、方块物品映射、工具/攻击/皮革护甲元数据和临时 loot 图标 | armorSlot/armorPoints 是静态元数据；不保存运行时装备状态 |
 | `src/inventory.js` | 36 格库存、cursor、堆叠、Shift 移动、死亡 `drain()` | 与 Equipment 分离；drain 必须复制后清空 cursor 与全部 slot |
 | `src/equipment.js` | head/chest/legs/feet 四槽、部位校验、cursor 拖放、快照恢复、总护甲点和死亡 `drain()` | 可序列化；不引用 DOM/Three.js；非法部位/非护甲快照必须过滤 |
@@ -30,23 +30,24 @@
 | `src/mobs.js` | 被动/敌对生物静态规则、生成选择、loot/xp 表与可注入 RNG roll | 僵尸/骷髅/苦力怕/蜘蛛只存规则，不直接操作 HUD/存档 |
 | `src/passive-mobs.js` | 被动生物生成、10 Hz 漫游/逃跑、命中、伤害/击退、死亡事件和视觉回收 | 使用 EntityStore/SpatialHash；死亡通过 callback 解耦奖励层 |
 | `src/hostile-mobs.js` | 僵尸近战、骷髅远程/侧移、苦力怕 fuse、蜘蛛追击/局部攀爬、夜间生成、伤害与死亡事件 | AI 只发伤害/投射物/爆炸事件；主编排层负责护甲减伤 |
-| `src/world-worker.js` | 程序化地形生成 | Worker 线程；Transferable 返回区块 |
-| `src/mesh-worker.js` | 可见面判定与区块 Buffer 数据构建 | Worker 线程；精确 TypedArray；Transferable 返回 |
-| `src/world.js` | 区块流式生命周期、方块查询/编辑、GPU mesh 安装 | 卸载区块必须 `geometry.dispose()`；raycast 是投射物方块阻挡的当前基础 |
-| `src/player.js` | 输入、AABB 碰撞、视角、玩家快照、受伤/击退/重生和第三人称占位模型 | 不持有 Equipment；虚空死亡直接令 hp=0，因此不会被护甲错误减免 |
+| `src/world-worker.js` | 程序化地形生成 | Worker 线程；Transferable 返回区块；仍只负责 voxel 数据，不负责 GPU pass |
+| `src/mesh-worker.js` | 可见面判定与区块 Buffer 数据构建；一次 chunk 扫描分别构建 `opaque` / `water` mesh payload | Worker 线程；两套精确 TypedArray + Transferable；同水面含跨 chunk 边界剔除；opaque 旧顶层字段仅作临时兼容 |
+| `src/world.js` | 区块流式生命周期、方块查询/编辑、opaque/water GPU mesh 安装 | 每 chunk 最多一个 opaque + 一个 water mesh；共享 atlas，水单独透明 material；卸载时两套 geometry 都必须 `dispose()` |
+| `src/player.js` | 输入、AABB 碰撞、视角、玩家快照、受伤/击退/重生和第三人称占位模型 | 不持有 Equipment；虚空死亡直接令 hp=0，因此不会被护甲错误减免；尚无水下/游泳状态 |
 | `src/storage.js` | IndexedDB 通用 world record 存取 | DB schema 仍 v1；逻辑快照当前 v5，新增 Equipment 不要求 object-store 迁移 |
 | `src/ui.js` | HUD、背包/合成/Equipment UI、聊天、加载反馈 | UI 只通过 Inventory/Equipment API 改状态；装备变化刷新 HUD 并标记存档 dirty |
-| `assets/textures/atlas.png` | 基础方块纹理 atlas | 共享单纹理，减少材质/纹理切换 |
+| `assets/textures/atlas.png` | 基础方块纹理 atlas | opaque 与 water material 共享同一 Texture，避免重复 GPU texture；退出世界只 dispose 一次共享纹理 |
 | `assets/items/*.png` | 已有非方块物品真实图标 | loot/皮革护甲当前部分使用内联 SVG 占位，不伪装成正式素材 |
-| `scripts/check.mjs` | Inventory/Recipes/Commands/Entity/Combat/Projectile/Mob/Spider/Death/Loot/Experience/Workers 回归检查 | Node 22，无浏览器依赖 |
+| `scripts/check.mjs` | Inventory/Recipes/Commands/Entity/Combat/Projectile/Mob/Spider/Death/Loot/Experience/Workers 回归检查 | Node 22，无浏览器依赖；保留旧 opaque Worker 顶层协议测试作为兼容兜底 |
 | `scripts/check-armor.mjs` | Equipment 槽兼容、快照过滤、drain、护甲公式和 `/give` 护甲回归 | Node 22，纯逻辑，无 DOM/Three.js 依赖 |
+| `scripts/check-water.mjs` | opaque/water mesh pass、同水内部面、水/实体边界、transfer buffers 和跨 chunk 水面回归 | Node 22；直接驱动 mesh Worker，不依赖 WebGL；不能替代真实透明像素测试 |
 | `scripts/serve.mjs` | Playwright / 本地开发共用的跨平台静态 HTTP server | 只服务仓库根目录；阻止 path traversal；测试时 no-store |
-| `tests/e2e/smoke.spec.mjs` | Chromium 页面启动、真实护甲拖放/v5 存档、虚空死亡后装备/背包/XP 清算 | 固定 seed；IndexedDB 断言要求新鲜 updatedAt，避免旧快照假绿 |
+| `tests/e2e/smoke.spec.mjs` | Chromium 页面启动、真实护甲拖放/v5 存档、虚空死亡后装备/背包/XP 清算 | 世界创建会经过 opaque/water 新 Worker 协议；固定 seed；IndexedDB 断言要求新鲜 updatedAt |
 | `playwright.config.mjs` | 浏览器测试超时、单 worker、Chromium/WebGL 启动、静态服务器和失败工件策略 | CI 优先可重复性，不追求并行吞吐 |
-| `package.json` | Node 22+ 测试脚本与固定 Playwright 版本 | `test:logic` 同时跑基础和护甲测试；纯静态 Pages 运行不依赖 npm |
+| `package.json` | Node 22+ 测试脚本与固定 Playwright 版本 | `test:logic` 顺序跑基础、护甲、水 pass 三套测试；纯静态 Pages 运行不依赖 npm |
 | `.github/workflows/quality.yml` | Node 静态/逻辑检查 + Chromium browser smoke 两层质量门 | `src/*.js` 与 `scripts/*.mjs` 语法检查；同 ref 新 push 取消旧 run |
 | `.github/workflows/pages.yml` | GitHub Pages 自动部署 | main 更新触发；仓库 Pages Source 必须为 GitHub Actions |
 | `docs/ARCHITECTURE.md` | 架构决策、技术债与性能原则 | 每次架构变化同步更新 |
 | `docs/PROGRESS.md` | 功能完成状态与下一阶段 | 只勾选实际落库且验证过的功能 |
-| `docs/TESTING.md` | 测试覆盖与验证边界 | 明确区分规则测试、browser smoke 和完整 E2E |
+| `docs/TESTING.md` | 测试覆盖与验证边界 | 明确区分规则测试、Worker 协议测试、browser smoke 和视觉 E2E |
 | `CHANGELOG.md` | 面向版本的变更记录 | 每个正式功能 / 工程质量 commit 更新 |
