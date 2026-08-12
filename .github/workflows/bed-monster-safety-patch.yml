@@ -1,0 +1,34 @@
+name: Bed monster safety integration patch
+on:
+  push:
+    branches: [survival/v0.4-bed-monster-safety]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: survival/v0.4-bed-monster-safety
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: python scripts/patch-bed-monster-safety.py
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: |
+          node --check src/commands.js
+          node --check src/hostile-mobs.js
+          node --check src/main.js
+          node --check tests/e2e/smoke.spec.mjs
+          node scripts/check-sleep-safety.mjs
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/commands.js src/hostile-mobs.js src/main.js tests/e2e/smoke.spec.mjs
+          git commit -m "survival: block bed sleep near hostile mobs"
+          git push origin HEAD:refs/heads/survival/v0.4-bed-monster-safety
