@@ -1,0 +1,27 @@
+name: Sync mobile browser docs
+on:
+  push:
+    branches: [feat/v0.4-mobile-landscape-controls]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/v0.4-mobile-landscape-controls
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Patch mobile documentation
+        run: python scripts/patch-mobile-docs.py
+      - name: Commit documentation only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md CHANGELOG.md docs/ARCHITECTURE.md docs/PROGRESS.md docs/TESTING.md docs/FILE_MANIFEST.md
+          git commit -m "docs: record mobile landscape browser support"
+          git push origin HEAD:refs/heads/feat/v0.4-mobile-landscape-controls
