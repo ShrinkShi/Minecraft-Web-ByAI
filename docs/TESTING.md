@@ -25,10 +25,11 @@ scripts/check-respawn.mjs
 scripts/check-bed.mjs
 scripts/check-mobile.mjs
 scripts/check-controls.mjs
-scripts/check-network-view.mjs
+  -> scripts/check-network-view.mjs
+scripts/check-sleep.mjs
 ```
 
-基础套件覆盖 Inventory / Crafting / Commands / EntityStore / SpatialHash / 四种敌对生物 / Combat / Projectile / Experience / Spider / Death / Mesh Worker / Terrain Worker。
+基础套件覆盖 Inventory / Crafting / Commands / EntityStore / SpatialHash / 四种敌对生物 / Combat / Projectile / Experience / Spider / Death / Mesh Worker / Terrain Worker。`check-network-view.mjs` 由 `check-controls.mjs` 作为 wire-contract 子回归串联，避免与独立 gameplay suite 抢占 package 脚本入口。
 
 ### Equipment / Armor
 - 四个固定 Equipment 槽、错误部位拒绝、cursor 装备/取下。
@@ -110,6 +111,18 @@ Node 层只验证 profile，不导入 Three.js WeatherSystem；后者由 Chromiu
 
 `scripts/check-bed.mjs` 覆盖 8 个床 voxel ID 的唯一性、四方向 look→facing、foot/head 两端坐标、从任一端解析 partner、两端归一到同一 respawn anchor、BLOCKS/ITEMS/drop/tint 元数据、3×3 `3 wool + 3 planks -> bed` 配方消费，以及真实 sheep loot 的 `white_wool` 来源。2×2 工作区不得误匹配床配方。
 
+### Sleep rules
+
+`scripts/check-sleep.mjs` 覆盖：
+
+- 24000 tick 日周期与负数/跨日时间归一化。
+- clear 精确窗口 `12542..23459`；rain 使用独立、更宽的 `12010..23991` 窗口；thunder 全天允许睡眠。
+- 未知 weather 直接拒绝，避免把协议错误静默当作 clear。
+- sleeper percentage 为 Java 风格非负 32-bit 整数：0% 仍至少要求 1 名玩家；50/100% 按 `ceil(total × percentage / 100)`；101% 等大于 100 的值允许存在并自然形成超过在线人数的不可达 quorum，而不是报参数错误。
+- solo ready、多人 waiting/ready、thunder 白天 ready、sleepingPlayers 超出总人数等边界。
+
+当前 runtime 单人仍按 1/1 quorum 立即跳到 `MORNING_TIME=1000`。真实 Java 的 101-tick 入睡过程、睡眠动画、床占用、附近敌对生物限制与维度爆炸不在本轮实现范围内，因此这些行为不能被该纯规则回归误标为完成。
+
 ### Mobile device / input contract
 
 `scripts/check-mobile.mjs` 覆盖桌面 Chrome、Android、iPhone portrait、iPadOS 桌面 UA 回退、带触摸屏 Windows 笔记本 false-positive 保护，以及 `userAgentData.mobile`。静态 contract 同时要求移动端 DOM/CSS、`MobileControls`、`DesktopControls` 与 Player DOM 输入解耦、共享 `ControlIntentBus` 主/副交互和 HUD hotbar touch index 接线存在。
@@ -145,7 +158,6 @@ npm run test:e2e
 
 当前天气 browser smoke 验证的是命令→profile→固定池数量→主循环/Three.js 生命周期，不做截图像素比较；屋顶遮雨、雨滴碰撞、透明效果和不同 GPU 的实际像素结果仍是未覆盖边界。
 
-
 ### Recoverable death / pickup browser regression
 
 第二条独立 Chromium 用例使用世界 `CI Recoverable Death`：
@@ -172,16 +184,17 @@ npm run test:e2e
 4. 显式点击“重生”，最终 debug XYZ 必须回到持久化自定义点（允许 0.15 格浮点观测误差）。
 5. 该测试不直接修改 respawnPoint/Player/IndexedDB，并持续捕获 pageerror/console error。
 
-### Bed respawn-anchor browser regression
+### Bed respawn-anchor / sleep browser regression
 
 第四条独立 Chromium 用例使用世界 `CI Bed Anchor`：
 
 1. 在平原世界非原点落地，`/give bed 1` 后按真实 UI 流程打开背包，将主背包槽 0 的床移动到热栏槽 27，并断言 HUD 当前选中物品确实是“床”。
 2. 获取真实 Pointer Lock，用鼠标向下看并右键世界；必须出现“放置 床”，说明运行时确实经过准星 raycast 和 `placeBed()`，不是直接写 voxel。
-3. 再次右键已放置床，必须出现“重生点已设置”。
-4. 暂停后只接受新鲜 v6 world record，并要求 edits 同时包含一对朝北床 ID `11/12`，且 `respawnPoint` 已保存。
-5. 返回游戏后传送到远处 `/kill`，显式“重生”后的公开 debug XYZ 必须回到保存的床锚点。
-6. 全程捕获 pageerror/console error；测试不直接修改 world edits、respawnPoint 或 IndexedDB。
+3. 再次右键已放置床，必须出现“重生点已设置”；白天使用仍只设置 respawn，不跳时间。
+4. 执行 `/time set night`，再次右键同一张真实床；toast 必须出现“已睡到清晨”，公开 debug `Time` 必须回到约 `1000..1199`，证明共享 world clock 而不是仅 UI 文案发生变化。
+5. 暂停后只接受新鲜 v6 world record，并要求 edits 同时包含一对朝北床 ID `11/12`，且 `respawnPoint` 已保存。
+6. 返回游戏后传送到远处 `/kill`，显式“重生”后的公开 debug XYZ 必须回到保存的床锚点。
+7. 全程捕获 pageerror/console error；测试不直接修改 world edits、respawnPoint、gameTime 或 IndexedDB。
 
 ### Android landscape mobile browser regression
 
@@ -208,7 +221,6 @@ npm run test:e2e
 
 - 真实 Android Chrome/Samsung Internet 与 iOS Safari 设备矩阵；当前自动移动端回归是 Chromium + Android UA/touch emulation。
 - 可选浏览器 fullscreen/orientation-lock、虚拟按键布局/灵敏度自定义、haptics、PWA 安装/离线缓存和更复杂的移动端 crafting 长按/拆分手势。
-
 - 自动天气周期和 weather duration。
 - 群系降水/雪、屋顶遮雨、雨线 world collision、地面 splash/湿润、闪电 flash/bolt/damage/sound。
 - 天气粒子的像素级密度、blending、不同 GPU/浏览器表现。
@@ -221,6 +233,6 @@ npm run test:e2e
 - 普通可恢复死亡的物品和 XP 球回收均已覆盖；装备掉落的单独可恢复死亡拾回断言仍未覆盖。
 - 死亡界面“返回标题画面”按钮的专门 browser E2E；运行时会 force-save 已结算的 hp=0 状态，重新进入时优先使用持久化自定义重生点，失效才回世界出生点。
 - 自定义重生点被方块阻塞时周边候选/fallback 的专门 Chromium 场景；纯规则候选顺序已有 Node 回归。
-- 床半高专用 mesh/collision、睡觉/跳夜、占用、附近怪物限制、床支撑更新、下界/末地爆炸和联动破坏的专门 Chromium 断言尚未覆盖；当前 browser E2E 聚焦真实放置→激活→重生锚点主链。
+- 床半高专用 mesh/collision、101-tick 入睡延迟/动画、占用、附近怪物限制、床支撑更新、下界/末地爆炸和联动破坏的专门 Chromium 断言尚未覆盖；当前 browser E2E 聚焦真实放置→激活→夜间跳时→重生锚点主链。
 - 死亡世界实体跨页面持久化、IndexedDB 配额/schema 迁移。
 - Three.js 运行时仍依赖 jsDelivr。
