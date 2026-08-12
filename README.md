@@ -2,7 +2,7 @@
 
 一个面向现代浏览器的体素沙盒复刻 / 重实现项目。目标不是照搬 Minecraft Java 版的内部实现，而是在保留经典玩法和交互语义的前提下，用浏览器并行能力、流式区块、紧凑数据结构、显式 GPU 生命周期和现代持久化重新实现核心系统。
 
-> 稳定发布基线：`v0.3.0`。当前 `main` 开发线为 `v0.4.0-dev`：实体数据层、第一批被动生物、四种敌对生物、基础战斗、箭矢/爆炸、战利品/经验、生存死亡损失、第一版护甲装备系统、水独立透明渲染 pass、水下氧气/溺水，以及基础游泳/浮力已经落库；流体传播、完整冲刺游泳、天气粒子和完整伤害公式等仍属于后续工作。
+> 稳定发布基线：`v0.3.0`。当前 `main` 开发线为 `v0.4.0-dev`：实体数据层、第一批被动生物、四种敌对生物、基础战斗、箭矢/爆炸、战利品/经验、生存死亡损失、第一版护甲装备系统、水独立透明渲染 pass、水下氧气/溺水、基础游泳/浮力，以及可见降雨/雷雨粒子已经落库；流体传播、完整冲刺游泳、自动天气周期/闪电和完整伤害公式等仍属于后续工作。
 
 在线构建：`https://shrinkshi.github.io/Minecraft-Web-ByAI/`
 
@@ -21,11 +21,13 @@
 - 水使用独立透明材质（当前 opacity 0.68、`depthWrite=false`）并与普通方块共享 atlas texture。
 - 玩家头部/眼睛所在 voxel 为 liquid 时判定为浸水；生存/冒险拥有 15 秒空气，离水后按每秒 4 秒额度恢复；空气耗尽后每秒受到 2 HP 溺水伤害。
 - 氧气 HUD 使用 10 个气泡显示，只在头部浸水或空气尚未恢复满时出现；创造/旁观不会消耗空气或溺水。
-- 氧气是瞬时环境状态，不写入 IndexedDB；重生、退出世界或切换到创造/旁观会恢复满空气。
 - 玩家脚部、躯干、眼睛三个 voxel 会参与水体覆盖率采样；覆盖越高，水平移动越接近陆地速度的 50%。
 - 水中使用独立垂直物理：重力显著降低，完整浸水有轻微浮力；Space 向上游、Shift 下潜，垂直速度约限制在 +3.4 / -3.0。
-- 游泳仍复用 PlayerController 原有 AABB 碰撞与轴向积分，不在主循环叠加第二套位置更新；离开水体后自动回到原陆地重力/跳跃路径。
-- 当前没有水流推动、流体传播、动态液面、冲刺游泳姿态/爬行过渡、水下 fog/折射或水下呼吸效果。
+- 游泳仍复用 PlayerController 原有 AABB 碰撞与轴向积分；当前没有水流推动、流体传播、动态液面、冲刺游泳姿态/爬行过渡或水下 fog/折射。
+- `/weather clear|rain|thunder` 现在同时改变环境光与可见天气 FX。雨和雷雨使用一个固定容量 `THREE.LineSegments` 池，不为每根雨线创建 Mesh。
+- 固定池上限为 720 条雨线：rain 激活 446 条，thunder 激活 720 条；雷雨拥有更高下落速度、更长雨线、更强风偏和更高透明度。
+- 雨线围绕玩家约 16 格范围复用/重生，底层位置数据只更新同一块动态 Float32Array；世界退出时显式释放 weather geometry/material。
+- 当前天气仍由指令或存档状态决定，没有自动天气周期、群系降水、屋顶遮雨、雨滴碰撞/飞溅、积雪/湿润、闪电实体/伤害或天气音效。
 - 草方块、泥土、石头、圆石、沙子、木板、原木、树叶、水、工作台等基础方块。
 - 左键持续挖掘、工具影响基础挖掘速度、右键放置。
 - 方块掉落物实体：简单重力、漂浮旋转、拾取、5 分钟销毁。
@@ -34,9 +36,9 @@
 - 3×3 工作台：当前至少可制作木镐。
 - 玩家 AABB 碰撞、重力、跳跃、掉落保护重生。
 - 基础生命、饱食度、经验、护甲和氧气 HUD。
-- IndexedDB 自动保存玩家状态、背包、四个护甲槽、经验和方块修改；再次进入相同“世界名称 + seed”会恢复。氧气和 swimCoverage 都是瞬时状态，不进入存档。
+- IndexedDB 自动保存玩家状态、背包、四个护甲槽、经验、天气和方块修改；再次进入相同“世界名称 + seed”会恢复。氧气和 swimCoverage 是瞬时状态，不进入存档。
 - T 打开聊天，`/` 直接输入指令；当前支持 `/gamemode`、`/give`、`/tp`、`/time set`、`/weather`、`/help`。
-- 昼夜光照随 24000 tick 周期变化；天气指令当前只改变天空/环境光强度。
+- 昼夜光照随 24000 tick 周期变化。
 - 文本“AI 地形提示词”会影响程序化地形参数；真正扩散模型高度图生成接口尚未接入。
 
 ### v0.4 开发线已经落库的实体 / 战斗 / 死亡 / 护甲能力
@@ -72,7 +74,7 @@ npm run serve
 
 ## 自动检查
 
-纯逻辑 / Worker / 护甲 / 水网格 / 氧气 / 游泳回归：
+纯逻辑 / Worker / 护甲 / 水网格 / 氧气 / 游泳 / 天气回归：
 
 ```bash
 npm run test:logic
@@ -86,23 +88,24 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-`Repository quality` 在 PR 和 `main` push 时先执行 Node 规则层，再用 Chromium 真正创建海洋测试世界，验证头部浸水、氧气下降、Space 上游、Shift 下潜、离水恢复，同时继续验证护甲 v5 IndexedDB 快照和虚空死亡清算。Node 层独立验证水体覆盖率、干燥路径 no-op、水平速度插值、浮力/上下游和限速。测试边界见 [`docs/TESTING.md`](docs/TESTING.md)。
+`Repository quality` 在 PR 和 `main` push 时先执行 Node 规则层，再用 Chromium 创建固定海洋测试世界，验证水体/氧气/游泳，并实际执行 `/weather rain → thunder → clear`，要求 WeatherFX 活跃条数 446 → 720 → 0；随后继续验证护甲 v5 IndexedDB 快照和虚空死亡清算。测试边界见 [`docs/TESTING.md`](docs/TESTING.md)。
 
 ## 技术方向
 
 - 渲染：Three.js + WebGL2 路线，后续保留 WebGPU renderer 迁移路径。
 - 世界：16×16×64 区块，紧凑 `Uint8Array` 方块存储。
 - 生成：独立 terrain Web Worker。
-- 网格：独立 mesh Web Worker；同一次 chunk 扫描分别生成 opaque / water 可见面，并返回两套 TypedArray / Transferable buffers。opaque 旧顶层字段暂时保留为兼容视图，运行时只消费新分层协议。
-- 水渲染：每 chunk 最多一个透明 water mesh；与 opaque mesh 共享 atlas，独立材质与 render order；chunk 卸载和世界退出时两套 geometry 都显式释放。
-- 水下生存：主线程采样玩家 eye voxel；`oxygen-rules.js` 维护纯逻辑空气状态和溺水事件，不把短时空气值写入 world record。
-- 水中运动：`PlayerController` 采样脚/躯干/眼睛水体覆盖率，`swim-rules.js` 只负责速度倍率和垂直速度更新；实际碰撞与位移仍走 Player 的单一积分路径。
+- 网格：独立 mesh Web Worker；同一次 chunk 扫描分别生成 opaque / water 可见面，并返回两套 TypedArray / Transferable buffers。opaque 旧顶层字段暂时保留为兼容视图。
+- 水渲染：每 chunk 最多一个透明 water mesh；与 opaque mesh 共享 atlas，独立材质与 render order。
+- 水下生存：主线程采样玩家 eye voxel；`oxygen-rules.js` 维护纯逻辑空气状态和溺水事件。
+- 水中运动：`PlayerController` 采样脚/躯干/眼睛水体覆盖率，`swim-rules.js` 负责速度倍率和垂直速度更新；实际碰撞与位移仍走 Player 的单一积分路径。
+- 天气：`weather-rules.js` 是纯 profile；`WeatherSystem` 使用固定 720 线段动态池，按玩家位置循环复用，不产生按雨滴增长的对象/geometry 数量。
 - 流式：玩家位置驱动加载；渲染距离外增加 1 chunk 滞回后卸载。
-- 存档：IndexedDB，仅保存程序化世界的增量编辑、玩家/背包/Equipment/经验快照，不保存 oxygen/swimCoverage 瞬时状态。
-- 实体：EntityStore 管身份与组件，SpatialHash 缩小邻域查询候选集；AI 固定低频 tick、视觉逐帧插值。
-- 装备：Equipment 是独立可序列化模型；减伤公式与 UI/存档分离，便于未来替换成 Java 风格 armor+toughness 规则而不迁移槽结构。
-- 生命周期：区块卸载时显式 `dispose()` opaque/water GPU geometry；掉落物、经验球、投射物、玩家和生物视觉对象都有显式销毁路径。
-- 后续：死亡界面/统计与床重生、完整伤害/护甲/耐久/附魔、流体传播/水流/冲刺游泳与水下视觉、天气粒子、状态效果、村民交易、酿造、维度、结构、多人生存网络层、真正 AI 地形管线。
+- 存档：IndexedDB 保存程序化世界增量编辑、玩家/背包/Equipment/经验和已有 weather 状态，不保存 oxygen/swimCoverage 瞬时状态。
+- 实体：EntityStore 管身份与组件，SpatialHash 缩小邻域查询候选集；AI 固定低频 tick。
+- 装备：Equipment 独立可序列化；减伤公式与 UI/存档分离。
+- 生命周期：chunk opaque/water geometry、WeatherSystem、掉落物、经验球、投射物、玩家和生物视觉对象都有显式销毁路径。
+- 后续：死亡界面/床重生、完整伤害/护甲/耐久/附魔、流体传播/水流/冲刺游泳与水下视觉、自动天气/闪电/雪、状态效果、村民交易、酿造、维度、结构、多人生存网络层、真正 AI 地形管线。
 
 ## 文档
 
