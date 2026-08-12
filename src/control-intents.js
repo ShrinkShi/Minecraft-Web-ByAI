@@ -1,6 +1,6 @@
 export const CONTROL_INTENT_VERSION=1;
 export const CONTINUOUS_CONTROLS=Object.freeze(['jump','sneak','sprint','primary']);
-export const CONTROL_ACTIONS=Object.freeze(['focus','escape','inventory','view','chat','drop','hotbar-select','hotbar-step','secondary']);
+export const CONTROL_ACTIONS=Object.freeze(['focus','escape','pause','inventory','view','chat','drop','hotbar-select','hotbar-step','secondary']);
 
 const clamp=(value,min=-1,max=1)=>Math.max(min,Math.min(max,Number(value)||0));
 const buttonSet=new Set(CONTINUOUS_CONTROLS),actionSet=new Set(CONTROL_ACTIONS);
