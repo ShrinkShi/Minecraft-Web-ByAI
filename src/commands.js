@@ -31,6 +31,15 @@ export function executeCommand(text,ctx){
     const p=ctx.player.position,x=num(parts[0],p.x),y=num(parts[1],p.y),z=num(parts[2],p.z);if(![x,y,z].every(Number.isFinite))return fail('坐标无效');
     ctx.teleport(x,y,z);return ok(`已传送至 ${x.toFixed(1)} ${y.toFixed(1)} ${z.toFixed(1)}`);
   }
+  if(name==='spawnpoint'){
+    if(parts.length!==0&&parts.length!==3)return fail('用法：/spawnpoint [x y z]');
+    const p=ctx.player?.position;if(!p)return fail('当前环境没有玩家位置');
+    const x=parts.length?num(parts[0],p.x):p.x,y=parts.length?num(parts[1],p.y):p.y,z=parts.length?num(parts[2],p.z):p.z;
+    if(![x,y,z].every(Number.isFinite))return fail('重生点坐标无效');
+    if(typeof ctx.setSpawnpoint!=='function')return fail('当前环境不支持 /spawnpoint');
+    const accepted=ctx.setSpawnpoint(x,y,z);if(accepted===false)return fail('无法设置重生点');
+    return ok(`已将重生点设置为 ${x.toFixed(1)} ${y.toFixed(1)} ${z.toFixed(1)}`);
+  }
   if(name==='xp'||name==='experience'){
     const action=(parts.shift()||'').toLowerCase();
     const amount=Number(parts.shift());
@@ -52,7 +61,7 @@ export function executeCommand(text,ctx){
   if(name==='weather'){
     const weather=(parts[0]||'').toLowerCase();if(!['clear','rain','thunder'].includes(weather))return fail('用法：/weather <clear|rain|thunder>');ctx.setWeather(weather);return ok(`天气已设为 ${weather}`);
   }
-  if(name==='help')return ok('可用：/gamemode /give /tp /kill /xp /time set /weather /help');
+  if(name==='help')return ok('可用：/gamemode /give /tp /spawnpoint /kill /xp /time set /weather /help');
   return fail(`未知指令：/${name}`);
 }
 
