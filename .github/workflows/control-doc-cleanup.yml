@@ -1,0 +1,29 @@
+name: Final control documentation cleanup
+on:
+  push:
+    branches: [refactor/v0.4-unified-control-intents]
+permissions:
+  contents: write
+jobs:
+  docs:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: refactor/v0.4-unified-control-intents
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: python scripts/patch-control-doc-cleanup.py
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: npm run test:logic
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/ARCHITECTURE.md docs/FILE_MANIFEST.md
+          git commit -m "docs: remove stale split-input architecture wording"
+          git push origin HEAD:refs/heads/refactor/v0.4-unified-control-intents
