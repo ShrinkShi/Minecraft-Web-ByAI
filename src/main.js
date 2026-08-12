@@ -2,6 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.m
 import {VoxelWorld} from './world.js';
 import {PlayerController} from './player.js';
 import {UI} from './ui.js';
+import {DeathScreen} from './death-screen.js';
 import {BLOCKS} from './blocks.js';
 import {ITEMS} from './items.js';
 import {Inventory} from './inventory.js';
@@ -35,21 +36,22 @@ const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.05,180);
 const hemi=new THREE.HemisphereLight(0xbfe4ff,0x6a5a42,2.4);scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xfff1c2,2.1);sun.position.set(80,120,60);scene.add(sun);
 
-const ui=new UI(),storage=new WorldStorage();
+const ui=new UI(),storage=new WorldStorage(),deathScreen=new DeathScreen();
 let world=null,player=null,inventory=null,equipment=null,drops=null,experienceOrbs=null,projectiles=null,explosions=null,passiveMobs=null,hostileMobs=null,weatherSystem=null;
 let running=false,paused=false,last=performance.now(),selectedTarget=null,breakStart=0,lastSecond=0,frames=0,fps=0,worldInfo=null,lastAttackAt=-Infinity;
 let saveDirty=false,saveInFlight=null,saveAgain=false,lastSaveAt=0,lastSavedPosition=null,gameTime=6000,weather='clear',totalXp=0;
 let oxygenState=createOxygenState(),headSubmerged=false;
+let deathState=null;
 
-function modeScreen(name){ui.showScreen(name==='main'?ui.main:name==='world'?ui.worldMenu:name==='pause'?ui.pause:null);}
-function pointer(){if(running&&!paused&&!ui.hasOpenPanel()&&!ui.isChatOpen())canvas.requestPointerLock().catch(()=>{});}
-function canControl(){return running&&!paused&&!ui.hasOpenPanel()&&!ui.isChatOpen()&&document.pointerLockElement===canvas;}
+function modeScreen(name){ui.showScreen(name==='main'?ui.main:name==='world'?ui.worldMenu:name==='pause'?ui.pause:name==='death'?deathScreen.root:null);}
+function pointer(){if(running&&!paused&&!deathState&&!ui.hasOpenPanel()&&!ui.isChatOpen())canvas.requestPointerLock().catch(()=>{});}
+function canControl(){return running&&!paused&&!deathState&&!ui.hasOpenPanel()&&!ui.isChatOpen()&&document.pointerLockElement===canvas;}
 function markSaveDirty(){saveDirty=true;}
 function renderPlayerStatus(){if(!player)return;const xp=experienceState(totalXp);ui.renderStatus(player.hp,player.hunger,xp.progress*100,xp.level,equipment?.armorPoints()||0);}
 function resetOxygen(){oxygenState=createOxygenState();headSubmerged=false;ui.renderOxygen(MAX_AIR_SECONDS,MAX_AIR_SECONDS,false);}
 
 function disposeWorld(){
-  running=false;document.exitPointerLock?.();ui.closeChat();ui.inventory.classList.add('hidden');ui.workbench.classList.add('hidden');resetOxygen();
+  running=false;deathState=null;deathScreen.hide();document.exitPointerLock?.();ui.closeChat();ui.inventory.classList.add('hidden');ui.workbench.classList.add('hidden');resetOxygen();
   weatherSystem?.dispose();explosions?.dispose();projectiles?.dispose();hostileMobs?.dispose();passiveMobs?.dispose();experienceOrbs?.dispose();drops?.dispose();player?.dispose();world?.dispose();
   weatherSystem=null;explosions=null;projectiles=null;hostileMobs=null;passiveMobs=null;experienceOrbs=null;drops=null;player=null;world=null;inventory=null;equipment=null;worldInfo=null;saveDirty=false;lastSavedPosition=null;lastAttackAt=-Infinity;totalXp=0;
 }
@@ -69,28 +71,35 @@ function drainDeathStacks(){
   if(!inventory)return[];const stacks=[...ui.craft2.drain(),...ui.craft3.drain(),...(equipment?.drain()||[]),...inventory.drain()];ui.inventory.classList.add('hidden');ui.workbench.classList.add('hidden');ui.closeChat();ui.refreshInventory();return stacks;
 }
 
-function respawnPlayer(reason='你死了'){
-  if(!player)return;const deathPosition=player.position.clone(),previousXp=totalXp,plan=deathLossPlan({mode:player.mode,totalXp:previousXp,position:deathPosition}),stacks=plan.losesInventory?drainDeathStacks():[];let lossMessage='';
+function beginPlayerDeath(reason='你死了'){
+  if(!player||deathState)return;
+  const deathPosition=player.position.clone(),previousXp=totalXp,plan=deathLossPlan({mode:player.mode,totalXp:previousXp,position:deathPosition}),stacks=plan.losesInventory?drainDeathStacks():[];
+  let detail=plan.losesInventory?'':'当前模式不会损失携带物品或经验。';
   if(plan.losesInventory){
     const itemCount=stacks.reduce((sum,stack)=>sum+stack.count,0);
     if(plan.recoverable){
       const origin=deathPosition.clone().add(new THREE.Vector3(0,.5,0));for(const stack of stacks)drops?.spawn(stack.id,stack.count,origin.clone());if(plan.droppedXp>0)experienceOrbs?.spawn(plan.droppedXp,origin.clone().add(new THREE.Vector3(0,.2,0)));
-      const parts=[];if(itemCount>0)parts.push(`${itemCount} 个物品`);if(plan.droppedXp>0)parts.push(`${plan.droppedXp} 点经验`);if(parts.length)lossMessage=`；${parts.join('、')}已掉落在死亡点`;
-    }else if(itemCount>0||previousXp>0)lossMessage='；虚空死亡使携带物品和经验无法回收';
+      const parts=[];if(itemCount>0)parts.push(`${itemCount} 个物品`);if(plan.droppedXp>0)parts.push(`${plan.droppedXp} 点经验`);detail=parts.length?`${parts.join('、')}已掉落在死亡点。`:'没有可掉落的携带物品或经验。';
+    }else detail=itemCount>0||previousXp>0?'虚空死亡使携带物品和经验无法回收。':'你掉出了世界边界。';
     if(plan.clearsExperience)totalXp=0;
   }
-  player.keys.clear();player.respawn(0,0);lastAttackAt=-Infinity;resetOxygen();renderPlayerStatus();ui.showToast(`${reason}，已在出生点重生${lossMessage}`);markSaveDirty();
+  player.keys.clear();player.velocity.set(0,0,0);lastAttackAt=-Infinity;resetOxygen();document.exitPointerLock?.();ui.closeChat();renderPlayerStatus();
+  deathState={reason,detail,position:{x:deathPosition.x,y:deathPosition.y,z:deathPosition.z},recoverable:plan.recoverable};deathScreen.set(reason,detail);modeScreen('death');markSaveDirty();void persistWorld(true);
+}
+
+function completeRespawn(){
+  if(!player||!deathState)return;player.respawn(0,0);lastAttackAt=-Infinity;resetOxygen();deathState=null;deathScreen.hide();modeScreen(null);renderPlayerStatus();markSaveDirty();ui.showToast('已重生');pointer();
 }
 
 function protectedDamage(amount){return mitigateArmorDamage(amount,equipment?.armorPoints()||0);}
 
 function handlePlayerHit({amount,source}){
-  if(!player)return;const result=player.takeDamage(protectedDamage(amount),performance.now(),source);if(!result.applied)return;markSaveDirty();renderPlayerStatus();if(result.dead)respawnPlayer();
+  if(!player||deathState)return;const result=player.takeDamage(protectedDamage(amount),performance.now(),source);if(!result.applied)return;markSaveDirty();renderPlayerStatus();if(result.dead)beginPlayerDeath();
 }
 
 function handlePlayerBlast({amount,source,knockback}){
-  if(!player)return;const result=player.takeDamage(protectedDamage(amount),performance.now(),null);if(!result.applied)return;
-  if(source&&Number.isFinite(knockback)&&knockback>0)player.knockbackFrom(source.x,source.z,Math.max(.25,knockback),Math.min(.55,.18+knockback*.3));markSaveDirty();renderPlayerStatus();if(result.dead)respawnPlayer('你被爆炸击倒了');
+  if(!player||deathState)return;const result=player.takeDamage(protectedDamage(amount),performance.now(),null);if(!result.applied)return;
+  if(source&&Number.isFinite(knockback)&&knockback>0)player.knockbackFrom(source.x,source.z,Math.max(.25,knockback),Math.min(.55,.18+knockback*.3));markSaveDirty();renderPlayerStatus();if(result.dead)beginPlayerDeath('你被爆炸击倒了');
 }
 
 function handleHostileProjectile({kind,damage,speed,source,target}){
@@ -120,17 +129,17 @@ async function startWorld(){
   ui.bindInventory(inventory,{equipment,onChanged:()=>{markSaveDirty();renderPlayerStatus();},onOverflow:spawnOverflow});running=true;paused=false;saveDirty=!saved;lastSavedPosition=player.position.clone();lastAttackAt=-Infinity;ui.hud.classList.remove('hidden');ui.showLoading(false);renderPlayerStatus();applySky();ui.chatMessage('夜间敌对池包括僵尸、骷髅、苦力怕和蜘蛛；水下会消耗氧气；天气指令会切换降雨粒子。');ui.showToast(saved?'已从浏览器存档恢复世界':mode==='creative'?'创造模式':'生存模式');pointer();
 }
 
-function pauseGame(){if(!running)return;paused=true;player?.keys.clear();document.exitPointerLock?.();modeScreen('pause');persistWorld();}
-function resume(){paused=false;modeScreen(null);pointer();}
-function toggleInventory(){if(!running||paused||ui.isChatOpen())return;if(ui.hasOpenPanel()){ui.closePanels();pointer();}else{player.keys.clear();document.exitPointerLock?.();ui.openInventory();}}
-function openWorkbench(){if(!running||paused)return;player.keys.clear();document.exitPointerLock?.();ui.openWorkbench();}
+function pauseGame(){if(!running||deathState)return;paused=true;player?.keys.clear();document.exitPointerLock?.();modeScreen('pause');persistWorld();}
+function resume(){if(deathState)return;paused=false;modeScreen(null);pointer();}
+function toggleInventory(){if(!running||paused||deathState||ui.isChatOpen())return;if(ui.hasOpenPanel()){ui.closePanels();pointer();}else{player.keys.clear();document.exitPointerLock?.();ui.openInventory();}}
+function openWorkbench(){if(!running||paused||deathState)return;player.keys.clear();document.exitPointerLock?.();ui.openWorkbench();}
 
 async function handleAction(action){
-  if(action==='singleplayer')modeScreen('world');else if(action==='back-main')modeScreen('main');else if(action==='create-world')await startWorld();else if(action==='resume')resume();else if(action==='save-main'){ui.showLoading(true,'正在写入浏览器存档',85);await persistWorld(true);disposeWorld();ui.hud.classList.add('hidden');ui.showLoading(false);modeScreen('main');}else if(action==='options')ui.showToast('选项系统将在后续阶段接入');else if(action==='multiplayer'||action==='realms')ui.showToast('网络层将在后续阶段接入');else if(action==='quit')ui.showToast('浏览器页面不能由网页强制关闭');
+  if(action==='singleplayer')modeScreen('world');else if(action==='back-main')modeScreen('main');else if(action==='create-world')await startWorld();else if(action==='resume')resume();else if(action==='respawn')completeRespawn();else if(action==='death-main'){ui.showLoading(true,'正在保存死亡结算',85);await persistWorld(true);disposeWorld();ui.hud.classList.add('hidden');ui.showLoading(false);modeScreen('main');}else if(action==='save-main'){ui.showLoading(true,'正在写入浏览器存档',85);await persistWorld(true);disposeWorld();ui.hud.classList.add('hidden');ui.showLoading(false);modeScreen('main');}else if(action==='options')ui.showToast('选项系统将在后续阶段接入');else if(action==='multiplayer'||action==='realms')ui.showToast('网络层将在后续阶段接入');else if(action==='quit')ui.showToast('浏览器页面不能由网页强制关闭');
 }
 
 document.addEventListener('click',e=>{const button=e.target.closest('[data-action]');if(button)handleAction(button.dataset.action);});canvas.addEventListener('click',pointer);window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight,false);});
-window.addEventListener('keydown',e=>{if(ui.isChatOpen()||e.repeat)return;if(e.code==='Escape'){if(ui.hasOpenPanel()){ui.closePanels();pointer();return;}if(running)pauseGame();}if(e.code==='KeyE')toggleInventory();if(e.code==='F5'&&running){e.preventDefault();const view=player.cycleView();ui.showToast(['第一人称','第三人称背面','第三人称正面'][view]);markSaveDirty();}if((e.code==='KeyT'||e.code==='Slash')&&running&&!paused&&!ui.hasOpenPanel()){e.preventDefault();player.keys.clear();document.exitPointerLock?.();ui.openChat(e.code==='Slash'?'/':'');}if(e.code==='KeyQ'&&canControl())dropSelected();if(/^Digit[1-9]$/.test(e.code)&&running)ui.select(Number(e.code.slice(-1))-1);});
+window.addEventListener('keydown',e=>{if(deathState){e.preventDefault();return;}if(ui.isChatOpen()||e.repeat)return;if(e.code==='Escape'){if(ui.hasOpenPanel()){ui.closePanels();pointer();return;}if(running)pauseGame();}if(e.code==='KeyE')toggleInventory();if(e.code==='F5'&&running){e.preventDefault();const view=player.cycleView();ui.showToast(['第一人称','第三人称背面','第三人称正面'][view]);markSaveDirty();}if((e.code==='KeyT'||e.code==='Slash')&&running&&!paused&&!ui.hasOpenPanel()){e.preventDefault();player.keys.clear();document.exitPointerLock?.();ui.openChat(e.code==='Slash'?'/':'');}if(e.code==='KeyQ'&&canControl())dropSelected();if(/^Digit[1-9]$/.test(e.code)&&running)ui.select(Number(e.code.slice(-1))-1);});
 ui.chatInput.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Escape'){e.preventDefault();ui.closeChat();pointer();return;}if(e.key==='Enter'){e.preventDefault();const text=ui.chatInput.value;ui.closeChat();if(text.trim())runCommand(text);pointer();}});
 canvas.addEventListener('wheel',e=>{if(running&&!ui.hasOpenPanel())ui.select(ui.selected+(e.deltaY>0?1:-1));},{passive:true});canvas.addEventListener('contextmenu',e=>e.preventDefault());
 canvas.addEventListener('mousedown',e=>{if(!canControl())return;if(e.button===0&&player.mode!=='spectator'){const entityHit=aimEntity(),blockHit=aim();if(entityHit&&(!blockHit||entityHit.distance<=blockHit.distance)){const now=performance.now();breakStart=0;ui.setBreak(0);if(player.mode!=='creative'&&!canAttack(lastAttackAt,now))return;lastAttackAt=now;const selected=ui.selectedItem(),damage=player.mode==='creative'?100:(ITEMS[selected?.id]?.attackDamage||1);entityHit.system.hurt(entityHit.entity,damage,player.position,now);return;}if(player.mode!=='adventure')breakStart=performance.now();}if(e.button===2){const hit=aim();if(hit?.id===9){openWorkbench();return;}if(player.mode==='spectator'||player.mode==='adventure'||!hit)return;const selected=ui.selectedItem(),def=ITEMS[selected?.id];if(!def?.blockId||def.blockId===8)return;const p=hit.previous;if(playerOccupies(p.x,p.y,p.z))return;if(world.setBlock(p.x,p.y,p.z,def.blockId)){if(player.mode!=='creative')ui.consumeSelected(1);ui.showToast(`放置 ${def.name}`);markSaveDirty();}}});
@@ -146,11 +155,11 @@ function interaction(now){if(!canControl()||!player||player.mode==='spectator'||
 function dropSelected(){const selected=ui.selectedItem();if(!selected||!drops||!player)return;const stack=player.mode==='creative'?{id:selected.id,count:1}:ui.consumeSelected(1);if(!stack)return;const dir=player.lookDirection(new THREE.Vector3()),origin=player.eyePosition(new THREE.Vector3()).addScaledVector(dir,.55),velocity=dir.clone().multiplyScalar(4).add(new THREE.Vector3(0,1.5,0));drops.spawn(stack.id,stack.count,origin,velocity);markSaveDirty();}
 function updateSurvival(dt){if(player.mode!=='survival')return;player.saturation=Math.max(0,player.saturation-dt*.012);if(player.saturation===0)player.hunger=Math.max(0,player.hunger-dt*.007);if(player.hunger>=18&&player.hp<20)player.hp=Math.min(20,player.hp+dt*.08);renderPlayerStatus();}
 function updateOxygen(dt,now){
-  if(!player||!world)return;const eye=player.eyePosition(new THREE.Vector3()),id=world.getBlock(Math.floor(eye.x),Math.floor(eye.y),Math.floor(eye.z));headSubmerged=!!BLOCKS[id]?.liquid;
+  if(!player||!world||deathState)return;const eye=player.eyePosition(new THREE.Vector3()),id=world.getBlock(Math.floor(eye.x),Math.floor(eye.y),Math.floor(eye.z));headSubmerged=!!BLOCKS[id]?.liquid;
   const result=stepOxygen(oxygenState,{dt,submerged:headSubmerged,mode:player.mode});oxygenState=result.state;
   ui.renderOxygen(oxygenState.air,MAX_AIR_SECONDS,usesOxygen(player.mode)&&(headSubmerged||oxygenState.air<MAX_AIR_SECONDS));
   for(let i=0;i<result.damageEvents;i++){
-    const hit=player.takeDamage(DROWN_DAMAGE,now,null);if(!hit.applied)continue;markSaveDirty();renderPlayerStatus();if(hit.dead){respawnPlayer('你溺水了');break;}
+    const hit=player.takeDamage(DROWN_DAMAGE,now,null);if(!hit.applied)continue;markSaveDirty();renderPlayerStatus();if(hit.dead){beginPlayerDeath('你溺水了');break;}
   }
 }
 function updateAutosave(now){if(!player||!world)return;if(!lastSavedPosition||player.position.distanceToSquared(lastSavedPosition)>.5)saveDirty=true;if(saveDirty&&now-lastSaveAt>5000)persistWorld();}
@@ -159,7 +168,24 @@ function applySky(){const angle=(gameTime-6000)/24000*Math.PI*2,sunHeight=Math.c
 
 function animate(now){
   requestAnimationFrame(animate);const dt=Math.min((now-last)/1000,.05);last=now;frames++;if(now-lastSecond>1000){fps=frames;frames=0;lastSecond=now;}
-  if(running&&!paused&&player){if(!ui.hasOpenPanel()&&!ui.isChatOpen())player.update(dt);if(player.hp<=0)respawnPlayer('你死了');world.ensureAround(player.position.x,player.position.z);interaction(now);updateSurvival(dt);updateOxygen(dt,now);drops?.update(dt,player);experienceOrbs?.update(dt,player);passiveMobs?.update(dt,player);hostileMobs?.update(dt,player,gameTime);projectiles?.update(dt,player);explosions?.update(dt);weatherSystem?.update(dt,player);updateAutosave(now);gameTime=(gameTime+dt*20)%24000;applySky();const p=player.position,xp=experienceState(totalXp),armor=equipment?.armorPoints()||0,air=oxygenState.air,weatherFx=weatherSystem?.activeCount||0;ui.debug.textContent=`Minecraft Web By AI v0.4-dev\nFPS ${fps} · WebGL ${renderer.capabilities.isWebGL2?'2':'1'}\nXYZ ${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}\nChunks ${world.chunks.size} · Meshes ${world.meshes.size} · MeshQ ${world.meshQueue.size}\nPassive ${passiveMobs?.size||0} · Hostile ${hostileMobs?.size||0} · Projectiles ${projectiles?.size||0} · FX ${explosions?.size||0}\nWeatherFX ${weatherSystem?.type||weather}:${weatherFx}\nDrops ${drops?.drops.length||0} · XPOrbs ${experienceOrbs?.size||0} · XP ${xp.total} / Lv.${xp.level}\nHP ${player.hp.toFixed(1)} · Armor ${armor} · Air ${air.toFixed(1)} · ${headSubmerged?'Submerged':'Dry'}\nTime ${Math.floor(gameTime)} · ${weather}\n模式 ${player.mode} · Seed ${worldInfo?.seed}`;}
+  if(running&&!paused&&player&&!deathState){
+    if(!ui.hasOpenPanel()&&!ui.isChatOpen())player.update(dt);
+    if(player.hp<=0)beginPlayerDeath(player.position.y<-10?'你掉入了虚空':'你死了');
+    if(!deathState){
+      world.ensureAround(player.position.x,player.position.z);interaction(now);updateSurvival(dt);updateOxygen(dt,now);
+      if(!deathState){drops?.update(dt,player);experienceOrbs?.update(dt,player);passiveMobs?.update(dt,player);hostileMobs?.update(dt,player,gameTime);projectiles?.update(dt,player);explosions?.update(dt);weatherSystem?.update(dt,player);updateAutosave(now);gameTime=(gameTime+dt*20)%24000;applySky();}
+      const p=player.position,xp=experienceState(totalXp),armor=equipment?.armorPoints()||0,air=oxygenState.air,weatherFx=weatherSystem?.activeCount||0;ui.debug.textContent=`Minecraft Web By AI v0.4-dev
+FPS ${fps} · WebGL ${renderer.capabilities.isWebGL2?'2':'1'}
+XYZ ${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}
+Chunks ${world.chunks.size} · Meshes ${world.meshes.size} · MeshQ ${world.meshQueue.size}
+Passive ${passiveMobs?.size||0} · Hostile ${hostileMobs?.size||0} · Projectiles ${projectiles?.size||0} · FX ${explosions?.size||0}
+WeatherFX ${weatherSystem?.type||weather}:${weatherFx}
+Drops ${drops?.drops.length||0} · XPOrbs ${experienceOrbs?.size||0} · XP ${xp.total} / Lv.${xp.level}
+HP ${player.hp.toFixed(1)} · Armor ${armor} · Air ${air.toFixed(1)} · ${headSubmerged?'Submerged':'Dry'}
+Time ${Math.floor(gameTime)} · ${weather}
+模式 ${player.mode} · Seed ${worldInfo?.seed}`;
+    }
+  }
   renderer.render(scene,camera);
 }
 requestAnimationFrame(animate);
