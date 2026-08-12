@@ -25,6 +25,7 @@ scripts/check-respawn.mjs
 scripts/check-bed.mjs
 scripts/check-mobile.mjs
 scripts/check-controls.mjs
+scripts/check-network-view.mjs
 ```
 
 基础套件覆盖 Inventory / Crafting / Commands / EntityStore / SpatialHash / 四种敌对生物 / Combat / Projectile / Experience / Spider / Death / Mesh Worker / Terrain Worker。
@@ -87,7 +88,21 @@ Node 层只验证 profile，不导入 Three.js WeatherSystem；后者由 Chromiu
 - 多输入 source 合并与 source reset；不同 source 同时按住 primary 时只有合并状态真正释放才产生 release edge。
 - look intent 的有限幅度、动作白名单和非法动作拒绝。
 - `desktop`、`touch`、`network-peer` 对同一逻辑输入必须生成完全相同的规范化 gameplay state。
+- `PlayerControlFrame v1` 对上述 canonical state 的编码必须完全一致，wire frame 只能包含 `v/seq/move/buttons`，不得携带 source/device。
+- control wire decoder 必须拒绝非法 uint32 sequence、未知 button bit、数值字符串 move、未归一化 move、额外字段与不兼容版本。
 - `scripts/check-mobile.mjs` 额外静态拒绝 Player 重新出现 `virtualInput`、`setVirtualMove`、DOM keyboard/mouse listener，并要求 DesktopControls/MobileControls 都只通过同一个 bus 输出 move/button/look/action。
+
+### Platform-neutral absolute view frame
+
+`scripts/check-network-view.mjs` 覆盖：
+
+- `PLAYER_VIEW_FRAME_VERSION=1` 与当前 Player pitch 上限 `1.553`。
+- 本地可无限累积 yaw 在 encoder 中规范化为 `[-π, π)`；`π` 必须 canonicalize 为 `-π`。
+- 相同绝对 yaw/pitch 无论来自桌面鼠标、手机拖动或未来 network-peer，都必须产生完全一致的 `{v,seq,yaw,pitch}` frame。
+- frame 不得携带 `source/device` 或原始 MouseEvent/PointerEvent/touch delta。
+- decoder 必须拒绝非 canonical yaw、越界 pitch、数值字符串、非法 sequence、额外字段与不兼容版本。
+
+该 view frame 是服务端验证“前进方向”、攻击、挖掘、放置和实体交互方向的协议前置。当前并未实现网络 transport，也不把浏览器原始鼠标/触控 delta 作为网络消息。
 
 真实桌面键盘/Pointer Lock 和 Android touch 路径继续由 Playwright 五场浏览器回归覆盖，因此 Node 层不伪造 DOM 输入。
 
@@ -97,7 +112,7 @@ Node 层只验证 profile，不导入 Three.js WeatherSystem；后者由 Chromiu
 
 ### Mobile device / input contract
 
-`scripts/check-mobile.mjs` 覆盖桌面 Chrome、Android、iPhone portrait、iPadOS 桌面 UA 回退、带触摸屏 Windows 笔记本 false-positive 保护，以及 `userAgentData.mobile`。静态 contract 同时要求移动端 DOM/CSS、`MobileControls`、Player virtual input、共享主/副交互和 HUD hotbar touch index 接线存在。
+`scripts/check-mobile.mjs` 覆盖桌面 Chrome、Android、iPhone portrait、iPadOS 桌面 UA 回退、带触摸屏 Windows 笔记本 false-positive 保护，以及 `userAgentData.mobile`。静态 contract 同时要求移动端 DOM/CSS、`MobileControls`、`DesktopControls` 与 Player DOM 输入解耦、共享 `ControlIntentBus` 主/副交互和 HUD hotbar touch index 接线存在。
 
 Node 层不伪造 Pointer Lock/Touch UI；真实设备画像、横竖屏切换和触控事件由下面的 Android Chromium 用例覆盖。
 

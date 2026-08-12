@@ -9,10 +9,11 @@
 ## 工程质量基础
 
 - [x] Node 22 `src/*.js` 与 `scripts/*.mjs` 语法检查。
-- [x] `npm run test:logic`：基础世界/实体/Worker + Equipment/Armor + Water Mesh + Oxygen/Drowning + Swimming/Buoyancy + Weather/Precipitation + Death Integration + Custom Respawn + Bed Rules + Mobile Device/Input + Unified Control Intent，共 11 套回归。
+- [x] `npm run test:logic`：基础世界/实体/Worker + Equipment/Armor + Water Mesh + Oxygen/Drowning + Swimming/Buoyancy + Weather/Precipitation + Death Integration + Custom Respawn + Bed Rules + Mobile Device/Input + Unified Control Intent + Absolute View Frame，共 12 套回归。
 - [x] PC/手机输入统一：`ControlIntentBus` 为唯一 gameplay input contract；Desktop/Touch 只是适配器，Player 不再拥有 DOM 键盘监听或 mobile virtualInput。
 - [x] 联机前置平台约束：同一 World/Player/Inventory/存档/玩法语义，未来 `network-peer` 与本地输入复用相同控制状态，不创建独立 mobile client protocol。
 - [x] `PlayerControlFrame v1`：平台无关连续控制 wire schema；desktop/touch/network-peer 同状态编码一致且不携带设备身份。
+- [x] `PlayerViewFrame v1`：平台无关绝对 yaw/pitch wire schema；yaw 规范化到 `[-π,π)`，pitch 严格限制为 Player 运行时范围，拒绝 device/source 与畸形字段。
 - [x] GitHub Pages 使用 GitHub Actions，并持续验证真实 Pages Deployment。
 - [x] Playwright Chromium browser smoke：主海洋世界覆盖氧气/游泳/WeatherFX/护甲 v6/虚空死亡；第二世界覆盖普通死亡物品+XP 回收；第三世界覆盖 `/spawnpoint` 持久化与精确自定义重生；第四世界覆盖真实床放置/激活与床锚点重生；第五条 Android 横屏用例覆盖移动端自动识别、旋转提示、触控 UI 和摇杆移动。
 - [x] 浏览器失败保留 Playwright trace / screenshot / report。
@@ -60,7 +61,7 @@
 ### Mobile browser / Landscape touch
 - [x] `device-profile.js`：Mobile UA / UA-CH + touch/coarse/no-hover 回退；iPadOS 桌面 UA 与 touchscreen laptop false-positive 边界回归
 - [x] portrait 手机全屏旋转提示；landscape 自动启用 safe-area-aware 触控 HUD
-- [x] 左模拟摇杆 + 右侧拖动视角；Player virtual input 与桌面键盘输入分离后在单一积分器合成
+- [x] 左模拟摇杆 + 右侧拖动视角；`DesktopControls` / `MobileControls` 只翻译设备事件并统一写入 `ControlIntentBus`，Player 仅消费 canonical control state/look intent
 - [x] 攻击/持续挖掘、使用/放置、跳跃、疾跑、潜行、丢弃、背包、暂停、聊天、视角切换与触控热栏
 - [x] 手机控制不依赖 Pointer Lock；桌面 Pointer Lock/键鼠路径保持原语义
 - [x] Android Chromium 844×390 + touch + Mobile UA：横竖屏、背包、暂停、视角、摇杆位移、热栏选择 E2E

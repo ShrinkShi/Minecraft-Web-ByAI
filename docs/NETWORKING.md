@@ -10,7 +10,7 @@ Minecraft-Web-ByAI 只有一个 Web 客户端和一套游戏运行时。桌面�
 设备事件
   -> DesktopControls / MobileControls / future GamepadControls
   -> ControlIntentBus
-  -> canonical ControlState
+  -> canonical ControlState + Player absolute view
   -> PlayerController / shared gameplay actions
   -> future network protocol
 ```
@@ -49,6 +49,19 @@ World、Player、Inventory、Equipment、Crafting、Combat、Entity、Storage、
 
 这样可以保证未来 server-authoritative 服务端收到的是已经满足协议不变量的输入，而不是把畸形或恶意数据归一化成另一条合法指令。
 
+## PlayerViewFrame v1
+
+仅有移动按键仍不足以做服务端权威模拟。玩家“向前”取决于 yaw，而攻击、挖掘、放置和实体交互还依赖 yaw + pitch。因此 `src/player-view-frame.js` 单独定义绝对视角帧：
+
+- `v`：视角帧版本；
+- `seq`：uint32 顺序号；
+- `yaw`：规范化到 `[-π, π)` 的绝对水平朝向；
+- `pitch`：绝对俯仰角，范围与当前 Player 运行时一致，为 `[-1.553, 1.553]`。
+
+这里刻意发送“绝对朝向”而不是 MouseEvent/PointerEvent/touch drag 的原始 delta。桌面鼠标、手机拖拽和未来手柄摇杆只负责在客户端形成同一个 Player yaw/pitch；网络协议不携带输入设备来源。
+
+wire decoder 对 view frame 同样采用严格校验：数值字符串、NaN/Infinity、非 canonical yaw、越界 pitch、非法 seq、额外字段和不兼容版本全部拒绝。encoder 只对本地可无限累积的 yaw 做环绕规范化，不会把越界 pitch 静默夹回合法范围。
+
 ## 本地动作与未来网络动作
 
 暂停、打开背包 GUI、切换第三人称、本地菜单焦点等属于客户端表现，不应发送给服务器作为世界模拟命令。
@@ -59,8 +72,8 @@ World、Player、Inventory、Equipment、Crafting、Combat、Entity、Storage、
 
 联机实现默认采用 server-authoritative 世界模型：
 
-1. 客户端把规范化控制帧/游戏动作发送给服务器；
-2. 服务器严格校验 schema/version/sequence 与动作合法性，再校验模式、距离、冷却、方块/实体状态；
+1. 客户端把规范化连续控制帧、绝对视角帧和离散游戏动作发送给服务器；
+2. 服务器严格校验 schema/version/sequence 与动作合法性，再用 authoritative position + view 校验模式、距离、冷却、方块/实体状态；
 3. 服务器执行世界变化并广播玩家/实体/方块状态；
 4. PC 与手机玩家消费完全相同的 replication 消息；
 5. 客户端可做移动预测/插值，但不得形成平台专属规则。
@@ -70,8 +83,9 @@ World、Player、Inventory、Equipment、Crafting、Combat、Entity、Storage、
 - 网络消息必须带 schema/version，并允许显式拒绝不兼容版本。
 - 存档 schema 与网络 schema 分离；不能因为移动端 UI 改版提升世界存档版本。
 - 服务端不得依据设备类型赋予不同伤害、移动速度、碰撞、掉落或交互距离。
-- 自动化至少保留“desktop/touch/network-peer 对同一逻辑状态产生相同 canonical frame”的回归，并覆盖非法 sequence、未知 bit、额外字段、类型伪装和未归一化 move 的拒绝。
+- 自动化必须保留 desktop/touch/network-peer 的 canonical control frame 等价，并验证绝对 view frame 不含 device/source 身份。
+- malformed control/view frame 必须覆盖非法 sequence、额外字段、类型伪装、未知 bit、未归一化 move、非 canonical yaw 和越界 pitch 的拒绝。
 
 ## 当前状态
 
-当前尚未实现真实多人服务器、WebSocket/WebTransport、玩家复制、房间/认证或服务器存档。该文档与 PlayerControlFrame v1 只建立协议边界，防止未来联机阶段再拆成 PC/手机两套客户端。
+当前尚未实现真实多人服务器、WebSocket/WebTransport、玩家复制、房间/认证或服务器存档。`PlayerControlFrame v1` 与 `PlayerViewFrame v1` 只建立协议边界；下一步仍应先定义离散 gameplay action schema，再接传输层，避免把本地 UI 事件直接固化成网络协议。

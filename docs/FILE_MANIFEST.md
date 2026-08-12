@@ -14,6 +14,7 @@
 | `src/device-profile.js` | 桌面/手机与横竖屏环境判定、body dataset 同步 | 纯环境逻辑；UA/UA-CH + touch/coarse/no-hover 边界可 Node 测试 |
 | `src/control-intents.js` | 平台无关控制意图版本、连续状态归一化、多 source 合并、look/action 分发 | 纯逻辑；未来 gamepad/network-peer 必须复用，不得携带 DOM/设备规则 |
 | `src/player-control-frame.js` | `PlayerControlFrame v1` 连续控制 wire 编码/解码与兼容性校验 | 仅含 version/seq/move/button bits；严禁设备/source/UA 进入未来网络控制帧 |
+| `src/player-view-frame.js` | `PlayerViewFrame v1` 绝对 yaw/pitch wire 编码/解码与兼容性校验 | yaw canonical `[-π,π)`；pitch 严格限制到 Player 运行时范围；不传设备身份或原始鼠标/触控 delta |
 | `src/desktop-controls.js` | Keyboard/Mouse/Pointer Lock → ControlIntentBus 桌面适配 | 只翻译输入，不访问 World/Inventory/玩法规则 |
 | `src/mobile-controls.js` | Touch/摇杆/手机按钮 → ControlIntentBus 触控适配 | 只翻译输入和维护触控 UI 状态，不实现独立玩法 |
 | `src/blocks.js` | 方块 ID、属性、atlas 索引、基础掉落约束 | 注册 8 个四方向床 foot/head ID；`tint` 可供 mesh Worker 做通用顶点着色 |
@@ -63,16 +64,17 @@
 | `scripts/check-respawn.mjs` | respawnPoint 归一化、14 个候选顺序、first-safe 与失败边界 | 纯逻辑；不依赖 Three.js/World |
 | `scripts/check-bed.mjs` | 床朝向/配对/锚点、BLOCKS/ITEMS 元数据、3×3 配方和羊毛 loot 来源 | 纯逻辑/静态数据；不启动浏览器 |
 | `scripts/check-mobile.mjs` | 手机设备判定、Desktop/Touch 适配器与 Player 输入解耦静态契约 | Node 22；Android Chromium 真实交互另由 mobile E2E 覆盖 |
-| `scripts/check-controls.mjs` | ControlIntent v1、source 合并、primary edge、look/action、desktop/touch/network-peer 等价性 | 纯逻辑；联机输入协议前置契约 |
+| `scripts/check-controls.mjs` | ControlIntent v1、source 合并、primary edge、look/action、desktop/touch/network-peer 等价性 | 纯逻辑；连续控制 wire 协议前置契约 |
+| `scripts/check-network-view.mjs` | 绝对 yaw/pitch canonicalization、strict decoder、device/source 无关性与 malformed view frame 拒绝 | 纯逻辑；未来服务端视线/交互校验前置契约 |
 | `scripts/serve.mjs` | Playwright / 本地开发共用 HTTP server | 阻止 path traversal；测试 no-store |
 | `tests/e2e/smoke.spec.mjs` | Chromium 主世界、普通死亡回收、自定义 `/spawnpoint` 与床重生锚点四世界集成 | 桌面玩法回归；床仍经过真实 raycast/right-click/persist/death/respawn；全程捕获 page/console error |
 | `tests/e2e/mobile.spec.mjs` | Android Mobile UA + touch 的横屏浏览器集成 | 横竖屏检测、无 Pointer Lock、背包/暂停/视角、摇杆位移和触控热栏 |
 | `playwright.config.mjs` | browser smoke 超时、单 worker、Chromium/WebGL、失败工件 | CI 优先稳定性 |
-| `package.json` | Node 22+ 测试脚本与固定 Playwright | `test:logic` 顺序跑基础/armor/water/oxygen/swim/weather/death/respawn/bed/mobile/controls 十一套测试 |
-| `.github/workflows/quality.yml` | Node + Chromium 两层质量门 | PR/main 自动执行；同 ref 新 push 取消旧 run |
+| `package.json` | Node 22+ 测试脚本与固定 Playwright | `test:logic` 顺序跑基础/armor/water/oxygen/swim/weather/death/respawn/bed/mobile/controls/network-view 十二套测试 |
+| `.github/workflows/quality.yml` | Node + Chromium 两层质量门 | PR/main 自动执行；同 ref 新 push 会取消旧 run |
 | `.github/workflows/pages.yml` | GitHub Pages 自动部署 | main 更新触发 |
 | `docs/ARCHITECTURE.md` | 架构决策、数据流、技术债 | 架构变化同步更新 |
-| `docs/NETWORKING.md` | PC/手机同客户端、平台无关控制帧与未来 server-authoritative 联机边界 | 网络实现不得按平台复制 World/Player/玩法规则 |
+| `docs/NETWORKING.md` | PC/手机同客户端、平台无关 control/view wire frame 与未来 server-authoritative 联机边界 | 网络实现不得按平台复制 World/Player/玩法规则 |
 | `docs/PROGRESS.md` | 功能完成状态与下一阶段 | 只勾选实际落库且验证过的功能 |
 | `docs/TESTING.md` | 自动验证覆盖与边界 | 区分纯规则、Worker、browser smoke |
 | `CHANGELOG.md` | 版本变更记录 | 每个正式功能/质量 commit 更新 |
