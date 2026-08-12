@@ -40,7 +40,9 @@
 - [x] `DeathScreen`：死亡原因/损失摘要、显式“重生”和“返回标题画面”；死亡状态下普通输入和本地世界帧被阻断
 - [x] 死亡结算与重生分离：`beginPlayerDeath()` 先在原位置清算并保存，`completeRespawn()` 仅由显式重生动作调用
 - [x] Chromium 虚空死亡 E2E：死亡界面必须持续存在，Escape 不得打开暂停菜单，点击“重生”后才恢复 hp=20；背包/装备/XP 仍保持清空
-- [ ] 普通死亡浏览器 E2E、死亡统计、床/重生点、`keepInventory`
+- [x] 标准 `/kill` self 指令通过正式 `beginPlayerDeath()` 进入死亡流程；额外参数拒绝
+- [x] Chromium 普通可恢复死亡物品闭环：给予 3 原木→`/kill`→死亡界面确认 3 物品掉落→显式重生→返回死亡坐标→DropSystem 真实拾回→IndexedDB 再次持有 3 原木
+- [ ] 普通死亡经验球回收 E2E、死亡统计、床/重生点、`keepInventory`
 - [ ] 死亡掉落/经验球跨页面重载持久化
 
 ### Equipment / Armor
