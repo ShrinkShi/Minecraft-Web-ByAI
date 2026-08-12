@@ -25,10 +25,10 @@ export class UI{
 
   bindSlotEvents(){
     document.addEventListener('pointerdown',e=>{
-      const slot=e.target.closest('[data-inv-index],[data-equipment-slot],[data-craft-index],[data-craft-result]');
-      if(!slot||!this.inventoryModel)return;
-      if(e.button!==0&&e.button!==2)return;
-      e.preventDefault();
+      const slot=e.target.closest('[data-hotbar-index],[data-inv-index],[data-equipment-slot],[data-craft-index],[data-craft-result]');
+      if(!slot)return;
+      if(slot.dataset.hotbarIndex!==undefined){if(e.button!==0)return;e.preventDefault();this.select(Number(slot.dataset.hotbarIndex));return;}
+      if(!this.inventoryModel)return;if(e.button!==0&&e.button!==2)return;e.preventDefault();
       if(slot.dataset.invIndex!==undefined){
         const changed=this.inventoryModel.click(Number(slot.dataset.invIndex),e.button,e.shiftKey);
         if(changed)this.changed();
@@ -111,7 +111,7 @@ export class UI{
   renderHotbar(){
     this.hotbar.textContent='';
     for(let i=0;i<9;i++){
-      const stack=this.inventoryModel?.hotbar(i)||null,s=this.makeSlot(stack,{key:String(i+1),hud:true});if(i===this.selected)s.classList.add('selected');this.hotbar.append(s);
+      const stack=this.inventoryModel?.hotbar(i)||null,s=this.makeSlot(stack,{key:String(i+1),hud:true});s.dataset.hotbarIndex=i;if(i===this.selected)s.classList.add('selected');this.hotbar.append(s);
     }
   }
 

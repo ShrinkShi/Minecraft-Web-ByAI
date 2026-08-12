@@ -7,7 +7,7 @@ export class PlayerController{
   constructor(camera,canvas,world,scene){
     this.camera=camera;this.canvas=canvas;this.world=world;this.scene=scene;
     this.position=new THREE.Vector3(0,40,0);this.velocity=new THREE.Vector3();
-    this.yaw=0;this.pitch=0;this.keys=new Set();this.grounded=false;this.flying=false;this.viewMode=0;this.swimCoverage=0;
+    this.yaw=0;this.pitch=0;this.keys=new Set();this.virtualInput={side:0,forward:0,jump:false,sneak:false,sprint:false};this.grounded=false;this.flying=false;this.viewMode=0;this.swimCoverage=0;
     this.mode='survival';this.hp=20;this.hunger=20;this.saturation=5;this.hurtUntil=-Infinity;
     this.eye=1.62;this.height=1.8;this.radius=.3;this.walk=4.3;this.sprint=5.6;
     this.avatar=this.createAvatar();this.bind();
@@ -25,10 +25,14 @@ export class PlayerController{
   bind(){
     this.onKeyDown=e=>{this.keys.add(e.code);if(e.code==='Space')e.preventDefault();};
     this.onKeyUp=e=>this.keys.delete(e.code);
-    this.onMove=e=>{if(document.pointerLockElement!==this.canvas)return;this.yaw-=e.movementX*.0022;this.pitch-=e.movementY*.0022;this.pitch=Math.max(-1.553,Math.min(1.553,this.pitch));};
+    this.onMove=e=>{if(document.pointerLockElement!==this.canvas)return;this.applyLookDelta(e.movementX,e.movementY);};
     window.addEventListener('keydown',this.onKeyDown);window.addEventListener('keyup',this.onKeyUp);document.addEventListener('mousemove',this.onMove);
   }
 
+  applyLookDelta(dx,dy,sensitivity=.0022){if(!Number.isFinite(dx)||!Number.isFinite(dy))return;this.setLook(this.yaw-dx*sensitivity,this.pitch-dy*sensitivity);}
+  setVirtualMove(side,forward){this.virtualInput.side=Math.max(-1,Math.min(1,Number(side)||0));this.virtualInput.forward=Math.max(-1,Math.min(1,Number(forward)||0));}
+  setVirtualButton(name,pressed){if(name in this.virtualInput)this.virtualInput[name]=!!pressed;}
+  clearVirtualInput(){this.virtualInput.side=0;this.virtualInput.forward=0;this.virtualInput.jump=false;this.virtualInput.sneak=false;this.virtualInput.sprint=false;}
   setMode(mode){this.mode=mode;this.flying=mode==='creative'||mode==='spectator';if(this.flying)this.swimCoverage=0;}
   cycleView(){this.viewMode=(this.viewMode+1)%3;this.syncCamera();return this.viewMode;}
 
@@ -77,11 +81,11 @@ export class PlayerController{
 
   update(dt){
     dt=Math.min(dt,.05);
-    const forward=(this.keys.has('KeyW')?1:0)-(this.keys.has('KeyS')?1:0),side=(this.keys.has('KeyD')?1:0)-(this.keys.has('KeyA')?1:0),sprint=this.keys.has('ControlLeft')||this.keys.has('ControlRight'),sneak=this.keys.has('ShiftLeft')||this.keys.has('ShiftRight'),up=this.keys.has('Space');
+    const keyForward=(this.keys.has('KeyW')?1:0)-(this.keys.has('KeyS')?1:0),keySide=(this.keys.has('KeyD')?1:0)-(this.keys.has('KeyA')?1:0),forward=Math.max(-1,Math.min(1,keyForward+this.virtualInput.forward)),side=Math.max(-1,Math.min(1,keySide+this.virtualInput.side)),sprint=this.keys.has('ControlLeft')||this.keys.has('ControlRight')||this.virtualInput.sprint,sneak=this.keys.has('ShiftLeft')||this.keys.has('ShiftRight')||this.virtualInput.sneak,up=this.keys.has('Space')||this.virtualInput.jump;
     this.swimCoverage=this.flying?0:this.waterCoverage();
     const swim=stepSwimming({velocityY:this.velocity.y,coverage:this.swimCoverage,dt,up,down:sneak});
-    const baseSpeed=swim.active?this.walk:(sprint?this.sprint:this.walk),sneakFactor=swim.active?1:(sneak?.35:1),speed=baseSpeed*sneakFactor*swim.speedMultiplier,dir=new THREE.Vector3();
-    if(forward||side)dir.set(Math.sin(this.yaw)*forward+Math.cos(this.yaw)*side,0,-Math.cos(this.yaw)*forward+Math.sin(this.yaw)*side).normalize().multiplyScalar(speed*dt);
+    const baseSpeed=swim.active?this.walk:(sprint?this.sprint:this.walk),sneakFactor=swim.active?1:(sneak?.35:1),speed=baseSpeed*sneakFactor*swim.speedMultiplier,dir=new THREE.Vector3(),moveAmount=Math.min(1,Math.hypot(forward,side));
+    if(moveAmount)dir.set(Math.sin(this.yaw)*forward+Math.cos(this.yaw)*side,0,-Math.cos(this.yaw)*forward+Math.sin(this.yaw)*side).normalize().multiplyScalar(speed*dt*moveAmount);
     if(this.flying){
       const vertical=((up?1:0)-(sneak?1:0))*7*dt;this.moveAxis('x',dir.x);this.moveAxis('z',dir.z);this.moveAxis('y',vertical);this.velocity.set(0,0,0);
     }else{

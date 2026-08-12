@@ -6,7 +6,7 @@
 - GitHub Pages 仓库发布源已设置为 **GitHub Actions**，并持续验证完整 `configure → artifact upload → deploy` 流水线。
 - 固定 `@playwright/test` `1.62.0`，要求 Node 22+；`scripts/serve.mjs` 作为本地/CI 浏览器测试统一 HTTP server。
 - `Repository quality` 为两层质量门：`static-checks` 成功后运行 Chromium `browser-smoke`；同 `github.ref` 新 push 会取消旧 run。
-- `static-checks` 同时检查 `src/*.js`、`scripts/*.mjs`；`npm run test:logic` 现在顺序执行基础、Equipment/Armor、Water Mesh、Oxygen/Drowning、Swimming/Buoyancy、Weather/Precipitation、Death Integration、Custom Respawn、Bed Rules 九套回归。
+- `static-checks` 同时检查 `src/*.js`、`scripts/*.mjs`；`npm run test:logic` 现在顺序执行基础、Equipment/Armor、Water Mesh、Oxygen/Drowning、Swimming/Buoyancy、Weather/Precipitation、Death Integration、Custom Respawn、Bed Rules、Mobile Device/Input 十套回归。
 - 新增 `scripts/check-death.mjs`：锁定死亡 DOM/样式引用、`DeathScreen`/`deathState`/显式重生接线，禁止旧 `respawnPlayer()` 和一次性 death patch 工具重新进入交付树。
 - 新增 `scripts/check-respawn.mjs`：覆盖自定义重生点归一化、14 个固定候选顺序、first-safe 解析和失败边界。
 - 新增 `scripts/check-bed.mjs`：覆盖 8 个床 ID、四方向朝向、foot/head 配对、统一重生锚点、方块/物品元数据、3×3 床配方和羊毛 loot 来源。
@@ -16,11 +16,15 @@
 - 新增 `scripts/check-swim.mjs`：三点水覆盖率、dry no-op、水平倍率插值、被动浮力、Space 上游、Shift 下潜、垂直限速、冲突输入与参数校验。
 - 新增 `scripts/check-weather.mjs`：clear/rain/thunder 类型、固定池精确预算、雷雨相对雨天的速度/长度/风偏/透明度强度和非法容量。
 - PR #12 首轮静态质量门暴露旧 `scripts/check.mjs` 仍消费 mesh Worker 顶层 `indices`；修复采用 opaque 顶层兼容视图而不是删除旧回归。
-- browser smoke 使用固定 seed + `海` prompt 真实生成水体，验证 Oxygen `data-air`、Space 上游、Shift 下潜；随后实际执行 `/weather rain → thunder → clear` 并要求 `WeatherFX 446 → 720 → 0`，再继续 Equipment/v6 存档和虚空死亡界面→显式重生链；第二世界验证普通死亡物品+XP 回收，第三世界验证持久化 `/spawnpoint`，第四世界用真实背包/热栏/Pointer Lock/右键链验证两格床放置与床锚点重生。
+- browser smoke 使用固定 seed + `海` prompt 真实生成水体，验证 Oxygen `data-air`、Space 上游、Shift 下潜；随后实际执行 `/weather rain → thunder → clear` 并要求 `WeatherFX 446 → 720 → 0`，再继续 Equipment/v6 存档和虚空死亡界面→显式重生链；第二世界验证普通死亡物品+XP 回收，第三世界验证持久化 `/spawnpoint`，第四世界验证两格床放置与床锚点重生；第五条 Android 横屏用例验证手机自动识别、旋转提示、无 Pointer Lock 触控、摇杆与移动端 UI 操作。
 - 浏览器存档断言确认 world record 不含 `oxygen`；`swimCoverage` 同样只存在于 Player 运行时。weather 继续使用既有长期存档字段。
 - 浏览器失败时上传 trace / screenshot / HTML report；当前 CI 只安装 Chromium。
 
 ### v0.4.0-dev — 已落库内容
+- `device-profile.js`：结合 Mobile UA / `userAgentData.mobile` 与 touch + coarse pointer + no-hover 回退自动区分手机与桌面；iPadOS 桌面 UA 可识别，普通带触摸屏但仍有 fine pointer/hover 的笔记本保持 desktop。
+- `mobile-controls.js` + `mobile.css`：手机横屏提供虚拟摇杆、拖动视角、攻击/挖掘、使用/放置、跳跃、疾跑、潜行、丢弃、背包、暂停、聊天、视角和触控热栏；竖屏显示旋转提示，safe-area 参与布局。
+- `PlayerController` 新增独立 virtual input；桌面键盘/Pointer Lock 与手机触控共用同一位移积分和主/副交互路径。手机 gameplay 不要求 Pointer Lock，普通桌面行为保持不变。
+- 新增 Android Chromium 移动端回归：Mobile UA + touch + 844×390，真实验证 portrait/landscape 切换、背包/暂停/视角、摇杆位移和触控热栏。
 - `EntityStore` + `SpatialHash` 实体数据/空间索引基础。
 - 牛、羊、猪、鸡被动生物：地表生成、10 Hz 漫游、受击逃跑、距离回收和数量上限。
 - `combat.js`：基础攻击冷却、受击无敌、伤害和击退纯规则。
