@@ -99,16 +99,16 @@ npm run test:e2e
 第二条独立 Chromium 用例使用世界 `CI Recoverable Death`：
 
 1. 创建 survival 世界并 `/tp 0 35 0` 到固定可恢复坐标。
-2. `/give oak_log 3` 后执行标准 `/kill`。
-3. `#death-menu` 必须 active，死亡原因包含“被杀死”，摘要必须包含“3 个物品”和“死亡点”。
+2. `/give oak_log 3`，再 `/xp add 16`；当前总经验正好对应等级 2，然后执行标准 `/kill`。
+3. `#death-menu` 必须 active，死亡原因包含“被杀死”，摘要必须同时包含“3 个物品”“14 点经验”和“死亡点”；14 来自 `Lv.2 × 7` 的现有死亡 XP 公式。
 4. 显式点击“重生”，而不是依赖自动重生。
 5. 记录拾取阶段时间，再 `/tp 0 35 0` 返回同一死亡坐标。
 6. 等待真实 `DropSystem.update()` 运行；测试不直接写 Inventory 或 IndexedDB。
 7. 暂停触发保存，只接受 `updatedAt >= pickupPhaseStartedAt` 的新鲜 world record。
-8. 新快照中 `block:6` 总数必须重新达到 3，Player hp=20 且位置仍有效。
+8. 新快照中 `block:6` 总数必须重新达到 3，`totalXp=14`，Player hp=20 且位置仍有效；这证明 DropSystem 与 ExperienceOrbSystem 都通过真实更新链完成回收。
 9. 全程无 pageerror / console error。
 
-这条用例关闭的是“普通死亡物品掉落→显式重生→返回死亡点→重新拾取”集成链。XP 球回收仍未做确定性浏览器覆盖。
+这条用例现在关闭“普通死亡物品 + XP 掉落→显式重生→返回死亡点→重新拾取/吸收”集成链。装备作为普通死亡掉落物的单独拾回断言仍未覆盖。
 
 ## GitHub Pages 部署验证
 
@@ -127,7 +127,7 @@ npm run test:e2e
 - Water surface blending、透明排序、深度冲突和水下 fog/折射。
 - 真实敌对生物有/无护甲 HP 差值。
 - Pointer Lock/F5/持续陆地移动的专门 E2E。
-- 普通可恢复死亡的 **物品** 掉落/重新拾取已覆盖；经验球回收与装备掉落的单独可恢复死亡断言仍未覆盖。
+- 普通可恢复死亡的物品和 XP 球回收均已覆盖；装备掉落的单独可恢复死亡拾回断言仍未覆盖。
 - 死亡界面“返回标题画面”按钮的专门 browser E2E；运行时会 force-save 已结算的 hp=0 状态，重新进入世界时由现有 startup fallback 自动回出生点。
 - 死亡世界实体跨页面持久化、IndexedDB 配额/schema 迁移。
 - Three.js 运行时仍依赖 jsDelivr。
