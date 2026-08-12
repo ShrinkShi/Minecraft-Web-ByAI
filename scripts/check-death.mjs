@@ -17,7 +17,8 @@ assert.match(main,/\bdeathState=null(?:[,;])/,'main must own explicit death stat
 assert.match(main,/function beginPlayerDeath\(/,'main must split death settlement from respawn');
 assert.match(main,/function completeRespawn\(/,'main must expose explicit respawn completion');
 assert.match(main,/name==='death'\?deathScreen\.root/,'screen routing must include the death layer');
-assert.match(main,/if\(deathState\)\{e\.preventDefault\(\);return;\}/,'keyboard input must be gated while dead');
+assert.match(main,/function controlActive\(\)\{return running&&!paused&&!deathState&&!ui\.hasOpenPanel\(\)&&!ui\.isChatOpen\(\);\}/,'continuous controls must be disabled while dead');
+assert.match(main,/function handleControlIntent\([^)]*\)\{[\s\S]*?if\(deathState\)return false;/,'all canonical one-shot control intents must be rejected while dead');
 assert.match(main,/if\(running&&!paused&&player&&!deathState\)/,'world simulation must stop while the death screen is active');
 assert.equal(main.includes('respawnPlayer('),false,'legacy immediate respawnPlayer path must not return');
 
