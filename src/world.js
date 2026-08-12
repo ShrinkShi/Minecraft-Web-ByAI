@@ -107,6 +107,17 @@ export class VoxelWorld{
     this.unloadFarChunks(cx,cz);
   }
 
+  async ensureReadyAround(worldX,worldZ,cellRadius=1,timeoutMs=5000){
+    if(!Number.isFinite(worldX)||!Number.isFinite(worldZ))return false;
+    this.ensureAround(worldX,worldZ);
+    const radius=Math.max(0,Math.floor(Number(cellRadius)||0)),baseX=Math.floor(worldX),baseZ=Math.floor(worldZ),needed=new Set();
+    for(let dx=-radius;dx<=radius;dx++)for(let dz=-radius;dz<=radius;dz++){
+      const cx=floorDiv(baseX+dx,CHUNK_SIZE),cz=floorDiv(baseZ+dz,CHUNK_SIZE),chunkKey=key(cx,cz);needed.add(chunkKey);this.wanted.add(chunkKey);this.requestChunk(cx,cz);
+    }
+    const ready=()=>[...needed].every(chunkKey=>this.chunks.has(chunkKey));if(ready())return true;
+    return await new Promise(resolve=>{const started=performance.now(),timer=setInterval(()=>{if(ready()){clearInterval(timer);resolve(true);return;}if(performance.now()-started>=timeoutMs){clearInterval(timer);resolve(false);}},20);});
+  }
+
   unloadFarChunks(cx,cz){
     for(const chunkKey of [...this.chunks.keys()]){
       const [x,z]=chunkKey.split(',').map(Number);
