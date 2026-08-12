@@ -89,8 +89,11 @@ self.onmessage=e=>{
 
   const opaque=buildMesh(data,blockAt,id=>!BLOCKS[id]?.liquid);
   const water=buildMesh(data,blockAt,id=>!!BLOCKS[id]?.liquid);
+  const legacyOpaque=opaque.empty?{empty:true}:{
+    empty:false,positions:opaque.positions,normals:opaque.normals,uvs:opaque.uvs,colors:opaque.colors,indices:opaque.indices
+  };
   self.postMessage(
-    {type:'mesh',key:m.key,cx:m.cx,cz:m.cz,version:m.version,opaque,water},
+    {type:'mesh',key:m.key,cx:m.cx,cz:m.cz,version:m.version,opaque,water,...legacyOpaque},
     [...transferables(opaque),...transferables(water)]
   );
 };
