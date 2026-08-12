@@ -4,21 +4,21 @@
 
 - 稳定发布基线：`v0.3.0`。
 - 当前 `main` 开发线：`v0.4.0-dev`。
-- 版本完成度只按 GitHub `main` 已落库代码和通过的质量门认定；未形成远端 commit 的本地/临时实现不计入完成。
+- 版本完成度只按 GitHub `main` 已落库代码和通过的质量门认定；未形成远端 commit 的临时实现不计入完成。
 
 ## 工程质量基础
 
 - [x] Node 22 `src/*.js` 与 `scripts/*.mjs` 语法检查。
-- [x] `npm run test:logic`：基础世界/实体/Worker + Equipment/Armor + Water Mesh + Oxygen/Drowning + Swimming/Buoyancy 回归。
+- [x] `npm run test:logic`：基础世界/实体/Worker + Equipment/Armor + Water Mesh + Oxygen/Drowning + Swimming/Buoyancy + Weather/Precipitation 回归。
 - [x] GitHub Pages 使用 GitHub Actions，并持续验证真实 Pages Deployment。
-- [x] Playwright Chromium browser smoke：海洋世界→氧气下降→Space 上游→Shift 下潜→离水恢复→护甲装备/存档→虚空死亡/重生→IndexedDB 核对。
+- [x] Playwright Chromium browser smoke：海洋世界→氧气→游泳→rain/thunder/clear WeatherFX→护甲装备/存档→虚空死亡/重生→IndexedDB 核对。
 - [x] 浏览器失败保留 Playwright trace / screenshot / report。
 - [ ] 将 Three.js 从运行时 jsDelivr 迁移为版本锁定的本地 vendor / 构建依赖。
-- [ ] 扩展 E2E 到普通死亡掉落/拾回、真实战斗减伤、完整溺水死亡、横向游泳速度、存档重载和水面像素断言。
+- [ ] 扩展 E2E 到普通死亡掉落/拾回、真实战斗减伤、完整溺水死亡、横向游泳速度、天气像素/遮雨、存档重载。
 
 ## v0.4.0 — 实体、战斗与生存扩展（开发中）
 
-状态：开发中。实体基础、四种敌对生物、奖励闭环、生存死亡损失、第一版护甲、透明水 pass、氧气/溺水，以及基础游泳/浮力已经落库；死亡界面、完整流体/冲刺游泳、水下视觉、天气粒子和正式 Java 伤害/护甲公式仍未完成。
+状态：开发中。实体基础、四种敌对生物、奖励闭环、生存死亡损失、第一版护甲、透明水 pass、氧气/溺水、基础游泳/浮力和可见降雨 FX 已落库；死亡界面、完整流体/冲刺游泳、自动天气/闪电/雪、水下视觉和正式 Java 伤害/护甲公式仍未完成。
 
 ### 实体 / 战斗 / 奖励
 - [x] `EntityStore` + `SpatialHash` 数据/空间索引基础及 Node 回归
@@ -75,10 +75,20 @@
 - [x] 水中不套用陆地 sprint/sneak 速度语义；Space 上游、Shift 下潜
 - [x] 完整浸水有轻微正浮力；水中垂直阻尼并限制约 +3.4/-3.0
 - [x] 水中仍复用 Player 原有 AABB 碰撞与单一轴向积分；离水自动恢复原陆地重力/跳跃
-- [x] swimCoverage 是瞬时运行时状态，不进入玩家/世界快照
-- [x] `scripts/check-swim.mjs`：dry no-op、覆盖率、速度插值、浮力、上下游、限速、输入冲突和非法参数
-- [x] Chromium：真实海洋中读取玩家 Y，Space 后必须上升、Shift 后必须下降；后续氧气/护甲/死亡链继续通过
+- [x] `scripts/check-swim.mjs` + Chromium 真实海洋 Space 上升 / Shift 下降
 - [ ] 冲刺游泳姿态/爬行过渡、视线方向三维推进、实体游泳 AI、水流作用、Depth Strider/Dolphin's Grace
+
+### Weather / Precipitation
+- [x] 原有 `/weather clear|rain|thunder` 与 world record weather 状态保留
+- [x] `weather-rules.js`：clear/rain/thunder 固定 profile，包含预算、下落速度、雨线长度、风偏和透明度
+- [x] 固定天气池上限 720：clear=0、rain=`floor(720×.62)=446`、thunder=720
+- [x] `WeatherSystem` 使用单一 `THREE.LineSegments` + 动态 Float32Array，不按雨滴创建 Mesh/Geometry
+- [x] 降水在玩家约 16 格范围内循环 respawn/recycle；玩家移动/传送后重新围绕玩家分布
+- [x] `/weather` 同时更新环境光和 WeatherSystem profile；恢复存档世界时恢复 weather FX
+- [x] world teardown 显式 dispose weather geometry/material
+- [x] `scripts/check-weather.mjs`：天气类型、精确预算、rain/thunder 参数强度和非法输入回归
+- [x] Chromium：真实执行 `/weather rain → thunder → clear`，debug 必须出现 `WeatherFX rain:446 → thunder:720 → clear:0`
+- [ ] 自动天气周期、群系降水、雪、屋顶遮雨/世界碰撞、飞溅/湿润、闪电实体/伤害/音效、像素级降雨视觉断言
 
 ## v0.3.0 — 生存闭环基础
 
