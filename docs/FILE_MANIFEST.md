@@ -30,7 +30,7 @@
 | `src/explosion-rules.js` | 爆炸距离伤害/击退纯规则 | 无 Three.js/DOM |
 | `src/explosions.js` | 苦力怕爆炸、玩家伤害/击退、地形破坏 | 不负责 Creeper AI |
 | `src/spider-rules.js` | 蜘蛛局部垂直移动/有限攀爬 | 不承担全局寻路 |
-| `src/commands.js` | 聊天指令解析与参数验证 | `/weather` 只发 setWeather context，不直接操作 Three.js |
+| `src/commands.js` | 聊天指令解析与参数验证 | `/weather` 通过 context 切天气；标准 self `/kill` 通过 `ctx.kill()` 进入正式死亡生命周期，不直接改 Inventory/UI |
 | `src/spatial-hash.js` | X/Z 实体空间分桶和邻域候选查询 | 查询不做全实体扫描 |
 | `src/entity-store.js` | 实体 ID、组件、位置与 SpatialHash 生命周期 | 位置移动必须经 `setPosition()` |
 | `src/combat.js` | 攻击冷却、受击无敌、伤害、击退方向 | 纯逻辑、时间基准 |
@@ -52,7 +52,7 @@
 | `scripts/check-swim.mjs` | 水覆盖率、dry no-op、速度插值、浮力、上下游、限速回归 | 纯逻辑 |
 | `scripts/check-weather.mjs` | clear/rain/thunder profile、精确池预算、参数强弱和非法输入回归 | 不导入 Three.js；渲染实例由 Chromium 覆盖 |
 | `scripts/serve.mjs` | Playwright / 本地开发共用 HTTP server | 阻止 path traversal；测试 no-store |
-| `tests/e2e/smoke.spec.mjs` | Chromium 世界启动、水体 oxygen/swimming、WeatherFX、护甲存档、死亡界面/显式重生 | 虚空死亡必须停在 death screen；Escape 不得绕过；点击重生后断言 hp=20 和损失状态；全程捕获 page/console error |
+| `tests/e2e/smoke.spec.mjs` | Chromium 世界启动、水体 oxygen/swimming、WeatherFX、护甲存档、虚空死亡界面，以及普通可恢复死亡拾取 | 第二用例 `/kill` 3 原木后显式重生并回死亡点，通过真实 DropSystem 拾回 3 原木；全程捕获 page/console error |
 | `playwright.config.mjs` | browser smoke 超时、单 worker、Chromium/WebGL、失败工件 | CI 优先稳定性 |
 | `package.json` | Node 22+ 测试脚本与固定 Playwright | `test:logic` 顺序跑基础/armor/water/oxygen/swim/weather 六套测试 |
 | `.github/workflows/quality.yml` | Node + Chromium 两层质量门 | PR/main 自动执行；同 ref 新 push 取消旧 run |

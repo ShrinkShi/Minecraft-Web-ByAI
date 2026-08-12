@@ -34,6 +34,8 @@
 - deathState 会阻断 Pointer Lock、暂停/背包/工作台/普通键盘输入和主世界更新；Escape 不能从死亡界面绕入暂停菜单。
 - “返回标题画面”先强制保存 hp=0 的已结算状态再销毁世界；DeathScreen 不持久化，重新进入时由现有 hp<=0 startup fallback 回出生点。
 - Chromium E2E 现在要求虚空死亡界面至少持续约 450 ms、Escape 仍停在死亡界面；点击“重生”后新鲜存档必须 hp=20、Inventory/Equipment/XP 仍清空。
+- 新增标准 self `/kill` 指令，复用正式 `beginPlayerDeath()`；命令回归覆盖成功调用和额外参数拒绝。
+- 新增第二条 Chromium 可恢复死亡回归：3 原木→`/kill`→死亡界面报告掉落→显式重生→返回原死亡坐标→真实 DropSystem 拾回→新鲜 IndexedDB 再次持有全部 3 原木。
 - `Equipment` 独立 head/chest/legs/feet 四槽；皮革帽子/外套/裤子/靴子护甲点 1/3/2/1。
 - `armor-rules.js`：过渡公式每护甲点 4%、最高 80%，完整皮革套 28%。
 - 僵尸/蜘蛛近战、骷髅箭矢和苦力怕爆炸经过基础护甲减伤；虚空与溺水绕过护甲。
@@ -76,7 +78,7 @@
 - 水仍是独立透明静态 pass，没有 fluid level/传播、动态液面、水下 fog/折射或不同 GPU 下的像素级透明排序自动测试。
 - mesh Worker 的 opaque 顶层 buffer 字段是临时迁移兼容层。
 - 护甲公式是过渡实现，不等于 Java armor+toughness；暂无耐久、更多材质、附魔、Armor Trim、正式穿戴模型或快捷装备。
-- 普通可恢复死亡的掉落/重新拾取尚未进入 browser E2E；死亡掉落与经验球也不跨页面持久化。
+- 普通可恢复死亡的物品掉落/重新拾取已进入 browser E2E；经验球回收与死亡实体跨页面持久化仍未覆盖。
 - Three.js 仍由运行时 jsDelivr URL 加载，后续应本地 vendor / 构建锁定。
 
 ## [0.3.0] - 2026-08-11

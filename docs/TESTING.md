@@ -93,6 +93,23 @@ npm run test:e2e
 
 当前天气 browser smoke 验证的是命令→profile→固定池数量→主循环/Three.js 生命周期，不做截图像素比较；屋顶遮雨、雨滴碰撞、透明效果和不同 GPU 的实际像素结果仍是未覆盖边界。
 
+
+### Recoverable death / pickup browser regression
+
+第二条独立 Chromium 用例使用世界 `CI Recoverable Death`：
+
+1. 创建 survival 世界并 `/tp 0 35 0` 到固定可恢复坐标。
+2. `/give oak_log 3` 后执行标准 `/kill`。
+3. `#death-menu` 必须 active，死亡原因包含“被杀死”，摘要必须包含“3 个物品”和“死亡点”。
+4. 显式点击“重生”，而不是依赖自动重生。
+5. 记录拾取阶段时间，再 `/tp 0 35 0` 返回同一死亡坐标。
+6. 等待真实 `DropSystem.update()` 运行；测试不直接写 Inventory 或 IndexedDB。
+7. 暂停触发保存，只接受 `updatedAt >= pickupPhaseStartedAt` 的新鲜 world record。
+8. 新快照中 `block:6` 总数必须重新达到 3，Player hp=20 且位置仍有效。
+9. 全程无 pageerror / console error。
+
+这条用例关闭的是“普通死亡物品掉落→显式重生→返回死亡点→重新拾取”集成链。XP 球回收仍未做确定性浏览器覆盖。
+
 ## GitHub Pages 部署验证
 
 仓库 Pages Source 为 **GitHub Actions**。每个主线 squash 后必须同时核对 `Repository quality` 与 `Deploy GitHub Pages` 最终 success。
@@ -110,7 +127,7 @@ npm run test:e2e
 - Water surface blending、透明排序、深度冲突和水下 fog/折射。
 - 真实敌对生物有/无护甲 HP 差值。
 - Pointer Lock/F5/持续陆地移动的专门 E2E。
-- 普通可恢复死亡的掉落/经验/护甲重新拾取。
+- 普通可恢复死亡的 **物品** 掉落/重新拾取已覆盖；经验球回收与装备掉落的单独可恢复死亡断言仍未覆盖。
 - 死亡界面“返回标题画面”按钮的专门 browser E2E；运行时会 force-save 已结算的 hp=0 状态，重新进入世界时由现有 startup fallback 自动回出生点。
 - 死亡世界实体跨页面持久化、IndexedDB 配额/schema 迁移。
 - Three.js 运行时仍依赖 jsDelivr。
