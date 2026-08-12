@@ -206,7 +206,12 @@ test('bed placement sets the persistent respawn anchor',async({page})=>{
   await expect(page.locator('#loading')).toHaveClass(/hidden/,{timeout:60_000});await expect(page.locator('#hud')).not.toHaveClass(/hidden/);
   await runCommand(page,'/tp 24 35 24');
   await expect.poll(async()=>{const a=await debugXYZ(page);await page.waitForTimeout(250);const b=await debugXYZ(page);return Math.abs(a.y-b.y)<.03&&b.y>0;},{timeout:10_000,message:'player should settle before placing a bed'}).toBe(true);
-  await runCommand(page,'/give bed 1');await lockPointerAndLook(page,{movementY:450});await rightClickCanvas(page);await expect(page.locator('#toast')).toContainText('放置 床',{timeout:5_000});
+  await runCommand(page,'/give bed 1');
+  await key(page,'KeyE');await expect(page.locator('#inventory')).not.toHaveClass(/hidden/);
+  await expect(page.locator('#inventory-grid [data-inv-index="0"]')).toHaveAttribute('title','床');
+  await page.locator('#inventory-grid [data-inv-index="0"]').click();await page.locator('#inventory-hotbar [data-inv-index="27"]').click();
+  await key(page,'Escape');await expect(page.locator('#inventory')).toHaveClass(/hidden/);await expect(page.locator('#hotbar .hotbar-slot.selected')).toHaveAttribute('title','床');
+  await lockPointerAndLook(page,{movementY:450});await rightClickCanvas(page);await expect(page.locator('#toast')).toContainText('放置 床',{timeout:5_000});
   await page.waitForTimeout(250);await rightClickCanvas(page);await expect(page.locator('#toast')).toContainText('重生点已设置',{timeout:5_000});
   const saveStarted=await page.evaluate(()=>Date.now());await key(page,'Escape');await expect(page.locator('#pause-menu')).toHaveClass(/active/);
   await expect.poll(async()=>{const record=(await savedWorlds(page)).find(world=>world.name==='CI Bed Anchor');if(!record||Number(record.updatedAt)<saveStarted||!record.respawnPoint)return null;const ids=Object.values(record.edits||{}).flat().map(entry=>Number(entry?.[1])).filter(id=>id>=11&&id<=18).sort((a,b)=>a-b);return{version:record.version,bedIds:ids,hasRespawn:true};},{timeout:10_000,message:'two bed halves and the bed respawn anchor should persist together'}).toEqual({version:6,bedIds:[11,12],hasRespawn:true});
