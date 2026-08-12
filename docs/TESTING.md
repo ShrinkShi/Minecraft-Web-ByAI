@@ -17,6 +17,7 @@ PR 必须先通过 `static-checks`，随后才运行 `browser-smoke`。浏览器
 scripts/check.mjs
 scripts/check-armor.mjs
 scripts/check-water.mjs
+scripts/check-oxygen.mjs
 ```
 
 基础套件覆盖 Inventory / Crafting / Commands / EntityStore / SpatialHash / 四种敌对生物 / Combat / Projectile / Experience / Spider / Death / Mesh Worker / Terrain Worker。
@@ -42,7 +43,18 @@ scripts/check-water.mjs
 - chunk 边界两侧都是水时，同水内部面跨 chunk 也必须剔除。
 - Worker 暂时保留 opaque 的旧顶层 buffer 字段作为兼容视图；`VoxelWorld` 运行时只消费新 `opaque` / `water` 子对象。
 
-PR #12 第一次静态 run 曾因为旧 `scripts/check.mjs` 仍读取 `out.indices` 而失败；这不是水几何算法失败。兼容视图补齐后，旧基础 Worker 测试、新水测试与 Chromium smoke 同时通过，避免通过“删除旧测试”来掩盖协议回归。
+氧气专用套件覆盖：
+
+- 只有 survival/adventure 使用氧气；creative/spectator 每次 step 都复位到满空气且不会产生溺水事件。
+- 初始空气固定 15 秒。
+- 连续浸水 5 秒后剩 10 秒；再 10 秒刚好到 0，但不会提前产生伤害事件。
+- 空气为 0 后以 1 秒为周期产生溺水事件；连续 2.4 秒产生 2 次事件并保留 0.4 秒余量。
+- 跨过空气 0 点时只把“真正无空气”的那段 dt 计入溺水计时，避免把最后一段剩余空气时间重复计入伤害。
+- 离水后按每真实秒恢复 4 秒空气额度，并立即清零 drowning timer。
+- 当前每个溺水事件的伤害常量为 2 HP。
+- 负 dt、非法状态或非布尔 submerged 输入拒绝。
+
+PR #12 第一次静态 run 曾因为旧 `scripts/check.mjs` 仍读取 `out.indices` 而失败；兼容视图补齐后旧基础 Worker 测试、新水测试与 Chromium smoke 同时通过，旧测试没有被删除来掩盖协议回归。
 
 静态 CI 同时对 `src/*.js` 和 `scripts/*.mjs` 执行 `node --check`。
 
@@ -60,22 +72,24 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-`scripts/serve.mjs` 是本地/CI 共用的跨平台静态服务器。当前 smoke 使用固定世界和 seed，验证：
+`scripts/serve.mjs` 是本地/CI 共用的跨平台静态服务器。当前 smoke 使用固定世界名与 seed，并将 terrain prompt 设置为 `海`，验证：
 
 1. 主菜单→单人世界→生存模式创建世界，HUD 与 WebGL Canvas 正常启动。
-2. 世界创建会实际经过新的 mesh Worker `opaque/water` payload 和 `VoxelWorld` 双 pass 安装路径；若协议/Buffer 安装错误会产生 pageerror/console error 并使测试失败。
-3. 真实聊天输入 `/give minecraft:leather_chestplate 1`。
-4. 通过 E 打开真实背包，点击 Inventory slot 0，再点击 chest Equipment 槽完成装备。
-5. Equipment chest 槽显示“皮革外套”；护甲 HUD 出现 1 个 full + 1 个 half 图标，对应 3 护甲点。
-6. 关闭背包→暂停→读取 **新鲜** IndexedDB 快照，确认逻辑快照 `version=5` 且 `equipment.slots.chest.id=leather_chestplate`。
-7. 恢复游戏，执行 `/give oak_log 3` 和 `/tp 0 -20 0`。
-8. 等待虚空死亡/重生，再暂停并读取死亡阶段之后的新快照。
-9. 最终断言：36 格背包占用=0、四个 Equipment 槽占用=0、`totalXp=0`、玩家已重生到 `y > -10`。
-10. 整个流程没有未捕获 `pageerror` 或 console error。
+2. 世界创建实际经过 mesh Worker `opaque/water` payload 和 `VoxelWorld` 双 pass 安装路径。
+3. 对固定 seed `ci-browser-smoke-2026`，`海` prompt 在出生点附近真实生成足够水位；Player eye voxel 进入 water 后 Oxygen HUD 必须自动出现。
+4. 读取 `#oxygen[data-air]` 的初始空气值，等待约 700 ms 后必须明显下降，证明不是只显示静态气泡。
+5. 执行 `/tp 0 35 0` 离开水体；空气按恢复规则回满后 Oxygen HUD 必须隐藏。
+6. 真实聊天输入 `/give minecraft:leather_chestplate 1`，再通过 E 打开背包，点击 Inventory slot 0 与 chest Equipment 槽完成装备。
+7. Equipment chest 槽显示“皮革外套”；护甲 HUD 出现 1 个 full + 1 个 half 图标，对应 3 护甲点。
+8. 暂停→读取 **新鲜** IndexedDB 快照，确认 `version=5`、chest 为 `leather_chestplate`，并确认 world record **没有** `oxygen` 字段。
+9. 恢复游戏，执行 `/give oak_log 3` 和 `/tp 0 -20 0`。
+10. 等待虚空死亡/重生，再暂停并读取死亡阶段之后的新快照。
+11. 最终断言：36 格背包占用=0、四个 Equipment 槽占用=0、`totalXp=0`、玩家已重生到 `y > -10`。
+12. 整个流程没有未捕获 `pageerror` 或 console error。
 
 IndexedDB 断言使用 `updatedAt >= 阶段开始时间`，防止把阶段之前的旧 autosave 误当成通过结果。
 
-CI 固定 `workers=1`，当前只安装 Chromium。
+CI 固定 `workers=1`，当前只安装 Chromium。完整 15 秒耗尽和溺水周期不在浏览器中等待，而由纯逻辑测试精确覆盖，避免每次 PR 无意义增加十几秒运行时间。
 
 ## GitHub Pages 部署验证
 
@@ -85,8 +99,9 @@ CI 固定 `workers=1`，当前只安装 Chromium。
 
 ## 仍未覆盖的浏览器集成边界
 
-- 真实水面像素结果、透明排序、不同观察角度的 blending、深度冲突和 GPU/浏览器差异；Node 只验证几何/协议，Chromium 当前主要验证双 pass 不造成运行时错误。
-- 水下检测、氧气/溺水、游泳速度、浮力、流体传播、水面高度与动画。
+- 完整 15 秒耗尽→真实 `Player.takeDamage()`→溺水死亡/重生的浏览器时间链；规则和头部浸水集成已分别自动覆盖。
+- 游泳速度、浮力、水流、流体传播、水面高度与动画、水下 fog/折射、水下呼吸/Respiration/Conduit。
+- 真实水面像素结果、透明排序、不同观察角度的 blending、深度冲突和 GPU/浏览器差异。
 - 真实敌对生物造成伤害时，对比无护甲/有护甲的 HP 差值；当前减伤数值由 Node 规则测试覆盖，Chromium 只验证装备/持久化/死亡清算。
 - Pointer Lock、F5 三视角和持续移动。
 - 不同 GPU/浏览器驱动的 WebGL 材质/纹理兼容性。
