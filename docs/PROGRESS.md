@@ -9,16 +9,16 @@
 ## 工程质量基础
 
 - [x] Node 22 `src/*.js` 与 `scripts/*.mjs` 语法检查。
-- [x] `npm run test:logic`：基础世界/实体/Worker + Equipment/Armor + Water Mesh + Oxygen/Drowning + Swimming/Buoyancy + Weather/Precipitation 回归。
+- [x] `npm run test:logic`：基础世界/实体/Worker + Equipment/Armor + Water Mesh + Oxygen/Drowning + Swimming/Buoyancy + Weather/Precipitation + Death Integration + Custom Respawn 回归。
 - [x] GitHub Pages 使用 GitHub Actions，并持续验证真实 Pages Deployment。
-- [x] Playwright Chromium browser smoke：海洋世界→氧气→游泳→rain/thunder/clear WeatherFX→护甲装备/存档→虚空死亡界面→显式重生→IndexedDB 核对。
+- [x] Playwright Chromium browser smoke：主海洋世界覆盖氧气/游泳/WeatherFX/护甲 v6/虚空死亡；第二世界覆盖普通死亡物品+XP 回收；第三世界覆盖 `/spawnpoint` 持久化与精确自定义重生。
 - [x] 浏览器失败保留 Playwright trace / screenshot / report。
 - [ ] 将 Three.js 从运行时 jsDelivr 迁移为版本锁定的本地 vendor / 构建依赖。
 - [ ] 扩展 E2E 到普通死亡掉落/拾回、真实战斗减伤、完整溺水死亡、横向游泳速度、天气像素/遮雨、存档重载。
 
 ## v0.4.0 — 实体、战斗与生存扩展（开发中）
 
-状态：开发中。实体基础、四种敌对生物、奖励闭环、生存死亡损失、显式死亡界面/重生、第一版护甲、透明水 pass、氧气/溺水、基础游泳/浮力和可见降雨 FX 已落库；死亡统计/床重生、完整流体/冲刺游泳、自动天气/闪电/雪、水下视觉和正式 Java 伤害/护甲公式仍未完成。
+状态：开发中。实体基础、四种敌对生物、奖励闭环、生存死亡损失、显式死亡界面/重生、持久化自定义重生点、第一版护甲、透明水 pass、氧气/溺水、基础游泳/浮力和可见降雨 FX 已落库；死亡统计/床重生、完整流体/冲刺游泳、自动天气/闪电/雪、水下视觉和正式 Java 伤害/护甲公式仍未完成。
 
 ### 实体 / 战斗 / 奖励
 - [x] `EntityStore` + `SpatialHash` 数据/空间索引基础及 Node 回归
@@ -43,8 +43,11 @@
 - [x] 标准 `/kill` self 指令通过正式 `beginPlayerDeath()` 进入死亡流程；额外参数拒绝
 - [x] Chromium 普通可恢复死亡物品闭环：给予 3 原木→`/kill`→死亡界面确认 3 物品掉落→显式重生→返回死亡坐标→DropSystem 真实拾回→IndexedDB 再次持有 3 原木
 - [x] self `/xp add <points>` / `/experience` points 指令，通过现有 `addExperience()` 接入，不支持 levels/目标选择器
-- [x] Chromium 普通死亡 XP 闭环：16 total XP（Lv.2）→`/kill`→摘要确认 14 XP→显式重生→返回死亡点→ExperienceOrbSystem 真实吸收→IndexedDB `totalXp=14`
-- [ ] 装备掉落的普通死亡单独拾回断言、死亡统计、床/重生点、`keepInventory`
+- [x] Chromium 普通死亡 XP 闭环：16 total XP（Lv.2）→`/kill`→摘要确认 14 XP→显式重生→返回死亡点→ExperienceOrbSystem 真实吸收→IndexedDB `totalXp=14`（恢复后派生 Lv.1）
+- [x] `respawn-rules.js` + `Player.respawnAt()`：精确点/周边候选、安全位置解析和世界出生点 fallback
+- [x] self `/spawnpoint [x y z]`：当前点或 `~` 相对坐标；v6 world record 持久化 `respawnPoint`
+- [x] Chromium 自定义重生 E2E：非原点设置并保存 `/spawnpoint`→移动到异地 `/kill`→显式重生必须回到持久化精确安全点
+- [ ] 装备掉落的普通死亡单独拾回断言、死亡统计、床方块/睡眠、`keepInventory`
 - [ ] 死亡掉落/经验球跨页面重载持久化
 
 ### Equipment / Armor
@@ -52,7 +55,7 @@
 - [x] 皮革四件：1/3/2/1 护甲点，cursor 手动装备，错误部位拒绝
 - [x] `armor-rules.js`：过渡公式每点 4%，最高 80%；完整皮革套 7 点=28%
 - [x] 敌对近战、箭矢、爆炸经过基础护甲减伤；虚空/溺水绕过护甲
-- [x] v5 world record 保存/恢复 Equipment；非法快照过滤
+- [x] v6 world record 保存/恢复 Equipment；非法快照过滤
 - [x] `scripts/check-armor.mjs` + Chromium 真实装备/存档/死亡清空
 - [ ] 正式 armor+toughness、耐久、更多材质、附魔、Armor Trim、装备配方/快捷装备
 
@@ -70,7 +73,7 @@
 - [x] survival/adventure 15 秒空气；离水 4× 恢复；creative/spectator 满空气
 - [x] 0 空气后每秒产生一次 2 HP 溺水伤害，溺水绕过护甲
 - [x] 10 气泡 Oxygen HUD；重生/退出/非氧气模式复位
-- [x] oxygen 是瞬时状态，不写入 v5 world record
+- [x] oxygen 是瞬时状态，不写入 v6 world record
 - [x] `scripts/check-oxygen.mjs` 精确时序回归
 - [x] Chromium：固定 seed + `海` prompt 真实浸水→air 下降→离水恢复；并确认存档无 oxygen
 - [ ] Respiration、Water Breathing、Conduit、气泡柱等扩展

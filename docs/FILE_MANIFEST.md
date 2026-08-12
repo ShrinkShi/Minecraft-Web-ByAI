@@ -21,6 +21,7 @@
 | `src/weather-system.js` | 固定容量降雨 LineSegments 池、动态 TypedArray 更新、玩家周围 respawn/recycle、材质/geometry 生命周期 | 只创建 1 个 LineSegments/Geometry/Material；clear drawRange=0；world teardown 必须 dispose |
 | `src/recipes.js` | 2×2 / 3×3 配方和 CraftingGrid death drain | 纯逻辑，无 DOM/Three.js |
 | `src/death-rules.js` | 模式死亡损失、死亡经验、虚空/可恢复位置判断 | 纯逻辑；不生成实体/不操作 UI |
+| `src/respawn-rules.js` | 自定义重生点归一化、固定周边候选与 first-safe 解析 | 纯逻辑；不导入 Three.js/World；安全判定由调用方注入 |
 | `src/death-screen.js` | 死亡界面 DOM 引用、原因/损失摘要写入和显示状态读取 | 不决定掉落/经验/重生位置；由 main 状态机驱动 |
 | `src/drops.js` | 世界掉落物视觉、重力、拾取、销毁 | 共享资源，退出世界显式释放 |
 | `src/experience.js` | XP 等级阈值、总经验↔等级和 HUD 进度派生 | 只以 totalXp 为真相源 |
@@ -30,7 +31,7 @@
 | `src/explosion-rules.js` | 爆炸距离伤害/击退纯规则 | 无 Three.js/DOM |
 | `src/explosions.js` | 苦力怕爆炸、玩家伤害/击退、地形破坏 | 不负责 Creeper AI |
 | `src/spider-rules.js` | 蜘蛛局部垂直移动/有限攀爬 | 不承担全局寻路 |
-| `src/commands.js` | 聊天指令解析与参数验证 | `/weather` 通过 context 切天气；self `/kill` 进入正式死亡生命周期；`/xp add <points>` / `/experience` 通过 `ctx.addXp()` 调现有经验系统，不直接改 totalXp |
+| `src/commands.js` | 聊天指令解析与参数验证 | `/weather` 通过 context 切天气；self `/kill` 进入正式死亡生命周期；`/xp add <points>` / `/experience` 调现有经验系统；`/spawnpoint [x y z]` 只经 context 更新持久化自定义点，均不直接改 IndexedDB |
 | `src/spatial-hash.js` | X/Z 实体空间分桶和邻域候选查询 | 查询不做全实体扫描 |
 | `src/entity-store.js` | 实体 ID、组件、位置与 SpatialHash 生命周期 | 位置移动必须经 `setPosition()` |
 | `src/combat.js` | 攻击冷却、受击无敌、伤害、击退方向 | 纯逻辑、时间基准 |
@@ -40,8 +41,8 @@
 | `src/world-worker.js` | 程序化地形生成 | Worker；固定 CI seed + `海` prompt 提供可重复水体 |
 | `src/mesh-worker.js` | 一次 chunk 扫描构建 opaque / water mesh payload | Worker；独立 TypedArray/Transferable；opaque 顶层兼容字段为临时层 |
 | `src/world.js` | chunk streaming、voxel 查询/编辑、opaque/water GPU 安装 | 两 pass geometry 显式 dispose；`getBlock()` 提供 oxygen/swim voxel 查询 |
-| `src/player.js` | 输入、陆地/飞行/水中移动、AABB 碰撞、视角、玩家快照、受伤/击退/重生 | 三点 liquid 采样；所有模式共用单一轴向位移积分 |
-| `src/storage.js` | IndexedDB world record | DB schema v1；逻辑快照 v5；weather 已持久化，oxygen/swimCoverage 不持久化 |
+| `src/player.js` | 输入、陆地/飞行/水中移动、AABB 碰撞、视角、玩家快照、受伤/击退/世界出生与精确 `respawnAt()` | 三点 liquid 采样；所有模式共用单一轴向位移积分；精确重生仍使用 AABB 校验 |
+| `src/storage.js` | IndexedDB world record | DB schema v1；逻辑快照 v6；weather/respawnPoint 持久化，oxygen/swimCoverage 不持久化 |
 | `src/ui.js` | HUD、背包/合成/Equipment/Oxygen UI、聊天 | `data-air` 为稳定 E2E 观测点 |
 | `assets/textures/atlas.png` | 基础方块纹理 atlas | opaque/water 共享同一 Texture |
 | `assets/items/*.png` | 非方块物品图标 | 部分 loot/皮革护甲仍使用占位图 |
@@ -52,10 +53,11 @@
 | `scripts/check-swim.mjs` | 水覆盖率、dry no-op、速度插值、浮力、上下游、限速回归 | 纯逻辑 |
 | `scripts/check-weather.mjs` | clear/rain/thunder profile、精确池预算、参数强弱和非法输入回归 | 不导入 Three.js；渲染实例由 Chromium 覆盖 |
 | `scripts/check-death.mjs` | 死亡 DOM/样式、DeathScreen/deathState、显式重生和旧立即重生路径的集成契约 | Node 静态契约；同时拒绝历史一次性 death patch 工具进入交付树 |
+| `scripts/check-respawn.mjs` | respawnPoint 归一化、14 个候选顺序、first-safe 与失败边界 | 纯逻辑；不依赖 Three.js/World |
 | `scripts/serve.mjs` | Playwright / 本地开发共用 HTTP server | 阻止 path traversal；测试 no-store |
-| `tests/e2e/smoke.spec.mjs` | Chromium 世界启动、水体 oxygen/swimming、WeatherFX、护甲存档、虚空死亡界面，以及普通可恢复死亡回收 | 第二用例 3 原木 + 16 XP 后 `/kill`，显式重生回死亡点，通过真实 DropSystem + ExperienceOrbSystem 恢复 3 原木和 14 XP；全程捕获 page/console error |
+| `tests/e2e/smoke.spec.mjs` | Chromium 主世界水体/天气/护甲/虚空死亡、普通可恢复死亡回收，以及持久化自定义重生 | 第二世界真实恢复 3 原木和 14 XP；第三世界验证 `/spawnpoint` v6 保存和异地死亡后精确重生；全程捕获 page/console error |
 | `playwright.config.mjs` | browser smoke 超时、单 worker、Chromium/WebGL、失败工件 | CI 优先稳定性 |
-| `package.json` | Node 22+ 测试脚本与固定 Playwright | `test:logic` 顺序跑基础/armor/water/oxygen/swim/weather/death 七套测试 |
+| `package.json` | Node 22+ 测试脚本与固定 Playwright | `test:logic` 顺序跑基础/armor/water/oxygen/swim/weather/death/respawn 八套测试 |
 | `.github/workflows/quality.yml` | Node + Chromium 两层质量门 | PR/main 自动执行；同 ref 新 push 取消旧 run |
 | `.github/workflows/pages.yml` | GitHub Pages 自动部署 | main 更新触发 |
 | `docs/ARCHITECTURE.md` | 架构决策、数据流、技术债 | 架构变化同步更新 |

@@ -21,6 +21,7 @@ scripts/check-oxygen.mjs
 scripts/check-swim.mjs
 scripts/check-weather.mjs
 scripts/check-death.mjs
+scripts/check-respawn.mjs
 ```
 
 基础套件覆盖 Inventory / Crafting / Commands / EntityStore / SpatialHash / 四种敌对生物 / Combat / Projectile / Experience / Spider / Death / Mesh Worker / Terrain Worker。
@@ -71,6 +72,10 @@ Node 层只验证 profile，不导入 Three.js WeatherSystem；后者由 Chromiu
 
 该 contract 是针对主线 `7e2a4920...` 的真实回归新增：当时 static-checks 仍为绿色，但 Chromium 因 `#death-menu` 不存在而两条死亡用例同时失败。此后死亡 UI 的 DOM、状态机和工具清理不再只依赖浏览器阶段发现。
 
+### Custom respawn rules
+
+`scripts/check-respawn.mjs` 覆盖 respawnPoint 数值归一化、14 个 exact/同层周边/+1Y 候选的稳定顺序、first-safe 选择、全部不可用返回 null，以及非法 `isSafe` 拒绝。该模块不导入 Three.js/World；真实方块支撑、液体、眼部空间和 Player AABB 检查由 Chromium/runtime 覆盖。
+
 ## Chromium browser smoke
 
 ```bash
@@ -91,7 +96,7 @@ npm run test:e2e
 8. 执行 `/weather clear`，debug 必须变为 `WeatherFX clear:0`。
 9. WeatherSystem 在上述切换和逐帧 update 期间不得产生 pageerror / console error。
 10. `/give minecraft:leather_chestplate 1`→真实 Equipment 拖放→护甲 HUD。
-11. 暂停读取新鲜 IndexedDB：`version=5`、chest 正确、weather=`clear`，且没有持久化 oxygen。
+11. 暂停读取新鲜 IndexedDB：`version=6`、chest 正确、weather=`clear`，且没有持久化 oxygen。
 12. 恢复→给予原木→传送虚空；`#death-menu` 必须进入 active，原因包含“虚空”，损失摘要包含“无法回收”。
 13. 等待约 450 ms 后死亡界面必须仍然 active；发送 Escape 后也必须继续停在死亡界面，`#pause-menu` 不得 active，证明没有自动重生或暂停菜单绕过。
 14. 点击“重生”后死亡界面关闭；随后 Escape 才能打开暂停菜单。
@@ -110,12 +115,22 @@ npm run test:e2e
 3. `#death-menu` 必须 active，死亡原因包含“被杀死”，摘要必须同时包含“3 个物品”“14 点经验”和“死亡点”；14 来自 `Lv.2 × 7` 的现有死亡 XP 公式。
 4. 显式点击“重生”，而不是依赖自动重生。
 5. 记录拾取阶段时间，再 `/tp 0 35 0` 返回同一死亡坐标。
-6. 等待真实 `DropSystem.update()` 运行；测试不直接写 Inventory 或 IndexedDB。
+6. 不使用固定 sleep 猜测回收完成；直接等待公开 debug 达到 `Drops 0 · XPOrbs 0 · XP 14 / Lv.1`，证明 DropSystem 与 ExperienceOrbSystem 都完成更新。
 7. 暂停触发保存，只接受 `updatedAt >= pickupPhaseStartedAt` 的新鲜 world record。
 8. 新快照中 `block:6` 总数必须重新达到 3，`totalXp=14`，Player hp=20 且位置仍有效；这证明 DropSystem 与 ExperienceOrbSystem 都通过真实更新链完成回收。
 9. 全程无 pageerror / console error。
 
 这条用例现在关闭“普通死亡物品 + XP 掉落→显式重生→返回死亡点→重新拾取/吸收”集成链。装备作为普通死亡掉落物的单独拾回断言仍未覆盖。
+
+### Persistent custom spawnpoint browser regression
+
+第三条独立 Chromium 用例使用世界 `CI Custom Respawn`：
+
+1. 在非原点位置等待玩家落地稳定，读取公开 debug XYZ。
+2. 执行 `/spawnpoint`，暂停触发保存；只接受新鲜 world record，并要求 `version=6` 与 `respawnPoint` 精确匹配记录坐标。
+3. 恢复后移动到另一位置执行 `/kill`，必须进入正式 DeathScreen。
+4. 显式点击“重生”，最终 debug XYZ 必须回到持久化自定义点（允许 0.15 格浮点观测误差）。
+5. 该测试不直接修改 respawnPoint/Player/IndexedDB，并持续捕获 pageerror/console error。
 
 ## GitHub Pages 部署验证
 
@@ -135,6 +150,7 @@ npm run test:e2e
 - 真实敌对生物有/无护甲 HP 差值。
 - Pointer Lock/F5/持续陆地移动的专门 E2E。
 - 普通可恢复死亡的物品和 XP 球回收均已覆盖；装备掉落的单独可恢复死亡拾回断言仍未覆盖。
-- 死亡界面“返回标题画面”按钮的专门 browser E2E；运行时会 force-save 已结算的 hp=0 状态，重新进入世界时由现有 startup fallback 自动回出生点。
+- 死亡界面“返回标题画面”按钮的专门 browser E2E；运行时会 force-save 已结算的 hp=0 状态，重新进入时优先使用持久化自定义重生点，失效才回世界出生点。
+- 自定义重生点被方块阻塞时周边候选/fallback 的专门 Chromium 场景；纯规则候选顺序已有 Node 回归。
 - 死亡世界实体跨页面持久化、IndexedDB 配额/schema 迁移。
 - Three.js 运行时仍依赖 jsDelivr。
