@@ -35,12 +35,17 @@ control_section='''### Unified control intents\n\n`scripts/check-controls.mjs` �
 rep('docs/TESTING.md',bed_marker,control_section+bed_marker,'testing control section')
 
 rep('docs/FILE_MANIFEST.md',
-'| `src/player.js` | 输入、陆地/飞行/水中移动、AABB 碰撞、视角、玩家快照、受伤/击退/世界出生与精确 `respawnAt()` | 三点 liquid 采样；所有模式共用单一轴向位移积分；精确重生仍使用 AABB 校验 |\n',
-'| `src/control-intents.js` | 平台无关控制意图版本、连续状态归一化、多 source 合并、look/action 分发 | 纯逻辑；未来 gamepad/network-peer 必须复用，不得携带 DOM/设备规则 |\n| `src/desktop-controls.js` | Keyboard/Mouse/Pointer Lock → ControlIntentBus 桌面适配 | 只翻译输入，不访问 World/Inventory/玩法规则 |\n| `src/mobile-controls.js` | Touch/摇杆/手机按钮 → ControlIntentBus 触控适配 | 只翻译输入和维护触控 UI 状态，不实现独立玩法 |\n| `src/player.js` | 平台无关 controlState、陆地/飞行/水中移动、AABB 碰撞、视角、玩家快照、受伤/击退/世界出生与精确 `respawnAt()` | 不注册 DOM 输入；所有平台/未来网络输入共用单一轴向位移积分 |\n',
-'manifest input modules')
+'| `src/mobile-controls.js` | 摇杆、拖动视角、hold/toggle/action 触摸手势适配 | 只输出虚拟输入/callback；不得直接写 World/Inventory/Storage |\n',
+'| `src/control-intents.js` | 平台无关控制意图版本、连续状态归一化、多 source 合并、look/action 分发 | 纯逻辑；未来 gamepad/network-peer 必须复用，不得携带 DOM/设备规则 |\n| `src/desktop-controls.js` | Keyboard/Mouse/Pointer Lock → ControlIntentBus 桌面适配 | 只翻译输入，不访问 World/Inventory/玩法规则 |\n| `src/mobile-controls.js` | Touch/摇杆/手机按钮 → ControlIntentBus 触控适配 | 只翻译输入和维护触控 UI 状态，不实现独立玩法 |\n',
+'manifest adapter modules')
 
 rep('docs/FILE_MANIFEST.md',
-'| `scripts/check-mobile.mjs` | 手机设备判定、触控布局/输入接线静态契约 | Node 22；Android Chromium 真实交互另由 mobile E2E 覆盖 |\n',
+'| `src/player.js` | 键盘 + virtual input、陆地/飞行/水中移动、AABB 碰撞、视角、玩家快照、受伤/击退/世界出生与精确 `respawnAt()` | 桌面/手机输入只在单一 `update()` 积分；触控模拟量保持幅度；精确重生仍使用 AABB 校验 |\n',
+'| `src/player.js` | 平台无关 controlState、陆地/飞行/水中移动、AABB 碰撞、视角、玩家快照、受伤/击退/世界出生与精确 `respawnAt()` | 不注册 DOM 输入；所有平台/未来网络输入共用单一轴向位移积分 |\n',
+'manifest player')
+
+rep('docs/FILE_MANIFEST.md',
+'| `scripts/check-mobile.mjs` | 手机/桌面设备画像、iPad/触摸笔记本边界与移动输入静态集成 contract | Node 22；不伪造 WebGL/Pointer Lock |\n',
 '| `scripts/check-mobile.mjs` | 手机设备判定、Desktop/Touch 适配器与 Player 输入解耦静态契约 | Node 22；Android Chromium 真实交互另由 mobile E2E 覆盖 |\n| `scripts/check-controls.mjs` | ControlIntent v1、source 合并、primary edge、look/action、desktop/touch/network-peer 等价性 | 纯逻辑；联机输入协议前置契约 |\n',
 'manifest control tests')
 
