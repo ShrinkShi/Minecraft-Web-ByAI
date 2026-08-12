@@ -33,6 +33,12 @@ async function debugXYZ(page){
   if(!match)throw new Error(`cannot parse player XYZ from debug HUD: ${text}`);return{x:Number(match[1]),y:Number(match[2]),z:Number(match[3])};
 }
 async function debugY(page){return (await debugXYZ(page)).y;}
+async function lockPointerAndLook(page,{movementX=0,movementY=0}={}){
+  const canvas=page.locator('#game-canvas');await canvas.click({position:{x:8,y:8}});
+  await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.id||null),{timeout:5_000,message:'canvas should own pointer lock before mouse interaction'}).toBe('game-canvas');
+  await page.evaluate(({movementX,movementY})=>{const event=new MouseEvent('mousemove',{bubbles:true});Object.defineProperty(event,'movementX',{value:movementX});Object.defineProperty(event,'movementY',{value:movementY});document.dispatchEvent(event);},{movementX,movementY});
+}
+async function rightClickCanvas(page){await page.locator('#game-canvas').dispatchEvent('mousedown',{button:2,bubbles:true});}
 
 test('boots, swims, switches precipitation, persists armor, then clears equipment on survival void death',async({page})=>{
   const pageErrors=[];
@@ -191,5 +197,21 @@ test('custom spawnpoint persists and explicit respawn returns to it',async({page
   await expect.poll(async()=>{const record=(await savedWorlds(page)).find(world=>world.name==='CI Custom Respawn');if(!record||Number(record.updatedAt)<saveStarted||!record.respawnPoint)return null;return{version:record.version,x:Number(record.respawnPoint.x.toFixed(1)),y:Number(record.respawnPoint.y.toFixed(1)),z:Number(record.respawnPoint.z.toFixed(1))};},{timeout:10_000,message:'spawnpoint should persist in a fresh v6 world snapshot'}).toEqual({version:6,x:custom.x,y:custom.y,z:custom.z});
   await page.getByRole('button',{name:'返回游戏'}).click();await runCommand(page,'/tp -7 35 -7');await runCommand(page,'/kill');await expect(page.locator('#death-menu')).toHaveClass(/active/,{timeout:10_000});await page.getByRole('button',{name:'重生'}).click();await expect(page.locator('#death-menu')).not.toHaveClass(/active/);
   await expect.poll(async()=>{const p=await debugXYZ(page);return Math.abs(p.x-custom.x)<.15&&Math.abs(p.y-custom.y)<.15&&Math.abs(p.z-custom.z)<.15;},{timeout:5_000,message:'explicit respawn should return to the persisted custom spawnpoint'}).toBe(true);
+  expect(pageErrors).toEqual([]);expect(consoleErrors).toEqual([]);
+});
+
+test('bed placement sets the persistent respawn anchor',async({page})=>{
+  const pageErrors=[],consoleErrors=[];page.on('pageerror',error=>pageErrors.push(error.message));page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
+  await page.goto('/');await page.getByRole('button',{name:'单人游戏'}).click();await page.locator('#world-name').fill('CI Bed Anchor');await page.locator('#world-seed').fill('ci-bed-anchor-2026');await page.locator('#game-mode').selectOption('survival');await page.locator('#terrain-prompt').fill('平原');await page.getByRole('button',{name:'创建 / 进入'}).click();
+  await expect(page.locator('#loading')).toHaveClass(/hidden/,{timeout:60_000});await expect(page.locator('#hud')).not.toHaveClass(/hidden/);
+  await runCommand(page,'/tp 24 35 24');
+  await expect.poll(async()=>{const a=await debugXYZ(page);await page.waitForTimeout(250);const b=await debugXYZ(page);return Math.abs(a.y-b.y)<.03&&b.y>0;},{timeout:10_000,message:'player should settle before placing a bed'}).toBe(true);
+  await runCommand(page,'/give bed 1');await lockPointerAndLook(page,{movementY:450});await rightClickCanvas(page);await expect(page.locator('#toast')).toContainText('放置 床',{timeout:5_000});
+  await page.waitForTimeout(250);await rightClickCanvas(page);await expect(page.locator('#toast')).toContainText('重生点已设置',{timeout:5_000});
+  const saveStarted=await page.evaluate(()=>Date.now());await key(page,'Escape');await expect(page.locator('#pause-menu')).toHaveClass(/active/);
+  await expect.poll(async()=>{const record=(await savedWorlds(page)).find(world=>world.name==='CI Bed Anchor');if(!record||Number(record.updatedAt)<saveStarted||!record.respawnPoint)return null;const ids=Object.values(record.edits||{}).flat().map(entry=>Number(entry?.[1])).filter(id=>id>=11&&id<=18).sort((a,b)=>a-b);return{version:record.version,bedIds:ids,hasRespawn:true};},{timeout:10_000,message:'two bed halves and the bed respawn anchor should persist together'}).toEqual({version:6,bedIds:[11,12],hasRespawn:true});
+  const bedRecord=(await savedWorlds(page)).find(world=>world.name==='CI Bed Anchor'),anchor=bedRecord.respawnPoint;expect(anchor).toBeTruthy();
+  await page.getByRole('button',{name:'返回游戏'}).click();await runCommand(page,'/tp -24 35 -24');await runCommand(page,'/kill');await expect(page.locator('#death-menu')).toHaveClass(/active/,{timeout:10_000});await page.getByRole('button',{name:'重生'}).click();
+  await expect.poll(async()=>{const pos=await debugXYZ(page);return Math.abs(pos.x-anchor.x)<.15&&Math.abs(pos.y-anchor.y)<.15&&Math.abs(pos.z-anchor.z)<.15;},{timeout:5_000,message:'explicit respawn should return to the bed anchor'}).toBe(true);
   expect(pageErrors).toEqual([]);expect(consoleErrors).toEqual([]);
 });
