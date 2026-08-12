@@ -51,10 +51,11 @@
 | `scripts/check-oxygen.mjs` | 氧气/溺水时序回归 | 不等待真实时间 |
 | `scripts/check-swim.mjs` | 水覆盖率、dry no-op、速度插值、浮力、上下游、限速回归 | 纯逻辑 |
 | `scripts/check-weather.mjs` | clear/rain/thunder profile、精确池预算、参数强弱和非法输入回归 | 不导入 Three.js；渲染实例由 Chromium 覆盖 |
+| `scripts/check-death.mjs` | 死亡 DOM/样式、DeathScreen/deathState、显式重生和旧立即重生路径的集成契约 | Node 静态契约；同时拒绝历史一次性 death patch 工具进入交付树 |
 | `scripts/serve.mjs` | Playwright / 本地开发共用 HTTP server | 阻止 path traversal；测试 no-store |
 | `tests/e2e/smoke.spec.mjs` | Chromium 世界启动、水体 oxygen/swimming、WeatherFX、护甲存档、虚空死亡界面，以及普通可恢复死亡回收 | 第二用例 3 原木 + 16 XP 后 `/kill`，显式重生回死亡点，通过真实 DropSystem + ExperienceOrbSystem 恢复 3 原木和 14 XP；全程捕获 page/console error |
 | `playwright.config.mjs` | browser smoke 超时、单 worker、Chromium/WebGL、失败工件 | CI 优先稳定性 |
-| `package.json` | Node 22+ 测试脚本与固定 Playwright | `test:logic` 顺序跑基础/armor/water/oxygen/swim/weather 六套测试 |
+| `package.json` | Node 22+ 测试脚本与固定 Playwright | `test:logic` 顺序跑基础/armor/water/oxygen/swim/weather/death 七套测试 |
 | `.github/workflows/quality.yml` | Node + Chromium 两层质量门 | PR/main 自动执行；同 ref 新 push 取消旧 run |
 | `.github/workflows/pages.yml` | GitHub Pages 自动部署 | main 更新触发 |
 | `docs/ARCHITECTURE.md` | 架构决策、数据流、技术债 | 架构变化同步更新 |
