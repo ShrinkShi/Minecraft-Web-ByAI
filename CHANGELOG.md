@@ -9,10 +9,12 @@
 - 新增 `playwright.config.mjs` 和 `tests/e2e/smoke.spec.mjs`。
 - `Repository quality` 从单一 Node job 扩展为两层质量门：`static-checks` 成功后，再运行 Chromium `browser-smoke`。
 - `Repository quality` 增加按 `github.ref` 分组的 `cancel-in-progress`，同一 PR / 分支的新 push 会取消过时的未完成质量 run。
-- `static-checks` 同时语法检查 `src/*.js` 和 `scripts/*.mjs`；`npm run test:logic` 现在顺序执行基础回归、Equipment/Armor 回归和 water mesh pass 回归。
+- `static-checks` 同时语法检查 `src/*.js` 和 `scripts/*.mjs`；`npm run test:logic` 现在顺序执行基础回归、Equipment/Armor、water mesh pass 与 Oxygen/Drowning 四套回归。
 - 新增 `scripts/check-water.mjs`：覆盖孤立水、相邻水内部面剔除、水/实体边界、两套 Transferable buffers 以及跨 chunk 同水面剔除。
+- 新增 `scripts/check-oxygen.mjs`：覆盖 survival/adventure 与 creative/spectator 模式边界、15 秒空气耗尽、4× 离水恢复、跨 0 点计时、每秒溺水事件和非法输入。
 - PR #12 第一轮静态质量门暴露旧 `scripts/check.mjs` 仍消费 mesh Worker 顶层 `indices`；修复采用 opaque 顶层兼容视图，而不是删除旧回归，随后基础/护甲/水三套 Node 测试和 Chromium smoke 同时通过。
-- browser smoke 当前真实验证：世界创建（实际经过新 opaque/water Worker 协议和双 pass 安装）→皮革外套真实拖放→护甲 HUD→v5 IndexedDB 装备快照→虚空死亡→装备/背包/XP 清空，并捕获 page/console error。
+- browser smoke 现在使用固定 seed + `海` prompt 真实生成水体，验证 Player eye voxel 浸水后 Oxygen HUD 出现且 `data-air` 实际下降，离水后恢复并隐藏；随后继续验证皮革外套、v5 IndexedDB Equipment 快照和虚空死亡清算。
+- 浏览器存档断言明确确认 world record 不含 `oxygen` 字段，避免把瞬时空气状态误纳入长期存档 schema。
 - 浏览器测试失败时上传 trace / screenshot / HTML report 目录作为定位工件。
 - GitHub Actions checkout/setup-node 使用 v6；浏览器 CI 当前只安装 Chromium。
 - `.gitignore` 包含 `playwright-report/` 和 `test-results/`。
@@ -36,7 +38,7 @@
 - 新增独立 `Equipment` 模型：head/chest/legs/feet 四槽，不占用 36 格 Inventory；支持部位校验、cursor 拖放、快照恢复、护甲点汇总和死亡 `drain()`。
 - 新增皮革帽子、皮革外套、皮革裤子、皮革靴子，护甲点分别为 1/3/2/1，总计 7；`/give` 支持 `minecraft:leather_*` 别名。
 - 新增 `armor-rules.js`：当前过渡公式每护甲点 4%、最高 80%，完整皮革套减伤 28%。
-- 僵尸/蜘蛛近战、骷髅箭矢和苦力怕爆炸的 damage amount 在进入 Player 前经过基础护甲减伤；虚空不受护甲保护。
+- 僵尸/蜘蛛近战、骷髅箭矢和苦力怕爆炸的 damage amount 在进入 Player 前经过基础护甲减伤；虚空与溺水不受护甲保护。
 - 世界 record 逻辑快照升级到 v5，保存 `equipment`；IndexedDB object-store schema 仍为 v1，无需数据库迁移。
 - 生存/冒险死亡清算现在同时抽空 Equipment；普通死亡会把护甲作为物品掉在死亡点，虚空死亡直接损失。
 - 新增 `armor.css` 和 Inventory 四个护甲槽；HUD armor row 显示 0–20 点护甲。
@@ -47,17 +49,26 @@
 - `VoxelWorld` 每个 chunk 最多安装一个 opaque mesh 与一个透明 water mesh；两者共享 atlas texture，water 使用 `transparent=true / opacity=.68 / depthWrite=false` 的独立材质。
 - chunk 重建、卸载和世界退出会同时释放 opaque/water geometry；两套材质独立 dispose，共享 atlas texture 只释放一次。
 - opaque 旧顶层 Worker buffer 字段暂时保留为迁移兼容层；运行时只消费新 `opaque/water` 子协议。
+- 新增 `oxygen-rules.js`：survival/adventure 具有 15 秒空气，离水后按每真实秒恢复 4 秒空气额度；creative/spectator 始终保持满空气。
+- 主循环按 `Player.eyePosition()` 所在 voxel 的 `liquid` 元数据判定头部浸水，而不是以脚部接触或渲染材质作为氧气真相源。
+- 空气耗尽后每累计 1 秒产生一次 2 HP 溺水伤害；跨过空气 0 点时只计算真正无空气的剩余 dt，避免提前伤害。
+- 溺水直接进入 `Player.takeDamage()`，不经过 `armor-rules.js`；护甲不会错误减免溺水。
+- 新增 `oxygen.css` 与 10 气泡 Oxygen HUD；仅在头部浸水或空气尚未恢复满时显示。
+- Oxygen 为瞬时环境状态：重生、世界退出或切换到 creative/spectator 会恢复满空气；v5 world record 不新增 oxygen 字段。
+- 世界启动聊天更新为明确提示头部浸水会消耗氧气。
 - 世界启动聊天修正为四种敌对生物，包含已经落库的蜘蛛。
 - 修正 Creeper 加入 `HOSTILE_MOBS` 后测试仍只期望 zombie/skeleton 的历史回归错误。
 
 ### Documentation
-- README 明确区分稳定基线 `v0.3.0` 与 `main` 的 `v0.4.0-dev`，并记录 Equipment/Armor 和水透明 pass 的当前实现边界。
-- `docs/ARCHITECTURE.md` 将 Equipment/armor-rules 和 opaque/water 双 pass 纳入正式数据流与 GPU 生命周期约束。
+- README 明确区分稳定基线 `v0.3.0` 与 `main` 的 `v0.4.0-dev`，并记录 Equipment/Armor、水透明 pass、氧气/溺水的当前实现边界。
+- `docs/ARCHITECTURE.md` 将 Equipment/armor-rules、opaque/water 双 pass 和 eye-voxel Oxygen 数据流纳入正式架构。
 - `docs/PROGRESS.md`、`docs/TESTING.md`、`docs/FILE_MANIFEST.md` 与实际代码/CI 对齐。
 
 ### Current limitations
-- `v0.4.0` 尚未封版：死亡界面/统计/床重生、水下检测/氧气、游泳/流体、天气粒子等仍未完成。
-- 当前水只完成独立透明渲染 pass；没有流体传播、液面高度/动画、浮力、水下 fog/折射，也尚无不同 GPU/角度下透明排序的像素级自动 E2E。
+- `v0.4.0` 尚未封版：死亡界面/统计/床重生、游泳/浮力/流体传播、水下视觉、天气粒子等仍未完成。
+- 当前已完成头部浸水→氧气→溺水事件闭环，但没有 Respiration、Water Breathing、Conduit、气泡柱等状态效果，也没有游泳/浮力和水流物理。
+- 完整 15 秒耗尽→真实溺水死亡的浏览器时间链尚未自动等待；规则时序由 Node 精确覆盖，Chromium 验证真实地形/Player/World/UI 接线。
+- 当前水只有独立透明静态 pass；没有流体传播、液面高度/动画、水下 fog/折射，也尚无不同 GPU/角度下透明排序的像素级自动 E2E。
 - mesh Worker 的 opaque 旧顶层 buffer 字段是临时迁移兼容层，所有消费者迁移后应删除。
 - 当前护甲公式是明确的过渡实现，不等于 Java armor+toughness；暂无耐久、附魔、更多材质、Armor Trim、玩家模型穿戴渲染、自动 Shift-equip 或护甲配方。
 - Chromium 自动化验证了装备/存档/死亡清算，但尚未通过真实敌对攻击测量有/无护甲 HP 差值。

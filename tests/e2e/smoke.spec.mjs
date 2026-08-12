@@ -24,7 +24,7 @@ async function runCommand(page,text){
 
 async function key(page,code){await page.evaluate(code=>window.dispatchEvent(new KeyboardEvent('keydown',{code,bubbles:true})),code);}
 
-test('boots, equips armor, persists it, then clears equipment on survival void death',async({page})=>{
+test('boots, detects underwater oxygen, equips armor, persists it, then clears equipment on survival void death',async({page})=>{
   const pageErrors=[];
   const consoleErrors=[];
   page.on('pageerror',error=>pageErrors.push(error.message));
@@ -39,12 +39,21 @@ test('boots, equips armor, persists it, then clears equipment on survival void d
   await page.locator('#world-name').fill('CI Browser Smoke');
   await page.locator('#world-seed').fill('ci-browser-smoke-2026');
   await page.locator('#game-mode').selectOption('survival');
+  await page.locator('#terrain-prompt').fill('海');
   await page.getByRole('button',{name:'创建 / 进入'}).click();
 
   await expect(page.locator('#loading')).toHaveClass(/hidden/,{timeout:60_000});
   await expect(page.locator('#hud')).not.toHaveClass(/hidden/);
   const canvas=await page.locator('#game-canvas').evaluate(element=>({width:element.width,height:element.height,clientWidth:element.clientWidth,clientHeight:element.clientHeight}));
   expect(canvas.width).toBeGreaterThan(0);expect(canvas.height).toBeGreaterThan(0);expect(canvas.clientWidth).toBeGreaterThan(0);expect(canvas.clientHeight).toBeGreaterThan(0);
+
+  const oxygen=page.locator('#oxygen');
+  await expect(oxygen).not.toHaveClass(/hidden/,{timeout:5_000});
+  const firstAir=Number(await oxygen.getAttribute('data-air'));expect(firstAir).toBeGreaterThan(13);expect(firstAir).toBeLessThanOrEqual(15);
+  await page.waitForTimeout(700);
+  const secondAir=Number(await oxygen.getAttribute('data-air'));expect(secondAir).toBeLessThan(firstAir-.3);
+  await runCommand(page,'/tp 0 35 0');
+  await expect(oxygen).toHaveClass(/hidden/,{timeout:5_000});
 
   await runCommand(page,'/give minecraft:leather_chestplate 1');
   await key(page,'KeyE');
@@ -63,8 +72,8 @@ test('boots, equips armor, persists it, then clears equipment on survival void d
   await expect.poll(async()=>{
     const record=(await savedWorlds(page)).find(world=>world.name==='CI Browser Smoke');
     if(!record||Number(record.updatedAt)<armorSaveStartedAt)return null;
-    return{version:record.version,chest:record.equipment?.slots?.chest?.id||null};
-  },{timeout:10_000,message:'a fresh pause save should persist the equipped leather chestplate'}).toEqual({version:5,chest:'leather_chestplate'});
+    return{version:record.version,chest:record.equipment?.slots?.chest?.id||null,hasTransientAir:Object.hasOwn(record,'oxygen')};
+  },{timeout:10_000,message:'a fresh pause save should persist armor but not transient oxygen state'}).toEqual({version:5,chest:'leather_chestplate',hasTransientAir:false});
   await page.getByRole('button',{name:'返回游戏'}).click();
   await expect(page.locator('#pause-menu')).not.toHaveClass(/active/);
 

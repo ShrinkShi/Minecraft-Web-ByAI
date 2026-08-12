@@ -1,0 +1,4 @@
+.oxygen{position:absolute;left:50%;right:auto;bottom:88px;transform:translateX(10px);display:flex;gap:2px;align-items:center;min-height:18px;filter:drop-shadow(1px 1px 0 #000)}
+.oxygen-bubble{display:block;width:12px;height:12px;border:2px solid #dff7ff;border-radius:50%;background:#6fd4ff99;box-shadow:inset 2px 2px 0 #ffffff99,inset -2px -2px 0 #277ea8aa}
+.oxygen-bubble.empty{opacity:.22;background:transparent;box-shadow:none}
+@media(max-width:650px){.oxygen{bottom:74px;transform:translateX(6px)}.oxygen-bubble{width:10px;height:10px}}
