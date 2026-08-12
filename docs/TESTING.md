@@ -22,6 +22,7 @@ scripts/check-swim.mjs
 scripts/check-weather.mjs
 scripts/check-death.mjs
 scripts/check-respawn.mjs
+scripts/check-bed.mjs
 ```
 
 基础套件覆盖 Inventory / Crafting / Commands / EntityStore / SpatialHash / 四种敌对生物 / Combat / Projectile / Experience / Spider / Death / Mesh Worker / Terrain Worker。
@@ -75,6 +76,10 @@ Node 层只验证 profile，不导入 Three.js WeatherSystem；后者由 Chromiu
 ### Custom respawn rules
 
 `scripts/check-respawn.mjs` 覆盖 respawnPoint 数值归一化、14 个 exact/同层周边/+1Y 候选的稳定顺序、first-safe 选择、全部不可用返回 null，以及非法 `isSafe` 拒绝。该模块不导入 Three.js/World；真实方块支撑、液体、眼部空间和 Player AABB 检查由 Chromium/runtime 覆盖。
+
+### Bed rules
+
+`scripts/check-bed.mjs` 覆盖 8 个床 voxel ID 的唯一性、四方向 look→facing、foot/head 两端坐标、从任一端解析 partner、两端归一到同一 respawn anchor、BLOCKS/ITEMS/drop/tint 元数据、3×3 `3 wool + 3 planks -> bed` 配方消费，以及真实 sheep loot 的 `white_wool` 来源。2×2 工作区不得误匹配床配方。
 
 ## Chromium browser smoke
 
@@ -132,6 +137,17 @@ npm run test:e2e
 4. 显式点击“重生”，最终 debug XYZ 必须回到持久化自定义点（允许 0.15 格浮点观测误差）。
 5. 该测试不直接修改 respawnPoint/Player/IndexedDB，并持续捕获 pageerror/console error。
 
+### Bed respawn-anchor browser regression
+
+第四条独立 Chromium 用例使用世界 `CI Bed Anchor`：
+
+1. 在平原世界非原点落地，`/give bed 1` 后按真实 UI 流程打开背包，将主背包槽 0 的床移动到热栏槽 27，并断言 HUD 当前选中物品确实是“床”。
+2. 获取真实 Pointer Lock，用鼠标向下看并右键世界；必须出现“放置 床”，说明运行时确实经过准星 raycast 和 `placeBed()`，不是直接写 voxel。
+3. 再次右键已放置床，必须出现“重生点已设置”。
+4. 暂停后只接受新鲜 v6 world record，并要求 edits 同时包含一对朝北床 ID `11/12`，且 `respawnPoint` 已保存。
+5. 返回游戏后传送到远处 `/kill`，显式“重生”后的公开 debug XYZ 必须回到保存的床锚点。
+6. 全程捕获 pageerror/console error；测试不直接修改 world edits、respawnPoint 或 IndexedDB。
+
 ## GitHub Pages 部署验证
 
 仓库 Pages Source 为 **GitHub Actions**。每个主线 squash 后必须同时核对 `Repository quality` 与 `Deploy GitHub Pages` 最终 success。
@@ -152,5 +168,6 @@ npm run test:e2e
 - 普通可恢复死亡的物品和 XP 球回收均已覆盖；装备掉落的单独可恢复死亡拾回断言仍未覆盖。
 - 死亡界面“返回标题画面”按钮的专门 browser E2E；运行时会 force-save 已结算的 hp=0 状态，重新进入时优先使用持久化自定义重生点，失效才回世界出生点。
 - 自定义重生点被方块阻塞时周边候选/fallback 的专门 Chromium 场景；纯规则候选顺序已有 Node 回归。
+- 床半高专用 mesh/collision、睡觉/跳夜、占用、附近怪物限制、床支撑更新、下界/末地爆炸和联动破坏的专门 Chromium 断言尚未覆盖；当前 browser E2E 聚焦真实放置→激活→重生锚点主链。
 - 死亡世界实体跨页面持久化、IndexedDB 配额/schema 迁移。
 - Three.js 运行时仍依赖 jsDelivr。

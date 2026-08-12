@@ -2,7 +2,7 @@
 
 ## 设计原则
 
-1. **数据优先**：区块用紧凑 TypedArray；Inventory、Equipment、配方、战斗、护甲、氧气、游泳、天气 profile、死亡与重生候选规则尽量保持纯数据/纯逻辑。
+1. **数据优先**：区块用紧凑 TypedArray；Inventory、Equipment、配方、战斗、护甲、氧气、游泳、天气 profile、死亡/重生候选与床配对规则尽量保持纯数据/纯逻辑。
 2. **重活离开主线程**：terrain 与 mesh 分别运行在 Web Worker；主线程负责输入、系统编排和 GPU 对象安装。
 3. **批处理渲染**：chunk 不是一方块一 Mesh；天气也不是一雨滴一 Mesh。可重复大量元素优先固定 Buffer 池。
 4. **玩家位置只有一个积分器**：陆地、飞行、水中移动都收口在 `PlayerController.update()`。
@@ -112,7 +112,9 @@ profile 还提供 fallSpeed、line length、windX/windZ、opacity。thunder 的�
 - “返回标题画面”会先 force-save 已清算的 hp=0 死亡状态再 dispose world；DeathScreen 本身不持久化。下次载入 hp<=0 的世界时，`startWorld()` 会优先解析已保存的自定义重生点及安全候选，失败才回世界出生点，因此不会把死亡 UI 跨页面保存。
 - `beginPlayerDeath()` 还会 fire-and-forget 启动一次强制 IndexedDB 保存，降低停留在死亡界面后直接关闭页面造成结算丢失的风险。
 - `respawn-rules.js` 是纯逻辑层：只负责 `{x,y,z}` 归一化、固定候选顺序和 first-safe 选择；它不读取 Three.js/World。`/spawnpoint` 只更新 main 的 `respawnPoint` + saveDirty，安全性在真正重生时由 world/player 检查。
-- `Player.respawnAt()` 只接受已经解析的精确位置，重置生命/饱食/受伤状态并复用 Player AABB 碰撞；床等未来重生来源应复用同一 setter/resolver，而不是另造重生状态机。
+- `Player.respawnAt()` 只接受已经解析的精确位置，重置生命/饱食/受伤状态并复用 Player AABB 碰撞。
+- `bed-rules.js` 把四个水平方向编码成 8 个 foot/head voxel ID，并纯逻辑负责朝向、配对端坐标和两端归一到同一床重生锚点；它不读取 World/Three.js。main 的 `placeBed()` 负责两端占位检查和原子写入，`breakBed()` 只在预期配对 ID 仍存在时联动删除，`activateBed()` 则只调用与 `/spawnpoint` 共用的 `setRespawnPoint()`。
+- 当前床渲染仍沿用标准 1m³ voxel mesh/collision，并通过通用 per-block vertex tint 区分视觉；这是明确的过渡实现，不等同于原版半高床模型。后续专用床 geometry/collision 不应改变已持久化的床 ID 或 respawnPoint 协议。
 - DropSystem / ExperienceOrbSystem 当前仍不跨页面持久化。
 
 ## Entities / Combat
@@ -133,8 +135,8 @@ profile 还提供 fallSpeed、line length、windX/windZ、opacity。thunder 的�
 
 `Repository quality`：
 
-1. static-checks：语法 + base/armor/water/oxygen/swim/weather/death/respawn 八套回归。
-2. browser-smoke：第一世界验证 water/oxygen/swimming、WeatherFX、Equipment v6、虚空显式重生；第二世界验证普通死亡 3 原木 + 14 XP 的真实回收；第三世界验证 `/spawnpoint` v6 持久化与异地死亡后精确自定义重生。
+1. static-checks：语法 + base/armor/water/oxygen/swim/weather/death/respawn/bed 九套回归。
+2. browser-smoke：第一世界验证 water/oxygen/swimming、WeatherFX、Equipment v6、虚空显式重生；第二世界验证普通死亡 3 原木 + 14 XP 的真实回收；第三世界验证 `/spawnpoint` v6 持久化与异地死亡后精确自定义重生；第四世界通过真实 Inventory→hotbar→Pointer Lock→右键链放置/激活床并验证床锚点重生。
 
 Weather browser test 不访问隐藏 WeatherSystem 实例，只读公开 debug HUD，并同时捕获 pageerror/console error，因此覆盖真实命令→main→Three.js 系统链。
 
@@ -149,6 +151,6 @@ Weather browser test 不访问隐藏 WeatherSystem 实例，只读公开 debug H
 - opaque Worker 顶层兼容 buffers 应在消费者迁移后删除。
 - Equipment 无快捷装备、耐久、正式穿戴模型和标准 armor+toughness。
 - 生物无 chunk 持久化、正式寻路/亮度生成/动画。
-- 死亡统计、床方块/睡眠语义、keepInventory、死亡世界实体持久化尚未完成；自定义重生点内核已经独立落库。
+- 死亡统计、床睡眠/跳夜/占用/怪物限制/维度爆炸语义、半高床 geometry/collision、keepInventory、死亡世界实体持久化尚未完成；两格床重生锚点基础已经落库。
 
 这些项目继续按独立可验证单元拆除，不能因为“已经能跑”就固化成长期架构。
