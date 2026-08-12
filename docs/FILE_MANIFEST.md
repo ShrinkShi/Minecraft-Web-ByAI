@@ -10,7 +10,7 @@
 | `oxygen.css` | 氧气气泡 HUD 样式 | 只负责表现；空气状态来自 oxygen-rules |
 | `death.css` | 死亡覆盖层、死亡原因/摘要和重生按钮样式 | 只负责表现，不参与死亡损失/重生规则 |
 | `mobile.css` | 手机 portrait 旋转提示、landscape 虚拟控件、safe-area 与紧凑 HUD/Inventory 布局 | 只负责移动端表现；不改变 gameplay 规则 |
-| `src/main.js` | 应用状态机、Three.js 场景、系统编排、桌面/移动共享交互、奖励/死亡/护甲/氧气/天气接线与自动保存 | 主/副交互只有一条 gameplay 路径；手机不要求 Pointer Lock，桌面仍要求；暂停/面板/死亡清虚拟输入 |
+| `src/main.js` | 应用状态机、Three.js 场景、系统编排、平台无关控制意图分发、奖励/死亡/护甲/氧气/天气接线与自动保存 | 主/副交互只有一条 gameplay 路径；设备差异只影响输入捕获；暂停/面板/死亡统一 reset ControlIntentBus |
 | `src/device-profile.js` | 桌面/手机与横竖屏环境判定、body dataset 同步 | 纯环境逻辑；UA/UA-CH + touch/coarse/no-hover 边界可 Node 测试 |
 | `src/control-intents.js` | 平台无关控制意图版本、连续状态归一化、多 source 合并、look/action 分发 | 纯逻辑；未来 gamepad/network-peer 必须复用，不得携带 DOM/设备规则 |
 | `src/desktop-controls.js` | Keyboard/Mouse/Pointer Lock → ControlIntentBus 桌面适配 | 只翻译输入，不访问 World/Inventory/玩法规则 |

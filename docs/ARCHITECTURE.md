@@ -12,7 +12,7 @@
 8. **规则可离线测试**：核心纯规则/Worker 协议在 Node 22 回归；真实 Three.js/WebGL 生命周期由 Chromium 覆盖。
 9. **远端证据决定完成度**：只有进入 GitHub `main` 且质量门和 Pages 通过才算完成。
 10. **单客户端、多输入适配器**：桌面/手机不得分叉 World、Player、Inventory、命令、存档或玩法规则。设备差异只允许存在于输入适配和响应式 UI；未来网络层接收/发送的也是平台无关 gameplay intent/state。
-10. **输入设备适配与玩法逻辑分离**：桌面键鼠和手机手势只产生统一 Player/交互输入，不允许移动端控制层直接修改 World/Inventory/IndexedDB。
+11. **输入适配器无玩法写权限**：键鼠、触摸以及未来手柄/网络 source 只产生统一控制意图，不允许输入适配层直接修改 World、Inventory、Storage 或伤害/碰撞规则。
 
 ## 当前 v0.4 总体数据流
 
@@ -34,15 +34,13 @@ AI damage/projectile/explosion -> armor-rules -> Player.takeDamage
 Mob death -> DropSystem + ExperienceOrbSystem -> Inventory / totalXp
 ```
 
-## Device profile / Mobile browser input
+## Device profile / Responsive presentation
 
 - `device-profile.js` 是纯环境判定层：优先使用 Mobile UA / `navigator.userAgentData.mobile`，并用 `maxTouchPoints + (pointer:coarse) + (hover:none) + compact viewport` 覆盖 iPadOS 桌面 UA；带触摸屏但仍有 fine pointer/hover 的桌面设备不自动切到手机布局。
-- 判定结果写入 `body[data-device]` / `body[data-orientation]`，并监听 resize/orientation/media-query 变化。portrait 手机只显示旋转提示；landscape 才允许触控游戏控件。
-- `mobile-controls.js` 只把 pointer 手势转换为 `onMove/onLook/onHold/onToggle/onAction`；它不读取或写入 World、Inventory、Storage。
-- `PlayerController.virtualInput` 与键盘 `keys` 分离，在唯一的 `PlayerController.update()` 中合成；触控摇杆保留模拟量，键盘语义不变。
-- 主编排层将桌面鼠标和手机按钮统一收口到 `primaryActionStart/End()` 与 `secondaryAction()`，因此攻击、持续挖掘、raycast、放置、工作台和床交互只有一条 gameplay 路径。
-- 手机 gameplay 的 `canControl()` 不要求 Pointer Lock；桌面仍要求 Pointer Lock。暂停、死亡、背包、工作台或聊天打开时会清除 virtual input，避免松手事件丢失造成持续移动/攻击。
-- `mobile.css` 使用 `env(safe-area-inset-*)` 避开刘海/圆角，并压缩横屏 HUD/背包；不设置 `user-scalable=no`，也不依赖浏览器通常受手势权限限制的强制 orientation lock。
+- 判定结果只写入 `body[data-device]` / `body[data-orientation]` 并选择输入适配器/响应式布局；它不进入 Player、World、Inventory、world record 或未来服务端玩法状态。
+- portrait 手机显示旋转提示，landscape 显示触控控件；桌面通过 Pointer Lock 获得鼠标视角。两者只是表现和输入捕获方式不同。
+- `mobile.css` 使用 `env(safe-area-inset-*)` 避开刘海/圆角并压缩横屏 HUD/背包；不设置 `user-scalable=no`，也不依赖浏览器通常受手势权限限制的强制 orientation lock。
+- 实际 gameplay 输入统一规则见下方 `Platform / Control Intent`；本节不得再描述 mobile-only Player 状态。
 
 ## Platform / Control Intent
 
