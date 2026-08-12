@@ -10,8 +10,8 @@ Minecraft-Web-ByAI 只有一个 Web 客户端和一套游戏运行时。桌面�
 设备事件
   -> DesktopControls / MobileControls / future GamepadControls
   -> ControlIntentBus
-  -> canonical ControlState + Player absolute view
-  -> PlayerController / shared gameplay actions
+  -> canonical ControlState + Player absolute view + semantic gameplay actions
+  -> PlayerController / shared gameplay rules
   -> future network protocol
 ```
 
@@ -62,30 +62,72 @@ World、Player、Inventory、Equipment、Crafting、Combat、Entity、Storage、
 
 wire decoder 对 view frame 同样采用严格校验：数值字符串、NaN/Infinity、非 canonical yaw、越界 pitch、非法 seq、额外字段和不兼容版本全部拒绝。encoder 只对本地可无限累积的 yaw 做环绕规范化，不会把越界 pitch 静默夹回合法范围。
 
-## 本地动作与未来网络动作
+## PlayerActionFrame v1
 
-暂停、打开背包 GUI、切换第三人称、本地菜单焦点等属于客户端表现，不应发送给服务器作为世界模拟命令。
+`src/player-action-frame.js` 定义第一批离散 gameplay action。这里使用**语义动作**而不是键鼠/触控事件名称：
 
-攻击/挖掘、使用/放置、丢弃、选择快捷栏、聊天和后续实体交互需要在真正实现联机时定义独立的、可验证的网络 action schema；不能直接把 DOM event、KeyboardEvent、PointerEvent 或 MobileControls callback 透传到服务器。
+- `use`：使用/交互/放置，对应当前 runtime 的 secondary gameplay 语义；
+- `drop`：丢出当前选中物品；
+- `hotbar-select`：把当前快捷栏切换到绝对 `slot=0..8`。
+
+`use` 与 `drop` wire frame 为：
+
+```text
+{ v, seq, kind, viewSeq }
+```
+
+两者都依赖玩家朝向：使用/放置需要视线 raycast，丢弃物的初速度也沿玩家视线。因此它们必须引用一个已发送的 `PlayerViewFrame` 序号 `viewSeq`。
+
+`hotbar-select` 为：
+
+```text
+{ v, seq, kind: "hotbar-select", slot }
+```
+
+这里发送绝对 slot，而不是鼠标滚轮 `+1/-1` 或移动端按钮来源。桌面数字键、滚轮、手机热栏和未来手柄都必须先归一化到同一个 0..8 结果。
+
+### 不信任客户端 target
+
+PlayerActionFrame v1 **不允许**包含客户端声称命中的：
+
+- block x/y/z；
+- entity id；
+- hit face / previous cell；
+- reach distance；
+- `source/device`。
+
+服务端收到 `use` 或 primary control 后，应使用 authoritative player position 和所引用/已接受的 absolute view 自己做 raycast，再校验模式、交互距离、方块/实体状态、冷却和库存。未来如果为了延迟补偿加入 client target hint，也只能作为非权威提示，并需要新的明确 schema/version 设计。
+
+### 本地动作与独立协议
+
+当前 `ControlIntentBus` 中的动作不能原样全部上网：
+
+- `focus / escape / pause / inventory / view`：客户端 UI/镜头控制，不属于实时世界 action；
+- `chat`：未来应走独立 chat/message schema，不塞进 PlayerActionFrame；
+- `hotbar-step`：设备相对输入，必须先在客户端解析成绝对 `hotbar-select`；
+- `secondary / drop / hotbar-select`：可分别映射为 `use / drop / hotbar-select`。
+
+背包 GUI 本身是本地表现，但未来真正的槽位移动、合成、装备等会改变 authoritative gameplay state，必须另定义 inventory transaction schema，不能因为“inventory 打开动作是本地的”就让物品修改继续客户端权威。
 
 ## 未来服务器边界
 
 联机实现默认采用 server-authoritative 世界模型：
 
-1. 客户端把规范化连续控制帧、绝对视角帧和离散游戏动作发送给服务器；
-2. 服务器严格校验 schema/version/sequence 与动作合法性，再用 authoritative position + view 校验模式、距离、冷却、方块/实体状态；
-3. 服务器执行世界变化并广播玩家/实体/方块状态；
-4. PC 与手机玩家消费完全相同的 replication 消息；
-5. 客户端可做移动预测/插值，但不得形成平台专属规则。
+1. 客户端把规范化连续控制帧、绝对视角帧和离散 gameplay action 发送给服务器；
+2. 服务端分别严格校验 schema/version/sequence，并拒绝未知字段、类型伪装和不兼容版本；
+3. 对依赖视线的 action，服务端通过 `viewSeq` 关联已接受的 absolute view，再用 authoritative position 自己 raycast；
+4. 服务端校验模式、距离、冷却、库存、方块/实体状态后才执行世界变化；
+5. 服务端广播玩家/实体/方块/库存等 authoritative replication；PC 与手机消费相同消息；
+6. 客户端可做移动预测/插值和视觉反馈，但不得形成平台专属规则或权威世界修改。
 
 ## 兼容性要求
 
 - 网络消息必须带 schema/version，并允许显式拒绝不兼容版本。
 - 存档 schema 与网络 schema 分离；不能因为移动端 UI 改版提升世界存档版本。
 - 服务端不得依据设备类型赋予不同伤害、移动速度、碰撞、掉落或交互距离。
-- 自动化必须保留 desktop/touch/network-peer 的 canonical control frame 等价，并验证绝对 view frame 不含 device/source 身份。
-- malformed control/view frame 必须覆盖非法 sequence、额外字段、类型伪装、未知 bit、未归一化 move、非 canonical yaw 和越界 pitch 的拒绝。
+- 自动化必须保留 desktop/touch/network-peer 的 canonical control frame 等价，并验证 view/action frame 不含 device/source 身份。
+- malformed control/view/action frame 必须覆盖非法 sequence、额外字段、类型伪装、未知 bit/kind、未归一化 move、非 canonical yaw、越界 pitch、非法 hotbar slot 和 client target 注入的拒绝。
 
 ## 当前状态
 
-当前尚未实现真实多人服务器、WebSocket/WebTransport、玩家复制、房间/认证或服务器存档。`PlayerControlFrame v1` 与 `PlayerViewFrame v1` 只建立协议边界；下一步仍应先定义离散 gameplay action schema，再接传输层，避免把本地 UI 事件直接固化成网络协议。
+当前尚未实现真实多人服务器、WebSocket/WebTransport、玩家复制、房间/认证、inventory transaction、chat message 或服务器存档。`PlayerControlFrame v1`、`PlayerViewFrame v1`、`PlayerActionFrame v1` 已建立实时输入协议边界；下一步才适合建立最小 transport/envelope/ordering 层，而不是继续把 DOM 或客户端命中结果直接暴露给服务器。

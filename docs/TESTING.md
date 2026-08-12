@@ -26,10 +26,11 @@ scripts/check-bed.mjs
 scripts/check-mobile.mjs
 scripts/check-controls.mjs
   -> scripts/check-network-view.mjs
+  -> scripts/check-network-actions.mjs
 scripts/check-sleep.mjs
 ```
 
-基础套件覆盖 Inventory / Crafting / Commands / EntityStore / SpatialHash / 四种敌对生物 / Combat / Projectile / Experience / Spider / Death / Mesh Worker / Terrain Worker。`check-network-view.mjs` 由 `check-controls.mjs` 作为 wire-contract 子回归串联，避免与独立 gameplay suite 抢占 package 脚本入口。
+基础套件覆盖 Inventory / Crafting / Commands / EntityStore / SpatialHash / 四种敌对生物 / Combat / Projectile / Experience / Spider / Death / Mesh Worker / Terrain Worker。`check-network-view.mjs` 与 `check-network-actions.mjs` 由 `check-controls.mjs` 作为 wire-contract 子回归串联，避免与独立 gameplay suite 抢占 package 脚本入口。
 
 ### Equipment / Armor
 - 四个固定 Equipment 槽、错误部位拒绝、cursor 装备/取下。
@@ -104,6 +105,19 @@ Node 层只验证 profile，不导入 Three.js WeatherSystem；后者由 Chromiu
 - decoder 必须拒绝非 canonical yaw、越界 pitch、数值字符串、非法 sequence、额外字段与不兼容版本。
 
 该 view frame 是服务端验证“前进方向”、攻击、挖掘、放置和实体交互方向的协议前置。当前并未实现网络 transport，也不把浏览器原始鼠标/触控 delta 作为网络消息。
+
+### Platform-neutral gameplay action frame
+
+`scripts/check-network-actions.mjs` 覆盖：
+
+- `PLAYER_ACTION_FRAME_VERSION=1` 与唯一 v1 action 集合 `use / drop / hotbar-select`。
+- `use` 和 `drop` 必须带 uint32 `viewSeq`，用于关联已经接受的绝对 PlayerViewFrame；两者不得自带客户端命中 target。
+- `hotbar-select` 必须发送绝对 `slot=0..8`，不接受数值字符串或越界 slot。
+- 相同语义 action 的 desktop/touch/network 编码完全一致，frame 不得携带 `source/device`。
+- encoder/decoder 必须拒绝非法 action/view sequence、未知 kind、不兼容版本、额外字段，以及伪造的 block/entity `target`。
+- `inventory`、`chat` 等非 v1 gameplay action 不能被该 codec 静默编码；本地 UI、chat message、inventory transaction 保持协议分层。
+
+该回归刻意不测试“客户端给出方块坐标后服务器照做”，因为这正是需要禁止的客户端权威模式。未来 server-authoritative runtime 应根据 authoritative player position + `viewSeq` 对应朝向自行 raycast，再校验模式、距离、冷却和库存。
 
 真实桌面键盘/Pointer Lock 和 Android touch 路径继续由 Playwright 五场浏览器回归覆盖，因此 Node 层不伪造 DOM 输入。
 
