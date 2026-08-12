@@ -19,12 +19,12 @@ scripts/check-armor.mjs
 scripts/check-water.mjs
 scripts/check-oxygen.mjs
 scripts/check-swim.mjs
+scripts/check-weather.mjs
 ```
 
 基础套件覆盖 Inventory / Crafting / Commands / EntityStore / SpatialHash / 四种敌对生物 / Combat / Projectile / Experience / Spider / Death / Mesh Worker / Terrain Worker。
 
 ### Equipment / Armor
-
 - 四个固定 Equipment 槽、错误部位拒绝、cursor 装备/取下。
 - 非法快照过滤和 stack count 归一化。
 - `Equipment.drain()` 死亡清算。
@@ -32,7 +32,6 @@ scripts/check-swim.mjs
 - `/give minecraft:leather_chestplate 1`。
 
 ### Water mesh
-
 - 单个实体方块只产 opaque，单个水方块只产 water。
 - 同水相邻内部面剔除，包括跨 chunk 边界。
 - 水对实体方块接触面剔除，实体面对透明水保留。
@@ -40,26 +39,30 @@ scripts/check-swim.mjs
 - opaque 旧顶层 buffer 字段仍作为临时兼容视图。
 
 ### Oxygen / Drowning
-
 - survival/adventure 使用氧气；creative/spectator 满空气且不溺水。
 - 15 秒耗尽、离水 4× 恢复、跨 0 点时序。
 - 0 空气后 1 秒一个 drowning event；当前每个事件 2 HP。
 - 非法 state/dt/submerged 输入拒绝。
 
 ### Swimming / Buoyancy
-
-`scripts/check-swim.mjs` 覆盖：
-
 - 脚/躯干/眼睛三点布尔采样得到 0、1/3、2/3、1 的覆盖率。
-- coverage=0 时规则严格 no-op：不改 vertical velocity，speed multiplier=1，保证陆地路径不被水规则污染。
-- coverage 从 0→1 时水平倍率从 1 平滑插值到 0.5；部分浸水不会瞬间跳成完整水中速度。
-- 完整浸水、无输入、初始垂直速度为 0 时产生轻微正浮力。
-- Space 的向上加速度必须大于被动浮力；Shift 必须产生向下速度。
-- +3.4 / -3.0 的垂直水中限速。
-- Space 与 Shift 同时按下时额外上下游加速度抵消，只保留基础浮力/重力。
-- coverage、dt、velocityY、输入类型非法时拒绝。
+- coverage=0 严格 no-op，防止水规则污染陆地路径。
+- coverage 从 0→1 时水平倍率从 1 平滑插值到 0.5。
+- 完整浸水有轻微正浮力；Space 上游、Shift 下潜。
+- +3.4 / -3.0 垂直限速；冲突输入与非法参数均有回归。
 
-这些测试验证的是独立数值规则；Player 的真实 world sampling、输入事件和碰撞积分由 Chromium 层覆盖。
+### Weather / Precipitation
+
+`scripts/check-weather.mjs` 覆盖：
+
+- 唯一天气类型为 `clear / rain / thunder`，未知类型拒绝。
+- 固定默认容量 `WEATHER_MAX_SEGMENTS=720`。
+- clear 激活 0 条；rain 激活 `floor(720×.62)=446`；thunder 激活 720 条。
+- rain 必须具有正的 fallSpeed、length、opacity；thunder 的数量、下落速度、雨线长度、透明度和总风偏强度必须高于 rain。
+- 自定义小容量也按 ratio 计算，例如 rain 10 条容量时激活 6，thunder 1 条容量时激活 1。
+- 非正整数容量拒绝。
+
+Node 层只验证 profile，不导入 Three.js WeatherSystem；后者由 Chromium 实际创建/更新，避免在 Node 中伪造 WebGL 对象。
 
 ## Chromium browser smoke
 
@@ -72,20 +75,21 @@ npm run test:e2e
 当前 smoke 使用固定世界名、seed `ci-browser-smoke-2026` 和 terrain prompt `海`，验证：
 
 1. 主菜单→生存世界，HUD 与 WebGL Canvas 启动。
-2. 世界实际经过 mesh Worker opaque/water 双 pass。
-3. 出生点附近真实水体使 Player eye voxel 浸水，Oxygen HUD 自动出现。
-4. `#oxygen[data-air]` 在约 500 ms 内明显下降。
-5. 从 debug HUD 解析真实玩家 Y。
-6. 持续 Space 约 350 ms，Y 必须上升至少约 0.08，验证 Player key state→三点水采样→swim rules→moveAxis 的上游链。
-7. 随后持续 Shift 约 650 ms，Y 必须相对上游后位置下降，验证下潜链。
-8. `/tp 0 35 0` 离开水体，Oxygen HUD 恢复后隐藏。
-9. `/give minecraft:leather_chestplate 1`→真实 Inventory/Equipment 拖放→护甲 HUD。
-10. 暂停读取新鲜 IndexedDB：`version=5`、chest 正确，并确认没有持久化 oxygen。
-11. 恢复→给予原木→传送虚空→死亡/重生。
-12. 新鲜死亡后快照：Inventory=0、Equipment=0、XP=0、位置可恢复。
-13. 全程无 pageerror / console error。
+2. 世界经过 mesh Worker opaque/water 双 pass。
+3. 真实水体触发 Oxygen HUD，`data-air` 明显下降。
+4. 从 debug HUD 解析玩家 Y；Space 后上升、Shift 后下降。
+5. `/tp 0 35 0` 离水，Oxygen HUD 恢复后隐藏。
+6. 执行 `/weather rain`，debug 必须变为 `WeatherFX rain:446`。
+7. 执行 `/weather thunder`，debug 必须变为 `WeatherFX thunder:720`。
+8. 执行 `/weather clear`，debug 必须变为 `WeatherFX clear:0`。
+9. WeatherSystem 在上述切换和逐帧 update 期间不得产生 pageerror / console error。
+10. `/give minecraft:leather_chestplate 1`→真实 Equipment 拖放→护甲 HUD。
+11. 暂停读取新鲜 IndexedDB：`version=5`、chest 正确、weather=`clear`，且没有持久化 oxygen。
+12. 恢复→给予原木→传送虚空→死亡/重生。
+13. 新鲜死亡后快照：Inventory=0、Equipment=0、XP=0、位置可恢复。
+14. 全程无 pageerror / console error。
 
-完整 15 秒窒息不在 Chromium 中硬等，由 Oxygen 纯规则精确覆盖；浏览器负责真实地形/Player/World/UI 接线。游泳浏览器链当前验证上下垂直移动，不把随机地形中的横向距离作为脆弱断言。
+当前天气 browser smoke 验证的是命令→profile→固定池数量→主循环/Three.js 生命周期，不做截图像素比较；屋顶遮雨、雨滴碰撞、透明效果和不同 GPU 的实际像素结果仍是未覆盖边界。
 
 ## GitHub Pages 部署验证
 
@@ -95,11 +99,13 @@ npm run test:e2e
 
 ## 仍未覆盖的浏览器集成边界
 
-- 完整 15 秒耗尽→真实 drowning damage→死亡/重生的浏览器时间链。
+- 自动天气周期和 weather duration。
+- 群系降水/雪、屋顶遮雨、雨线 world collision、地面 splash/湿润、闪电 flash/bolt/damage/sound。
+- 天气粒子的像素级密度、blending、不同 GPU/浏览器表现。
+- 完整 15 秒耗尽→真实 drowning damage→死亡/重生。
 - 横向水中速度与陆地速度的浏览器定量对比。
-- 冲刺游泳姿态/三维视线方向推进、爬行过渡、实体游泳 AI、水流/流体传播。
-- Water surface blending、透明排序、深度冲突和不同 GPU/浏览器差异。
-- 水下 fog/折射、Respiration、Water Breathing、Conduit、Depth Strider、Dolphin's Grace。
+- 冲刺游泳姿态、三维视线方向推进、爬行过渡、实体游泳 AI、水流/流体传播。
+- Water surface blending、透明排序、深度冲突和水下 fog/折射。
 - 真实敌对生物有/无护甲 HP 差值。
 - Pointer Lock/F5/持续陆地移动的专门 E2E。
 - 普通可恢复死亡的掉落/经验/护甲重新拾取。
