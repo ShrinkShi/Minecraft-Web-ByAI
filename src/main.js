@@ -212,6 +212,7 @@ function activateBed(hit){
   const sleep=resolveSleep({gameTime,weather,sleepingPlayers:1,totalPlayers:1,percentage:100});
   if(!sleep.allowed){ui.showToast('重生点已设置 · 只能在夜晚或雷暴中睡觉');return true;}
   if(!sleep.ready){ui.showToast(`重生点已设置 · 已有 ${sleep.sleepingPlayers}/${sleep.required} 名玩家睡觉`);return true;}
+  const blocker=hostileMobs?.sleepBlockerNear(anchor);if(blocker){ui.showToast('重生点已设置 · 附近有怪物，无法睡觉');return true;}
   gameTime=sleep.nextTime;if(weather!=='clear'){weather='clear';weatherSystem?.setWeather(weather);}applySky();markSaveDirty();ui.showToast('已睡到清晨 · 重生点已设置');return true;
 }
 function breakBed(broken){
@@ -235,7 +236,7 @@ function updateOxygen(dt,now){
   }
 }
 function updateAutosave(now){if(!player||!world)return;if(!lastSavedPosition||player.position.distanceToSquared(lastSavedPosition)>.5)saveDirty=true;if(saveDirty&&now-lastSaveAt>5000)persistWorld();}
-function runCommand(text){const result=executeCommand(text,{player,inventory,inventoryChanged:()=>{ui.refreshInventory();markSaveDirty();},setMode:mode=>{player.setMode(mode);worldInfo.mode=mode;if(!usesOxygen(mode))resetOxygen();markSaveDirty();},setSpawnpoint:(x,y,z)=>setRespawnPoint({x,y,z}),addXp:value=>addExperience(value),kill:()=>{if(deathState)return;player.hp=0;player.velocity.set(0,0,0);beginPlayerDeath('你被杀死了');},teleport:(x,y,z)=>{player.position.set(x,y,z);player.velocity.set(0,0,0);world.ensureAround(x,z);player.syncCamera();markSaveDirty();},setTime:value=>{gameTime=value;applySky();markSaveDirty();},setWeather:value=>{weather=value;weatherSystem?.setWeather(value);applySky();markSaveDirty();}});ui.chatMessage(result.message,result.ok?'system':'error');}
+function runCommand(text){const result=executeCommand(text,{player,inventory,inventoryChanged:()=>{ui.refreshInventory();markSaveDirty();},setMode:mode=>{player.setMode(mode);worldInfo.mode=mode;if(!usesOxygen(mode))resetOxygen();markSaveDirty();},setSpawnpoint:(x,y,z)=>setRespawnPoint({x,y,z}),summon:(type,x,y,z)=>!!hostileMobs?.spawn(type,{x,y,z}),addXp:value=>addExperience(value),kill:()=>{if(deathState)return;player.hp=0;player.velocity.set(0,0,0);beginPlayerDeath('你被杀死了');},teleport:(x,y,z)=>{player.position.set(x,y,z);player.velocity.set(0,0,0);world.ensureAround(x,z);player.syncCamera();markSaveDirty();},setTime:value=>{gameTime=value;applySky();markSaveDirty();},setWeather:value=>{weather=value;weatherSystem?.setWeather(value);applySky();markSaveDirty();}});ui.chatMessage(result.message,result.ok?'system':'error');}
 function applySky(){const angle=(gameTime-6000)/24000*Math.PI*2,sunHeight=Math.cos(angle),daylight=Math.max(.08,Math.min(1,(sunHeight+.25)/1.25)),storm=weather==='clear'?1:weather==='rain' ? .72 : .55,night=new THREE.Color(0x061126),day=new THREE.Color(0x86bff2),color=night.clone().lerp(day,daylight*storm);scene.background=color;scene.fog.color.copy(color);hemi.intensity=.35+2.05*daylight*storm;sun.intensity=Math.max(0,2.2*daylight*storm);sun.position.set(Math.cos(angle)*100,Math.sin(Math.PI/2-angle)*110,45);}
 
 function animate(now){
