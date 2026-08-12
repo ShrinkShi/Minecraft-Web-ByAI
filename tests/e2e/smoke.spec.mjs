@@ -166,7 +166,7 @@ test('recoverable death drops and re-picks items after explicit respawn',async({
   await expect(page.locator('#death-menu')).not.toHaveClass(/active/);
   const pickupPhaseStartedAt=await page.evaluate(()=>Date.now());
   await runCommand(page,'/tp 0 35 0');
-  await page.waitForTimeout(1400);
+  await expect(page.locator('#debug')).toContainText('Drops 0 · XPOrbs 0 · XP 14 / Lv.2',{timeout:10_000});
 
   await key(page,'Escape');
   await expect(page.locator('#pause-menu')).toHaveClass(/active/);
