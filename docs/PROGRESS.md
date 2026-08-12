@@ -9,21 +9,21 @@
 ## 工程质量基础
 
 - [x] Node 22 `src/*.js` 与 `scripts/*.mjs` 语法检查。
-- [x] `npm run test:logic`：基础世界/实体/Worker + Equipment/Armor + Water Mesh + Oxygen/Drowning + Swimming/Buoyancy + Weather/Precipitation + Death Integration + Custom Respawn + Bed Rules + Mobile Device/Input + Unified Control Intent + Absolute View Frame + Gameplay Action Frame + Sleep Rules，共 14 套逻辑回归；View/Action Frame 由 `check-controls.mjs` 串联执行。
+- [x] `npm run test:logic`：基础世界/实体/Worker + Equipment/Armor + Water Mesh + Oxygen/Drowning + Swimming/Buoyancy + Weather/Precipitation + Death Integration + Custom Respawn + Bed Rules + Mobile Device/Input + Unified Control Intent + Absolute View Frame + Gameplay Action Frame + Sleep Rules + Sleep Safety，共 15 套逻辑/契约回归；View/Action Frame 由 `check-controls.mjs` 串联执行。
 - [x] PC/手机输入统一：`ControlIntentBus` 为唯一 gameplay input contract；Desktop/Touch 只是适配器，Player 不再拥有 DOM 键盘监听或 mobile virtualInput。
 - [x] 联机前置平台约束：同一 World/Player/Inventory/存档/玩法语义，未来 `network-peer` 与本地输入复用相同控制状态，不创建独立 mobile client protocol。
 - [x] `PlayerControlFrame v1`：平台无关连续控制 wire schema；desktop/touch/network-peer 同状态编码一致且不携带设备身份。
 - [x] `PlayerViewFrame v1`：平台无关绝对 yaw/pitch wire schema；yaw 规范化到 `[-π,π)`，pitch 严格限制为 Player 运行时范围，拒绝 device/source 与畸形字段。
 - [x] `PlayerActionFrame v1`：离散 `use/drop/hotbar-select` wire schema；use/drop 关联 `viewSeq`，hotbar 发送绝对 slot，拒绝 client target/source/device 与未知 action。
 - [x] GitHub Pages 使用 GitHub Actions，并持续验证真实 Pages Deployment。
-- [x] Playwright Chromium browser smoke：主海洋世界覆盖氧气/游泳/WeatherFX/护甲 v6/虚空死亡；第二世界覆盖普通死亡物品+XP 回收；第三世界覆盖 `/spawnpoint` 持久化与精确自定义重生；第四世界覆盖真实床放置/激活、夜间用床跳到清晨与床锚点重生；第五条 Android 横屏用例覆盖移动端自动识别、旋转提示、触控 UI 和摇杆移动。
+- [x] Playwright Chromium browser smoke：主海洋世界覆盖氧气/游泳/WeatherFX/护甲 v6/虚空死亡；第二世界覆盖普通死亡物品+XP 回收；第三世界覆盖 `/spawnpoint` 持久化与精确自定义重生；第四世界覆盖真实床放置/激活、夜间跳夜、附近敌对生物阻止睡眠与床锚点重生；第五条 Android 横屏用例覆盖移动端自动识别、旋转提示、触控 UI 和摇杆移动。
 - [x] 浏览器失败保留 Playwright trace / screenshot / report。
 - [ ] 将 Three.js 从运行时 jsDelivr 迁移为版本锁定的本地 vendor / 构建依赖。
 - [ ] 扩展 E2E 到普通死亡掉落/拾回、真实战斗减伤、完整溺水死亡、横向游泳速度、天气像素/遮雨、存档重载。
 
 ## v0.4.0 — 实体、战斗与生存扩展（开发中）
 
-状态：开发中。实体基础、四种敌对生物、奖励闭环、生存死亡损失、显式死亡界面/重生、持久化自定义重生点、两格床重生锚点与基础睡眠跳夜、第一版护甲、透明水 pass、氧气/溺水、基础游泳/浮力、可见降雨 FX 和手机浏览器横屏触控底座已落库；死亡统计、完整床睡眠表现/限制、完整流体/冲刺游泳、自动天气/闪电/雪、水下视觉和正式 Java 伤害/护甲公式仍未完成。
+状态：开发中。实体基础、四种敌对生物、奖励闭环、生存死亡损失、显式死亡界面/重生、持久化自定义重生点、两格床重生锚点/基础跳夜/附近怪物阻止睡眠、第一版护甲、透明水 pass、氧气/溺水、基础游泳/浮力、可见降雨 FX 和手机浏览器横屏触控底座已落库；死亡统计、完整床睡眠表现/占用/模型、完整流体/冲刺游泳、自动天气/闪电/雪、水下视觉和正式 Java 伤害/护甲公式仍未完成。
 
 ### 联机协议前置
 - [x] 连续移动/按键：`PlayerControlFrame v1`
@@ -62,13 +62,16 @@
 - [x] `respawn-rules.js` + `Player.respawnAt()`：精确点/周边候选、安全位置解析和世界出生点 fallback
 - [x] self `/spawnpoint [x y z]`：当前点或 `~` 相对坐标；v6 world record 持久化 `respawnPoint`
 - [x] Chromium 自定义重生 E2E：非原点设置并保存 `/spawnpoint`→移动到异地 `/kill`→显式重生必须回到持久化精确安全点
-- [x] `bed-rules.js`：四方向 foot/head 配对、任一端 partner 解析与统一床锚点纯规则
+- [x] `bed-rules.js`：四方向 foot/head 配对、任一端 partner 解析、统一床锚点与 canonical sleep-check point；睡眠判定点和 `y+1.01` respawn anchor 明确分离
 - [x] 生存床物品/配方：3 白色羊毛 + 3 橡木木板→1 床；羊既有 loot 提供 `white_wool`
 - [x] 两格床 runtime：真实朝向原子放置、任一端使用设置共享 respawnPoint、破坏任一端联动清理并只掉 1 床
 - [x] `sleep-rules.js`：晴天可睡窗口 12542..23459；雨天独立窗口 12010..23991；雷暴全天可睡；`playersSleepingPercentage` 风格 quorum 支持 0..2^31-1，0 仍至少需 1 人，>100 会产生不可达 quorum 而不是报错
 - [x] 当前单人睡眠：夜间/雨天窗口/雷暴使用床时 1/1 quorum 立即把共享世界时间推进到 1000 tick 清晨；有降水时清为 `clear`，并标记世界存档 dirty
-- [x] Chromium 床 E2E：`/give bed`→真实背包槽 0→热栏 27→Pointer Lock/向下看→右键放置→右键床设重生点→`/time set night`→再次右键床→世界时钟回到约 1000 tick→v6 同时保存两端 edits/respawnPoint→异地死亡回床锚点
-- [ ] 装备掉落的普通死亡单独拾回断言、死亡统计、床 101-tick 入睡延迟/动画、占用、附近怪物限制、半高模型/碰撞、维度爆炸、`keepInventory`
+- [x] `sleep-safety-rules.js` + HostileMobSystem SpatialHash 查询：当前实现的僵尸/骷髅/苦力怕/蜘蛛在床 X/Z ±8、Y ±5 范围内阻止睡眠；边界从真实 bed plane 计算，不受 respawn Y offset 影响
+- [x] `/summon <entity> [x y z]`：支持当前四类敌对生物和 `~` 相对坐标，用于正常调试/确定性集成，不提供 E2E 私有世界修改接口
+- [x] Chromium 床 E2E：真实放置/设重生点→夜间正常跳到约 1000 tick→再次设夜 `/summon zombie ~2 ~ ~`→同一床提示附近怪物且时间保持夜晚→传送触发怪物正常回收→v6 保存两端 edits/respawnPoint→异地死亡回床锚点
+- [ ] 装备掉落的普通死亡单独拾回断言、死亡统计、床 101-tick 入睡延迟/动画、占用、半高模型/碰撞、维度爆炸、`keepInventory`
+- [ ] 完整 Minecraft hostile/neutral 睡眠阻止例外表；当前只覆盖项目已实现的四类敌对生物
 - [ ] 死亡掉落/经验球跨页面重载持久化
 
 ### Mobile browser / Landscape touch
