@@ -9,7 +9,9 @@
 ## 工程质量基础
 
 - [x] Node 22 `src/*.js` 与 `scripts/*.mjs` 语法检查。
-- [x] `npm run test:logic`：基础世界/实体/Worker + Equipment/Armor + Water Mesh + Oxygen/Drowning + Swimming/Buoyancy + Weather/Precipitation + Death Integration + Custom Respawn + Bed Rules + Mobile Device/Input 十套回归。
+- [x] `npm run test:logic`：基础世界/实体/Worker + Equipment/Armor + Water Mesh + Oxygen/Drowning + Swimming/Buoyancy + Weather/Precipitation + Death Integration + Custom Respawn + Bed Rules + Mobile Device/Input + Unified Control Intent，共 11 套回归。
+- [x] PC/手机输入统一：`ControlIntentBus` 为唯一 gameplay input contract；Desktop/Touch 只是适配器，Player 不再拥有 DOM 键盘监听或 mobile virtualInput。
+- [x] 联机前置平台约束：同一 World/Player/Inventory/存档/玩法语义，未来 `network-peer` 与本地输入复用相同控制状态，不创建独立 mobile client protocol。
 - [x] GitHub Pages 使用 GitHub Actions，并持续验证真实 Pages Deployment。
 - [x] Playwright Chromium browser smoke：主海洋世界覆盖氧气/游泳/WeatherFX/护甲 v6/虚空死亡；第二世界覆盖普通死亡物品+XP 回收；第三世界覆盖 `/spawnpoint` 持久化与精确自定义重生；第四世界覆盖真实床放置/激活与床锚点重生；第五条 Android 横屏用例覆盖移动端自动识别、旋转提示、触控 UI 和摇杆移动。
 - [x] 浏览器失败保留 Playwright trace / screenshot / report。

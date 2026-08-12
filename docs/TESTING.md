@@ -24,6 +24,7 @@ scripts/check-death.mjs
 scripts/check-respawn.mjs
 scripts/check-bed.mjs
 scripts/check-mobile.mjs
+scripts/check-controls.mjs
 ```
 
 基础套件覆盖 Inventory / Crafting / Commands / EntityStore / SpatialHash / 四种敌对生物 / Combat / Projectile / Experience / Spider / Death / Mesh Worker / Terrain Worker。
@@ -77,6 +78,18 @@ Node 层只验证 profile，不导入 Three.js WeatherSystem；后者由 Chromiu
 ### Custom respawn rules
 
 `scripts/check-respawn.mjs` 覆盖 respawnPoint 数值归一化、14 个 exact/同层周边/+1Y 候选的稳定顺序、first-safe 选择、全部不可用返回 null，以及非法 `isSafe` 拒绝。该模块不导入 Three.js/World；真实方块支撑、液体、眼部空间和 Player AABB 检查由 Chromium/runtime 覆盖。
+
+### Unified control intents
+
+`scripts/check-controls.mjs` 覆盖：
+
+- 标准移动向量归一化与 `CONTROL_INTENT_VERSION=1`。
+- 多输入 source 合并与 source reset；不同 source 同时按住 primary 时只有合并状态真正释放才产生 release edge。
+- look intent 的有限幅度、动作白名单和非法动作拒绝。
+- `desktop`、`touch`、`network-peer` 对同一逻辑输入必须生成完全相同的规范化 gameplay state。
+- `scripts/check-mobile.mjs` 额外静态拒绝 Player 重新出现 `virtualInput`、`setVirtualMove`、DOM keyboard/mouse listener，并要求 DesktopControls/MobileControls 都只通过同一个 bus 输出 move/button/look/action。
+
+真实桌面键盘/Pointer Lock 和 Android touch 路径继续由 Playwright 五场浏览器回归覆盖，因此 Node 层不伪造 DOM 输入。
 
 ### Bed rules
 

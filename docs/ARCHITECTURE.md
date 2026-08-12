@@ -11,6 +11,7 @@
 7. **瞬时状态不滥入存档**：Oxygen 与 swimCoverage 不持久化；weather 本身是长期世界状态，继续使用既有 weather 字段。
 8. **规则可离线测试**：核心纯规则/Worker 协议在 Node 22 回归；真实 Three.js/WebGL 生命周期由 Chromium 覆盖。
 9. **远端证据决定完成度**：只有进入 GitHub `main` 且质量门和 Pages 通过才算完成。
+10. **单客户端、多输入适配器**：桌面/手机不得分叉 World、Player、Inventory、命令、存档或玩法规则。设备差异只允许存在于输入适配和响应式 UI；未来网络层接收/发送的也是平台无关 gameplay intent/state。
 10. **输入设备适配与玩法逻辑分离**：桌面键鼠和手机手势只产生统一 Player/交互输入，不允许移动端控制层直接修改 World/Inventory/IndexedDB。
 
 ## 当前 v0.4 总体数据流
@@ -42,6 +43,16 @@ Mob death -> DropSystem + ExperienceOrbSystem -> Inventory / totalXp
 - 主编排层将桌面鼠标和手机按钮统一收口到 `primaryActionStart/End()` 与 `secondaryAction()`，因此攻击、持续挖掘、raycast、放置、工作台和床交互只有一条 gameplay 路径。
 - 手机 gameplay 的 `canControl()` 不要求 Pointer Lock；桌面仍要求 Pointer Lock。暂停、死亡、背包、工作台或聊天打开时会清除 virtual input，避免松手事件丢失造成持续移动/攻击。
 - `mobile.css` 使用 `env(safe-area-inset-*)` 避开刘海/圆角，并压缩横屏 HUD/背包；不设置 `user-scalable=no`，也不依赖浏览器通常受手势权限限制的强制 orientation lock。
+
+## Platform / Control Intent
+
+- 浏览器项目只有一个客户端 runtime，没有“电脑版逻辑”和“手机版逻辑”两棵树。
+- `control-intents.js` 定义 `CONTROL_INTENT_VERSION=1`、规范化连续状态和一次性动作；状态来源可以是 `desktop`、`touch`，以后也可以是 `gamepad` 或 `network-peer`。
+- `desktop-controls.js` 只把 Keyboard/Mouse/Pointer Lock 翻译成标准意图；`mobile-controls.js` 只把摇杆/触摸/按钮翻译成同一标准意图。
+- `PlayerController` 不再注册 DOM keyboard/mouse listener，也不保存 `virtualInput`；它只消费规范化 `controlState` 和平台无关 look intent。
+- `main.js` 的 `handleControlIntent()` 不按输入来源分叉玩法：primary/secondary、背包、热栏、暂停、聊天、视角和丢弃都进入同一运行时函数。
+- Pointer Lock、横竖屏提示和 safe-area 属于 presentation/input adapter，不得进入世界快照或未来 server-authoritative gameplay state。
+- 联机实现时客户端平台字段可以用于 UI/遥测，但不得决定碰撞、伤害、移动速度、物品、实体或世界协议。PC 与手机必须能进入同一房间并互相看到/交互。
 
 ## World / Water render
 
