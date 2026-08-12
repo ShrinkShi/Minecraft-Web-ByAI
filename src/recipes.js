@@ -2,6 +2,7 @@ const RECIPES=[
   {id:'planks',kind:'shapeless',items:['block:6'],result:{id:'block:5',count:4}},
   {id:'sticks',kind:'shaped',pattern:[['block:5'],['block:5']],result:{id:'stick',count:4}},
   {id:'crafting_table',kind:'shaped',pattern:[['block:5','block:5'],['block:5','block:5']],result:{id:'block:9',count:1}},
+  {id:'bed',kind:'shaped',pattern:[['white_wool','white_wool','white_wool'],['block:5','block:5','block:5']],result:{id:'bed',count:1},minSize:3},
   {id:'wooden_pickaxe',kind:'shaped',pattern:[['block:5','block:5','block:5'],[null,'stick',null],[null,'stick',null]],result:{id:'wooden_pickaxe',count:1},minSize:3}
 ];
 

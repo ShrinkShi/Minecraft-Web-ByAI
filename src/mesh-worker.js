@@ -44,13 +44,13 @@ function buildMesh(data,blockAt,accept){
       if(!faceVisible(id,blockAt(x+f.n[0],y+f.n[1],z+f.n[2])))continue;
       const tile=tileForFace(id,f.name),tx=tile%ATLAS_COLS,ty=Math.floor(tile/ATLAS_COLS),eps=.001;
       const u0=tx/ATLAS_COLS+eps,u1=(tx+1)/ATLAS_COLS-eps,v1=1-ty/ATLAS_ROWS-eps,v0=1-(ty+1)/ATLAS_ROWS+eps;
-      const shade=f.n[1]>0?255:f.n[1]<0?158:f.n[0]!==0?212:184;
+      const shade=f.n[1]>0?255:f.n[1]<0?158:f.n[0]!==0?212:184,tint=BLOCKS[id]?.tint||[255,255,255];
       const vertexBase=faceIndex*4,positionBase=faceIndex*12,uvBase=faceIndex*8,indexBase=faceIndex*6;
       for(let i=0;i<4;i++){
         const p=f.v[i],po=positionBase+i*3,uo=uvBase+i*2;
         positions[po]=x+p[0];positions[po+1]=y+p[1];positions[po+2]=z+p[2];
         normals[po]=f.n[0]*127;normals[po+1]=f.n[1]*127;normals[po+2]=f.n[2]*127;
-        colors[po]=shade;colors[po+1]=shade;colors[po+2]=shade;
+        colors[po]=Math.round(shade*(Number(tint[0])||0)/255);colors[po+1]=Math.round(shade*(Number(tint[1])||0)/255);colors[po+2]=Math.round(shade*(Number(tint[2])||0)/255);
         const uvOrder=UV_ORDER[i];uvs[uo]=uvOrder[0]?u1:u0;uvs[uo+1]=uvOrder[1]?v1:v0;
       }
       for(let i=0;i<6;i++)indices[indexBase+i]=vertexBase+TRI[i];
@@ -64,9 +64,7 @@ function buildMesh(data,blockAt,accept){
   };
 }
 
-function transferables(mesh){
-  return mesh.empty?[]:[mesh.positions,mesh.normals,mesh.uvs,mesh.colors,mesh.indices];
-}
+function transferables(mesh){return mesh.empty?[]:[mesh.positions,mesh.normals,mesh.uvs,mesh.colors,mesh.indices];}
 
 self.onmessage=e=>{
   const m=e.data;
