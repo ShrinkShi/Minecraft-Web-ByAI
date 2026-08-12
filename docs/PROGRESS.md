@@ -9,115 +9,100 @@
 ## 工程质量基础
 
 - [x] Node 22 `src/*.js` 与 `scripts/*.mjs` 语法检查。
-- [x] `npm run test:logic`：世界/实体/Worker + Equipment/Armor + 水网格 pass + Oxygen/Drowning 回归。
-- [x] GitHub Pages 仓库源设置为 GitHub Actions，并验证真实 Pages Deployment 成功。
-- [x] Playwright Chromium browser smoke：页面加载→海洋生存世界→氧气 HUD 下降/离水恢复→护甲装备/存档→虚空死亡/重生→IndexedDB 状态核对。
-- [x] 浏览器失败时保留 Playwright trace / screenshot 报告目录。
-- [ ] 将 Three.js 从运行时 jsDelivr 依赖迁移为版本锁定的本地 vendor / 构建依赖，降低外部 CDN 对运行时和 E2E 的影响。
-- [ ] 扩展浏览器 E2E 到普通死亡掉落/拾回、真实战斗减伤、完整溺水死亡、存档重载、水面视觉断言和更多指令链。
+- [x] `npm run test:logic`：基础世界/实体/Worker + Equipment/Armor + Water Mesh + Oxygen/Drowning + Swimming/Buoyancy 回归。
+- [x] GitHub Pages 使用 GitHub Actions，并持续验证真实 Pages Deployment。
+- [x] Playwright Chromium browser smoke：海洋世界→氧气下降→Space 上游→Shift 下潜→离水恢复→护甲装备/存档→虚空死亡/重生→IndexedDB 核对。
+- [x] 浏览器失败保留 Playwright trace / screenshot / report。
+- [ ] 将 Three.js 从运行时 jsDelivr 迁移为版本锁定的本地 vendor / 构建依赖。
+- [ ] 扩展 E2E 到普通死亡掉落/拾回、真实战斗减伤、完整溺水死亡、横向游泳速度、存档重载和水面像素断言。
 
 ## v0.4.0 — 实体、战斗与生存扩展（开发中）
 
-状态：开发中。实体基础、四种敌对生物、奖励闭环、生存死亡损失、第一版护甲/Equipment、水独立透明渲染 pass，以及头部浸水→氧气→溺水伤害闭环已落库；死亡界面、游泳/浮力/流体传播、天气粒子和完整 Java 伤害/护甲公式仍未完成。
+状态：开发中。实体基础、四种敌对生物、奖励闭环、生存死亡损失、第一版护甲、透明水 pass、氧气/溺水，以及基础游泳/浮力已经落库；死亡界面、完整流体/冲刺游泳、水下视觉、天气粒子和正式 Java 伤害/护甲公式仍未完成。
 
-- [x] `EntityStore`：实体 ID、类型、组件数据、位置的统一注册与生命周期
-- [x] `SpatialHash`：按 X/Z 网格分桶的半径 / AABB 邻域查询，实体移动时同步迁移桶
-- [x] EntityStore / SpatialHash Node 回归测试
-- [x] 牛、羊、猪、鸡：被动生物数据定义与运行时接入
-- [x] 被动生物在草地/泥土地表附近生成，10 Hz 漫游 AI、受击逃跑、距离回收和实体数量上限
-- [x] 玩家左键在实体与方块之间按距离选择目标
-- [x] 公共 `combat.js`：攻击冷却、受击无敌窗口、伤害结算和击退方向纯逻辑
-- [x] 木镐基础攻击伤害；普通攻击 600 ms 冷却；被动/敌对实体共用受击无敌与击退路径
-- [x] 玩家受伤、水平/垂直击退、0 HP/掉出世界后的出生点重生
-- [x] 僵尸：夜间地表生成、24 格基础追踪、近战攻击、受击和击退
-- [x] 被动生物/敌对生物死亡事件统一回调到奖励编排层
-- [x] 第一批战利品：生牛肉/皮革、羊毛/生羊肉、生猪排、生鸡肉/羽毛、腐肉、骨头/箭、火药、线
-- [x] `ExperienceOrbSystem`：经验球物理、吸附、拾取和 300 秒销毁
-- [x] Java 风格经验等级阈值/总经验公式；`totalXp` 写入世界快照
-- [x] Loot / Experience 确定性 Node 回归测试
-- [x] 骷髅：夜间敌对生成池、距离控制、侧移、箭矢远程攻击
-- [x] `ProjectileSystem`：箭矢重力、轨迹朝向、方块阻挡、玩家线段/AABB 命中和生命周期
-- [x] 投射物纯规则：线段/AABB 首次命中时间和带重力瞄准初速度；Node 回归测试
-- [x] 苦力怕：夜间敌对生成池、接近/引信/取消范围、爆炸事件
-- [x] `ExplosionSystem` / explosion rules：基础距离伤害、击退和附近地形破坏
-- [x] 蜘蛛：16 HP、宽体低矮视觉模板、夜间生成、近战追击、线掉落和基础经验
-- [x] `spider-rules.js`：最多约 3 格局部高度差的有界攀爬、最大 2 格下落约束；不是完整墙面寻路
-- [x] `death-rules.js`：生存/冒险损失策略、死亡 XP 公式 `min(100, level × 7)` 和可恢复死亡位置判断
-- [x] 生存/冒险死亡统一抽空 36 格背包、cursor、2×2/3×3 合成输入；普通死亡在原死亡点生成物品和经验球并清零总经验
-- [x] `y < -10` 虚空死亡直接损失携带物品/经验，不创建无法回收的掉落实体；创造/旁观不执行死亡损失
-- [x] `Equipment`：head/chest/legs/feet 四个独立可序列化槽，不占用 36 格背包
-- [x] 皮革帽子/外套/裤子/靴子：1/3/2/1 护甲点，可通过 cursor 拖放到匹配部位
-- [x] `armor-rules.js`：当前过渡减伤为每点 4%、最高 80%；整套皮革 7 点 = 28%
-- [x] 敌对近战、箭矢和苦力怕爆炸经过基础护甲减伤；虚空与溺水绕过护甲
-- [x] 世界快照版本 v5 保存/恢复 Equipment；非法部位/非护甲快照会被过滤
-- [x] 生存/冒险死亡会把已装备护甲与背包/cursor/合成输入一起结算
-- [x] `scripts/check-armor.mjs`：槽位兼容、存档过滤、drain、护甲公式和 `/give leather_*` 回归
-- [x] Chromium E2E：`/give leather_chestplate`→真实背包拖放→护甲 HUD→v5 IndexedDB 快照→虚空死亡→装备/背包/XP 全清空
-- [x] `mesh-worker.js`：单次 chunk 扫描分别构建 opaque / water 两套 TypedArray + Transferable buffers；保留 opaque 旧顶层字段作为临时兼容视图
-- [x] 水网格可见面规则：同水内部面剔除；跨 chunk 同水边界剔除；水对实体方块面剔除，实体方块面对透明水仍保留
-- [x] `VoxelWorld`：每个 chunk 最多安装一个 opaque mesh + 一个透明 water mesh；共享 atlas，水材质 `transparent=true / opacity=.68 / depthWrite=false`
-- [x] chunk 卸载与世界 dispose 会同时释放 opaque/water geometry、两套 material 和共享 atlas texture
-- [x] `scripts/check-water.mjs`：孤立水、相邻水、水/实体边界、双 buffer transfer 和跨 chunk 水面剔除回归
-- [x] 头部浸水检测：采样玩家 eye position 所在 voxel，仅 `liquid` 方块触发氧气系统
-- [x] `oxygen-rules.js`：survival/adventure 15 秒空气；离水按 4 秒额度/秒恢复；creative/spectator 保持满空气
-- [x] 空气耗尽后每 1 秒发出一次 2 HP 溺水伤害；溺水不走护甲减伤
-- [x] 10 气泡 Oxygen HUD；仅浸水或未恢复满时显示，重生/退出世界/切换非氧气模式会复位
-- [x] 氧气是瞬时状态，不写入 v5 world record
-- [x] `scripts/check-oxygen.mjs`：模式边界、15 秒耗尽、恢复速率、跨零点时序、多次溺水事件和非法输入回归
-- [x] Chromium E2E：固定 seed + `海` prompt 真实生成水→出生点眼睛浸水→HUD air 下降→`/tp` 离水→HUD 恢复隐藏；同时确认 IndexedDB 不含 oxygen 字段
-- [ ] 普通可恢复死亡的浏览器 E2E：物品/经验/护甲生成、死亡点存在与重新拾回
-- [ ] 死亡界面、死亡统计、床/重生点和 `keepInventory`
+### 实体 / 战斗 / 奖励
+- [x] `EntityStore` + `SpatialHash` 数据/空间索引基础及 Node 回归
+- [x] 牛、羊、猪、鸡：地表生成、10 Hz 漫游、受击逃跑、距离回收
+- [x] 僵尸：夜间生成、追击和近战
+- [x] 骷髅：距离控制、侧移和箭矢远程攻击
+- [x] 苦力怕：引信/取消/爆炸；玩家伤害/击退与附近地形破坏
+- [x] 蜘蛛：16 HP、宽体视觉、近战追击、有限局部攀爬
+- [x] `combat.js`：攻击冷却、受击无敌、伤害和击退纯规则
+- [x] `ProjectileSystem` + projectile rules：箭矢重力、方块阻挡、segment/AABB 玩家命中
+- [x] 第一批 loot、`ExperienceOrbSystem`、Java 风格 XP 等级/总经验公式与存档
+- [ ] 完整寻路、亮度生成、日照燃烧、玩家弓、暴击/扫击/完整攻击强度曲线
+
+### 死亡
+- [x] `death-rules.js`：模式损失策略、`min(100, level × 7)` 死亡 XP、虚空边界
+- [x] survival/adventure 死亡统一 drain Inventory/cursor/Crafting/Equipment
+- [x] 普通死亡在原地生成物品/经验；`y < -10` 虚空死亡直接损失
+- [x] creative/spectator 不执行上述死亡损失
+- [x] Chromium 虚空死亡 E2E：背包/装备/XP 清空且重生位置有效
+- [ ] 普通死亡浏览器 E2E、死亡界面/统计、床/重生点、`keepInventory`
 - [ ] 死亡掉落/经验球跨页面重载持久化
-- [ ] Java armor+toughness 正式公式、耐久、更多材质、附魔和 Armor Trim
-- [ ] Shift-click 自动装备、快捷右键装备和护甲合成配方
-- [ ] 将 DropSystem / ExperienceOrbSystem / ProjectileSystem 统一到 EntityStore / SpatialHash（只有规模证明需要时再做）
-- [ ] 被动生物繁殖和跨存档实体持久化
-- [ ] Looting、火焰烹饪掉落、幼体掉落等精确战利品规则
-- [ ] 僵尸/骷髅日照燃烧、完整寻路、视线/亮度生成和障碍交互
-- [ ] 玩家弓、箭的拾回/卡墙、蓄力和远程武器规则
-- [ ] 完整武器属性、攻击强度曲线、暴击、扫击和精确 Java 版伤害规则
-- [ ] 游泳/浮力、流体传播、水面高度/动画、水下视觉、水下呼吸/Respiration/Conduit 等扩展
-- [ ] 降雨粒子和基础天气循环
+
+### Equipment / Armor
+- [x] `Equipment`：head/chest/legs/feet 四槽，不占 36 格 Inventory
+- [x] 皮革四件：1/3/2/1 护甲点，cursor 手动装备，错误部位拒绝
+- [x] `armor-rules.js`：过渡公式每点 4%，最高 80%；完整皮革套 7 点=28%
+- [x] 敌对近战、箭矢、爆炸经过基础护甲减伤；虚空/溺水绕过护甲
+- [x] v5 world record 保存/恢复 Equipment；非法快照过滤
+- [x] `scripts/check-armor.mjs` + Chromium 真实装备/存档/死亡清空
+- [ ] 正式 armor+toughness、耐久、更多材质、附魔、Armor Trim、装备配方/快捷装备
+
+### Water render
+- [x] `mesh-worker.js` 单次 chunk 扫描分别构建 opaque / water 两套 TypedArray + Transferable
+- [x] 同水内部面与跨 chunk 同水边界剔除；水/实体边界方向规则
+- [x] `VoxelWorld` 每 chunk 最多一个 opaque mesh + 一个透明 water mesh
+- [x] 两 pass 共享 atlas；water 当前 `transparent=true / opacity=.68 / depthWrite=false`
+- [x] rebuild/unload/dispose 显式释放两套 geometry、material 与共享 texture
+- [x] `scripts/check-water.mjs` 回归；opaque 旧顶层 buffers 暂留迁移兼容层
+- [ ] 流体 level/传播、水流、动态水面、透明排序像素测试、水下 fog/折射
+
+### Oxygen / Drowning
+- [x] eye voxel `liquid` 头部浸水检测
+- [x] survival/adventure 15 秒空气；离水 4× 恢复；creative/spectator 满空气
+- [x] 0 空气后每秒产生一次 2 HP 溺水伤害，溺水绕过护甲
+- [x] 10 气泡 Oxygen HUD；重生/退出/非氧气模式复位
+- [x] oxygen 是瞬时状态，不写入 v5 world record
+- [x] `scripts/check-oxygen.mjs` 精确时序回归
+- [x] Chromium：固定 seed + `海` prompt 真实浸水→air 下降→离水恢复；并确认存档无 oxygen
+- [ ] Respiration、Water Breathing、Conduit、气泡柱等扩展
+
+### Swimming / Buoyancy
+- [x] `swim-rules.js`：水体覆盖率、水平速度倍率、降低重力、浮力、上下游和垂直限速纯规则
+- [x] Player 脚/躯干/眼睛三点采样；覆盖率由 0→1 时水平速度平滑趋近陆地的 50%
+- [x] 水中不套用陆地 sprint/sneak 速度语义；Space 上游、Shift 下潜
+- [x] 完整浸水有轻微正浮力；水中垂直阻尼并限制约 +3.4/-3.0
+- [x] 水中仍复用 Player 原有 AABB 碰撞与单一轴向积分；离水自动恢复原陆地重力/跳跃
+- [x] swimCoverage 是瞬时运行时状态，不进入玩家/世界快照
+- [x] `scripts/check-swim.mjs`：dry no-op、覆盖率、速度插值、浮力、上下游、限速、输入冲突和非法参数
+- [x] Chromium：真实海洋中读取玩家 Y，Space 后必须上升、Shift 后必须下降；后续氧气/护甲/死亡链继续通过
+- [ ] 冲刺游泳姿态/爬行过渡、视线方向三维推进、实体游泳 AI、水流作用、Depth Strider/Dolphin's Grace
 
 ## v0.3.0 — 生存闭环基础
 
-状态：实现完成；Node 语法检查、纯逻辑回归检查和 Worker 几何/地形检查已通过。
+状态：实现完成。
 
-- [x] 36 格真实背包数据模型，9 格快捷栏映射 slots 27~35
-- [x] 左键整组、右键拆半/单放、Shift 快速移动
-- [x] 共用 cursor stack 的背包/合成操作
-- [x] 2×2 原木→木板、木板→木棍、4 木板→工作台
-- [x] 工作台方块放置和右键打开 3×3 GUI
-- [x] 3×3 木镐配方
-- [x] 石头→圆石的基础工具门槛
-- [x] 方块掉落物、拾取、Q 丢弃、300 秒销毁
-- [x] F5 三视角循环和第三人称占位玩家模型
+- [x] 36 格背包 + 9 格快捷栏映射
+- [x] 左/右键、Shift、cursor stack
+- [x] 2×2 基础配方与 3×3 木镐、工作台 GUI
+- [x] 方块掉落/拾取/Q 丢弃/300 秒销毁
+- [x] F5 三视角
 - [x] `/gamemode` `/give` `/tp` `/time set` `/weather` `/help`
-- [x] 昼夜环境光变化
-- [x] Inventory / Recipes / Commands 自动逻辑测试
-- [x] Mesh Worker 边界面测试
-- [x] Terrain Worker 生成测试
-- [x] GitHub Actions 质量 workflow
+- [x] 昼夜环境光、IndexedDB 基础存档、GitHub Actions 质量门
 
 ## v0.2.0 — 流式世界与持久化
 
-- [x] 玩家跨区块时动态请求新的 chunk
-- [x] 超出保留距离的 chunk 数据卸载
-- [x] chunk 卸载时显式释放 Three.js `BufferGeometry`
-- [x] 独立 `mesh-worker.js`，可见面扫描和顶点/索引构建离开主线程
-- [x] Worker 返回精确长度 TypedArray + Transferable buffers
-- [x] mesh 请求 Set 去重与串行泵
-- [x] IndexedDB 世界存档与增量方块修改
-- [x] 保存/恢复玩家状态
+- [x] 动态 chunk streaming 与卸载滞回
+- [x] mesh Worker、精确 TypedArray + Transferable、请求去重队列
+- [x] chunk 卸载 GPU geometry 释放
+- [x] IndexedDB voxel edits + 玩家状态恢复
 
 ## v0.1.0 — 可玩体素核心
 
 - [x] 主菜单 / 世界创建 / 暂停菜单
-- [x] 第一人称视角与 Pointer Lock
-- [x] WASD / Jump / Sprint / Sneak speed
-- [x] 生存 / 创造创建选项
-- [x] Worker 地形生成
-- [x] 区块合并网格与暴露面剔除
-- [x] 方块破坏与放置
-- [x] 玩家碰撞、重力、跳跃
-- [x] HUD 与 GitHub Pages workflow
+- [x] Pointer Lock、WASD、Jump、Sprint、Sneak
+- [x] 生存 / 创造基础模式
+- [x] terrain Worker、chunk 合并 mesh、方块破坏/放置
+- [x] AABB 碰撞、重力、跳跃、HUD、GitHub Pages workflow
