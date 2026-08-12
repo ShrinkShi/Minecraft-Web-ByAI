@@ -7,10 +7,12 @@
 - 新增 `DesktopControls` 适配器并重构 `MobileControls`：两者只负责设备事件翻译，primary/secondary/背包/热栏/聊天/暂停/视角等统一进入 `handleControlIntent()`，World/Player/Inventory/存档不按平台分叉。
 - 新增第 11 套 `scripts/check-controls.mjs`，明确验证 `desktop` / `touch` / `network-peer` 的规范化状态等价，为未来 PC↔手机同服联机建立协议前置约束。
 - 新增 `PlayerControlFrame v1`：只序列化版本、uint32 序号、归一化 move 与 jump/sneak/sprint/primary 位掩码；设备/UA/source 不进入 wire frame，同逻辑 desktop/touch/network 输入必须编码一致。
+- 新增 `PlayerViewFrame v1`：序列化 canonical absolute yaw/pitch；yaw 规范化到 `[-π,π)`，pitch 严格限制在 Player 运行时范围，拒绝 source/device、原始鼠标/触控 delta 与畸形字段。
+- 新增第 12 套 `scripts/check-network-view.mjs`，验证绝对视角帧的 canonicalization、严格 decoder、设备无关性及非法 sequence/字段/角度拒绝，为未来服务端移动方向与交互射线校验建立前置约束。
 - GitHub Pages 仓库发布源已设置为 **GitHub Actions**，并持续验证完整 `configure → artifact upload → deploy` 流水线。
 - 固定 `@playwright/test` `1.62.0`，要求 Node 22+；`scripts/serve.mjs` 作为本地/CI 浏览器测试统一 HTTP server。
 - `Repository quality` 为两层质量门：`static-checks` 成功后运行 Chromium `browser-smoke`；同 `github.ref` 新 push 会取消旧 run。
-- `static-checks` 同时检查 `src/*.js`、`scripts/*.mjs`；`npm run test:logic` 现在顺序执行基础、Equipment/Armor、Water Mesh、Oxygen/Drowning、Swimming/Buoyancy、Weather/Precipitation、Death Integration、Custom Respawn、Bed Rules、Mobile Device/Input 十套回归。
+- `static-checks` 同时检查 `src/*.js`、`scripts/*.mjs`；`npm run test:logic` 现在顺序执行基础、Equipment/Armor、Water Mesh、Oxygen/Drowning、Swimming/Buoyancy、Weather/Precipitation、Death Integration、Custom Respawn、Bed Rules、Mobile Device/Input、Unified Control Intent、Absolute View Frame 共十二套回归。
 - 新增 `scripts/check-death.mjs`：锁定死亡 DOM/样式引用、`DeathScreen`/`deathState`/显式重生接线，禁止旧 `respawnPlayer()` 和一次性 death patch 工具重新进入交付树。
 - 新增 `scripts/check-respawn.mjs`：覆盖自定义重生点归一化、14 个固定候选顺序、first-safe 解析和失败边界。
 - 新增 `scripts/check-bed.mjs`：覆盖 8 个床 ID、四方向朝向、foot/head 配对、统一重生锚点、方块/物品元数据、3×3 床配方和羊毛 loot 来源。
@@ -27,7 +29,7 @@
 ### v0.4.0-dev — 已落库内容
 - `device-profile.js`：结合 Mobile UA / `userAgentData.mobile` 与 touch + coarse pointer + no-hover 回退自动区分手机与桌面；iPadOS 桌面 UA 可识别，普通带触摸屏但仍有 fine pointer/hover 的笔记本保持 desktop。
 - `mobile-controls.js` + `mobile.css`：手机横屏提供虚拟摇杆、拖动视角、攻击/挖掘、使用/放置、跳跃、疾跑、潜行、丢弃、背包、暂停、聊天、视角和触控热栏；竖屏显示旋转提示，safe-area 参与布局。
-- `PlayerController` 新增独立 virtual input；桌面键盘/Pointer Lock 与手机触控共用同一位移积分和主/副交互路径。手机 gameplay 不要求 Pointer Lock，普通桌面行为保持不变。
+- `DesktopControls` / `MobileControls` 只负责设备事件翻译并统一写入 `ControlIntentBus`；`PlayerController` 不直接监听 DOM，也不保留 mobile-only `virtualInput`。桌面 Pointer Lock/键鼠与手机触控共用单一移动积分和主/副交互路径，手机 gameplay 不要求 Pointer Lock。
 - 新增 Android Chromium 移动端回归：Mobile UA + touch + 844×390，真实验证 portrait/landscape 切换、背包/暂停/视角、摇杆位移和触控热栏。
 - `EntityStore` + `SpatialHash` 实体数据/空间索引基础。
 - 牛、羊、猪、鸡被动生物：地表生成、10 Hz 漫游、受击逃跑、距离回收和数量上限。
@@ -89,6 +91,7 @@
 ### Documentation
 - README 区分稳定基线 `v0.3.0` 与 `v0.4.0-dev`，记录 Armor、Water、Oxygen、Swimming、Precipitation 当前实现边界。
 - `docs/ARCHITECTURE.md` 固化 Player 单一积分器和固定天气 Buffer 池架构。
+- `docs/NETWORKING.md` 固化平台无关 control/view wire frame 与未来 server-authoritative 边界；明确离散 gameplay action schema 应先于传输层落地。
 - `docs/PROGRESS.md`、`docs/TESTING.md`、`docs/FILE_MANIFEST.md` 与实际代码/CI 对齐。
 
 ### Current limitations
