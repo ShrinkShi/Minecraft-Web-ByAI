@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="./styles.css" />
   <link rel="stylesheet" href="./armor.css" />
   <link rel="stylesheet" href="./oxygen.css" />
+  <link rel="stylesheet" href="./death.css" />
 </head>
 <body>
   <div id="app">
@@ -53,6 +54,16 @@
         <button class="mc-button" data-action="resume">返回游戏</button>
         <button class="mc-button" data-action="options">选项</button>
         <button class="mc-button" data-action="save-main">保存并返回标题画面</button>
+      </div>
+    </section>
+
+    <section id="death-menu" class="screen death-layer" aria-label="死亡界面">
+      <div class="death-card">
+        <h1>你死了！</h1>
+        <p id="death-reason">你死了</p>
+        <p id="death-detail" class="death-detail"></p>
+        <button class="mc-button primary" data-action="respawn">重生</button>
+        <button class="mc-button" data-action="death-main">返回标题画面</button>
       </div>
     </section>
 
