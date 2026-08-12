@@ -6,7 +6,7 @@
   "engines": {"node": ">=22"},
   "scripts": {
     "serve": "node scripts/serve.mjs",
-    "test:logic": "node scripts/check.mjs && node scripts/check-armor.mjs",
+    "test:logic": "node scripts/check.mjs && node scripts/check-armor.mjs && node scripts/check-water.mjs",
     "test:e2e": "playwright test"
   },
   "devDependencies": {"@playwright/test": "1.62.0"}
