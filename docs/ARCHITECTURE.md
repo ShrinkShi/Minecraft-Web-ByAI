@@ -2,7 +2,7 @@
 
 ## 设计原则
 
-1. **数据优先**：区块用紧凑 TypedArray；Inventory、Equipment、配方、战斗、护甲、氧气、游泳、天气 profile 和死亡规则尽量保持纯数据/纯逻辑。
+1. **数据优先**：区块用紧凑 TypedArray；Inventory、Equipment、配方、战斗、护甲、氧气、游泳、天气 profile、死亡与重生候选规则尽量保持纯数据/纯逻辑。
 2. **重活离开主线程**：terrain 与 mesh 分别运行在 Web Worker；主线程负责输入、系统编排和 GPU 对象安装。
 3. **批处理渲染**：chunk 不是一方块一 Mesh；天气也不是一雨滴一 Mesh。可重复大量元素优先固定 Buffer 池。
 4. **玩家位置只有一个积分器**：陆地、飞行、水中移动都收口在 `PlayerController.update()`。
@@ -49,13 +49,13 @@ Mob death -> DropSystem + ExperienceOrbSystem -> Inventory / totalXp
 - Oxygen 只采样 eye voxel，脚/躯干入水但头未入水不会扣空气。
 - survival/adventure 15 秒空气，离水 4x 恢复；0-air 每秒一个 2 HP drowning event；creative/spectator 满空气。
 - drowning 直接进入 Player.takeDamage，不经过 armor-rules。
-- Oxygen/swimCoverage 都是环境派生瞬时状态，不进入 v5 world record。
+- Oxygen/swimCoverage 都是环境派生瞬时状态，不进入 v6 world record。
 
 ## Weather / Precipitation
 
 ### 状态边界
 
-- `weather` 仍是世界长期状态，合法值 `clear / rain / thunder`，继续写入既有 v5 world record。
+- `weather` 仍是世界长期状态，合法值 `clear / rain / thunder`，继续写入 v6 world record。
 - `/weather` 通过 Commands context 调用主编排层；main 同时更新 `weather`、`WeatherSystem.setWeather()`、`applySky()` 并标记存档 dirty。
 - 世界载入时从 saved weather 恢复天空光照和 WeatherSystem profile，不引入新数据库 schema。
 
@@ -97,7 +97,7 @@ profile 还提供 fallSpeed、line length、windX/windZ、opacity。thunder 的�
 - Inventory 固定 36 格；Equipment 固定 head/chest/legs/feet 四槽。
 - 皮革护甲 1/3/2/1 点，共 7；当前 armor-rules 为 `min(0.8, armorPoints*0.04)`，整套 28%。
 - melee/arrow/explosion 经过护甲；void/drowning 绕过。
-- v5 world record 保存 Equipment，非法快照过滤。
+- v6 world record 保存 Equipment，非法快照过滤。
 
 ## Death / Rewards / Explicit Respawn
 
@@ -105,12 +105,14 @@ profile 还提供 fallSpeed、line length、windX/windZ、opacity。thunder 的�
 - `beginPlayerDeath()` 捕获原死亡坐标和旧 totalXp，在**原坐标**完成掉落/经验或虚空直接损失，然后设置 `deathState`、退出 Pointer Lock、写入死亡原因/损失摘要并显示 `DeathScreen`；它不会调用 `Player.respawn()`。
 - 普通死亡在死亡点生成 drops/orbs；`y < -10` 虚空直接损失；死亡 XP 为 `min(100, currentLevel*7)`。
 - deathState 激活时 `pointer()/canControl()/pause/inventory/workbench/key handler` 均有显式 guard，主 animate 的普通世界更新块也停止，避免尸体继续被移动、攻击或自动重生。
-- `completeRespawn()` 只由“重生”按钮调用：`Player.respawn(0,0)` → reset oxygen → 清 deathState → 返回游戏 → 标记存档 dirty。
+- `completeRespawn()` 只由“重生”按钮调用：先用 `respawn-rules.js` 对持久化 `respawnPoint` 生成 exact/周边候选，并由 main 的 world/AABB 安全检查选择首个可用位置；成功时走 `Player.respawnAt()`，全部候选失效才回退 `Player.respawn(0,0)`。随后 reset oxygen → 清 deathState → 返回游戏 → 标记存档 dirty。
 - 标准 self `/kill` 由 `commands.js` 解析后调用 main context 的 `kill()`；main 将 hp 置 0 并直接复用 `beginPlayerDeath('你被杀死了')`。它既是用户可用 Minecraft 风格指令，也是确定性可恢复死亡集成入口，不存在绕过死亡策略的测试后门。
 - self `/xp add <points>` / `/experience` 只做正整数 points 增量，commands 经 `ctx.addXp()` 调用既有 `addExperience()`；因此等级派生、HUD、saveDirty 和死亡 XP 公式仍只有一套真相源。levels/target selectors 暂不实现。
 - 浏览器普通死亡回归在同一页面内返回死亡坐标，让现有 DropSystem 与 ExperienceOrbSystem 自己完成物品拾取和 XP 吸收；测试只从随后保存的 IndexedDB 观察 Inventory/totalXp，避免直接操纵运行时内部数组。
-- “返回标题画面”会先 force-save 已清算的 hp=0 死亡状态再 dispose world；DeathScreen 本身不持久化。下次载入 hp<=0 的世界时，现有 `startWorld()` fallback 会直接 `player.respawn(0,0)`，因此不会把死亡 UI 跨页面保存。
+- “返回标题画面”会先 force-save 已清算的 hp=0 死亡状态再 dispose world；DeathScreen 本身不持久化。下次载入 hp<=0 的世界时，`startWorld()` 会优先解析已保存的自定义重生点及安全候选，失败才回世界出生点，因此不会把死亡 UI 跨页面保存。
 - `beginPlayerDeath()` 还会 fire-and-forget 启动一次强制 IndexedDB 保存，降低停留在死亡界面后直接关闭页面造成结算丢失的风险。
+- `respawn-rules.js` 是纯逻辑层：只负责 `{x,y,z}` 归一化、固定候选顺序和 first-safe 选择；它不读取 Three.js/World。`/spawnpoint` 只更新 main 的 `respawnPoint` + saveDirty，安全性在真正重生时由 world/player 检查。
+- `Player.respawnAt()` 只接受已经解析的精确位置，重置生命/饱食/受伤状态并复用 Player AABB 碰撞；床等未来重生来源应复用同一 setter/resolver，而不是另造重生状态机。
 - DropSystem / ExperienceOrbSystem 当前仍不跨页面持久化。
 
 ## Entities / Combat
@@ -122,8 +124,8 @@ profile 还提供 fallSpeed、line length、windX/windZ、opacity。thunder 的�
 
 ## Storage
 
-- IndexedDB object-store schema version 1；world record 逻辑快照 v5。
-- 保存 Player、Inventory、Equipment、totalXp、gameTime、weather、voxel edits。
+- IndexedDB object-store schema version 1；world record 逻辑快照 v6。
+- 保存 Player、Inventory、Equipment、totalXp、gameTime、weather、`respawnPoint`、voxel edits。
 - weather 是持久状态；Oxygen/swimCoverage 是瞬时状态。
 - 程序化 chunk 由 seed/prompt 重建，不存完整 chunk。
 
@@ -131,8 +133,8 @@ profile 还提供 fallSpeed、line length、windX/windZ、opacity。thunder 的�
 
 `Repository quality`：
 
-1. static-checks：语法 + base/armor/water/oxygen/swim/weather 六套回归。
-2. browser-smoke：固定海洋世界验证 water/oxygen/swimming；随后真实执行 `/weather rain → thunder → clear`，debug 必须出现 446 → 720 → 0；再验证 Equipment v5 存档和虚空死亡。
+1. static-checks：语法 + base/armor/water/oxygen/swim/weather/death/respawn 八套回归。
+2. browser-smoke：第一世界验证 water/oxygen/swimming、WeatherFX、Equipment v6、虚空显式重生；第二世界验证普通死亡 3 原木 + 14 XP 的真实回收；第三世界验证 `/spawnpoint` v6 持久化与异地死亡后精确自定义重生。
 
 Weather browser test 不访问隐藏 WeatherSystem 实例，只读公开 debug HUD，并同时捕获 pageerror/console error，因此覆盖真实命令→main→Three.js 系统链。
 
@@ -147,6 +149,6 @@ Weather browser test 不访问隐藏 WeatherSystem 实例，只读公开 debug H
 - opaque Worker 顶层兼容 buffers 应在消费者迁移后删除。
 - Equipment 无快捷装备、耐久、正式穿戴模型和标准 armor+toughness。
 - 生物无 chunk 持久化、正式寻路/亮度生成/动画。
-- 死亡统计、床/重生点、keepInventory、死亡世界实体持久化尚未完成。
+- 死亡统计、床方块/睡眠语义、keepInventory、死亡世界实体持久化尚未完成；自定义重生点内核已经独立落库。
 
 这些项目继续按独立可验证单元拆除，不能因为“已经能跑”就固化成长期架构。

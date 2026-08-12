@@ -28,11 +28,11 @@ async function holdKey(page,code,durationMs){
   await page.waitForTimeout(durationMs);
   await page.evaluate(code=>window.dispatchEvent(new KeyboardEvent('keyup',{code,bubbles:true})),code);
 }
-async function debugY(page){
-  const text=await page.locator('#debug').innerText(),match=text.match(/XYZ\s+[-\d.]+\s*\/\s*([-\d.]+)\s*\//);
-  if(!match)throw new Error(`cannot parse player Y from debug HUD: ${text}`);
-  return Number(match[1]);
+async function debugXYZ(page){
+  const text=await page.locator('#debug').innerText(),match=text.match(/XYZ\s+([-\d.]+)\s*\/\s*([-\d.]+)\s*\/\s*([-\d.]+)/);
+  if(!match)throw new Error(`cannot parse player XYZ from debug HUD: ${text}`);return{x:Number(match[1]),y:Number(match[2]),z:Number(match[3])};
 }
+async function debugY(page){return (await debugXYZ(page)).y;}
 
 test('boots, swims, switches precipitation, persists armor, then clears equipment on survival void death',async({page})=>{
   const pageErrors=[];
@@ -99,7 +99,7 @@ test('boots, swims, switches precipitation, persists armor, then clears equipmen
     const record=(await savedWorlds(page)).find(world=>world.name==='CI Browser Smoke');
     if(!record||Number(record.updatedAt)<armorSaveStartedAt)return null;
     return{version:record.version,chest:record.equipment?.slots?.chest?.id||null,weather:record.weather,hasTransientAir:Object.hasOwn(record,'oxygen')};
-  },{timeout:10_000,message:'a fresh pause save should persist armor and clear weather but not transient oxygen state'}).toEqual({version:5,chest:'leather_chestplate',weather:'clear',hasTransientAir:false});
+  },{timeout:10_000,message:'a fresh pause save should persist armor and clear weather but not transient oxygen state'}).toEqual({version:6,chest:'leather_chestplate',weather:'clear',hasTransientAir:false});
   await page.getByRole('button',{name:'返回游戏'}).click();
   await expect(page.locator('#pause-menu')).not.toHaveClass(/active/);
 
@@ -166,7 +166,7 @@ test('recoverable death drops and re-picks items after explicit respawn',async({
   await expect(page.locator('#death-menu')).not.toHaveClass(/active/);
   const pickupPhaseStartedAt=await page.evaluate(()=>Date.now());
   await runCommand(page,'/tp 0 35 0');
-  await page.waitForTimeout(1400);
+  await expect(page.locator('#debug')).toContainText('Drops 0 · XPOrbs 0 · XP 14 / Lv.1',{timeout:10_000});
 
   await key(page,'Escape');
   await expect(page.locator('#pause-menu')).toHaveClass(/active/);
@@ -179,4 +179,17 @@ test('recoverable death drops and re-picks items after explicit respawn',async({
 
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
+});
+
+test('custom spawnpoint persists and explicit respawn returns to it',async({page})=>{
+  const pageErrors=[],consoleErrors=[];page.on('pageerror',error=>pageErrors.push(error.message));page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
+  await page.goto('/');await page.getByRole('button',{name:'单人游戏'}).click();await page.locator('#world-name').fill('CI Custom Respawn');await page.locator('#world-seed').fill('ci-custom-respawn-2026');await page.locator('#game-mode').selectOption('survival');await page.locator('#terrain-prompt').fill('平原');await page.getByRole('button',{name:'创建 / 进入'}).click();
+  await expect(page.locator('#loading')).toHaveClass(/hidden/,{timeout:60_000});await expect(page.locator('#hud')).not.toHaveClass(/hidden/);
+  await runCommand(page,'/tp 7 35 7');
+  await expect.poll(async()=>{const a=await debugXYZ(page);await page.waitForTimeout(250);const b=await debugXYZ(page);return Math.abs(a.y-b.y)<.03&&b.y>0;},{timeout:10_000,message:'player should settle on terrain before setting spawnpoint'}).toBe(true);
+  const custom=await debugXYZ(page);await runCommand(page,'/spawnpoint');const saveStarted=await page.evaluate(()=>Date.now());await key(page,'Escape');await expect(page.locator('#pause-menu')).toHaveClass(/active/);
+  await expect.poll(async()=>{const record=(await savedWorlds(page)).find(world=>world.name==='CI Custom Respawn');if(!record||Number(record.updatedAt)<saveStarted||!record.respawnPoint)return null;return{version:record.version,x:Number(record.respawnPoint.x.toFixed(1)),y:Number(record.respawnPoint.y.toFixed(1)),z:Number(record.respawnPoint.z.toFixed(1))};},{timeout:10_000,message:'spawnpoint should persist in a fresh v6 world snapshot'}).toEqual({version:6,x:custom.x,y:custom.y,z:custom.z});
+  await page.getByRole('button',{name:'返回游戏'}).click();await runCommand(page,'/tp -7 35 -7');await runCommand(page,'/kill');await expect(page.locator('#death-menu')).toHaveClass(/active/,{timeout:10_000});await page.getByRole('button',{name:'重生'}).click();await expect(page.locator('#death-menu')).not.toHaveClass(/active/);
+  await expect.poll(async()=>{const p=await debugXYZ(page);return Math.abs(p.x-custom.x)<.15&&Math.abs(p.y-custom.y)<.15&&Math.abs(p.z-custom.z)<.15;},{timeout:5_000,message:'explicit respawn should return to the persisted custom spawnpoint'}).toBe(true);
+  expect(pageErrors).toEqual([]);expect(consoleErrors).toEqual([]);
 });

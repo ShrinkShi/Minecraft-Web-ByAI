@@ -33,7 +33,12 @@ export class PlayerController{
   cycleView(){this.viewMode=(this.viewMode+1)%3;this.syncCamera();return this.viewMode;}
 
   spawn(x,z){const y=this.world.highestSolid(x,z)+1.001;this.position.set(x+.5,y,z+.5);this.velocity.set(0,0,0);this.swimCoverage=0;this.syncCamera();}
-  respawn(x=0,z=0){this.hp=20;this.hunger=20;this.saturation=5;this.hurtUntil=-Infinity;this.spawn(x,z);}
+  resetVitals(){this.hp=20;this.hunger=20;this.saturation=5;this.hurtUntil=-Infinity;}
+  respawn(x=0,z=0){this.resetVitals();this.spawn(x,z);}
+  respawnAt(position){
+    if(!position||![position.x,position.y,position.z].every(Number.isFinite))return false;const next=new THREE.Vector3(position.x,position.y,position.z);
+    if(this.mode!=='spectator'&&this.collides(next))return false;this.resetVitals();this.position.copy(next);this.velocity.set(0,0,0);this.swimCoverage=0;this.syncCamera();return true;
+  }
 
   restore(snapshot){
     if(!snapshot)return false;const p=snapshot.position;if(!p||![p.x,p.y,p.z].every(Number.isFinite))return false;

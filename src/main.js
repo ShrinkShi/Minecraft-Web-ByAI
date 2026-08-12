@@ -3,7 +3,8 @@ import {VoxelWorld} from './world.js';
 import {PlayerController} from './player.js';
 import {UI} from './ui.js';
 import {DeathScreen} from './death-screen.js';
-import {BLOCKS} from './blocks.js';
+import {BLOCKS,WORLD_HEIGHT} from './blocks.js';
+import {normalizeRespawnPoint,resolveRespawnPosition} from './respawn-rules.js';
 import {ITEMS} from './items.js';
 import {Inventory} from './inventory.js';
 import {Equipment} from './equipment.js';
@@ -41,7 +42,7 @@ let world=null,player=null,inventory=null,equipment=null,drops=null,experienceOr
 let running=false,paused=false,last=performance.now(),selectedTarget=null,breakStart=0,lastSecond=0,frames=0,fps=0,worldInfo=null,lastAttackAt=-Infinity;
 let saveDirty=false,saveInFlight=null,saveAgain=false,lastSaveAt=0,lastSavedPosition=null,gameTime=6000,weather='clear',totalXp=0;
 let oxygenState=createOxygenState(),headSubmerged=false;
-let deathState=null;
+let deathState=null,respawnPoint=null;
 
 function modeScreen(name){ui.showScreen(name==='main'?ui.main:name==='world'?ui.worldMenu:name==='pause'?ui.pause:name==='death'?deathScreen.root:null);}
 function pointer(){if(running&&!paused&&!deathState&&!ui.hasOpenPanel()&&!ui.isChatOpen())canvas.requestPointerLock().catch(()=>{});}
@@ -49,17 +50,22 @@ function canControl(){return running&&!paused&&!deathState&&!ui.hasOpenPanel()&&
 function markSaveDirty(){saveDirty=true;}
 function renderPlayerStatus(){if(!player)return;const xp=experienceState(totalXp);ui.renderStatus(player.hp,player.hunger,xp.progress*100,xp.level,equipment?.armorPoints()||0);}
 function resetOxygen(){oxygenState=createOxygenState();headSubmerged=false;ui.renderOxygen(MAX_AIR_SECONDS,MAX_AIR_SECONDS,false);}
+function isSafeRespawnPosition(value){
+  const point=normalizeRespawnPoint(value);if(!point||!world||!player||point.y<0||point.y>WORLD_HEIGHT+2)return false;const x=Math.floor(point.x),z=Math.floor(point.z),below=BLOCKS[world.getBlock(x,Math.floor(point.y-.05),z)],feet=BLOCKS[world.getBlock(x,Math.floor(point.y+.05),z)],eye=BLOCKS[world.getBlock(x,Math.floor(point.y+player.eye),z)];if(!below?.solid||feet?.solid||feet?.liquid||eye?.solid||eye?.liquid)return false;return !player.collides(new THREE.Vector3(point.x,point.y,point.z));
+}
+function preferredRespawn(){return respawnPoint?resolveRespawnPosition(respawnPoint,isSafeRespawnPosition):null;}
+function respawnAtPreferredPoint(){const custom=preferredRespawn();if(custom&&player?.respawnAt(custom))return{custom:true,position:custom};player?.respawn(0,0);return{custom:false,position:player?{x:player.position.x,y:player.position.y,z:player.position.z}:null};}
 
 function disposeWorld(){
   running=false;deathState=null;deathScreen.hide();document.exitPointerLock?.();ui.closeChat();ui.inventory.classList.add('hidden');ui.workbench.classList.add('hidden');resetOxygen();
   weatherSystem?.dispose();explosions?.dispose();projectiles?.dispose();hostileMobs?.dispose();passiveMobs?.dispose();experienceOrbs?.dispose();drops?.dispose();player?.dispose();world?.dispose();
-  weatherSystem=null;explosions=null;projectiles=null;hostileMobs=null;passiveMobs=null;experienceOrbs=null;drops=null;player=null;world=null;inventory=null;equipment=null;worldInfo=null;saveDirty=false;lastSavedPosition=null;lastAttackAt=-Infinity;totalXp=0;
+  weatherSystem=null;explosions=null;projectiles=null;hostileMobs=null;passiveMobs=null;experienceOrbs=null;drops=null;player=null;world=null;inventory=null;equipment=null;worldInfo=null;respawnPoint=null;saveDirty=false;lastSavedPosition=null;lastAttackAt=-Infinity;totalXp=0;
 }
 
 async function persistWorld(force=false){
   if(!world||!player||!worldInfo||!inventory||!equipment)return;
   if(saveInFlight){saveAgain=true;return saveInFlight;}if(!force&&!saveDirty)return;
-  const record={id:worldInfo.id,name:worldInfo.name,seed:worldInfo.seed,prompt:worldInfo.prompt,mode:player.mode,updatedAt:Date.now(),player:player.snapshot(),inventory:inventory.snapshot(),equipment:equipment.snapshot(),edits:world.exportEdits(),gameTime,weather,totalXp,version:5};
+  const record={id:worldInfo.id,name:worldInfo.name,seed:worldInfo.seed,prompt:worldInfo.prompt,mode:player.mode,updatedAt:Date.now(),player:player.snapshot(),inventory:inventory.snapshot(),equipment:equipment.snapshot(),edits:world.exportEdits(),gameTime,weather,totalXp,respawnPoint:respawnPoint?{...respawnPoint}:null,version:6};
   saveDirty=false;saveAgain=false;
   saveInFlight=storage.putWorld(record).then(()=>{lastSaveAt=performance.now();lastSavedPosition=player?.position.clone()||null;}).catch(error=>{saveDirty=true;console.error('世界存档失败',error);ui.showToast('世界存档失败：IndexedDB 不可用');}).finally(async()=>{saveInFlight=null;if(saveAgain&&world&&player)await persistWorld(true);});
   return saveInFlight;
@@ -88,7 +94,7 @@ function beginPlayerDeath(reason='你死了'){
 }
 
 function completeRespawn(){
-  if(!player||!deathState)return;player.respawn(0,0);lastAttackAt=-Infinity;resetOxygen();deathState=null;deathScreen.hide();modeScreen(null);renderPlayerStatus();markSaveDirty();ui.showToast('已重生');pointer();
+  if(!player||!deathState)return;const result=respawnAtPreferredPoint();lastAttackAt=-Infinity;resetOxygen();deathState=null;deathScreen.hide();modeScreen(null);renderPlayerStatus();markSaveDirty();ui.showToast(result.custom?'已在自定义重生点重生':'已在世界出生点重生');pointer();
 }
 
 function protectedDamage(amount){return mitigateArmorDamage(amount,equipment?.armorPoints()||0);}
@@ -121,10 +127,10 @@ function handleMobDeath({type,position}){
 async function startWorld(){
   disposeWorld();const seed=document.querySelector('#world-seed').value||String(Date.now()),prompt=document.querySelector('#terrain-prompt').value,selectedMode=document.querySelector('#game-mode').value,name=document.querySelector('#world-name').value||'新的世界',id=worldIdFor(name,seed);let saved=null;
   try{saved=await storage.getWorld(id);}catch(error){console.warn('无法读取 IndexedDB 存档，将启动无持久化会话',error);}
-  const mode=saved?.mode||selectedMode;worldInfo={id,seed:saved?.seed||seed,prompt:saved?.prompt||prompt,mode,name:saved?.name||name};gameTime=Number.isFinite(saved?.gameTime)?saved.gameTime:6000;weather=saved?.weather||'clear';totalXp=Number.isFinite(saved?.totalXp)?Math.max(0,Math.floor(saved.totalXp)):0;
-  const startPosition=saved?.player?.position,centerX=Number.isFinite(startPosition?.x)?startPosition.x:0,centerZ=Number.isFinite(startPosition?.z)?startPosition.z:0;modeScreen(null);ui.showLoading(true,saved?'读取世界存档':'启动地形 Worker',2);
+  const mode=saved?.mode||selectedMode;worldInfo={id,seed:saved?.seed||seed,prompt:saved?.prompt||prompt,mode,name:saved?.name||name};gameTime=Number.isFinite(saved?.gameTime)?saved.gameTime:6000;weather=saved?.weather||'clear';totalXp=Number.isFinite(saved?.totalXp)?Math.max(0,Math.floor(saved.totalXp)):0;respawnPoint=normalizeRespawnPoint(saved?.respawnPoint);
+  const savedDead=Number.isFinite(saved?.player?.hp)&&saved.player.hp<=0,startPosition=savedDead&&respawnPoint?respawnPoint:saved?.player?.position,centerX=Number.isFinite(startPosition?.x)?startPosition.x:0,centerZ=Number.isFinite(startPosition?.z)?startPosition.z:0;modeScreen(null);ui.showLoading(true,saved?'读取世界存档':'启动地形 Worker',2);
   world=new VoxelWorld(scene,{seed:worldInfo.seed,prompt:worldInfo.prompt,renderDistance:3,savedEdits:saved?.edits||{},onEdit:markSaveDirty,onProgress:(done,total)=>ui.showLoading(true,`生成区块 ${done}/${total}`,total?Math.round(done/total*100):100)});await world.generateArea(centerX,centerZ);
-  inventory=new Inventory(mode,saved?.inventory||null);equipment=new Equipment(saved?.equipment||null);player=new PlayerController(camera,canvas,world,scene);player.setMode(mode);const restored=saved?.player?player.restore(saved.player):false;if(!restored)player.spawn(centerX,centerZ);if(player.hp<=0)player.respawn(0,0);resetOxygen();
+  inventory=new Inventory(mode,saved?.inventory||null);equipment=new Equipment(saved?.equipment||null);player=new PlayerController(camera,canvas,world,scene);player.setMode(mode);const restored=!savedDead&&saved?.player?player.restore(saved.player):false;if(!restored)player.spawn(centerX,centerZ);if(savedDead)respawnAtPreferredPoint();resetOxygen();
   drops=new DropSystem(scene,world,inventory,()=>{ui.refreshInventory();markSaveDirty();});experienceOrbs=new ExperienceOrbSystem(scene,world,addExperience);projectiles=new ProjectileSystem(scene,world,{onPlayerHit:handlePlayerHit});explosions=new ExplosionSystem(scene,world,{onPlayerBlast:handlePlayerBlast});passiveMobs=new PassiveMobSystem(scene,world,{onDeath:handleMobDeath});hostileMobs=new HostileMobSystem(scene,world,{onPlayerHit:handlePlayerHit,onProjectile:handleHostileProjectile,onExplosion:handleHostileExplosion,onDeath:handleMobDeath});weatherSystem=new WeatherSystem(scene);weatherSystem.setWeather(weather);
   ui.bindInventory(inventory,{equipment,onChanged:()=>{markSaveDirty();renderPlayerStatus();},onOverflow:spawnOverflow});running=true;paused=false;saveDirty=!saved;lastSavedPosition=player.position.clone();lastAttackAt=-Infinity;ui.hud.classList.remove('hidden');ui.showLoading(false);renderPlayerStatus();applySky();ui.chatMessage('夜间敌对池包括僵尸、骷髅、苦力怕和蜘蛛；水下会消耗氧气；天气指令会切换降雨粒子。');ui.showToast(saved?'已从浏览器存档恢复世界':mode==='creative'?'创造模式':'生存模式');pointer();
 }
@@ -163,7 +169,7 @@ function updateOxygen(dt,now){
   }
 }
 function updateAutosave(now){if(!player||!world)return;if(!lastSavedPosition||player.position.distanceToSquared(lastSavedPosition)>.5)saveDirty=true;if(saveDirty&&now-lastSaveAt>5000)persistWorld();}
-function runCommand(text){const result=executeCommand(text,{player,inventory,inventoryChanged:()=>{ui.refreshInventory();markSaveDirty();},setMode:mode=>{player.setMode(mode);worldInfo.mode=mode;if(!usesOxygen(mode))resetOxygen();markSaveDirty();},addXp:value=>addExperience(value),kill:()=>{if(deathState)return;player.hp=0;player.velocity.set(0,0,0);beginPlayerDeath('你被杀死了');},teleport:(x,y,z)=>{player.position.set(x,y,z);player.velocity.set(0,0,0);world.ensureAround(x,z);player.syncCamera();markSaveDirty();},setTime:value=>{gameTime=value;applySky();markSaveDirty();},setWeather:value=>{weather=value;weatherSystem?.setWeather(value);applySky();markSaveDirty();}});ui.chatMessage(result.message,result.ok?'system':'error');}
+function runCommand(text){const result=executeCommand(text,{player,inventory,inventoryChanged:()=>{ui.refreshInventory();markSaveDirty();},setMode:mode=>{player.setMode(mode);worldInfo.mode=mode;if(!usesOxygen(mode))resetOxygen();markSaveDirty();},setSpawnpoint:(x,y,z)=>{const point=normalizeRespawnPoint({x,y,z});if(!point)return false;respawnPoint=point;markSaveDirty();return true;},addXp:value=>addExperience(value),kill:()=>{if(deathState)return;player.hp=0;player.velocity.set(0,0,0);beginPlayerDeath('你被杀死了');},teleport:(x,y,z)=>{player.position.set(x,y,z);player.velocity.set(0,0,0);world.ensureAround(x,z);player.syncCamera();markSaveDirty();},setTime:value=>{gameTime=value;applySky();markSaveDirty();},setWeather:value=>{weather=value;weatherSystem?.setWeather(value);applySky();markSaveDirty();}});ui.chatMessage(result.message,result.ok?'system':'error');}
 function applySky(){const angle=(gameTime-6000)/24000*Math.PI*2,sunHeight=Math.cos(angle),daylight=Math.max(.08,Math.min(1,(sunHeight+.25)/1.25)),storm=weather==='clear'?1:weather==='rain' ? .72 : .55,night=new THREE.Color(0x061126),day=new THREE.Color(0x86bff2),color=night.clone().lerp(day,daylight*storm);scene.background=color;scene.fog.color.copy(color);hemi.intensity=.35+2.05*daylight*storm;sun.intensity=Math.max(0,2.2*daylight*storm);sun.position.set(Math.cos(angle)*100,Math.sin(Math.PI/2-angle)*110,45);}
 
 function animate(now){

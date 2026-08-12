@@ -6,15 +6,16 @@
 - GitHub Pages 仓库发布源已设置为 **GitHub Actions**，并持续验证完整 `configure → artifact upload → deploy` 流水线。
 - 固定 `@playwright/test` `1.62.0`，要求 Node 22+；`scripts/serve.mjs` 作为本地/CI 浏览器测试统一 HTTP server。
 - `Repository quality` 为两层质量门：`static-checks` 成功后运行 Chromium `browser-smoke`；同 `github.ref` 新 push 会取消旧 run。
-- `static-checks` 同时检查 `src/*.js`、`scripts/*.mjs`；`npm run test:logic` 现在顺序执行基础、Equipment/Armor、Water Mesh、Oxygen/Drowning、Swimming/Buoyancy、Weather/Precipitation、Death Integration 七套回归。
+- `static-checks` 同时检查 `src/*.js`、`scripts/*.mjs`；`npm run test:logic` 现在顺序执行基础、Equipment/Armor、Water Mesh、Oxygen/Drowning、Swimming/Buoyancy、Weather/Precipitation、Death Integration、Custom Respawn 八套回归。
 - 新增 `scripts/check-death.mjs`：锁定死亡 DOM/样式引用、`DeathScreen`/`deathState`/显式重生接线，禁止旧 `respawnPlayer()` 和一次性 death patch 工具重新进入交付树。
+- 新增 `scripts/check-respawn.mjs`：覆盖自定义重生点归一化、14 个固定候选顺序、first-safe 解析和失败边界。
 - 主线 `7e2a4920...` 验收发现 PR #16 的死亡界面曾半落库：`death.css`/`death-screen.js` 存在，但 `index.html` 缺 DOM/样式引用，`main.js` 仍走立即重生且遗留 patch workflow/script；PR #19 将运行时、DOM 与质量门统一恢复，并以两条 Chromium 死亡链重新验收。
 - 新增 `scripts/check-water.mjs`：孤立水、同水内部面、水/实体边界、Transferable buffers、跨 chunk 同水面。
 - 新增 `scripts/check-oxygen.mjs`：15 秒空气、4× 恢复、模式边界、跨 0 点、每秒溺水事件与非法输入。
 - 新增 `scripts/check-swim.mjs`：三点水覆盖率、dry no-op、水平倍率插值、被动浮力、Space 上游、Shift 下潜、垂直限速、冲突输入与参数校验。
 - 新增 `scripts/check-weather.mjs`：clear/rain/thunder 类型、固定池精确预算、雷雨相对雨天的速度/长度/风偏/透明度强度和非法容量。
 - PR #12 首轮静态质量门暴露旧 `scripts/check.mjs` 仍消费 mesh Worker 顶层 `indices`；修复采用 opaque 顶层兼容视图而不是删除旧回归。
-- browser smoke 使用固定 seed + `海` prompt 真实生成水体，验证 Oxygen `data-air`、Space 上游、Shift 下潜；随后实际执行 `/weather rain → thunder → clear` 并要求 `WeatherFX 446 → 720 → 0`，再继续 Equipment/v5 存档和虚空死亡界面→显式重生链。
+- browser smoke 使用固定 seed + `海` prompt 真实生成水体，验证 Oxygen `data-air`、Space 上游、Shift 下潜；随后实际执行 `/weather rain → thunder → clear` 并要求 `WeatherFX 446 → 720 → 0`，再继续 Equipment/v6 存档和虚空死亡界面→显式重生链；第二世界验证普通死亡物品+XP 回收，第三世界验证持久化 `/spawnpoint`。
 - 浏览器存档断言确认 world record 不含 `oxygen`；`swimCoverage` 同样只存在于 Player 运行时。weather 继续使用既有长期存档字段。
 - 浏览器失败时上传 trace / screenshot / HTML report；当前 CI 只安装 Chromium。
 
@@ -39,11 +40,14 @@
 - 新增标准 self `/kill` 指令，复用正式 `beginPlayerDeath()`；命令回归覆盖成功调用和额外参数拒绝。
 - 新增第二条 Chromium 可恢复死亡回归：3 原木→`/kill`→死亡界面报告掉落→显式重生→返回原死亡坐标→真实 DropSystem 拾回→新鲜 IndexedDB 再次持有全部 3 原木。
 - 新增 self `/xp add <points>`（`/experience` 别名），通过现有 `addExperience()` 增加 points；拒绝 0/负数、超限和 `levels`。
-- 可恢复死亡 Chromium 回归升级为 3 原木 + 16 XP：Lv.2 死亡摘要必须报告 14 XP，显式重生回死亡点后真实 ExperienceOrbSystem 吸收，最终新鲜 IndexedDB 必须 `totalXp=14`。
+- 可恢复死亡 Chromium 回归升级为 3 原木 + 16 XP：Lv.2 死亡摘要必须报告 14 XP，显式重生回死亡点后真实 ExperienceOrbSystem 吸收，最终新鲜 IndexedDB 必须 `totalXp=14`（派生 Lv.1）；测试由固定 1400ms sleep 改为等待公开 runtime 状态 `Drops 0 · XPOrbs 0 · XP 14`。
+- 新增 `respawn-rules.js` 与 `Player.respawnAt()`：持久化精确点通过固定周边候选和世界/AABB 安全判定选择首个可用重生位置，全部无效时回退世界出生点。
+- 新增 self `/spawnpoint [x y z]`，支持当前精确位置和 `~` 相对坐标；world record 逻辑快照升级到 v6 并保存 `respawnPoint`，IndexedDB object-store schema 仍为 v1。
+- 新增第三条 Chromium 自定义重生用例：非原点设置 `/spawnpoint`→确认 v6 新鲜存档→异地 `/kill`→显式重生必须回到该持久化安全点。
 - `Equipment` 独立 head/chest/legs/feet 四槽；皮革帽子/外套/裤子/靴子护甲点 1/3/2/1。
 - `armor-rules.js`：过渡公式每护甲点 4%、最高 80%，完整皮革套 28%。
 - 僵尸/蜘蛛近战、骷髅箭矢和苦力怕爆炸经过基础护甲减伤；虚空与溺水绕过护甲。
-- world record 逻辑快照 v5 保存 Equipment；IndexedDB object-store schema 仍为 v1。
+- world record 逻辑快照 v6 保存 Equipment 与 respawnPoint；IndexedDB object-store schema 仍为 v1。
 - `mesh-worker.js` 一次 chunk 扫描分别构建 `opaque` 与 `water` 两套 TypedArray/Transferable payload。
 - 同水内部面含跨 chunk 边界会剔除；水对实体接触面剔除，实体面对透明水保留。
 - `VoxelWorld` 每 chunk 最多一个 opaque mesh 与一个透明 water mesh；共享 atlas，water 使用 `transparent=true / opacity=.68 / depthWrite=false`。
@@ -53,7 +57,7 @@
 - 主循环按 `Player.eyePosition()` 所在 voxel 的 `liquid` 判定头部浸水。
 - 空气耗尽后每累计 1 秒产生一次 2 HP 溺水伤害；跨 0 点仅计算真正无空气的剩余 dt。
 - 溺水直接进入 `Player.takeDamage()`，不经过 armor-rules。
-- `oxygen.css` + 10 气泡 HUD；Oxygen 为瞬时状态，不进入 v5 world record。
+- `oxygen.css` + 10 气泡 HUD；Oxygen 为瞬时状态，不进入 v6 world record。
 - `swim-rules.js`：根据水体覆盖率派生水中水平倍率、低重力/浮力、Space/Shift 垂直控制、指数阻尼和垂直限速。
 - `PlayerController` 每帧采样脚部 `+0.2`、躯干 `+0.9`、眼睛 `+1.62` 三个 voxel，得到 0/1/3/2/3/1 水覆盖率。
 - coverage 从 0→1 时水平移动倍率从 1 平滑趋近 0.5；水中不使用陆地 sprint/sneak 速度语义。
@@ -75,7 +79,7 @@
 - `docs/PROGRESS.md`、`docs/TESTING.md`、`docs/FILE_MANIFEST.md` 与实际代码/CI 对齐。
 
 ### Current limitations
-- `v0.4.0` 尚未封版：死亡统计/床重生/`keepInventory`、完整流体、水下视觉、自动天气/闪电/雪等仍未完成。
+- `v0.4.0` 尚未封版：死亡统计/床方块与睡眠/`keepInventory`、完整流体、水下视觉、自动天气/闪电/雪等仍未完成。
 - WeatherSystem 当前只有玩家周围的轻量 rain/thunder 线段 FX：没有自动周期、群系降水、屋顶遮雨/世界碰撞、飞溅/湿润、闪电 flash/bolt/damage/sound 或像素级天气 E2E。
 - Swimming 只是基础直立水中运动：没有冲刺游泳姿态、沿 pitch 三维推进、crawl transition、动画、实体游泳 AI、水流推动、Depth Strider/Dolphin's Grace。
 - 已完成头部浸水→氧气→溺水事件闭环，但没有 Respiration、Water Breathing、Conduit、气泡柱；完整 15 秒真实溺水死亡仍未在 browser E2E 中硬等待。
