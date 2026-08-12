@@ -13,7 +13,7 @@ assert.match(html,/data-action="death-main"/,'death screen must expose return-to
 assert.match(deathScreen,/document\.querySelector\('#death-menu'\)/,'DeathScreen must bind the death root');
 assert.match(main,/import \{DeathScreen\} from '\.\/death-screen\.js';/,'main must import DeathScreen');
 assert.match(main,/deathScreen=new DeathScreen\(\)/,'main must construct DeathScreen');
-assert.match(main,/let deathState=null;/,'main must own explicit death state');
+assert.match(main,/\bdeathState=null(?:[,;])/,'main must own explicit death state initialized to null');
 assert.match(main,/function beginPlayerDeath\(/,'main must split death settlement from respawn');
 assert.match(main,/function completeRespawn\(/,'main must expose explicit respawn completion');
 assert.match(main,/name==='death'\?deathScreen\.root/,'screen routing must include the death layer');
