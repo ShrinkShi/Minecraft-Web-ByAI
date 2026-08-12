@@ -9,11 +9,12 @@
 ## 工程质量基础
 
 - [x] Node 22 `src/*.js` 与 `scripts/*.mjs` 语法检查。
-- [x] `npm run test:logic`：基础世界/实体/Worker + Equipment/Armor + Water Mesh + Oxygen/Drowning + Swimming/Buoyancy + Weather/Precipitation + Death Integration + Custom Respawn + Bed Rules + Mobile Device/Input + Unified Control Intent + Absolute View Frame + Sleep Rules，共 13 套逻辑回归；Absolute View Frame 由 `check-controls.mjs` 串联执行。
+- [x] `npm run test:logic`：基础世界/实体/Worker + Equipment/Armor + Water Mesh + Oxygen/Drowning + Swimming/Buoyancy + Weather/Precipitation + Death Integration + Custom Respawn + Bed Rules + Mobile Device/Input + Unified Control Intent + Absolute View Frame + Gameplay Action Frame + Sleep Rules，共 14 套逻辑回归；View/Action Frame 由 `check-controls.mjs` 串联执行。
 - [x] PC/手机输入统一：`ControlIntentBus` 为唯一 gameplay input contract；Desktop/Touch 只是适配器，Player 不再拥有 DOM 键盘监听或 mobile virtualInput。
 - [x] 联机前置平台约束：同一 World/Player/Inventory/存档/玩法语义，未来 `network-peer` 与本地输入复用相同控制状态，不创建独立 mobile client protocol。
 - [x] `PlayerControlFrame v1`：平台无关连续控制 wire schema；desktop/touch/network-peer 同状态编码一致且不携带设备身份。
 - [x] `PlayerViewFrame v1`：平台无关绝对 yaw/pitch wire schema；yaw 规范化到 `[-π,π)`，pitch 严格限制为 Player 运行时范围，拒绝 device/source 与畸形字段。
+- [x] `PlayerActionFrame v1`：离散 `use/drop/hotbar-select` wire schema；use/drop 关联 `viewSeq`，hotbar 发送绝对 slot，拒绝 client target/source/device 与未知 action。
 - [x] GitHub Pages 使用 GitHub Actions，并持续验证真实 Pages Deployment。
 - [x] Playwright Chromium browser smoke：主海洋世界覆盖氧气/游泳/WeatherFX/护甲 v6/虚空死亡；第二世界覆盖普通死亡物品+XP 回收；第三世界覆盖 `/spawnpoint` 持久化与精确自定义重生；第四世界覆盖真实床放置/激活、夜间用床跳到清晨与床锚点重生；第五条 Android 横屏用例覆盖移动端自动识别、旋转提示、触控 UI 和摇杆移动。
 - [x] 浏览器失败保留 Playwright trace / screenshot / report。
@@ -23,6 +24,16 @@
 ## v0.4.0 — 实体、战斗与生存扩展（开发中）
 
 状态：开发中。实体基础、四种敌对生物、奖励闭环、生存死亡损失、显式死亡界面/重生、持久化自定义重生点、两格床重生锚点与基础睡眠跳夜、第一版护甲、透明水 pass、氧气/溺水、基础游泳/浮力、可见降雨 FX 和手机浏览器横屏触控底座已落库；死亡统计、完整床睡眠表现/限制、完整流体/冲刺游泳、自动天气/闪电/雪、水下视觉和正式 Java 伤害/护甲公式仍未完成。
+
+### 联机协议前置
+- [x] 连续移动/按键：`PlayerControlFrame v1`
+- [x] 绝对朝向：`PlayerViewFrame v1`
+- [x] 离散实时动作：`PlayerActionFrame v1`，仅 `use/drop/hotbar-select`
+- [x] action v1 不接受客户端 block/entity target；未来服务端用 authoritative position + referenced view 自己 raycast
+- [x] 本地 UI 动作与世界动作分离：pause/view/focus/escape 不进入 gameplay wire；chat 预留独立消息协议；hotbar-step 必须归一化为绝对 slot
+- [ ] 最小 transport envelope / ordering / session schema
+- [ ] WebSocket/WebTransport transport、房间/认证、玩家复制与 authoritative server loop
+- [ ] Inventory/Crafting/Equipment transaction schema 与 Chat message schema
 
 ### 实体 / 战斗 / 奖励
 - [x] `EntityStore` + `SpatialHash` 数据/空间索引基础及 Node 回归
