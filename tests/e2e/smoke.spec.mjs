@@ -23,8 +23,18 @@ async function runCommand(page,text){
 }
 
 async function key(page,code){await page.evaluate(code=>window.dispatchEvent(new KeyboardEvent('keydown',{code,bubbles:true})),code);}
+async function holdKey(page,code,durationMs){
+  await page.evaluate(code=>window.dispatchEvent(new KeyboardEvent('keydown',{code,bubbles:true})),code);
+  await page.waitForTimeout(durationMs);
+  await page.evaluate(code=>window.dispatchEvent(new KeyboardEvent('keyup',{code,bubbles:true})),code);
+}
+async function debugY(page){
+  const text=await page.locator('#debug').innerText(),match=text.match(/XYZ\s+[-\d.]+\s*\/\s*([-\d.]+)\s*\//);
+  if(!match)throw new Error(`cannot parse player Y from debug HUD: ${text}`);
+  return Number(match[1]);
+}
 
-test('boots, detects underwater oxygen, equips armor, persists it, then clears equipment on survival void death',async({page})=>{
+test('boots, swims in generated water, tracks oxygen, persists armor, then clears equipment on survival void death',async({page})=>{
   const pageErrors=[];
   const consoleErrors=[];
   page.on('pageerror',error=>pageErrors.push(error.message));
@@ -50,8 +60,17 @@ test('boots, detects underwater oxygen, equips armor, persists it, then clears e
   const oxygen=page.locator('#oxygen');
   await expect(oxygen).not.toHaveClass(/hidden/,{timeout:5_000});
   const firstAir=Number(await oxygen.getAttribute('data-air'));expect(firstAir).toBeGreaterThan(13);expect(firstAir).toBeLessThanOrEqual(15);
-  await page.waitForTimeout(700);
-  const secondAir=Number(await oxygen.getAttribute('data-air'));expect(secondAir).toBeLessThan(firstAir-.3);
+  await page.waitForTimeout(500);
+  const secondAir=Number(await oxygen.getAttribute('data-air'));expect(secondAir).toBeLessThan(firstAir-.2);
+
+  const swimStartY=await debugY(page);
+  await holdKey(page,'Space',350);
+  await page.waitForTimeout(80);
+  const swimUpY=await debugY(page);expect(swimUpY).toBeGreaterThan(swimStartY+.08);
+  await holdKey(page,'ShiftLeft',650);
+  await page.waitForTimeout(80);
+  const swimDownY=await debugY(page);expect(swimDownY).toBeLessThan(swimUpY-.03);
+
   await runCommand(page,'/tp 0 35 0');
   await expect(oxygen).toHaveClass(/hidden/,{timeout:5_000});
 
