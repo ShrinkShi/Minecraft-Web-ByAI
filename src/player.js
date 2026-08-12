@@ -98,6 +98,7 @@ export class PlayerController{
   isGroundedProbe(){const p=this.position.clone();p.y-=.06;return this.collides(p);}
   eyePosition(target=new THREE.Vector3()){return target.set(this.position.x,this.position.y+this.eye,this.position.z);}
   lookDirection(target=new THREE.Vector3()){const cp=Math.cos(this.pitch);return target.set(Math.sin(this.yaw)*cp,Math.sin(this.pitch),-Math.cos(this.yaw)*cp).normalize();}
+  setLook(yaw,pitch){if(Number.isFinite(yaw))this.yaw=yaw;if(Number.isFinite(pitch))this.pitch=Math.max(-1.553,Math.min(1.553,pitch));this.syncCamera();}
 
   syncCamera(){
     const target=this.eyePosition(new THREE.Vector3()),forward=this.lookDirection(new THREE.Vector3());

@@ -39,10 +39,9 @@ async function lockPointerAndLook(page,{movementX=0,movementY=0}={}){
   await page.evaluate(({movementX,movementY})=>{const event=new MouseEvent('mousemove',{bubbles:true});Object.defineProperty(event,'movementX',{value:movementX});Object.defineProperty(event,'movementY',{value:movementY});document.dispatchEvent(event);},{movementX,movementY});
 }
 async function rightClickCanvas(page){await page.locator('#game-canvas').dispatchEvent('mousedown',{button:2,bubbles:true});}
-async function rotateLook(page,movementX){await page.evaluate(x=>{const e=new MouseEvent('mousemove',{bubbles:true});Object.defineProperty(e,'movementX',{value:x});Object.defineProperty(e,'movementY',{value:0});document.dispatchEvent(e);},movementX);}
 async function placeBedWithRealAim(page){
-  await lockPointerAndLook(page,{movementY:240});
-  for(let i=0;i<14;i++){await rightClickCanvas(page);await page.waitForTimeout(120);if(((await page.locator('#toast').textContent())||'').includes('放置 床'))return;await rotateLook(page,210);}
+  const candidates=[];for(const pitch of [-.45,-.65,-.85])for(const yaw of [0,Math.PI/2,Math.PI,-Math.PI/2])candidates.push([yaw,pitch]);
+  for(const [yaw,pitch] of candidates){await page.evaluate(({yaw,pitch})=>globalThis.__minecraftE2E?.setLook(yaw,pitch),{yaw,pitch});await page.waitForTimeout(80);await rightClickCanvas(page);await page.waitForTimeout(120);if(((await page.locator('#toast').textContent())||'').includes('放置 床'))return;}
   throw new Error(`no real two-cell bed surface found; ${await page.locator('#debug').innerText()}`);
 }
 
@@ -201,7 +200,7 @@ test('custom spawnpoint persists and explicit respawn returns to it',async({page
 
 test('bed placement sets the persistent respawn anchor',async({page})=>{
   const pageErrors=[],consoleErrors=[];page.on('pageerror',error=>pageErrors.push(error.message));page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
-  await page.goto('/');await page.getByRole('button',{name:'单人游戏'}).click();await page.locator('#world-name').fill('CI Bed Anchor');await page.locator('#world-seed').fill('ci-bed-anchor-2026');await page.locator('#game-mode').selectOption('survival');await page.locator('#terrain-prompt').fill('平原');await page.getByRole('button',{name:'创建 / 进入'}).click();
+  await page.goto('/?e2e=1');await page.getByRole('button',{name:'单人游戏'}).click();await page.locator('#world-name').fill('CI Bed Anchor');await page.locator('#world-seed').fill('ci-bed-anchor-2026');await page.locator('#game-mode').selectOption('survival');await page.locator('#terrain-prompt').fill('平原');await page.getByRole('button',{name:'创建 / 进入'}).click();
   await expect(page.locator('#loading')).toHaveClass(/hidden/,{timeout:60_000});await expect(page.locator('#hud')).not.toHaveClass(/hidden/);
   await runCommand(page,'/tp 20 35 20');
   await expect.poll(async()=>{const a=await debugXYZ(page);await page.waitForTimeout(180);const b=await debugXYZ(page);return Math.abs(a.y-b.y)<.03&&b.y>0;},{timeout:10_000,message:'player should settle before bed placement search'}).toBe(true);
