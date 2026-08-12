@@ -133,7 +133,8 @@ profile 还提供 fallSpeed、line length、windX/windZ、opacity。thunder 的�
 - `beginPlayerDeath()` 还会 fire-and-forget 启动一次强制 IndexedDB 保存，降低停留在死亡界面后直接关闭页面造成结算丢失的风险。
 - `respawn-rules.js` 是纯逻辑层：只负责 `{x,y,z}` 归一化、固定候选顺序和 first-safe 选择；它不读取 Three.js/World。`/spawnpoint` 只更新 main 的 `respawnPoint` + saveDirty，安全性在真正重生时由 world/player 检查。
 - `Player.respawnAt()` 只接受已经解析的精确位置，重置生命/饱食/受伤状态并复用 Player AABB 碰撞。
-- `bed-rules.js` 把四个水平方向编码成 8 个 foot/head voxel ID，并纯逻辑负责朝向、配对端坐标和两端归一到同一床重生锚点；它不读取 World/Three.js。main 的 `placeBed()` 负责两端占位检查和原子写入，`breakBed()` 只在预期配对 ID 仍存在时联动删除，`activateBed()` 则只调用与 `/spawnpoint` 共用的 `setRespawnPoint()`。
+- `bed-rules.js` 把四个水平方向编码成 8 个 foot/head voxel ID，并纯逻辑负责朝向、配对端坐标和两端归一到同一床重生锚点；它不读取 World/Three.js。main 的 `placeBed()` 负责两端占位检查和原子写入，`breakBed()` 只在预期配对 ID 仍存在时联动删除。
+- `sleep-rules.js` 独立负责夜间/雷暴可睡条件、清晨目标和 sleeper percentage/quorum；它不读取 DOM、设备类型或 World。`activateBed()` 先走共享 `setRespawnPoint()`，再调用 `resolveSleep()`；桌面/手机都从同一个 secondary/use 动作进入该函数。当前单人传入 1/1，未来 server-authoritative 联机由服务器提供真实 sleepingPlayers/totalPlayers/percentage，设备平台不得影响 quorum。
 - 当前床渲染仍沿用标准 1m³ voxel mesh/collision，并通过通用 per-block vertex tint 区分视觉；这是明确的过渡实现，不等同于原版半高床模型。后续专用床 geometry/collision 不应改变已持久化的床 ID 或 respawnPoint 协议。
 - DropSystem / ExperienceOrbSystem 当前仍不跨页面持久化。
 
