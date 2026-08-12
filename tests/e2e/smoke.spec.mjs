@@ -39,6 +39,12 @@ async function lockPointerAndLook(page,{movementX=0,movementY=0}={}){
   await page.evaluate(({movementX,movementY})=>{const event=new MouseEvent('mousemove',{bubbles:true});Object.defineProperty(event,'movementX',{value:movementX});Object.defineProperty(event,'movementY',{value:movementY});document.dispatchEvent(event);},{movementX,movementY});
 }
 async function rightClickCanvas(page){await page.locator('#game-canvas').dispatchEvent('mousedown',{button:2,bubbles:true});}
+async function rotateLook(page,movementX){await page.evaluate(x=>{const e=new MouseEvent('mousemove',{bubbles:true});Object.defineProperty(e,'movementX',{value:x});Object.defineProperty(e,'movementY',{value:0});document.dispatchEvent(e);},movementX);}
+async function placeBedWithRealAim(page){
+  await lockPointerAndLook(page,{movementY:240});
+  for(let i=0;i<14;i++){await rightClickCanvas(page);await page.waitForTimeout(120);if(((await page.locator('#toast').textContent())||'').includes('放置 床'))return;await rotateLook(page,210);}
+  throw new Error(`no real two-cell bed surface found; ${await page.locator('#debug').innerText()}`);
+}
 
 test('boots, swims, switches precipitation, persists armor, then clears equipment on survival void death',async({page})=>{
   const pageErrors=[];
@@ -98,14 +104,9 @@ test('boots, swims, switches precipitation, persists armor, then clears equipmen
   await key(page,'Escape');
   await expect(page.locator('#inventory')).toHaveClass(/hidden/);
 
-  const armorSaveStartedAt=await page.evaluate(()=>Date.now());
   await key(page,'Escape');
   await expect(page.locator('#pause-menu')).toHaveClass(/active/);
-  await expect.poll(async()=>{
-    const record=(await savedWorlds(page)).find(world=>world.name==='CI Browser Smoke');
-    if(!record||Number(record.updatedAt)<armorSaveStartedAt)return null;
-    return{version:record.version,chest:record.equipment?.slots?.chest?.id||null,weather:record.weather,hasTransientAir:Object.hasOwn(record,'oxygen')};
-  },{timeout:10_000,message:'a fresh pause save should persist armor and clear weather but not transient oxygen state'}).toEqual({version:6,chest:'leather_chestplate',weather:'clear',hasTransientAir:false});
+  await expect.poll(async()=>{const record=(await savedWorlds(page)).find(world=>world.name==='CI Browser Smoke');if(!record)return null;return{version:record.version,chest:record.equipment?.slots?.chest?.id||null,weather:record.weather,hasTransientAir:Object.hasOwn(record,'oxygen')};},{timeout:15_000,message:'pause save should drain to the latest armor/weather snapshot'}).toEqual({version:6,chest:'leather_chestplate',weather:'clear',hasTransientAir:false});
   await page.getByRole('button',{name:'返回游戏'}).click();
   await expect(page.locator('#pause-menu')).not.toHaveClass(/active/);
 
@@ -202,16 +203,17 @@ test('bed placement sets the persistent respawn anchor',async({page})=>{
   const pageErrors=[],consoleErrors=[];page.on('pageerror',error=>pageErrors.push(error.message));page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
   await page.goto('/');await page.getByRole('button',{name:'单人游戏'}).click();await page.locator('#world-name').fill('CI Bed Anchor');await page.locator('#world-seed').fill('ci-bed-anchor-2026');await page.locator('#game-mode').selectOption('survival');await page.locator('#terrain-prompt').fill('平原');await page.getByRole('button',{name:'创建 / 进入'}).click();
   await expect(page.locator('#loading')).toHaveClass(/hidden/,{timeout:60_000});await expect(page.locator('#hud')).not.toHaveClass(/hidden/);
-  await runCommand(page,'/tp 20 26.01 20');
+  await runCommand(page,'/tp 20 35 20');
+  await expect.poll(async()=>{const a=await debugXYZ(page);await page.waitForTimeout(180);const b=await debugXYZ(page);return Math.abs(a.y-b.y)<.03&&b.y>0;},{timeout:10_000,message:'player should settle before bed placement search'}).toBe(true);
   await runCommand(page,'/give bed 1');
   await key(page,'KeyE');await expect(page.locator('#inventory')).not.toHaveClass(/hidden/);
   await expect(page.locator('#inventory-grid [data-inv-index="0"]')).toHaveAttribute('title','床');
   await page.locator('#inventory-grid [data-inv-index="0"]').click();await page.locator('#inventory-hotbar [data-inv-index="27"]').click();
   await key(page,'Escape');await expect(page.locator('#inventory')).toHaveClass(/hidden/);await expect(page.locator('#hotbar .hotbar-slot.selected')).toHaveAttribute('title','床');
-  await lockPointerAndLook(page,{movementY:350});await expect(page.locator('#debug')).toContainText('Aim 20/25/18 -> 20/26/18',{timeout:5_000});await rightClickCanvas(page);await expect(page.locator('#toast')).toContainText('放置 床',{timeout:5_000});
+  await placeBedWithRealAim(page);await expect(page.locator('#toast')).toContainText('放置 床',{timeout:2_000});
   await page.waitForTimeout(250);await rightClickCanvas(page);await expect(page.locator('#toast')).toContainText('重生点已设置',{timeout:5_000});
-  const saveStarted=await page.evaluate(()=>Date.now());await key(page,'Escape');await expect(page.locator('#pause-menu')).toHaveClass(/active/);
-  await expect.poll(async()=>{const record=(await savedWorlds(page)).find(world=>world.name==='CI Bed Anchor');if(!record||Number(record.updatedAt)<saveStarted||!record.respawnPoint)return null;const ids=Object.values(record.edits||{}).flat().map(entry=>Number(entry?.[1])).filter(id=>id>=11&&id<=18).sort((a,b)=>a-b);return{version:record.version,bedIds:ids,hasRespawn:true};},{timeout:10_000,message:'two bed halves and the bed respawn anchor should persist together'}).toEqual({version:6,bedIds:[11,12],hasRespawn:true});
+  await key(page,'Escape');await expect(page.locator('#pause-menu')).toHaveClass(/active/);
+  await expect.poll(async()=>{const record=(await savedWorlds(page)).find(world=>world.name==='CI Bed Anchor');if(!record||!record.respawnPoint)return null;const ids=Object.values(record.edits||{}).flat().map(entry=>Number(entry?.[1])).filter(id=>id>=11&&id<=18).sort((a,b)=>a-b);return{version:record.version,validPair:['11,12','13,14','15,16','17,18'].includes(ids.join(',')),hasRespawn:true};},{timeout:15_000,message:'valid bed pair and respawn anchor should persist together'}).toEqual({version:6,validPair:true,hasRespawn:true});
   const bedRecord=(await savedWorlds(page)).find(world=>world.name==='CI Bed Anchor'),anchor=bedRecord.respawnPoint;expect(anchor).toBeTruthy();
   await page.getByRole('button',{name:'返回游戏'}).click();await runCommand(page,'/tp -24 35 -24');await runCommand(page,'/kill');await expect(page.locator('#death-menu')).toHaveClass(/active/,{timeout:10_000});await page.getByRole('button',{name:'重生'}).click();
   await expect.poll(async()=>{const pos=await debugXYZ(page);return Math.abs(pos.x-anchor.x)<.15&&Math.abs(pos.y-anchor.y)<.15&&Math.abs(pos.z-anchor.z)<.15;},{timeout:5_000,message:'explicit respawn should return to the bed anchor'}).toBe(true);

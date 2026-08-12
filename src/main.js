@@ -41,7 +41,7 @@ const sun=new THREE.DirectionalLight(0xfff1c2,2.1);sun.position.set(80,120,60);s
 const ui=new UI(),storage=new WorldStorage(),deathScreen=new DeathScreen();
 let world=null,player=null,inventory=null,equipment=null,drops=null,experienceOrbs=null,projectiles=null,explosions=null,passiveMobs=null,hostileMobs=null,weatherSystem=null;
 let running=false,paused=false,last=performance.now(),selectedTarget=null,breakStart=0,lastSecond=0,frames=0,fps=0,worldInfo=null,lastAttackAt=-Infinity;
-let saveDirty=false,saveInFlight=null,saveAgain=false,lastSaveAt=0,lastSavedPosition=null,gameTime=6000,weather='clear',totalXp=0;
+let saveDirty=false,saveInFlight=null,lastSaveAt=0,lastSavedPosition=null,gameTime=6000,weather='clear',totalXp=0;
 let oxygenState=createOxygenState(),headSubmerged=false;
 let deathState=null,respawnPoint=null;
 
@@ -69,11 +69,16 @@ function disposeWorld(){
 
 async function persistWorld(force=false){
   if(!world||!player||!worldInfo||!inventory||!equipment)return;
-  if(saveInFlight){saveAgain=true;return saveInFlight;}if(!force&&!saveDirty)return;
-  const record={id:worldInfo.id,name:worldInfo.name,seed:worldInfo.seed,prompt:worldInfo.prompt,mode:player.mode,updatedAt:Date.now(),player:player.snapshot(),inventory:inventory.snapshot(),equipment:equipment.snapshot(),edits:world.exportEdits(),gameTime,weather,totalXp,respawnPoint:respawnPoint?{...respawnPoint}:null,version:6};
-  saveDirty=false;saveAgain=false;
-  saveInFlight=storage.putWorld(record).then(()=>{lastSaveAt=performance.now();lastSavedPosition=player?.position.clone()||null;}).catch(error=>{saveDirty=true;console.error('世界存档失败',error);ui.showToast('世界存档失败：IndexedDB 不可用');}).finally(async()=>{saveInFlight=null;if(saveAgain&&world&&player)await persistWorld(true);});
-  return saveInFlight;
+  if(force)saveDirty=true;if(saveInFlight)return saveInFlight;if(!saveDirty)return;
+  const drain=(async()=>{try{
+    while(world&&player&&worldInfo&&inventory&&equipment&&saveDirty){
+      const record={id:worldInfo.id,name:worldInfo.name,seed:worldInfo.seed,prompt:worldInfo.prompt,mode:player.mode,updatedAt:Date.now(),player:player.snapshot(),inventory:inventory.snapshot(),equipment:equipment.snapshot(),edits:world.exportEdits(),gameTime,weather,totalXp,respawnPoint:respawnPoint?{...respawnPoint}:null,version:6};
+      saveDirty=false;
+      try{await storage.putWorld(record);lastSaveAt=performance.now();lastSavedPosition=player?.position.clone()||null;}
+      catch(error){saveDirty=true;console.error('世界存档失败',error);ui.showToast('世界存档失败：IndexedDB 不可用');break;}
+    }
+  }finally{if(saveInFlight===drain)saveInFlight=null;}})();
+  saveInFlight=drain;return drain;
 }
 
 function spawnOverflow(stacks){if(!drops||!player)return;const origin=player.position.clone().add(new THREE.Vector3(0,1,0));for(const stack of stacks)drops.spawn(stack.id,stack.count,origin.clone());}
