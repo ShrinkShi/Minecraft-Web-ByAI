@@ -4,6 +4,7 @@ export const BED_IDS=Object.freeze({
   west:Object.freeze({foot:15,head:16,dx:-1,dz:0}),
   east:Object.freeze({foot:17,head:18,dx:1,dz:0})
 });
+export const BED_RESPAWN_Y_OFFSET=1.01;
 
 const metadata=new Map();
 for(const [facing,entry] of Object.entries(BED_IDS)){
@@ -39,9 +40,24 @@ export function bedPartner(cell,id){
   return{x:Math.floor(cell.x)+meta.dx*sign,y:Math.floor(cell.y),z:Math.floor(cell.z)+meta.dz*sign,id:meta.partnerId};
 }
 
-export function bedRespawnAnchor(cell,id){
+function bedFootCell(cell,id){
   const meta=bedBlockMeta(id);if(!meta||!cell||![cell.x,cell.y,cell.z].every(Number.isFinite))return null;
   let x=Math.floor(cell.x),y=Math.floor(cell.y),z=Math.floor(cell.z);
   if(meta.part==='head'){x-=meta.dx;z-=meta.dz;}
-  return{x:x+.5,y:y+1.01,z:z+.5};
+  return{x,y,z};
+}
+
+export function bedSleepCheckPoint(cell,id){
+  const foot=bedFootCell(cell,id);if(!foot)return null;
+  return{x:foot.x+.5,y:foot.y,z:foot.z+.5};
+}
+
+export function bedSleepCheckPointFromRespawn(anchor){
+  if(!anchor||![anchor.x,anchor.y,anchor.z].every(Number.isFinite))return null;
+  return{x:anchor.x,y:anchor.y-BED_RESPAWN_Y_OFFSET,z:anchor.z};
+}
+
+export function bedRespawnAnchor(cell,id){
+  const foot=bedFootCell(cell,id);if(!foot)return null;
+  return{x:foot.x+.5,y:foot.y+BED_RESPAWN_Y_OFFSET,z:foot.z+.5};
 }

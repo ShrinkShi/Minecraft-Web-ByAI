@@ -4,6 +4,8 @@ import {EntityStore} from './entity-store.js';
 import {HOSTILE_MOBS,chooseHostileMob,isNightTime} from './mobs.js';
 import {applyDamage,knockbackDirection} from './combat.js';
 import {resolveSpiderClimb} from './spider-rules.js';
+import {bedSleepCheckPointFromRespawn} from './bed-rules.js';
+import {SLEEP_MONSTER_HORIZONTAL,firstSleepBlocker} from './sleep-safety-rules.js';
 
 const tempA=new THREE.Vector3(),tempB=new THREE.Vector3(),SPAWN_GROUND=new Set([BLOCK.GRASS,BLOCK.DIRT,BLOCK.STONE,BLOCK.SAND,BLOCK.COBBLESTONE]);
 
@@ -93,6 +95,13 @@ export class HostileMobSystem{
     if(!player)return;this.aiAccumulator=Math.min(.5,this.aiAccumulator+dt);while(this.aiAccumulator>=.1){this.tick(.1,player,gameTime);this.aiAccumulator-=.1;}
     const smoothing=1-Math.exp(-14*dt);for(const record of this.store.values()){const position=this.store.getPosition(record.id),visual=this.visuals.get(record.id),def=HOSTILE_MOBS[record.type];if(!position||!visual||!def)continue;visual.position.lerp(tempA.set(position.x,position.y,position.z),smoothing);let scale=record.components.hurtPulse>0?1.08:1;if(def.attackStyle==='fuse'&&record.components.fuse>0){const progress=record.components.fuse/def.fuseTime;scale+=progress*.08*(.55+.45*Math.sin(record.components.fuse*28));}visual.scale.setScalar(scale);}
   }
+  sleepBlockerNear(respawnAnchor){
+    const position=bedSleepCheckPointFromRespawn(respawnAnchor);if(!position)return null;
+    const radius=Math.SQRT2*SLEEP_MONSTER_HORIZONTAL,candidates=this.store.nearby(position.x,position.z,radius),monsters=[];
+    for(const record of candidates){const at=this.store.getPosition(record.id);if(at)monsters.push({id:record.id,type:record.type,position:at,entity:record});}
+    return firstSleepBlocker(position,monsters);
+  }
+
   dispose(){for(const id of[...this.visuals.keys()])this.despawn(id);this.store.clear();for(const geometry of this.resources.geometries)geometry.dispose();for(const material of this.resources.materials)material.dispose();this.resources.geometries.clear();this.resources.materials.clear();this.templates.clear();}
   get size(){return this.store.size;}
 }

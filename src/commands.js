@@ -53,6 +53,12 @@ export function executeCommand(text,ctx){
     if(typeof ctx.kill!=='function')return fail('当前环境不支持 /kill');
     ctx.kill();return ok('已杀死玩家');
   }
+  if(name==='summon'){
+    const type=(parts.shift()||'').toLowerCase().replace(/^minecraft:/,'');if(!type)return fail('用法：/summon <实体> [x y z]');
+    if(parts.length!==0&&parts.length!==3)return fail('用法：/summon <实体> [x y z]');const p=ctx.player?.position;if(!p)return fail('当前环境没有玩家位置');
+    const x=parts.length?num(parts[0],p.x):p.x,y=parts.length?num(parts[1],p.y):p.y,z=parts.length?num(parts[2],p.z):p.z;if(![x,y,z].every(Number.isFinite))return fail('召唤坐标无效');
+    if(typeof ctx.summon!=='function')return fail('当前环境不支持 /summon');const spawned=ctx.summon(type,x,y,z);if(!spawned)return fail(`未知或无法召唤实体：${type}`);return ok(`已召唤 ${type}`);
+  }
   if(name==='time'){
     if(parts[0]!=='set')return fail('用法：/time set <day|night|数字>');
     const value=(parts[1]||'').toLowerCase(),time=value==='day'?1000:value==='noon'?6000:value==='night'?13000:value==='midnight'?18000:Number(value);
@@ -61,7 +67,7 @@ export function executeCommand(text,ctx){
   if(name==='weather'){
     const weather=(parts[0]||'').toLowerCase();if(!['clear','rain','thunder'].includes(weather))return fail('用法：/weather <clear|rain|thunder>');ctx.setWeather(weather);return ok(`天气已设为 ${weather}`);
   }
-  if(name==='help')return ok('可用：/gamemode /give /tp /spawnpoint /kill /xp /time set /weather /help');
+  if(name==='help')return ok('可用：/gamemode /give /tp /spawnpoint /summon /kill /xp /time set /weather /help');
   return fail(`未知指令：/${name}`);
 }
 
