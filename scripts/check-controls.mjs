@@ -24,8 +24,11 @@ const desktopFrame=encodePlayerControlFrame(desktopState,42),touchFrame=encodePl
 assert.deepEqual(desktopFrame,touchFrame);assert.deepEqual(networkFrame,desktopFrame,'wire frame must not contain device/source identity');
 assert.deepEqual(Object.keys(desktopFrame).sort(),['buttons','move','seq','v']);assert.equal('source' in desktopFrame,false);assert.equal('device' in desktopFrame,false);
 const decoded=decodePlayerControlFrame(desktopFrame);assert.equal(decoded.sequence,42);assert.deepEqual({...decoded,sequence:undefined},{...normalizeControlState(logical),sequence:undefined});assert.equal(isCompatibleControlFrame(desktopFrame),true);
-assert.throws(()=>decodePlayerControlFrame({...desktopFrame,v:99}),/unsupported/);assert.throws(()=>decodePlayerControlFrame({...desktopFrame,buttons:16}),/unknown button bits/);assert.throws(()=>decodePlayerControlFrame({...desktopFrame,seq:-1}),/uint32/);assert.equal(isCompatibleControlFrame({}),false);
+assert.throws(()=>encodePlayerControlFrame(desktopState,-1),/uint32/);assert.throws(()=>encodePlayerControlFrame(desktopState,0x100000000),/uint32/);assert.throws(()=>encodePlayerControlFrame(desktopState,1.5),/uint32/);
+assert.throws(()=>decodePlayerControlFrame({...desktopFrame,v:99}),/unsupported/);assert.throws(()=>decodePlayerControlFrame({...desktopFrame,buttons:16}),/unknown button bits/);assert.throws(()=>decodePlayerControlFrame({...desktopFrame,seq:-1}),/uint32/);
+assert.throws(()=>decodePlayerControlFrame({...desktopFrame,move:['-.25',.8]}),/finite numbers/);assert.throws(()=>decodePlayerControlFrame({...desktopFrame,move:[1,1]}),/normalized/);assert.throws(()=>decodePlayerControlFrame({...desktopFrame,source:'desktop'}),/unexpected fields/);
+assert.equal(isCompatibleControlFrame({}),false);assert.equal(isCompatibleControlFrame({...desktopFrame,device:'mobile'}),false);
 
 bus.resetAll();snapshot=bus.snapshot();assert.deepEqual({...snapshot,sequence:0},{...normalizeControlState(),sequence:0},'shape after reset remains canonical');
 assert.ok(states.length>0);
-console.log('unified control intent + platform-neutral wire frame contracts: PASS');
+console.log('unified control intent + strict platform-neutral wire frame contracts: PASS');
