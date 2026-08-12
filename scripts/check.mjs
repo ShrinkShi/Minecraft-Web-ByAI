@@ -26,12 +26,12 @@ function testInventoryDrain(){
 }
 
 function testCommands(){
-  let mode='survival',time=0,weather='clear',killed=false;const p={position:{x:1,y:2,z:3}},inventory=new Inventory('survival');
-  const ctx={player:p,inventory,inventoryChanged(){},setMode:v=>mode=v,kill:()=>killed=true,teleport:(x,y,z)=>p.position={x,y,z},setTime:v=>time=v,setWeather:v=>weather=v};
+  let mode='survival',time=0,weather='clear',killed=false,addedXp=0;const p={position:{x:1,y:2,z:3}},inventory=new Inventory('survival');
+  const ctx={player:p,inventory,inventoryChanged(){},setMode:v=>mode=v,addXp:v=>addedXp+=v,kill:()=>killed=true,teleport:(x,y,z)=>p.position={x,y,z},setTime:v=>time=v,setWeather:v=>weather=v};
   assert.equal(executeCommand('/gamemode creative',ctx).ok,true);assert.equal(mode,'creative');
   assert.equal(executeCommand('/give oak_log 3',ctx).ok,true);assert.equal(inventory.slots[0].count,3);
   assert.equal(executeCommand('/tp ~1 70 ~-2',ctx).ok,true);assert.deepEqual(p.position,{x:2,y:70,z:1});
-  assert.equal(executeCommand('/kill',ctx).ok,true);assert.equal(killed,true);assert.equal(executeCommand('/kill extra',ctx).ok,false);executeCommand('/time set night',ctx);assert.equal(time,13000);executeCommand('/weather rain',ctx);assert.equal(weather,'rain');
+  assert.equal(executeCommand('/xp add 16',ctx).ok,true);assert.equal(addedXp,16);assert.equal(executeCommand('/experience add 4 points',ctx).ok,true);assert.equal(addedXp,20);assert.equal(executeCommand('/xp add 0',ctx).ok,false);assert.equal(executeCommand('/xp add 3 levels',ctx).ok,false);assert.equal(executeCommand('/kill',ctx).ok,true);assert.equal(killed,true);assert.equal(executeCommand('/kill extra',ctx).ok,false);executeCommand('/time set night',ctx);assert.equal(time,13000);executeCommand('/weather rain',ctx);assert.equal(weather,'rain');
 }
 
 function testSpatialHash(){

@@ -152,10 +152,12 @@ test('recoverable death drops and re-picks items after explicit respawn',async({
 
   await runCommand(page,'/tp 0 35 0');
   await runCommand(page,'/give oak_log 3');
+  await runCommand(page,'/xp add 16');
   await runCommand(page,'/kill');
   await expect(page.locator('#death-menu')).toHaveClass(/active/,{timeout:10_000});
   await expect(page.locator('#death-reason')).toContainText('被杀死');
   await expect(page.locator('#death-detail')).toContainText('3 个物品');
+  await expect(page.locator('#death-detail')).toContainText('14 点经验');
   await expect(page.locator('#death-detail')).toContainText('死亡点');
   await page.waitForTimeout(350);
   await expect(page.locator('#death-menu')).toHaveClass(/active/);
@@ -164,7 +166,7 @@ test('recoverable death drops and re-picks items after explicit respawn',async({
   await expect(page.locator('#death-menu')).not.toHaveClass(/active/);
   const pickupPhaseStartedAt=await page.evaluate(()=>Date.now());
   await runCommand(page,'/tp 0 35 0');
-  await page.waitForTimeout(900);
+  await page.waitForTimeout(1400);
 
   await key(page,'Escape');
   await expect(page.locator('#pause-menu')).toHaveClass(/active/);
@@ -172,8 +174,8 @@ test('recoverable death drops and re-picks items after explicit respawn',async({
     const record=(await savedWorlds(page)).find(world=>world.name==='CI Recoverable Death');
     if(!record||Number(record.updatedAt)<pickupPhaseStartedAt)return null;
     const logs=(record.inventory?.slots||[]).reduce((sum,stack)=>sum+(stack?.id==='block:6'?stack.count:0),0);
-    return{logs,hp:record.player?.hp,alive:Number(record.player?.position?.y)>-10};
-  },{timeout:10_000,message:'returning to the recoverable death point should pick the dropped logs back into inventory'}).toEqual({logs:3,hp:20,alive:true});
+    return{logs,totalXp:record.totalXp,hp:record.player?.hp,alive:Number(record.player?.position?.y)>-10};
+  },{timeout:10_000,message:'returning to the recoverable death point should pick the dropped logs and death XP back up'}).toEqual({logs:3,totalXp:14,hp:20,alive:true});
 
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);

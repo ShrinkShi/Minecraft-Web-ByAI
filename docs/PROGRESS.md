@@ -42,7 +42,9 @@
 - [x] Chromium 虚空死亡 E2E：死亡界面必须持续存在，Escape 不得打开暂停菜单，点击“重生”后才恢复 hp=20；背包/装备/XP 仍保持清空
 - [x] 标准 `/kill` self 指令通过正式 `beginPlayerDeath()` 进入死亡流程；额外参数拒绝
 - [x] Chromium 普通可恢复死亡物品闭环：给予 3 原木→`/kill`→死亡界面确认 3 物品掉落→显式重生→返回死亡坐标→DropSystem 真实拾回→IndexedDB 再次持有 3 原木
-- [ ] 普通死亡经验球回收 E2E、死亡统计、床/重生点、`keepInventory`
+- [x] self `/xp add <points>` / `/experience` points 指令，通过现有 `addExperience()` 接入，不支持 levels/目标选择器
+- [x] Chromium 普通死亡 XP 闭环：16 total XP（Lv.2）→`/kill`→摘要确认 14 XP→显式重生→返回死亡点→ExperienceOrbSystem 真实吸收→IndexedDB `totalXp=14`
+- [ ] 装备掉落的普通死亡单独拾回断言、死亡统计、床/重生点、`keepInventory`
 - [ ] 死亡掉落/经验球跨页面重载持久化
 
 ### Equipment / Armor

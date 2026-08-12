@@ -107,7 +107,8 @@ profile 还提供 fallSpeed、line length、windX/windZ、opacity。thunder 的�
 - deathState 激活时 `pointer()/canControl()/pause/inventory/workbench/key handler` 均有显式 guard，主 animate 的普通世界更新块也停止，避免尸体继续被移动、攻击或自动重生。
 - `completeRespawn()` 只由“重生”按钮调用：`Player.respawn(0,0)` → reset oxygen → 清 deathState → 返回游戏 → 标记存档 dirty。
 - 标准 self `/kill` 由 `commands.js` 解析后调用 main context 的 `kill()`；main 将 hp 置 0 并直接复用 `beginPlayerDeath('你被杀死了')`。它既是用户可用 Minecraft 风格指令，也是确定性可恢复死亡集成入口，不存在绕过死亡策略的测试后门。
-- 浏览器普通死亡回归在同一页面内返回死亡坐标，让现有 DropSystem 自己完成拾取；测试只从随后保存的 IndexedDB 观察 Inventory，避免直接操纵运行时内部数组。
+- self `/xp add <points>` / `/experience` 只做正整数 points 增量，commands 经 `ctx.addXp()` 调用既有 `addExperience()`；因此等级派生、HUD、saveDirty 和死亡 XP 公式仍只有一套真相源。levels/target selectors 暂不实现。
+- 浏览器普通死亡回归在同一页面内返回死亡坐标，让现有 DropSystem 与 ExperienceOrbSystem 自己完成物品拾取和 XP 吸收；测试只从随后保存的 IndexedDB 观察 Inventory/totalXp，避免直接操纵运行时内部数组。
 - “返回标题画面”会先 force-save 已清算的 hp=0 死亡状态再 dispose world；DeathScreen 本身不持久化。下次载入 hp<=0 的世界时，现有 `startWorld()` fallback 会直接 `player.respawn(0,0)`，因此不会把死亡 UI 跨页面保存。
 - `beginPlayerDeath()` 还会 fire-and-forget 启动一次强制 IndexedDB 保存，降低停留在死亡界面后直接关闭页面造成结算丢失的风险。
 - DropSystem / ExperienceOrbSystem 当前仍不跨页面持久化。

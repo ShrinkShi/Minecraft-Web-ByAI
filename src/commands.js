@@ -31,6 +31,14 @@ export function executeCommand(text,ctx){
     const p=ctx.player.position,x=num(parts[0],p.x),y=num(parts[1],p.y),z=num(parts[2],p.z);if(![x,y,z].every(Number.isFinite))return fail('坐标无效');
     ctx.teleport(x,y,z);return ok(`已传送至 ${x.toFixed(1)} ${y.toFixed(1)} ${z.toFixed(1)}`);
   }
+  if(name==='xp'||name==='experience'){
+    const action=(parts.shift()||'').toLowerCase();
+    const amount=Number(parts.shift());
+    const unit=(parts.shift()||'points').toLowerCase();
+    if(action!=='add'||parts.length||!Number.isInteger(amount)||amount<=0||amount>100000||!['point','points'].includes(unit))return fail('用法：/xp add <1..100000> [points]');
+    if(typeof ctx.addXp!=='function')return fail('当前环境不支持 /xp');
+    ctx.addXp(amount);return ok(`增加 ${amount} 点经验`);
+  }
   if(name==='kill'){
     if(parts.length)return fail('用法：/kill');
     if(typeof ctx.kill!=='function')return fail('当前环境不支持 /kill');
@@ -44,7 +52,7 @@ export function executeCommand(text,ctx){
   if(name==='weather'){
     const weather=(parts[0]||'').toLowerCase();if(!['clear','rain','thunder'].includes(weather))return fail('用法：/weather <clear|rain|thunder>');ctx.setWeather(weather);return ok(`天气已设为 ${weather}`);
   }
-  if(name==='help')return ok('可用：/gamemode /give /tp /kill /time set /weather /help');
+  if(name==='help')return ok('可用：/gamemode /give /tp /kill /xp /time set /weather /help');
   return fail(`未知指令：/${name}`);
 }
 
