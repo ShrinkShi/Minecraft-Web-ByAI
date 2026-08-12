@@ -11,6 +11,7 @@
 7. **瞬时状态不滥入存档**：Oxygen 与 swimCoverage 不持久化；weather 本身是长期世界状态，继续使用既有 weather 字段。
 8. **规则可离线测试**：核心纯规则/Worker 协议在 Node 22 回归；真实 Three.js/WebGL 生命周期由 Chromium 覆盖。
 9. **远端证据决定完成度**：只有进入 GitHub `main` 且质量门和 Pages 通过才算完成。
+10. **输入设备适配与玩法逻辑分离**：桌面键鼠和手机手势只产生统一 Player/交互输入，不允许移动端控制层直接修改 World/Inventory/IndexedDB。
 
 ## 当前 v0.4 总体数据流
 
@@ -31,6 +32,16 @@ AI damage/projectile/explosion -> armor-rules -> Player.takeDamage
 
 Mob death -> DropSystem + ExperienceOrbSystem -> Inventory / totalXp
 ```
+
+## Device profile / Mobile browser input
+
+- `device-profile.js` 是纯环境判定层：优先使用 Mobile UA / `navigator.userAgentData.mobile`，并用 `maxTouchPoints + (pointer:coarse) + (hover:none) + compact viewport` 覆盖 iPadOS 桌面 UA；带触摸屏但仍有 fine pointer/hover 的桌面设备不自动切到手机布局。
+- 判定结果写入 `body[data-device]` / `body[data-orientation]`，并监听 resize/orientation/media-query 变化。portrait 手机只显示旋转提示；landscape 才允许触控游戏控件。
+- `mobile-controls.js` 只把 pointer 手势转换为 `onMove/onLook/onHold/onToggle/onAction`；它不读取或写入 World、Inventory、Storage。
+- `PlayerController.virtualInput` 与键盘 `keys` 分离，在唯一的 `PlayerController.update()` 中合成；触控摇杆保留模拟量，键盘语义不变。
+- 主编排层将桌面鼠标和手机按钮统一收口到 `primaryActionStart/End()` 与 `secondaryAction()`，因此攻击、持续挖掘、raycast、放置、工作台和床交互只有一条 gameplay 路径。
+- 手机 gameplay 的 `canControl()` 不要求 Pointer Lock；桌面仍要求 Pointer Lock。暂停、死亡、背包、工作台或聊天打开时会清除 virtual input，避免松手事件丢失造成持续移动/攻击。
+- `mobile.css` 使用 `env(safe-area-inset-*)` 避开刘海/圆角，并压缩横屏 HUD/背包；不设置 `user-scalable=no`，也不依赖浏览器通常受手势权限限制的强制 orientation lock。
 
 ## World / Water render
 
@@ -135,12 +146,14 @@ profile 还提供 fallSpeed、line length、windX/windZ、opacity。thunder 的�
 
 `Repository quality`：
 
-1. static-checks：语法 + base/armor/water/oxygen/swim/weather/death/respawn/bed 九套回归。
-2. browser-smoke：第一世界验证 water/oxygen/swimming、WeatherFX、Equipment v6、虚空显式重生；第二世界验证普通死亡 3 原木 + 14 XP 的真实回收；第三世界验证 `/spawnpoint` v6 持久化与异地死亡后精确自定义重生；第四世界通过真实 Inventory→hotbar→Pointer Lock→右键链放置/激活床并验证床锚点重生。
+1. static-checks：语法 + base/armor/water/oxygen/swim/weather/death/respawn/bed/mobile 十套回归。
+2. browser-smoke：第一世界验证 water/oxygen/swimming、WeatherFX、Equipment v6、虚空显式重生；第二世界验证普通死亡 3 原木 + 14 XP 的真实回收；第三世界验证 `/spawnpoint` v6 持久化与异地死亡后精确自定义重生；第四世界验证两格床放置/激活与床锚点重生；第五条 Android 横屏用例验证设备检测、portrait rotate overlay、无 Pointer Lock 触控、移动端 UI、虚拟摇杆和触控热栏。
 
 Weather browser test 不访问隐藏 WeatherSystem 实例，只读公开 debug HUD，并同时捕获 pageerror/console error，因此覆盖真实命令→main→Three.js 系统链。
 
 ## 当前技术债
+
+- 手机端目前是浏览器横屏适配，不是原生 App/PWA；尚缺真实 iOS Safari/Android 设备矩阵、手柄/震动反馈、控件自定义、PWA 离线/安装、可选全屏/方向锁定和更细的触控合成体验。
 
 - Three.js 仍从 jsDelivr runtime import。
 - terrain/mesh 各只有一个 Worker，高速探索需要 pool/优先级/取消。

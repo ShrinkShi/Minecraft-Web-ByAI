@@ -9,16 +9,16 @@
 ## 工程质量基础
 
 - [x] Node 22 `src/*.js` 与 `scripts/*.mjs` 语法检查。
-- [x] `npm run test:logic`：基础世界/实体/Worker + Equipment/Armor + Water Mesh + Oxygen/Drowning + Swimming/Buoyancy + Weather/Precipitation + Death Integration + Custom Respawn + Bed Rules 回归。
+- [x] `npm run test:logic`：基础世界/实体/Worker + Equipment/Armor + Water Mesh + Oxygen/Drowning + Swimming/Buoyancy + Weather/Precipitation + Death Integration + Custom Respawn + Bed Rules + Mobile Device/Input 十套回归。
 - [x] GitHub Pages 使用 GitHub Actions，并持续验证真实 Pages Deployment。
-- [x] Playwright Chromium browser smoke：主海洋世界覆盖氧气/游泳/WeatherFX/护甲 v6/虚空死亡；第二世界覆盖普通死亡物品+XP 回收；第三世界覆盖 `/spawnpoint` 持久化与精确自定义重生；第四世界覆盖真实床放置/激活与床锚点重生。
+- [x] Playwright Chromium browser smoke：主海洋世界覆盖氧气/游泳/WeatherFX/护甲 v6/虚空死亡；第二世界覆盖普通死亡物品+XP 回收；第三世界覆盖 `/spawnpoint` 持久化与精确自定义重生；第四世界覆盖真实床放置/激活与床锚点重生；第五条 Android 横屏用例覆盖移动端自动识别、旋转提示、触控 UI 和摇杆移动。
 - [x] 浏览器失败保留 Playwright trace / screenshot / report。
 - [ ] 将 Three.js 从运行时 jsDelivr 迁移为版本锁定的本地 vendor / 构建依赖。
 - [ ] 扩展 E2E 到普通死亡掉落/拾回、真实战斗减伤、完整溺水死亡、横向游泳速度、天气像素/遮雨、存档重载。
 
 ## v0.4.0 — 实体、战斗与生存扩展（开发中）
 
-状态：开发中。实体基础、四种敌对生物、奖励闭环、生存死亡损失、显式死亡界面/重生、持久化自定义重生点、两格床重生锚点、第一版护甲、透明水 pass、氧气/溺水、基础游泳/浮力和可见降雨 FX 已落库；死亡统计/床重生、完整流体/冲刺游泳、自动天气/闪电/雪、水下视觉和正式 Java 伤害/护甲公式仍未完成。
+状态：开发中。实体基础、四种敌对生物、奖励闭环、生存死亡损失、显式死亡界面/重生、持久化自定义重生点、两格床重生锚点、第一版护甲、透明水 pass、氧气/溺水、基础游泳/浮力、可见降雨 FX 和手机浏览器横屏触控底座已落库；死亡统计/床重生、完整流体/冲刺游泳、自动天气/闪电/雪、水下视觉和正式 Java 伤害/护甲公式仍未完成。
 
 ### 实体 / 战斗 / 奖励
 - [x] `EntityStore` + `SpatialHash` 数据/空间索引基础及 Node 回归
@@ -53,6 +53,15 @@
 - [x] Chromium 床 E2E：`/give bed`→真实背包槽 0→热栏 27→Pointer Lock/向下看→右键放置→右键床设重生点→v6 同时保存两端 edits/respawnPoint→异地死亡回床锚点
 - [ ] 装备掉落的普通死亡单独拾回断言、死亡统计、床睡眠/跳夜/占用/怪物限制/半高模型、`keepInventory`
 - [ ] 死亡掉落/经验球跨页面重载持久化
+
+### Mobile browser / Landscape touch
+- [x] `device-profile.js`：Mobile UA / UA-CH + touch/coarse/no-hover 回退；iPadOS 桌面 UA 与 touchscreen laptop false-positive 边界回归
+- [x] portrait 手机全屏旋转提示；landscape 自动启用 safe-area-aware 触控 HUD
+- [x] 左模拟摇杆 + 右侧拖动视角；Player virtual input 与桌面键盘输入分离后在单一积分器合成
+- [x] 攻击/持续挖掘、使用/放置、跳跃、疾跑、潜行、丢弃、背包、暂停、聊天、视角切换与触控热栏
+- [x] 手机控制不依赖 Pointer Lock；桌面 Pointer Lock/键鼠路径保持原语义
+- [x] Android Chromium 844×390 + touch + Mobile UA：横竖屏、背包、暂停、视角、摇杆位移、热栏选择 E2E
+- [ ] 真实 iOS Safari / Android 设备矩阵、可选全屏/方向锁定、震动反馈、控件尺寸/位置自定义、PWA 安装与离线缓存
 
 ### Equipment / Armor
 - [x] `Equipment`：head/chest/legs/feet 四槽，不占 36 格 Inventory

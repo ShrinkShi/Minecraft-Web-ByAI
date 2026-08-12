@@ -23,6 +23,7 @@ scripts/check-weather.mjs
 scripts/check-death.mjs
 scripts/check-respawn.mjs
 scripts/check-bed.mjs
+scripts/check-mobile.mjs
 ```
 
 基础套件覆盖 Inventory / Crafting / Commands / EntityStore / SpatialHash / 四种敌对生物 / Combat / Projectile / Experience / Spider / Death / Mesh Worker / Terrain Worker。
@@ -80,6 +81,12 @@ Node 层只验证 profile，不导入 Three.js WeatherSystem；后者由 Chromiu
 ### Bed rules
 
 `scripts/check-bed.mjs` 覆盖 8 个床 voxel ID 的唯一性、四方向 look→facing、foot/head 两端坐标、从任一端解析 partner、两端归一到同一 respawn anchor、BLOCKS/ITEMS/drop/tint 元数据、3×3 `3 wool + 3 planks -> bed` 配方消费，以及真实 sheep loot 的 `white_wool` 来源。2×2 工作区不得误匹配床配方。
+
+### Mobile device / input contract
+
+`scripts/check-mobile.mjs` 覆盖桌面 Chrome、Android、iPhone portrait、iPadOS 桌面 UA 回退、带触摸屏 Windows 笔记本 false-positive 保护，以及 `userAgentData.mobile`。静态 contract 同时要求移动端 DOM/CSS、`MobileControls`、Player virtual input、共享主/副交互和 HUD hotbar touch index 接线存在。
+
+Node 层不伪造 Pointer Lock/Touch UI；真实设备画像、横竖屏切换和触控事件由下面的 Android Chromium 用例覆盖。
 
 ## Chromium browser smoke
 
@@ -148,6 +155,21 @@ npm run test:e2e
 5. 返回游戏后传送到远处 `/kill`，显式“重生”后的公开 debug XYZ 必须回到保存的床锚点。
 6. 全程捕获 pageerror/console error；测试不直接修改 world edits、respawnPoint 或 IndexedDB。
 
+### Android landscape mobile browser regression
+
+第五条 Chromium 用例 `tests/e2e/mobile.spec.mjs` 使用 Android Mobile UA、`hasTouch=true` 和 844×390 viewport：
+
+1. 标题页必须自动得到 `body[data-device="mobile"]` 与 landscape；此时游戏触控层尚未显示。
+2. 动态切到 390×844 portrait 时必须显示“请将手机横屏”覆盖层；切回 landscape 后覆盖层自动消失。
+3. 创建 creative 平原世界后触控层必须可见，同时 `document.pointerLockElement` 仍为 null，证明手机控制不借用桌面 Pointer Lock。
+4. 通过真实移动端按钮打开/关闭背包，并要求 gameplay controls 在 panel 打开时隐藏、关闭后恢复。
+5. 移动端“视角”按钮必须进入第三人称背面；“暂停”必须打开正式 pause menu，返回后恢复 controls。
+6. 用 PointerEvent 驱动左摇杆并从公开 debug XYZ 观察水平位移，要求移动超过 0.3 格。
+7. HUD 必须暴露 9 个可触控 hotbar slot，触摸 index 3 后 selected 必须同步到 3。
+8. 全程无 pageerror / console error。
+
+该自动化验证的是 Chromium 的 Android 浏览器模型，不等同于已经覆盖真实 Chrome Android / Samsung Internet / Safari iOS 的设备矩阵。
+
 ## GitHub Pages 部署验证
 
 仓库 Pages Source 为 **GitHub Actions**。每个主线 squash 后必须同时核对 `Repository quality` 与 `Deploy GitHub Pages` 最终 success。
@@ -155,6 +177,9 @@ npm run test:e2e
 在线地址：`https://shrinkshi.github.io/Minecraft-Web-ByAI/`
 
 ## 仍未覆盖的浏览器集成边界
+
+- 真实 Android Chrome/Samsung Internet 与 iOS Safari 设备矩阵；当前自动移动端回归是 Chromium + Android UA/touch emulation。
+- 可选浏览器 fullscreen/orientation-lock、虚拟按键布局/灵敏度自定义、haptics、PWA 安装/离线缓存和更复杂的移动端 crafting 长按/拆分手势。
 
 - 自动天气周期和 weather duration。
 - 群系降水/雪、屋顶遮雨、雨线 world collision、地面 splash/湿润、闪电 flash/bolt/damage/sound。
