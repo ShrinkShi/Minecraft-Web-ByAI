@@ -14,9 +14,12 @@ const touchLaptop=classifyDevice({ua:'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
 assert.equal(touchLaptop.mobile,false,'touch-capable desktop with fine pointer/hover must stay desktop');
 const uaData=classifyDevice({ua:'',uaDataMobile:true,width:800,height:360});assert.equal(uaData.mobile,true);
 
-const index=readFileSync(new URL('../index.html',import.meta.url),'utf8'),main=readFileSync(new URL('../src/main.js',import.meta.url),'utf8'),player=readFileSync(new URL('../src/player.js',import.meta.url),'utf8'),ui=readFileSync(new URL('../src/ui.js',import.meta.url),'utf8');
+const index=readFileSync(new URL('../index.html',import.meta.url),'utf8'),main=readFileSync(new URL('../src/main.js',import.meta.url),'utf8'),player=readFileSync(new URL('../src/player.js',import.meta.url),'utf8'),ui=readFileSync(new URL('../src/ui.js',import.meta.url),'utf8'),mobile=readFileSync(new URL('../src/mobile-controls.js',import.meta.url),'utf8'),desktopAdapter=readFileSync(new URL('../src/desktop-controls.js',import.meta.url),'utf8');
 for(const token of ['mobile.css','id="rotate-device"','id="mobile-controls"','data-mobile-hold="attack"','data-mobile-action="use"','data-mobile-action="inventory"'])assert.ok(index.includes(token),`index missing ${token}`);
-for(const token of ['new MobileControls','deviceProfile.mobile','setVirtualMove','primaryActionStart','secondaryAction'])assert.ok(main.includes(token),`main missing ${token}`);
-for(const token of ['virtualInput','setVirtualMove','setVirtualButton','clearVirtualInput','applyLookDelta'])assert.ok(player.includes(token),`player missing ${token}`);
+for(const token of ['new ControlIntentBus','new DesktopControls','new MobileControls','handleControlIntent','primaryActionStart','secondaryAction'])assert.ok(main.includes(token),`main missing ${token}`);
+for(const token of ['controlState','setControlState','clearControlState','applyLookIntent'])assert.ok(player.includes(token),`player missing ${token}`);
+for(const forbidden of ['virtualInput','setVirtualMove','setVirtualButton','window.addEventListener(\'keydown\'','document.addEventListener(\'mousemove\''])assert.ok(!player.includes(forbidden),`PlayerController must not own device input: ${forbidden}`);
+for(const token of ['bus.setMove','bus.setButton','bus.action','bus.look'])assert.ok(mobile.includes(token),`mobile adapter missing ${token}`);
+for(const token of ['bus.setMove','bus.setButton','bus.action','bus.look'])assert.ok(desktopAdapter.includes(token),`desktop adapter missing ${token}`);
 assert.ok(ui.includes('data.hotbarIndex')||ui.includes('dataset.hotbarIndex'),'HUD hotbar must expose touch selection indexes');
-console.log('mobile device/input contracts: PASS');
+console.log('mobile device/input adapter contracts: PASS');
