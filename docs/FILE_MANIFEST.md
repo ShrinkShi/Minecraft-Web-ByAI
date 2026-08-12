@@ -13,6 +13,7 @@
 | `src/main.js` | 应用状态机、Three.js 场景、系统编排、平台无关控制意图分发、奖励/死亡/护甲/氧气/天气接线与自动保存 | 主/副交互只有一条 gameplay 路径；设备差异只影响输入捕获；暂停/面板/死亡统一 reset ControlIntentBus |
 | `src/device-profile.js` | 桌面/手机与横竖屏环境判定、body dataset 同步 | 纯环境逻辑；UA/UA-CH + touch/coarse/no-hover 边界可 Node 测试 |
 | `src/control-intents.js` | 平台无关控制意图版本、连续状态归一化、多 source 合并、look/action 分发 | 纯逻辑；未来 gamepad/network-peer 必须复用，不得携带 DOM/设备规则 |
+| `src/player-control-frame.js` | `PlayerControlFrame v1` 连续控制 wire 编码/解码与兼容性校验 | 仅含 version/seq/move/button bits；严禁设备/source/UA 进入未来网络控制帧 |
 | `src/desktop-controls.js` | Keyboard/Mouse/Pointer Lock → ControlIntentBus 桌面适配 | 只翻译输入，不访问 World/Inventory/玩法规则 |
 | `src/mobile-controls.js` | Touch/摇杆/手机按钮 → ControlIntentBus 触控适配 | 只翻译输入和维护触控 UI 状态，不实现独立玩法 |
 | `src/blocks.js` | 方块 ID、属性、atlas 索引、基础掉落约束 | 注册 8 个四方向床 foot/head ID；`tint` 可供 mesh Worker 做通用顶点着色 |
@@ -71,6 +72,7 @@
 | `.github/workflows/quality.yml` | Node + Chromium 两层质量门 | PR/main 自动执行；同 ref 新 push 取消旧 run |
 | `.github/workflows/pages.yml` | GitHub Pages 自动部署 | main 更新触发 |
 | `docs/ARCHITECTURE.md` | 架构决策、数据流、技术债 | 架构变化同步更新 |
+| `docs/NETWORKING.md` | PC/手机同客户端、平台无关控制帧与未来 server-authoritative 联机边界 | 网络实现不得按平台复制 World/Player/玩法规则 |
 | `docs/PROGRESS.md` | 功能完成状态与下一阶段 | 只勾选实际落库且验证过的功能 |
 | `docs/TESTING.md` | 自动验证覆盖与边界 | 区分纯规则、Worker、browser smoke |
 | `CHANGELOG.md` | 版本变更记录 | 每个正式功能/质量 commit 更新 |
