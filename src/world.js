@@ -25,7 +25,9 @@ export class VoxelWorld{
     this.initialTotal=0;
     this.centerChunk={cx:Number.NaN,cz:Number.NaN};
     this.edits=this.importEdits(savedEdits);
-    this.material=this.makeMaterial();
+    this.atlasTexture=this.makeAtlasTexture();
+    this.material=this.makeOpaqueMaterial();
+    this.waterMaterial=this.makeWaterMaterial();
     this.terrainWorker=new Worker(new URL('./world-worker.js',import.meta.url),{type:'module'});
     this.meshWorker=new Worker(new URL('./mesh-worker.js',import.meta.url),{type:'module'});
     this.terrainWorker.onmessage=e=>this.onTerrainWorker(e.data);
@@ -33,12 +35,22 @@ export class VoxelWorld{
     this.terrainWorker.postMessage({type:'init',seed,prompt});
   }
 
-  makeMaterial(){
+  makeAtlasTexture(){
     const tex=new THREE.TextureLoader().load('./assets/textures/atlas.png');
     tex.magFilter=THREE.NearestFilter;
     tex.minFilter=THREE.NearestMipmapNearestFilter;
     tex.colorSpace=THREE.SRGBColorSpace;
-    return new THREE.MeshLambertMaterial({map:tex,vertexColors:true,alphaTest:.08,transparent:false});
+    return tex;
+  }
+
+  makeOpaqueMaterial(){
+    return new THREE.MeshLambertMaterial({map:this.atlasTexture,vertexColors:true,alphaTest:.08,transparent:false});
+  }
+
+  makeWaterMaterial(){
+    return new THREE.MeshLambertMaterial({
+      map:this.atlasTexture,vertexColors:true,transparent:true,opacity:.68,depthWrite:false,side:THREE.DoubleSide
+    });
   }
 
   importEdits(saved){
@@ -103,10 +115,19 @@ export class VoxelWorld{
     }
   }
 
+  disposeChunkMeshes(chunkKey){
+    const record=this.meshes.get(chunkKey);
+    if(!record)return;
+    for(const mesh of [record.opaque,record.water]){
+      if(!mesh)continue;
+      this.scene.remove(mesh);mesh.geometry.dispose();
+    }
+    this.meshes.delete(chunkKey);
+  }
+
   unloadChunk(cx,cz){
     const chunkKey=key(cx,cz);
-    const mesh=this.meshes.get(chunkKey);
-    if(mesh){this.scene.remove(mesh);mesh.geometry.dispose();this.meshes.delete(chunkKey);}
+    this.disposeChunkMeshes(chunkKey);
     this.chunks.delete(chunkKey);
     this.meshQueue.delete(chunkKey);
     this.meshVersions.set(chunkKey,(this.meshVersions.get(chunkKey)||0)+1);
@@ -170,25 +191,30 @@ export class VoxelWorld{
     }
   }
 
+  makeChunkMesh(part,material,cx,cz,renderOrder=0){
+    if(!part||part.empty)return null;
+    const geometry=new THREE.BufferGeometry();
+    geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(part.positions),3));
+    geometry.setAttribute('normal',new THREE.BufferAttribute(new Int8Array(part.normals),3,true));
+    geometry.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(part.uvs),2));
+    geometry.setAttribute('color',new THREE.BufferAttribute(new Uint8Array(part.colors),3,true));
+    geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(part.indices),1));
+    geometry.computeBoundingSphere();
+    const mesh=new THREE.Mesh(geometry,material);
+    mesh.position.set(cx*CHUNK_SIZE,0,cz*CHUNK_SIZE);
+    mesh.matrixAutoUpdate=false;mesh.updateMatrix();mesh.frustumCulled=true;mesh.renderOrder=renderOrder;
+    this.scene.add(mesh);
+    return mesh;
+  }
+
   onMeshWorker(m){
     if(m.type!=='mesh')return;
     this.meshWorkerBusy=false;
     if(this.meshVersions.get(m.key)===m.version&&this.chunks.has(m.key)){
-      const old=this.meshes.get(m.key);
-      if(old){this.scene.remove(old);old.geometry.dispose();this.meshes.delete(m.key);}
-      if(!m.empty){
-        const geometry=new THREE.BufferGeometry();
-        geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(m.positions),3));
-        geometry.setAttribute('normal',new THREE.BufferAttribute(new Int8Array(m.normals),3,true));
-        geometry.setAttribute('uv',new THREE.BufferAttribute(new Float32Array(m.uvs),2));
-        geometry.setAttribute('color',new THREE.BufferAttribute(new Uint8Array(m.colors),3,true));
-        geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(m.indices),1));
-        geometry.computeBoundingSphere();
-        const mesh=new THREE.Mesh(geometry,this.material);
-        mesh.position.set(m.cx*CHUNK_SIZE,0,m.cz*CHUNK_SIZE);
-        mesh.matrixAutoUpdate=false;mesh.updateMatrix();mesh.frustumCulled=true;
-        this.scene.add(mesh);this.meshes.set(m.key,mesh);
-      }
+      this.disposeChunkMeshes(m.key);
+      const opaque=this.makeChunkMesh(m.opaque,this.material,m.cx,m.cz,0);
+      const water=this.makeChunkMesh(m.water,this.waterMaterial,m.cx,m.cz,1);
+      if(opaque||water)this.meshes.set(m.key,{opaque,water});
     }
     this.pumpMeshQueue();
   }
@@ -236,8 +262,8 @@ export class VoxelWorld{
 
   dispose(){
     this.terrainWorker.terminate();this.meshWorker.terminate();
-    for(const mesh of this.meshes.values()){this.scene.remove(mesh);mesh.geometry.dispose();}
-    this.meshes.clear();this.chunks.clear();this.pending.clear();this.meshQueue.clear();
-    this.material.map?.dispose();this.material.dispose();
+    for(const chunkKey of [...this.meshes.keys()])this.disposeChunkMeshes(chunkKey);
+    this.chunks.clear();this.pending.clear();this.meshQueue.clear();
+    this.material.dispose();this.waterMaterial.dispose();this.atlasTexture.dispose();
   }
 }

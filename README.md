@@ -2,7 +2,7 @@
 
 一个面向现代浏览器的体素沙盒复刻 / 重实现项目。目标不是照搬 Minecraft Java 版的内部实现，而是在保留经典玩法和交互语义的前提下，用浏览器并行能力、流式区块、紧凑数据结构、显式 GPU 生命周期和现代持久化重新实现核心系统。
 
-> 稳定发布基线：`v0.3.0`。当前 `main` 开发线为 `v0.4.0-dev`：实体数据层、第一批被动生物、僵尸、骷髅、苦力怕、蜘蛛、基础战斗、箭矢、爆炸、战利品/经验、基础生存死亡损失和第一版护甲装备系统已经落库；水/氧气、天气粒子、完整伤害公式等仍属于后续工作，未完成前不会计入版本完成度。
+> 稳定发布基线：`v0.3.0`。当前 `main` 开发线为 `v0.4.0-dev`：实体数据层、第一批被动生物、僵尸、骷髅、苦力怕、蜘蛛、基础战斗、箭矢、爆炸、战利品/经验、基础生存死亡损失、第一版护甲装备系统和水独立透明渲染 pass 已经落库；水下检测/氧气、天气粒子、完整伤害公式等仍属于后续工作，未完成前不会计入版本完成度。
 
 在线构建：`https://shrinkshi.github.io/Minecraft-Web-ByAI/`
 
@@ -17,6 +17,8 @@
 - 程序化区块世界，玩家跨区块时动态加载，离开较远区域后自动卸载。
 - terrain Worker 异步生成地形；mesh Worker 异步计算暴露面和顶点缓冲。
 - 区块级合并网格：不是“一个方块一个 Three.js Mesh”。
+- 水已从普通不透明 chunk mesh 中拆成独立透明 pass：同水内部面会剔除，opaque/water 分别通过 TypedArray + Transferable 返回主线程；每个 chunk 最多安装一个 opaque mesh 和一个 water mesh。
+- 水使用独立透明材质（当前 opacity 0.68、`depthWrite=false`）并与普通方块共享 atlas texture；水下检测、氧气、游泳和流体传播尚未接入。
 - 草方块、泥土、石头、圆石、沙子、木板、原木、树叶、水、工作台等基础方块。
 - 左键持续挖掘、工具影响基础挖掘速度、右键放置。
 - 方块掉落物实体：简单重力、漂浮旋转、拾取、5 分钟销毁。
@@ -65,7 +67,7 @@ npm run serve
 
 ## 自动检查
 
-纯逻辑 / Worker / 护甲回归：
+纯逻辑 / Worker / 护甲 / 水网格回归：
 
 ```bash
 npm run test:logic
@@ -79,20 +81,21 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-`Repository quality` 在 PR 和 `main` push 时先执行 Node 规则层，再用 Chromium 真正创建世界、装备护甲、验证 v5 IndexedDB 快照并走一次虚空死亡清算。测试边界见 [`docs/TESTING.md`](docs/TESTING.md)。
+`Repository quality` 在 PR 和 `main` push 时先执行 Node 规则层，再用 Chromium 真正创建世界、装备护甲、验证 v5 IndexedDB 快照并走一次虚空死亡清算。Node 层还独立验证 opaque/water 网格拆分、同水内部面剔除、水/实体边界和跨 chunk 水面剔除。测试边界见 [`docs/TESTING.md`](docs/TESTING.md)。
 
 ## 技术方向
 
 - 渲染：Three.js + WebGL2 路线，后续保留 WebGPU renderer 迁移路径。
 - 世界：16×16×64 区块，紧凑 `Uint8Array` 方块存储。
 - 生成：独立 terrain Web Worker。
-- 网格：独立 mesh Web Worker，仅生成可见面并返回 TypedArray / Transferable buffers。
+- 网格：独立 mesh Web Worker；同一次 chunk 扫描分别生成 opaque / water 可见面，并返回两套 TypedArray / Transferable buffers。opaque 旧顶层字段暂时保留为兼容视图，运行时只消费新分层协议。
+- 水渲染：每 chunk 最多一个透明 water mesh；与 opaque mesh 共享 atlas，独立材质与 render order；chunk 卸载和世界退出时两套 geometry 都显式释放。
 - 流式：玩家位置驱动加载；渲染距离外增加 1 chunk 滞回后卸载。
 - 存档：IndexedDB，仅保存程序化世界的增量编辑、玩家/背包/Equipment/经验快照。
 - 实体：EntityStore 管身份与组件，SpatialHash 缩小邻域查询候选集；AI 固定低频 tick、视觉逐帧插值。
 - 装备：Equipment 是独立可序列化模型；减伤公式与 UI/存档分离，便于未来替换成 Java 风格 armor+toughness 规则而不迁移槽结构。
-- 生命周期：区块卸载时显式 `dispose()` GPU geometry；掉落物、经验球、投射物、玩家和生物视觉对象都有显式销毁路径。
-- 后续：死亡界面/统计与床重生、完整伤害/护甲/耐久/附魔、水与氧气、天气粒子、状态效果、村民交易、酿造、维度、结构、多人生存网络层、真正 AI 地形管线。
+- 生命周期：区块卸载时显式 `dispose()` opaque/water GPU geometry；掉落物、经验球、投射物、玩家和生物视觉对象都有显式销毁路径。
+- 后续：死亡界面/统计与床重生、完整伤害/护甲/耐久/附魔、水下检测/氧气/游泳/流体、天气粒子、状态效果、村民交易、酿造、维度、结构、多人生存网络层、真正 AI 地形管线。
 
 ## 文档
 

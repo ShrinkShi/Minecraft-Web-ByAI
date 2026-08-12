@@ -9,8 +9,10 @@
 - 新增 `playwright.config.mjs` 和 `tests/e2e/smoke.spec.mjs`。
 - `Repository quality` 从单一 Node job 扩展为两层质量门：`static-checks` 成功后，再运行 Chromium `browser-smoke`。
 - `Repository quality` 增加按 `github.ref` 分组的 `cancel-in-progress`，同一 PR / 分支的新 push 会取消过时的未完成质量 run。
-- `static-checks` 现在同时语法检查 `src/*.js` 和 `scripts/*.mjs`，`npm run test:logic` 顺序执行基础回归和 Equipment/Armor 专用回归。
-- browser smoke 当前真实验证：生存世界创建→皮革外套真实拖放→护甲 HUD→v5 IndexedDB 装备快照→虚空死亡→装备/背包/XP 清空，并捕获 page/console error。
+- `static-checks` 同时语法检查 `src/*.js` 和 `scripts/*.mjs`；`npm run test:logic` 现在顺序执行基础回归、Equipment/Armor 回归和 water mesh pass 回归。
+- 新增 `scripts/check-water.mjs`：覆盖孤立水、相邻水内部面剔除、水/实体边界、两套 Transferable buffers 以及跨 chunk 同水面剔除。
+- PR #12 第一轮静态质量门暴露旧 `scripts/check.mjs` 仍消费 mesh Worker 顶层 `indices`；修复采用 opaque 顶层兼容视图，而不是删除旧回归，随后基础/护甲/水三套 Node 测试和 Chromium smoke 同时通过。
+- browser smoke 当前真实验证：世界创建（实际经过新 opaque/water Worker 协议和双 pass 安装）→皮革外套真实拖放→护甲 HUD→v5 IndexedDB 装备快照→虚空死亡→装备/背包/XP 清空，并捕获 page/console error。
 - 浏览器测试失败时上传 trace / screenshot / HTML report 目录作为定位工件。
 - GitHub Actions checkout/setup-node 使用 v6；浏览器 CI 当前只安装 Chromium。
 - `.gitignore` 包含 `playwright-report/` 和 `test-results/`。
@@ -40,16 +42,23 @@
 - 新增 `armor.css` 和 Inventory 四个护甲槽；HUD armor row 显示 0–20 点护甲。
 - 新增 `scripts/check-armor.mjs`，覆盖槽位兼容、非法快照过滤、drain、7 点=28% 公式和 `/give leather_chestplate`。
 - Chromium E2E 先验证真实装备/存档，再执行虚空死亡并确认 Equipment/Inventory/XP 全部清空。
+- `mesh-worker.js` 现在一次 chunk 扫描分别构建 `opaque` 与 `water` 两套 mesh payload，并通过独立 TypedArray + Transferable buffers 返回主线程。
+- 同水内部面会剔除，包括跨 chunk 同水边界；水对实体方块的接触面剔除，实体方块面对透明水仍保留。
+- `VoxelWorld` 每个 chunk 最多安装一个 opaque mesh 与一个透明 water mesh；两者共享 atlas texture，water 使用 `transparent=true / opacity=.68 / depthWrite=false` 的独立材质。
+- chunk 重建、卸载和世界退出会同时释放 opaque/water geometry；两套材质独立 dispose，共享 atlas texture 只释放一次。
+- opaque 旧顶层 Worker buffer 字段暂时保留为迁移兼容层；运行时只消费新 `opaque/water` 子协议。
 - 世界启动聊天修正为四种敌对生物，包含已经落库的蜘蛛。
 - 修正 Creeper 加入 `HOSTILE_MOBS` 后测试仍只期望 zombie/skeleton 的历史回归错误。
 
 ### Documentation
-- README 明确区分稳定基线 `v0.3.0` 与 `main` 的 `v0.4.0-dev`，并记录 Equipment/Armor 当前公式与边界。
-- `docs/ARCHITECTURE.md` 将 Equipment 与 armor-rules 纳入伤害、存档和死亡数据流。
+- README 明确区分稳定基线 `v0.3.0` 与 `main` 的 `v0.4.0-dev`，并记录 Equipment/Armor 和水透明 pass 的当前实现边界。
+- `docs/ARCHITECTURE.md` 将 Equipment/armor-rules 和 opaque/water 双 pass 纳入正式数据流与 GPU 生命周期约束。
 - `docs/PROGRESS.md`、`docs/TESTING.md`、`docs/FILE_MANIFEST.md` 与实际代码/CI 对齐。
 
 ### Current limitations
-- `v0.4.0` 尚未封版：死亡界面/统计/床重生、水/氧气、天气粒子等仍未完成。
+- `v0.4.0` 尚未封版：死亡界面/统计/床重生、水下检测/氧气、游泳/流体、天气粒子等仍未完成。
+- 当前水只完成独立透明渲染 pass；没有流体传播、液面高度/动画、浮力、水下 fog/折射，也尚无不同 GPU/角度下透明排序的像素级自动 E2E。
+- mesh Worker 的 opaque 旧顶层 buffer 字段是临时迁移兼容层，所有消费者迁移后应删除。
 - 当前护甲公式是明确的过渡实现，不等于 Java armor+toughness；暂无耐久、附魔、更多材质、Armor Trim、玩家模型穿戴渲染、自动 Shift-equip 或护甲配方。
 - Chromium 自动化验证了装备/存档/死亡清算，但尚未通过真实敌对攻击测量有/无护甲 HP 差值。
 - 普通可恢复死亡的物品/经验/护甲实体生成与重新拾回尚未进入 browser E2E；当前自动浏览器链覆盖的是虚空直接损失。

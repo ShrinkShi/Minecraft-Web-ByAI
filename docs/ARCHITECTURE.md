@@ -5,11 +5,11 @@
 1. **不复制 Java 版技术债。** 不模拟单线程世界生成、每方块对象模型或无边界常驻内存。
 2. **数据优先。** 区块用紧凑 TypedArray；背包、Equipment、配方、战斗、护甲和死亡规则是纯数据/纯逻辑，不把 DOM 当游戏状态。
 3. **并行优先。** terrain 和 mesh 分别运行在 Web Worker；主线程主要处理输入、状态协调和 GPU 对象安装。
-4. **渲染批处理。** 每个区块只生成暴露面并合并为 `BufferGeometry`，而不是每方块一个 Mesh。
-5. **资源生命周期显式管理。** chunk geometry、掉落、经验球、投射物和生物视觉都有销毁路径；退出世界终止 Worker 并释放共享 GPU 资源。
+4. **渲染批处理。** 每个区块只生成暴露面并合并为 `BufferGeometry`；当前最多一个 opaque mesh + 一个 water mesh，而不是每方块一个 Mesh。
+5. **资源生命周期显式管理。** opaque/water chunk geometry、掉落、经验球、投射物和生物视觉都有销毁路径；退出世界终止 Worker 并释放共享 GPU 资源。
 6. **存档保存差异。** 程序化区块按 seed 重建，IndexedDB 只保存玩家/背包/Equipment/经验快照和 voxel edits。
 7. **系统边界固定。** World / Player / Inventory / Equipment / Crafting / Storage / UI / Commands / Entities / Combat / Armor / Projectiles / Rewards / Death Rules 分层。
-8. **规则可离线测试。** 不依赖 WebGL 的核心规则必须能在 Node 22 中验证关键不变量。
+8. **规则可离线测试。** 不依赖 WebGL 的核心规则必须能在 Node 22 中验证关键不变量；Worker 输出协议也必须有直接回归。
 9. **实体查询不做全表两两扫描。** EntityStore 管身份/组件，SpatialHash 先缩小 X/Z 邻域候选，再做精确判断。
 10. **AI 不直接修改核心状态。** 生物 AI 只发伤害、投射物、爆炸、死亡事件；主编排层和独立规则模块负责结算。
 11. **版本完成度以远端证据为准。** 只有进入 GitHub `main` 且通过质量门的实现才算完成。
@@ -53,13 +53,38 @@ death-rules.js -> mode / XP / void policy
 Player.respawn()
 ```
 
-## World / Worker
+## World / Worker / Render passes
+
+```text
+world-worker.js
+    │ chunk Uint8Array
+    ▼
+VoxelWorld.chunks
+    │ copied chunk + 4 neighbor snapshots
+    ▼
+mesh-worker.js
+    │ one voxel scan / face classification
+    ├── opaque -> positions/normals/uvs/colors/indices
+    └── water  -> positions/normals/uvs/colors/indices
+              (independent Transferable buffers)
+    ▼
+VoxelWorld.onMeshWorker()
+    ├── opaque BufferGeometry + opaque MeshLambertMaterial
+    └── water  BufferGeometry + transparent MeshLambertMaterial
+```
 
 - `world-worker.js`：程序化 chunk 生成；主线程通过 Transferable 接收紧凑方块数据。
-- `mesh-worker.js`：暴露面扫描、顶点/法线/UV/索引构建；返回精确长度 TypedArray。
-- `VoxelWorld`：玩家位置驱动 chunk streaming；当前 `renderDistance=3`、额外一圈卸载滞回。
-- chunk 卸载必须 `geometry.dispose()`；世界退出时终止 Worker、释放材质/纹理。
-- IndexedDB 当前只保存世界增量 edits 和玩家状态，不保存完整程序化 chunk。
+- `mesh-worker.js`：仍在 Worker 中完成暴露面扫描、顶点/法线/UV/索引构建，不把水拆分工作退回主线程。
+- 每次 mesh 请求返回 `opaque` 和 `water` 两个子 payload；每个非空 payload 都有自己精确长度的 TypedArray buffers，并一起放入 Transferable list。
+- 水与同 ID 水相邻时内部面不生成；这个规则也使用四个邻 chunk snapshot 跨 chunk 工作。
+- 水对实体方块的接触面不生成；实体方块面对透明水仍生成，防止实体边界缺面。
+- opaque 旧顶层 `positions/normals/uvs/colors/indices` 暂时保留为兼容视图，让旧 Worker 消费者/回归可以渐进迁移；`VoxelWorld` 只读取新 `opaque/water` 协议。
+- `VoxelWorld.meshes` 每个 chunk 保存 `{opaque, water}` 记录；任一 pass 可为空。
+- opaque 与 water 共用一张 atlas `Texture`；opaque 使用原不透明材质，water 使用独立 `transparent=true, opacity=.68, depthWrite=false` 材质并设更高 render order。
+- chunk 重建或卸载时旧 opaque/water geometry 都显式 `dispose()`；世界退出时两套材质分别 dispose，共享 atlas texture 只 dispose 一次。
+- 当前 `renderDistance=3`、额外一圈卸载滞回；玩家位置驱动 chunk streaming 逻辑没有因双 pass 改变。
+- IndexedDB 当前只保存世界增量 edits 和玩家状态，不保存完整程序化 chunk，也不保存 GPU mesh。
+- 这一层只是**渲染 pass 基础**，不是流体系统：当前没有流向/水位传播、动态表面高度、动画、折射、岸边泡沫、水下 fog 或介质后处理。
 
 ## Inventory / Equipment / Crafting
 
@@ -184,8 +209,10 @@ Player.respawn()
 
 `Repository quality` 两层：
 
-1. `static-checks`：Node 22 对 `src/*.js` 和 `scripts/*.mjs` 做语法检查，再执行 `npm run test:logic`（基础套件 + armor suite）。
-2. `browser-smoke`：Chromium 实际创建世界、通过 UI 装备皮革外套、验证 v5 Equipment 快照，然后执行虚空死亡并核对背包/Equipment/XP 全部清空。
+1. `static-checks`：Node 22 对 `src/*.js` 和 `scripts/*.mjs` 做语法检查，再执行 `npm run test:logic`（基础套件 + armor suite + water mesh suite）。
+2. `browser-smoke`：Chromium 实际创建世界，因此会走 mesh Worker 新 `opaque/water` 协议和双 pass GPU 安装；随后通过 UI 装备皮革外套、验证 v5 Equipment 快照，再执行虚空死亡并核对背包/Equipment/XP 全部清空。
+
+水专用 Node 回归直接验证孤立/相邻/跨 chunk 水面、水/实体边界和双 Transferable payload。Chromium 当前验证双 pass 不导致运行时错误，但还没有像素级透明排序/混合断言。
 
 同一 `github.ref` 使用 `cancel-in-progress`，新 push 会取消旧质量 run，避免陈旧 HEAD 占用 runner。GitHub Pages 由独立 workflow 从 `main` 部署。
 
@@ -193,7 +220,8 @@ Player.respawn()
 
 - Three.js 仍从 jsDelivr runtime import；应 vendor/pin 或引入构建产物，避免 CDN 成为运行时单点依赖。
 - terrain / mesh 各只有 1 个 Worker；高速移动/大范围编辑最终需要 Worker pool、优先级和取消机制。
-- 水仍与实体方块共用不透明材质，没有独立透明 pass、流体、氧气和水下介质。
+- 水已经有独立透明 pass，但仍是静态整方块表面：没有流体传播/液面高度、游泳/浮力、水下检测/氧气、水下 fog/折射，也没有不同 GPU 上的像素级透明排序自动验证。
+- mesh Worker 的 opaque 旧顶层 buffer 字段是迁移兼容层；所有消费者迁到 `opaque/water` 协议后应删除，避免长期维护双接口。
 - IndexedDB edits 仍集中在单 world record。
 - UI 通过重建 slot DOM 保证简单正确；物品规模增加后需局部更新减少 GC/布局。
 - Equipment 当前只支持手动 cursor 拖放；Shift-click 自动装备、右键快捷装备未实现。
