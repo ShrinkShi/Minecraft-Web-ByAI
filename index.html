@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="./armor.css" />
   <link rel="stylesheet" href="./oxygen.css" />
   <link rel="stylesheet" href="./death.css" />
+  <link rel="stylesheet" href="./mobile.css" />
 </head>
 <body>
   <div id="app">
@@ -88,6 +89,7 @@
 
     <section id="inventory" class="inventory hidden" aria-label="物品栏">
       <div class="inventory-panel">
+        <button class="mobile-panel-close" data-action="mobile-close-panel" aria-label="关闭物品栏">×</button>
         <div class="inventory-title">物品栏</div>
         <div class="inventory-top">
           <div id="equipment-slots" class="equipment-slots" aria-label="护甲槽"></div>
@@ -101,6 +103,7 @@
 
     <section id="workbench" class="inventory hidden" aria-label="工作台">
       <div class="inventory-panel workbench-panel">
+        <button class="mobile-panel-close" data-action="mobile-close-panel" aria-label="关闭工作台">×</button>
         <div class="inventory-title">工作台</div>
         <div class="workbench-craft"><div id="craft-grid-3" class="craft-grid grid-3"></div><b>→</b><div id="craft-result-3" class="craft-result"></div></div>
         <div id="workbench-grid" class="inventory-grid"></div>
@@ -108,8 +111,19 @@
       </div>
     </section>
 
+    <div id="rotate-device" class="rotate-device" role="status" aria-live="polite"><div class="rotate-device-card"><strong>请将手机横屏</strong><span>横屏后会自动切换到触控游戏布局。</span></div></div>
+    <div id="mobile-controls" class="mobile-controls hidden" aria-label="手机触控操作" aria-hidden="true">
+      <div id="mobile-look-zone" class="mobile-look-zone" aria-label="拖动调整视角"></div>
+      <div id="mobile-joystick" class="mobile-joystick" aria-label="移动摇杆"><span id="mobile-joystick-knob" class="mobile-joystick-knob"></span></div>
+      <div class="mobile-top-actions">
+        <button class="mobile-control-button" data-mobile-action="pause">暂停</button><button class="mobile-control-button" data-mobile-action="inventory">背包</button><button class="mobile-control-button" data-mobile-action="chat">聊天</button><button class="mobile-control-button" data-mobile-action="view">视角</button>
+      </div>
+      <div class="mobile-action-cluster">
+        <button class="mobile-control-button" data-mobile-hold="attack">攻击</button><button class="mobile-control-button" data-mobile-action="use">使用</button><button class="mobile-control-button" data-mobile-hold="jump">跳</button><button class="mobile-control-button" data-mobile-toggle="sprint" aria-pressed="false">跑</button><button class="mobile-control-button" data-mobile-toggle="sneak" aria-pressed="false">潜</button><button class="mobile-control-button" data-mobile-action="drop">丢</button>
+      </div>
+    </div>
     <div id="cursor-stack" class="cursor-stack hidden"></div>
-    <div id="chat-input-wrap" class="chat-input-wrap hidden"><input id="chat-input" autocomplete="off" spellcheck="false" maxlength="256" /></div>
+    <div id="chat-input-wrap" class="chat-input-wrap hidden"><input id="chat-input" autocomplete="off" spellcheck="false" maxlength="256" /><button class="mobile-chat-close" data-action="mobile-close-chat" aria-label="关闭聊天">×</button></div>
   </div>
   <script type="module" src="./src/main.js"></script>
 </body>

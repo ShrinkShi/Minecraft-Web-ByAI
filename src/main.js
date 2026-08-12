@@ -24,6 +24,8 @@ import {ProjectileSystem} from './projectiles.js';
 import {ExplosionSystem} from './explosions.js';
 import {WeatherSystem} from './weather-system.js';
 import {deathLossPlan} from './death-rules.js';
+import {MobileControls} from './mobile-controls.js';
+import {detectDeviceProfile} from './device-profile.js';
 
 const canvas=document.querySelector('#game-canvas');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:false,powerPreference:'high-performance'});
@@ -40,6 +42,7 @@ const sun=new THREE.DirectionalLight(0xfff1c2,2.1);sun.position.set(80,120,60);s
 
 const ui=new UI(),storage=new WorldStorage(),deathScreen=new DeathScreen();
 const e2eEnabled=new URLSearchParams(location.search).get('e2e')==='1';
+let deviceProfile=detectDeviceProfile(),mobileControls=null;
 let world=null,player=null,inventory=null,equipment=null,drops=null,experienceOrbs=null,projectiles=null,explosions=null,passiveMobs=null,hostileMobs=null,weatherSystem=null;
 let running=false,paused=false,last=performance.now(),selectedTarget=null,breakStart=0,lastSecond=0,frames=0,fps=0,worldInfo=null,lastAttackAt=-Infinity;
 let saveDirty=false,saveInFlight=null,lastSaveAt=0,lastSavedPosition=null,gameTime=6000,weather='clear',totalXp=0;
@@ -47,9 +50,11 @@ let oxygenState=createOxygenState(),headSubmerged=false;
 let deathState=null,respawnPoint=null;
 
 function modeScreen(name){ui.showScreen(name==='main'?ui.main:name==='world'?ui.worldMenu:name==='pause'?ui.pause:name==='death'?deathScreen.root:null);}
-function pointer(){if(running&&!paused&&!deathState&&!ui.hasOpenPanel()&&!ui.isChatOpen())canvas.requestPointerLock().catch(()=>{});}
-function canControl(){return running&&!paused&&!deathState&&!ui.hasOpenPanel()&&!ui.isChatOpen()&&document.pointerLockElement===canvas;}
+function pointer(){if(running&&!paused&&!deathState&&!ui.hasOpenPanel()&&!ui.isChatOpen()&&!deviceProfile.mobile)canvas.requestPointerLock().catch(()=>{});}
+function canControl(){const active=running&&!paused&&!deathState&&!ui.hasOpenPanel()&&!ui.isChatOpen();return active&&(deviceProfile.mobile||document.pointerLockElement===canvas);}
 function markSaveDirty(){saveDirty=true;}
+function clearPlayerInput(){player?.keys.clear();player?.clearVirtualInput?.();}
+function syncMobileControls(){mobileControls?.setGameplayEnabled(running&&!paused&&!deathState&&!ui.hasOpenPanel()&&!ui.isChatOpen());}
 if(e2eEnabled)Object.defineProperty(globalThis,'__minecraftE2E',{value:{setLook:(yaw,pitch)=>{player?.setLook(yaw,pitch);return !!player;}},configurable:true});
 function setRespawnPoint(value){const point=normalizeRespawnPoint(value);if(!point)return false;respawnPoint=point;markSaveDirty();return true;}
 function renderPlayerStatus(){if(!player)return;const xp=experienceState(totalXp);ui.renderStatus(player.hp,player.hunger,xp.progress*100,xp.level,equipment?.armorPoints()||0);}
@@ -101,7 +106,7 @@ function beginPlayerDeath(reason='你死了'){
     }else detail=itemCount>0||previousXp>0?'虚空死亡使携带物品和经验无法回收。':'你掉出了世界边界。';
     if(plan.clearsExperience)totalXp=0;
   }
-  player.keys.clear();player.velocity.set(0,0,0);lastAttackAt=-Infinity;resetOxygen();document.exitPointerLock?.();ui.closeChat();renderPlayerStatus();
+  clearPlayerInput();player.velocity.set(0,0,0);lastAttackAt=-Infinity;resetOxygen();document.exitPointerLock?.();ui.closeChat();renderPlayerStatus();
   deathState={reason,detail,position:{x:deathPosition.x,y:deathPosition.y,z:deathPosition.z},recoverable:plan.recoverable};deathScreen.set(reason,detail);modeScreen('death');markSaveDirty();void persistWorld(true);
 }
 
@@ -147,21 +152,32 @@ async function startWorld(){
   ui.bindInventory(inventory,{equipment,onChanged:()=>{markSaveDirty();renderPlayerStatus();},onOverflow:spawnOverflow});running=true;paused=false;saveDirty=!saved;lastSavedPosition=player.position.clone();lastAttackAt=-Infinity;ui.hud.classList.remove('hidden');ui.showLoading(false);renderPlayerStatus();applySky();ui.chatMessage('夜间敌对池包括僵尸、骷髅、苦力怕和蜘蛛；水下会消耗氧气；天气指令会切换降雨粒子。');ui.showToast(saved?'已从浏览器存档恢复世界':mode==='creative'?'创造模式':'生存模式');pointer();
 }
 
-function pauseGame(){if(!running||deathState)return;paused=true;player?.keys.clear();document.exitPointerLock?.();modeScreen('pause');persistWorld();}
+function pauseGame(){if(!running||deathState)return;paused=true;clearPlayerInput();document.exitPointerLock?.();modeScreen('pause');persistWorld();}
 function resume(){if(deathState)return;paused=false;modeScreen(null);pointer();}
-function toggleInventory(){if(!running||paused||deathState||ui.isChatOpen())return;if(ui.hasOpenPanel()){ui.closePanels();pointer();}else{player.keys.clear();document.exitPointerLock?.();ui.openInventory();}}
-function openWorkbench(){if(!running||paused||deathState)return;player.keys.clear();document.exitPointerLock?.();ui.openWorkbench();}
+function toggleInventory(){if(!running||paused||deathState||ui.isChatOpen())return;if(ui.hasOpenPanel()){ui.closePanels();pointer();}else{clearPlayerInput();document.exitPointerLock?.();ui.openInventory();}}
+function openWorkbench(){if(!running||paused||deathState)return;clearPlayerInput();document.exitPointerLock?.();ui.openWorkbench();}
+function cycleViewMode(){if(!running||!player)return;const view=player.cycleView();ui.showToast(['第一人称','第三人称背面','第三人称正面'][view]);markSaveDirty();}
+function openChatInput(prefix=''){if(!running||paused||deathState||ui.hasOpenPanel())return;clearPlayerInput();document.exitPointerLock?.();ui.openChat(prefix);}
 
 async function handleAction(action){
-  if(action==='singleplayer')modeScreen('world');else if(action==='back-main')modeScreen('main');else if(action==='create-world')await startWorld();else if(action==='resume')resume();else if(action==='respawn')await completeRespawn();else if(action==='death-main'){ui.showLoading(true,'正在保存死亡结算',85);await persistWorld(true);disposeWorld();ui.hud.classList.add('hidden');ui.showLoading(false);modeScreen('main');}else if(action==='save-main'){ui.showLoading(true,'正在写入浏览器存档',85);await persistWorld(true);disposeWorld();ui.hud.classList.add('hidden');ui.showLoading(false);modeScreen('main');}else if(action==='options')ui.showToast('选项系统将在后续阶段接入');else if(action==='multiplayer'||action==='realms')ui.showToast('网络层将在后续阶段接入');else if(action==='quit')ui.showToast('浏览器页面不能由网页强制关闭');
+  if(action==='singleplayer')modeScreen('world');else if(action==='back-main')modeScreen('main');else if(action==='create-world')await startWorld();else if(action==='resume')resume();else if(action==='respawn')await completeRespawn();else if(action==='mobile-close-panel'){ui.closePanels();pointer();}else if(action==='mobile-close-chat'){ui.closeChat();pointer();}else if(action==='death-main'){ui.showLoading(true,'正在保存死亡结算',85);await persistWorld(true);disposeWorld();ui.hud.classList.add('hidden');ui.showLoading(false);modeScreen('main');}else if(action==='save-main'){ui.showLoading(true,'正在写入浏览器存档',85);await persistWorld(true);disposeWorld();ui.hud.classList.add('hidden');ui.showLoading(false);modeScreen('main');}else if(action==='options')ui.showToast('选项系统将在后续阶段接入');else if(action==='multiplayer'||action==='realms')ui.showToast('网络层将在后续阶段接入');else if(action==='quit')ui.showToast('浏览器页面不能由网页强制关闭');
 }
 
 document.addEventListener('click',e=>{const button=e.target.closest('[data-action]');if(button)handleAction(button.dataset.action);});canvas.addEventListener('click',pointer);window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight,false);});
-window.addEventListener('keydown',e=>{if(deathState){e.preventDefault();return;}if(ui.isChatOpen()||e.repeat)return;if(e.code==='Escape'){if(ui.hasOpenPanel()){ui.closePanels();pointer();return;}if(running)pauseGame();}if(e.code==='KeyE')toggleInventory();if(e.code==='F5'&&running){e.preventDefault();const view=player.cycleView();ui.showToast(['第一人称','第三人称背面','第三人称正面'][view]);markSaveDirty();}if((e.code==='KeyT'||e.code==='Slash')&&running&&!paused&&!ui.hasOpenPanel()){e.preventDefault();player.keys.clear();document.exitPointerLock?.();ui.openChat(e.code==='Slash'?'/':'');}if(e.code==='KeyQ'&&canControl())dropSelected();if(/^Digit[1-9]$/.test(e.code)&&running)ui.select(Number(e.code.slice(-1))-1);});
+window.addEventListener('keydown',e=>{if(deathState){e.preventDefault();return;}if(ui.isChatOpen()||e.repeat)return;if(e.code==='Escape'){if(ui.hasOpenPanel()){ui.closePanels();pointer();return;}if(running)pauseGame();}if(e.code==='KeyE')toggleInventory();if(e.code==='F5'&&running){e.preventDefault();cycleViewMode();}if((e.code==='KeyT'||e.code==='Slash')&&running&&!paused&&!ui.hasOpenPanel()){e.preventDefault();openChatInput(e.code==='Slash'?'/':'');}if(e.code==='KeyQ'&&canControl())dropSelected();if(/^Digit[1-9]$/.test(e.code)&&running)ui.select(Number(e.code.slice(-1))-1);});
 ui.chatInput.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Escape'){e.preventDefault();ui.closeChat();pointer();return;}if(e.key==='Enter'){e.preventDefault();const text=ui.chatInput.value;ui.closeChat();if(text.trim())runCommand(text);pointer();}});
 canvas.addEventListener('wheel',e=>{if(running&&!ui.hasOpenPanel())ui.select(ui.selected+(e.deltaY>0?1:-1));},{passive:true});canvas.addEventListener('contextmenu',e=>e.preventDefault());
-canvas.addEventListener('mousedown',e=>{if(!canControl())return;if(e.button===0&&player.mode!=='spectator'){const entityHit=aimEntity(),blockHit=aim();if(entityHit&&(!blockHit||entityHit.distance<=blockHit.distance)){const now=performance.now();breakStart=0;ui.setBreak(0);if(player.mode!=='creative'&&!canAttack(lastAttackAt,now))return;lastAttackAt=now;const selected=ui.selectedItem(),damage=player.mode==='creative'?100:(ITEMS[selected?.id]?.attackDamage||1);entityHit.system.hurt(entityHit.entity,damage,player.position,now);return;}if(player.mode!=='adventure')breakStart=performance.now();}if(e.button===2){const hit=aim();if(hit&&isBedBlock(hit.id)){if(player.mode!=='spectator')activateBed(hit);return;}if(hit?.id===9){openWorkbench();return;}if(player.mode==='spectator'||player.mode==='adventure'||!hit)return;const selected=ui.selectedItem(),def=ITEMS[selected?.id];if(def?.placeKind==='bed'){const plan=placeBed(hit.previous);if(!plan){ui.showToast('这里无法放置床');return;}if(player.mode!=='creative')ui.consumeSelected(1);ui.showToast(`放置 ${def.name}`);markSaveDirty();return;}if(!def?.blockId||def.blockId===8)return;const p=hit.previous;if(playerOccupies(p.x,p.y,p.z))return;if(world.setBlock(p.x,p.y,p.z,def.blockId)){if(player.mode!=='creative')ui.consumeSelected(1);ui.showToast(`放置 ${def.name}`);markSaveDirty();}}});
-window.addEventListener('mouseup',e=>{if(e.button===0){breakStart=0;ui.setBreak(0);}});document.addEventListener('visibilitychange',()=>{if(document.hidden)persistWorld();});window.addEventListener('beforeunload',()=>{persistWorld();});
+function primaryActionStart(){
+  if(!canControl()||!player||player.mode==='spectator')return;const entityHit=aimEntity(),blockHit=aim();
+  if(entityHit&&(!blockHit||entityHit.distance<=blockHit.distance)){const now=performance.now();breakStart=0;ui.setBreak(0);if(player.mode!=='creative'&&!canAttack(lastAttackAt,now))return;lastAttackAt=now;const selected=ui.selectedItem(),damage=player.mode==='creative'?100:(ITEMS[selected?.id]?.attackDamage||1);entityHit.system.hurt(entityHit.entity,damage,player.position,now);return;}
+  if(player.mode!=='adventure')breakStart=performance.now();
+}
+function primaryActionEnd(){breakStart=0;ui.setBreak(0);}
+function secondaryAction(){
+  if(!canControl()||!player)return;const hit=aim();if(hit&&isBedBlock(hit.id)){if(player.mode!=='spectator')activateBed(hit);return;}if(hit?.id===9){openWorkbench();return;}if(player.mode==='spectator'||player.mode==='adventure'||!hit)return;const selected=ui.selectedItem(),def=ITEMS[selected?.id];if(def?.placeKind==='bed'){const plan=placeBed(hit.previous);if(!plan){ui.showToast('这里无法放置床');return;}if(player.mode!=='creative')ui.consumeSelected(1);ui.showToast(`放置 ${def.name}`);markSaveDirty();return;}if(!def?.blockId||def.blockId===8)return;const p=hit.previous;if(playerOccupies(p.x,p.y,p.z))return;if(world.setBlock(p.x,p.y,p.z,def.blockId)){if(player.mode!=='creative')ui.consumeSelected(1);ui.showToast(`放置 ${def.name}`);markSaveDirty();}
+}
+canvas.addEventListener('mousedown',e=>{if(e.button===0)primaryActionStart();else if(e.button===2)secondaryAction();});
+window.addEventListener('mouseup',e=>{if(e.button===0)primaryActionEnd();});document.addEventListener('visibilitychange',()=>{if(document.hidden)persistWorld();});window.addEventListener('beforeunload',()=>{persistWorld();});
 
 function playerOccupies(x,y,z){if(!player)return false;const minX=player.position.x-player.radius,maxX=player.position.x+player.radius,minY=player.position.y,maxY=player.position.y+player.height,minZ=player.position.z-player.radius,maxZ=player.position.z+player.radius;return x+1>minX&&x<maxX&&y+1>minY&&y<maxY&&z+1>minZ&&z<maxZ;}
 function placeBed(cell){
@@ -197,7 +213,7 @@ function runCommand(text){const result=executeCommand(text,{player,inventory,inv
 function applySky(){const angle=(gameTime-6000)/24000*Math.PI*2,sunHeight=Math.cos(angle),daylight=Math.max(.08,Math.min(1,(sunHeight+.25)/1.25)),storm=weather==='clear'?1:weather==='rain' ? .72 : .55,night=new THREE.Color(0x061126),day=new THREE.Color(0x86bff2),color=night.clone().lerp(day,daylight*storm);scene.background=color;scene.fog.color.copy(color);hemi.intensity=.35+2.05*daylight*storm;sun.intensity=Math.max(0,2.2*daylight*storm);sun.position.set(Math.cos(angle)*100,Math.sin(Math.PI/2-angle)*110,45);}
 
 function animate(now){
-  requestAnimationFrame(animate);const dt=Math.min((now-last)/1000,.05);last=now;frames++;if(now-lastSecond>1000){fps=frames;frames=0;lastSecond=now;}
+  requestAnimationFrame(animate);const dt=Math.min((now-last)/1000,.05);last=now;frames++;if(now-lastSecond>1000){fps=frames;frames=0;lastSecond=now;}syncMobileControls();
   if(running&&!paused&&player&&!deathState){
     if(!ui.hasOpenPanel()&&!ui.isChatOpen())player.update(dt);
     if(player.hp<=0)beginPlayerDeath(player.position.y<-10?'你掉入了虚空':'你死了');
@@ -219,4 +235,12 @@ Time ${Math.floor(gameTime)} · ${weather}
   }
   renderer.render(scene,camera);
 }
+mobileControls=new MobileControls({
+  onProfile:profile=>{deviceProfile=profile;if(!profile.mobile)player?.clearVirtualInput?.();},
+  onMove:(side,forward)=>player?.setVirtualMove(side,forward),
+  onLook:(dx,dy)=>{if(canControl())player?.applyLookDelta(dx,dy,.0026);},
+  onHold:(name,pressed)=>{if(name==='jump')player?.setVirtualButton('jump',pressed);else if(name==='attack'){if(pressed)primaryActionStart();else primaryActionEnd();}},
+  onToggle:(name,pressed)=>player?.setVirtualButton(name,pressed),
+  onAction:action=>{if(action==='use')secondaryAction();else if(action==='inventory')toggleInventory();else if(action==='pause')pauseGame();else if(action==='chat')openChatInput('');else if(action==='view')cycleViewMode();else if(action==='drop'&&canControl())dropSelected();}
+});
 requestAnimationFrame(animate);
