@@ -31,6 +31,11 @@ export function executeCommand(text,ctx){
     const p=ctx.player.position,x=num(parts[0],p.x),y=num(parts[1],p.y),z=num(parts[2],p.z);if(![x,y,z].every(Number.isFinite))return fail('坐标无效');
     ctx.teleport(x,y,z);return ok(`已传送至 ${x.toFixed(1)} ${y.toFixed(1)} ${z.toFixed(1)}`);
   }
+  if(name==='kill'){
+    if(parts.length)return fail('用法：/kill');
+    if(typeof ctx.kill!=='function')return fail('当前环境不支持 /kill');
+    ctx.kill();return ok('已杀死玩家');
+  }
   if(name==='time'){
     if(parts[0]!=='set')return fail('用法：/time set <day|night|数字>');
     const value=(parts[1]||'').toLowerCase(),time=value==='day'?1000:value==='noon'?6000:value==='night'?13000:value==='midnight'?18000:Number(value);
@@ -39,7 +44,7 @@ export function executeCommand(text,ctx){
   if(name==='weather'){
     const weather=(parts[0]||'').toLowerCase();if(!['clear','rain','thunder'].includes(weather))return fail('用法：/weather <clear|rain|thunder>');ctx.setWeather(weather);return ok(`天气已设为 ${weather}`);
   }
-  if(name==='help')return ok('可用：/gamemode /give /tp /time set /weather /help');
+  if(name==='help')return ok('可用：/gamemode /give /tp /kill /time set /weather /help');
   return fail(`未知指令：/${name}`);
 }
 
