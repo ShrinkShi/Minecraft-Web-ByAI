@@ -1,10 +1,16 @@
+import {BED_IDS,BED_BLOCK_IDS,bedBlockMeta} from './bed-rules.js';
+
 export const CHUNK_SIZE = 16;
 export const WORLD_HEIGHT = 64;
 export const ATLAS_COLS = 4;
 export const ATLAS_ROWS = 4;
 
 export const BLOCK = Object.freeze({
-  AIR:0,GRASS:1,DIRT:2,STONE:3,SAND:4,PLANKS:5,LOG:6,LEAVES:7,WATER:8,CRAFTING_TABLE:9,COBBLESTONE:10
+  AIR:0,GRASS:1,DIRT:2,STONE:3,SAND:4,PLANKS:5,LOG:6,LEAVES:7,WATER:8,CRAFTING_TABLE:9,COBBLESTONE:10,
+  BED_NORTH_FOOT:BED_IDS.north.foot,BED_NORTH_HEAD:BED_IDS.north.head,
+  BED_SOUTH_FOOT:BED_IDS.south.foot,BED_SOUTH_HEAD:BED_IDS.south.head,
+  BED_WEST_FOOT:BED_IDS.west.foot,BED_WEST_HEAD:BED_IDS.west.head,
+  BED_EAST_FOOT:BED_IDS.east.foot,BED_EAST_HEAD:BED_IDS.east.head
 });
 
 export const BLOCKS = {
@@ -20,6 +26,11 @@ export const BLOCKS = {
   9:{name:'工作台',solid:true,hardness:2.5,tiles:[10,5,11],drops:'block:9'},
   10:{name:'圆石',solid:true,hardness:2,tiles:[13,13,13],drops:'block:10',requires:'pickaxe'}
 };
+
+for(const id of BED_BLOCK_IDS){
+  const meta=bedBlockMeta(id);
+  BLOCKS[id]={name:`床（${meta.part==='foot'?'脚端':'头端'}）`,solid:true,hardness:.2,tiles:[5,5,5],drops:'bed',bed:true,bedPart:meta.part,bedFacing:meta.facing,tint:[255,118,118]};
+}
 
 export function tileForFace(blockId,faceName){
   const block=BLOCKS[blockId]||BLOCKS[0];
