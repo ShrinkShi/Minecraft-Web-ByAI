@@ -2,15 +2,16 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.m
 import {BLOCKS} from './blocks.js';
 import {applyDamage,knockbackDirection} from './combat.js';
 import {waterCoverageFromSamples,stepSwimming} from './swim-rules.js';
+import {normalizeControlState} from './control-intents.js';
 
 export class PlayerController{
   constructor(camera,canvas,world,scene){
     this.camera=camera;this.canvas=canvas;this.world=world;this.scene=scene;
     this.position=new THREE.Vector3(0,40,0);this.velocity=new THREE.Vector3();
-    this.yaw=0;this.pitch=0;this.keys=new Set();this.virtualInput={side:0,forward:0,jump:false,sneak:false,sprint:false};this.grounded=false;this.flying=false;this.viewMode=0;this.swimCoverage=0;
+    this.yaw=0;this.pitch=0;this.controlState=normalizeControlState();this.grounded=false;this.flying=false;this.viewMode=0;this.swimCoverage=0;
     this.mode='survival';this.hp=20;this.hunger=20;this.saturation=5;this.hurtUntil=-Infinity;
     this.eye=1.62;this.height=1.8;this.radius=.3;this.walk=4.3;this.sprint=5.6;
-    this.avatar=this.createAvatar();this.bind();
+    this.avatar=this.createAvatar();
   }
 
   createAvatar(){
@@ -22,17 +23,9 @@ export class PlayerController{
     this.scene.add(group);group.visible=false;return group;
   }
 
-  bind(){
-    this.onKeyDown=e=>{this.keys.add(e.code);if(e.code==='Space')e.preventDefault();};
-    this.onKeyUp=e=>this.keys.delete(e.code);
-    this.onMove=e=>{if(document.pointerLockElement!==this.canvas)return;this.applyLookDelta(e.movementX,e.movementY);};
-    window.addEventListener('keydown',this.onKeyDown);window.addEventListener('keyup',this.onKeyUp);document.addEventListener('mousemove',this.onMove);
-  }
-
-  applyLookDelta(dx,dy,sensitivity=.0022){if(!Number.isFinite(dx)||!Number.isFinite(dy))return;this.setLook(this.yaw-dx*sensitivity,this.pitch-dy*sensitivity);}
-  setVirtualMove(side,forward){this.virtualInput.side=Math.max(-1,Math.min(1,Number(side)||0));this.virtualInput.forward=Math.max(-1,Math.min(1,Number(forward)||0));}
-  setVirtualButton(name,pressed){if(name in this.virtualInput)this.virtualInput[name]=!!pressed;}
-  clearVirtualInput(){this.virtualInput.side=0;this.virtualInput.forward=0;this.virtualInput.jump=false;this.virtualInput.sneak=false;this.virtualInput.sprint=false;}
+  setControlState(state){this.controlState=normalizeControlState(state);}
+  clearControlState(){this.controlState=normalizeControlState();}
+  applyLookIntent(yawDelta,pitchDelta){if(!Number.isFinite(yawDelta)||!Number.isFinite(pitchDelta))return;this.setLook(this.yaw+yawDelta,this.pitch+pitchDelta);}
   setMode(mode){this.mode=mode;this.flying=mode==='creative'||mode==='spectator';if(this.flying)this.swimCoverage=0;}
   cycleView(){this.viewMode=(this.viewMode+1)%3;this.syncCamera();return this.viewMode;}
 
@@ -81,7 +74,7 @@ export class PlayerController{
 
   update(dt){
     dt=Math.min(dt,.05);
-    const keyForward=(this.keys.has('KeyW')?1:0)-(this.keys.has('KeyS')?1:0),keySide=(this.keys.has('KeyD')?1:0)-(this.keys.has('KeyA')?1:0),forward=Math.max(-1,Math.min(1,keyForward+this.virtualInput.forward)),side=Math.max(-1,Math.min(1,keySide+this.virtualInput.side)),sprint=this.keys.has('ControlLeft')||this.keys.has('ControlRight')||this.virtualInput.sprint,sneak=this.keys.has('ShiftLeft')||this.keys.has('ShiftRight')||this.virtualInput.sneak,up=this.keys.has('Space')||this.virtualInput.jump;
+    const {forward,side,sprint,sneak,jump:up}=this.controlState;
     this.swimCoverage=this.flying?0:this.waterCoverage();
     const swim=stepSwimming({velocityY:this.velocity.y,coverage:this.swimCoverage,dt,up,down:sneak});
     const baseSpeed=swim.active?this.walk:(sprint?this.sprint:this.walk),sneakFactor=swim.active?1:(sneak?.35:1),speed=baseSpeed*sneakFactor*swim.speedMultiplier,dir=new THREE.Vector3(),moveAmount=Math.min(1,Math.hypot(forward,side));
@@ -111,5 +104,5 @@ export class PlayerController{
     if(this.avatar){this.avatar.visible=this.viewMode!==0;this.avatar.position.copy(this.position);this.avatar.rotation.y=this.yaw;}
   }
 
-  dispose(){window.removeEventListener('keydown',this.onKeyDown);window.removeEventListener('keyup',this.onKeyUp);document.removeEventListener('mousemove',this.onMove);if(this.avatar){this.scene?.remove(this.avatar);for(const child of this.avatar.children){child.geometry?.dispose();child.material?.dispose();}}}
+  dispose(){if(this.avatar){this.scene?.remove(this.avatar);for(const child of this.avatar.children){child.geometry?.dispose();child.material?.dispose();}}}
 }
