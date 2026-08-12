@@ -1,0 +1,29 @@
+name: Patch respawn XP level expectation
+on:
+  push:
+    branches: [feat/v0.4-custom-respawn-point]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feat/v0.4-custom-respawn-point
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Fix recovered XP level expectation
+        run: python scripts/patch-respawn-xp-level-expectation.py
+      - name: Verify E2E syntax
+        run: node --check tests/e2e/smoke.spec.mjs
+      - name: Commit test only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/e2e/smoke.spec.mjs
+          git commit -m "test: expect recovered 14 XP at level one"
+          git push origin HEAD:refs/heads/feat/v0.4-custom-respawn-point
