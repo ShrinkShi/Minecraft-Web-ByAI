@@ -1,0 +1,29 @@
+name: One-shot recoverable death patch
+on:
+  push:
+    branches: [test/v0.4-recoverable-death-pickup]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: test/v0.4-recoverable-death-pickup
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Patch recoverable death closure
+        run: python scripts/patch-recoverable-death.py
+      - name: Remove one-shot patch files
+        run: rm scripts/patch-recoverable-death.py .github/workflows/recoverable-death-patch.yml
+      - name: Commit recoverable death closure
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/commands.js src/main.js scripts/check.mjs tests/e2e/smoke.spec.mjs scripts/patch-recoverable-death.py .github/workflows/recoverable-death-patch.yml
+          git commit -m "test: close recoverable death pickup loop"
+          git push origin HEAD:test/v0.4-recoverable-death-pickup
