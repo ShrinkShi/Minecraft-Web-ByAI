@@ -9,16 +9,16 @@
 ## 工程质量基础
 
 - [x] Node 22 `src/*.js` 与 `scripts/*.mjs` 语法检查。
-- [x] `npm run test:logic`：世界/实体/Worker 回归 + 独立 Equipment/Armor 回归。
+- [x] `npm run test:logic`：世界/实体/Worker 回归 + 独立 Equipment/Armor 回归 + 水网格 pass 回归。
 - [x] GitHub Pages 仓库源设置为 GitHub Actions，并验证真实 Pages Deployment 成功。
 - [x] Playwright Chromium browser smoke：页面加载→生存世界创建→护甲装备/存档→虚空死亡/重生→IndexedDB 状态核对。
 - [x] 浏览器失败时保留 Playwright trace / screenshot 报告目录。
 - [ ] 将 Three.js 从运行时 jsDelivr 依赖迁移为版本锁定的本地 vendor / 构建依赖，降低外部 CDN 对运行时和 E2E 的影响。
-- [ ] 扩展浏览器 E2E 到普通死亡掉落/拾回、真实战斗减伤、存档重载和更多指令链。
+- [ ] 扩展浏览器 E2E 到普通死亡掉落/拾回、真实战斗减伤、存档重载、水面视觉断言和更多指令链。
 
 ## v0.4.0 — 实体、战斗与生存扩展（开发中）
 
-状态：开发中。实体基础、四种敌对生物、奖励闭环、生存死亡损失和第一版护甲/Equipment 已落库；死亡界面、水/氧气、天气粒子和完整 Java 伤害/护甲公式仍未完成。
+状态：开发中。实体基础、四种敌对生物、奖励闭环、生存死亡损失、第一版护甲/Equipment 和水独立透明渲染 pass 已落库；死亡界面、水下检测/氧气、天气粒子和完整 Java 伤害/护甲公式仍未完成。
 
 - [x] `EntityStore`：实体 ID、类型、组件数据、位置的统一注册与生命周期
 - [x] `SpatialHash`：按 X/Z 网格分桶的半径 / AABB 邻域查询，实体移动时同步迁移桶
@@ -53,6 +53,11 @@
 - [x] 生存/冒险死亡会把已装备护甲与背包/cursor/合成输入一起结算
 - [x] `scripts/check-armor.mjs`：槽位兼容、存档过滤、drain、护甲公式和 `/give leather_*` 回归
 - [x] Chromium E2E：`/give leather_chestplate`→真实背包拖放→护甲 HUD→v5 IndexedDB 快照→虚空死亡→装备/背包/XP 全清空
+- [x] `mesh-worker.js`：单次 chunk 扫描分别构建 opaque / water 两套 TypedArray + Transferable buffers；保留 opaque 旧顶层字段作为临时兼容视图
+- [x] 水网格可见面规则：同水内部面剔除；跨 chunk 同水边界剔除；水对实体方块面剔除，实体方块面对透明水仍保留
+- [x] `VoxelWorld`：每个 chunk 最多安装一个 opaque mesh + 一个透明 water mesh；共享 atlas，水材质 `transparent=true / opacity=.68 / depthWrite=false`
+- [x] chunk 卸载与世界 dispose 会同时释放 opaque/water geometry、两套 material 和共享 atlas texture
+- [x] `scripts/check-water.mjs`：孤立水、相邻水、水/实体边界、双 buffer transfer 和跨 chunk 水面剔除回归
 - [ ] 普通可恢复死亡的浏览器 E2E：物品/经验/护甲生成、死亡点存在与重新拾回
 - [ ] 死亡界面、死亡统计、床/重生点和 `keepInventory`
 - [ ] 死亡掉落/经验球跨页面重载持久化
@@ -64,7 +69,7 @@
 - [ ] 僵尸/骷髅日照燃烧、完整寻路、视线/亮度生成和障碍交互
 - [ ] 玩家弓、箭的拾回/卡墙、蓄力和远程武器规则
 - [ ] 完整武器属性、攻击强度曲线、暴击、扫击和精确 Java 版伤害规则
-- [ ] 水独立透明 pass、水下检测与氧气/溺水
+- [ ] 水下检测、氧气/溺水、游泳物理、流体传播与水面高度/动画
 - [ ] 降雨粒子和基础天气循环
 
 ## v0.3.0 — 生存闭环基础
