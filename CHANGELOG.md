@@ -6,13 +6,14 @@
 - GitHub Pages 仓库发布源已设置为 **GitHub Actions**，并持续验证完整 `configure → artifact upload → deploy` 流水线。
 - 固定 `@playwright/test` `1.62.0`，要求 Node 22+；`scripts/serve.mjs` 作为本地/CI 浏览器测试统一 HTTP server。
 - `Repository quality` 为两层质量门：`static-checks` 成功后运行 Chromium `browser-smoke`；同 `github.ref` 新 push 会取消旧 run。
-- `static-checks` 同时检查 `src/*.js`、`scripts/*.mjs`；`npm run test:logic` 现在顺序执行基础、Equipment/Armor、Water Mesh、Oxygen/Drowning、Swimming/Buoyancy 五套回归。
+- `static-checks` 同时检查 `src/*.js`、`scripts/*.mjs`；`npm run test:logic` 现在顺序执行基础、Equipment/Armor、Water Mesh、Oxygen/Drowning、Swimming/Buoyancy、Weather/Precipitation 六套回归。
 - 新增 `scripts/check-water.mjs`：孤立水、同水内部面、水/实体边界、Transferable buffers、跨 chunk 同水面。
 - 新增 `scripts/check-oxygen.mjs`：15 秒空气、4× 恢复、模式边界、跨 0 点、每秒溺水事件与非法输入。
 - 新增 `scripts/check-swim.mjs`：三点水覆盖率、dry no-op、水平倍率插值、被动浮力、Space 上游、Shift 下潜、垂直限速、冲突输入与参数校验。
+- 新增 `scripts/check-weather.mjs`：clear/rain/thunder 类型、固定池精确预算、雷雨相对雨天的速度/长度/风偏/透明度强度和非法容量。
 - PR #12 首轮静态质量门暴露旧 `scripts/check.mjs` 仍消费 mesh Worker 顶层 `indices`；修复采用 opaque 顶层兼容视图而不是删除旧回归。
-- browser smoke 使用固定 seed + `海` prompt 真实生成水体，验证 Oxygen `data-air` 下降、Space 后玩家 Y 上升、Shift 后 Y 下降、离水恢复；随后继续验证皮革外套、v5 IndexedDB Equipment 快照和虚空死亡清算。
-- 浏览器存档断言确认 world record 不含 `oxygen`；`swimCoverage` 同样只存在于 Player 运行时，不进入 snapshot。
+- browser smoke 使用固定 seed + `海` prompt 真实生成水体，验证 Oxygen `data-air`、Space 上游、Shift 下潜；随后实际执行 `/weather rain → thunder → clear` 并要求 `WeatherFX 446 → 720 → 0`，再继续 Equipment/v5 存档和虚空死亡链。
+- 浏览器存档断言确认 world record 不含 `oxygen`；`swimCoverage` 同样只存在于 Player 运行时。weather 继续使用既有长期存档字段。
 - 浏览器失败时上传 trace / screenshot / HTML report；当前 CI 只安装 Chromium。
 
 ### v0.4.0-dev — 已落库内容
@@ -43,23 +44,31 @@
 - 空气耗尽后每累计 1 秒产生一次 2 HP 溺水伤害；跨 0 点仅计算真正无空气的剩余 dt。
 - 溺水直接进入 `Player.takeDamage()`，不经过 armor-rules。
 - `oxygen.css` + 10 气泡 HUD；Oxygen 为瞬时状态，不进入 v5 world record。
-- 新增 `swim-rules.js`：根据水体覆盖率派生水中水平倍率、低重力/浮力、Space/Shift 垂直控制、指数阻尼和垂直限速。
+- `swim-rules.js`：根据水体覆盖率派生水中水平倍率、低重力/浮力、Space/Shift 垂直控制、指数阻尼和垂直限速。
 - `PlayerController` 每帧采样脚部 `+0.2`、躯干 `+0.9`、眼睛 `+1.62` 三个 voxel，得到 0/1/3/2/3/1 水覆盖率。
 - coverage 从 0→1 时水平移动倍率从 1 平滑趋近 0.5；水中不使用陆地 sprint/sneak 速度语义。
 - 完整浸水有轻微正浮力；Space 额外上游、Shift 额外下潜，垂直水中速度约限制在 +3.4/-3.0。
 - 水中物理仍复用 Player 原有 AABB `collides()` 与 `moveAxis()` 单一积分路径；离水后恢复原陆地 `-24` 重力和 grounded jump。
 - `swimCoverage` 为瞬时派生状态，不进入 Player/world snapshot。
-- Chromium E2E 在真实海洋中从 debug HUD 读取 Y，自动验证 Space 上升和 Shift 下降，再继续 Oxygen/Equipment/死亡完整链。
+- Chromium E2E 在真实海洋中从 debug HUD 读取 Y，自动验证 Space 上升和 Shift 下降。
+- 新增 `weather-rules.js`：clear/rain/thunder 纯降水 profile，默认固定容量 720；clear=0、rain=446、thunder=720。
+- 新增 `WeatherSystem`：单一 `THREE.LineSegments` + 单一动态 Float32Array position buffer；不按雨滴创建 Mesh/Geometry。
+- rain/thunder 通过 profile 调整 fallSpeed、line length、wind 和 opacity；thunder 的视觉强度参数高于 rain。
+- 雨线在玩家约 16 格范围内循环复用，落出下边界或玩家移动/传送导致超范围时重新生成到玩家上方。
+- `/weather` 现在同时更新天空/环境光与 WeatherSystem profile；加载既有 world record 时恢复天气 FX，不升级存档 schema。
+- world teardown 显式移除 WeatherSystem 并 dispose weather geometry/material。
+- Chromium E2E 实际验证 `/weather rain`=`WeatherFX rain:446`、`thunder`=`720`、`clear`=`0`，并确认 Three.js 更新链无 pageerror/console error。
 
 ### Documentation
-- README 区分稳定基线 `v0.3.0` 与 `v0.4.0-dev`，记录 Armor、Water Render、Oxygen 和 Swimming 当前实现边界。
-- `docs/ARCHITECTURE.md` 固化“Player 只有一个位置积分器”，将三点液体采样和 swim-rules 纳入 Player 数据流。
+- README 区分稳定基线 `v0.3.0` 与 `v0.4.0-dev`，记录 Armor、Water、Oxygen、Swimming、Precipitation 当前实现边界。
+- `docs/ARCHITECTURE.md` 固化 Player 单一积分器和固定天气 Buffer 池架构。
 - `docs/PROGRESS.md`、`docs/TESTING.md`、`docs/FILE_MANIFEST.md` 与实际代码/CI 对齐。
 
 ### Current limitations
-- `v0.4.0` 尚未封版：死亡界面/统计/床重生、完整流体、水下视觉、天气粒子等仍未完成。
-- 当前 Swimming 只是基础直立水中运动：没有冲刺游泳姿态、沿 pitch 三维推进、crawl transition、动画、实体游泳 AI、水流推动、Depth Strider/Dolphin's Grace。
-- 当前已完成头部浸水→氧气→溺水事件闭环，但没有 Respiration、Water Breathing、Conduit、气泡柱；完整 15 秒真实溺水死亡仍未在 browser E2E 中硬等待。
+- `v0.4.0` 尚未封版：死亡界面/统计/床重生、完整流体、水下视觉、自动天气/闪电/雪等仍未完成。
+- WeatherSystem 当前只有玩家周围的轻量 rain/thunder 线段 FX：没有自动周期、群系降水、屋顶遮雨/世界碰撞、飞溅/湿润、闪电 flash/bolt/damage/sound 或像素级天气 E2E。
+- Swimming 只是基础直立水中运动：没有冲刺游泳姿态、沿 pitch 三维推进、crawl transition、动画、实体游泳 AI、水流推动、Depth Strider/Dolphin's Grace。
+- 已完成头部浸水→氧气→溺水事件闭环，但没有 Respiration、Water Breathing、Conduit、气泡柱；完整 15 秒真实溺水死亡仍未在 browser E2E 中硬等待。
 - 水仍是独立透明静态 pass，没有 fluid level/传播、动态液面、水下 fog/折射或不同 GPU 下的像素级透明排序自动测试。
 - mesh Worker 的 opaque 顶层 buffer 字段是临时迁移兼容层。
 - 护甲公式是过渡实现，不等于 Java armor+toughness；暂无耐久、更多材质、附魔、Armor Trim、正式穿戴模型或快捷装备。
@@ -92,7 +101,7 @@
 ### Known limitations
 - 工作台正面目前仍按统一 side 纹理渲染，没有方块朝向 blockstate。
 - 木镐耐久元数据尚未进入物品栈。
-- `/weather rain` 目前只改变环境光和天空，没有降雨粒子/湿润效果。
+- `/weather rain` 在 v0.3.0 仍只改变环境光和天空，没有降雨粒子/湿润效果。
 
 ## [0.2.0] - 2026-08-11
 

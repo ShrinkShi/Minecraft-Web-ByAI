@@ -34,7 +34,7 @@ async function debugY(page){
   return Number(match[1]);
 }
 
-test('boots, swims in generated water, tracks oxygen, persists armor, then clears equipment on survival void death',async({page})=>{
+test('boots, swims, switches precipitation, persists armor, then clears equipment on survival void death',async({page})=>{
   const pageErrors=[];
   const consoleErrors=[];
   page.on('pageerror',error=>pageErrors.push(error.message));
@@ -74,6 +74,13 @@ test('boots, swims in generated water, tracks oxygen, persists armor, then clear
   await runCommand(page,'/tp 0 35 0');
   await expect(oxygen).toHaveClass(/hidden/,{timeout:5_000});
 
+  await runCommand(page,'/weather rain');
+  await expect(page.locator('#debug')).toContainText('WeatherFX rain:446',{timeout:5_000});
+  await runCommand(page,'/weather thunder');
+  await expect(page.locator('#debug')).toContainText('WeatherFX thunder:720',{timeout:5_000});
+  await runCommand(page,'/weather clear');
+  await expect(page.locator('#debug')).toContainText('WeatherFX clear:0',{timeout:5_000});
+
   await runCommand(page,'/give minecraft:leather_chestplate 1');
   await key(page,'KeyE');
   await expect(page.locator('#inventory')).not.toHaveClass(/hidden/);
@@ -91,8 +98,8 @@ test('boots, swims in generated water, tracks oxygen, persists armor, then clear
   await expect.poll(async()=>{
     const record=(await savedWorlds(page)).find(world=>world.name==='CI Browser Smoke');
     if(!record||Number(record.updatedAt)<armorSaveStartedAt)return null;
-    return{version:record.version,chest:record.equipment?.slots?.chest?.id||null,hasTransientAir:Object.hasOwn(record,'oxygen')};
-  },{timeout:10_000,message:'a fresh pause save should persist armor but not transient oxygen state'}).toEqual({version:5,chest:'leather_chestplate',hasTransientAir:false});
+    return{version:record.version,chest:record.equipment?.slots?.chest?.id||null,weather:record.weather,hasTransientAir:Object.hasOwn(record,'oxygen')};
+  },{timeout:10_000,message:'a fresh pause save should persist armor and clear weather but not transient oxygen state'}).toEqual({version:5,chest:'leather_chestplate',weather:'clear',hasTransientAir:false});
   await page.getByRole('button',{name:'返回游戏'}).click();
   await expect(page.locator('#pause-menu')).not.toHaveClass(/active/);
 
