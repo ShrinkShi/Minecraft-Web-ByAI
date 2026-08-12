@@ -6,6 +6,7 @@ import {DeathScreen} from './death-screen.js';
 import {BLOCKS,WORLD_HEIGHT} from './blocks.js';
 import {normalizeRespawnPoint,resolveRespawnPosition} from './respawn-rules.js';
 import {bedPlacement,bedPartner,bedRespawnAnchor,isBedBlock} from './bed-rules.js';
+import {resolveSleep} from './sleep-rules.js';
 import {ITEMS} from './items.js';
 import {Inventory} from './inventory.js';
 import {Equipment} from './equipment.js';
@@ -206,7 +207,13 @@ function placeBed(cell){
   if(!world.setBlock(plan.head.x,plan.head.y,plan.head.z,plan.head.id)){world.setBlock(plan.foot.x,plan.foot.y,plan.foot.z,0);return null;}
   return plan;
 }
-function activateBed(hit){const anchor=bedRespawnAnchor(hit,hit?.id);if(!anchor||!setRespawnPoint(anchor))return false;ui.showToast('重生点已设置');return true;}
+function activateBed(hit){
+  const anchor=bedRespawnAnchor(hit,hit?.id);if(!anchor||!setRespawnPoint(anchor))return false;
+  const sleep=resolveSleep({gameTime,weather,sleepingPlayers:1,totalPlayers:1,percentage:100});
+  if(!sleep.allowed){ui.showToast('重生点已设置 · 只能在夜晚或雷雨中睡觉');return true;}
+  if(!sleep.ready){ui.showToast(`重生点已设置 · 已有 ${sleep.sleepingPlayers}/${sleep.required} 名玩家睡觉`);return true;}
+  gameTime=sleep.nextTime;if(weather!=='clear'){weather='clear';weatherSystem?.setWeather(weather);}applySky();markSaveDirty();ui.showToast('已睡到清晨 · 重生点已设置');return true;
+}
 function breakBed(broken){
   const partner=bedPartner(broken,broken?.id);if(!world.setBlock(broken.x,broken.y,broken.z,0))return false;
   if(partner&&world.getBlock(partner.x,partner.y,partner.z)===partner.id)world.setBlock(partner.x,partner.y,partner.z,0);return true;
