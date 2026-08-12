@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {executeCommand} from '../src/commands.js';
-import {BED_IDS,bedSleepCheckPoint} from '../src/bed-rules.js';
+import {BED_IDS,bedRespawnAnchor,bedSleepCheckPoint,bedSleepCheckPointFromRespawn} from '../src/bed-rules.js';
 import {SLEEP_MONSTER_HORIZONTAL,SLEEP_MONSTER_VERTICAL,isSleepBlockingPosition,firstSleepBlocker} from '../src/sleep-safety-rules.js';
 
 assert.equal(SLEEP_MONSTER_HORIZONTAL,8);assert.equal(SLEEP_MONSTER_VERTICAL,5);
@@ -17,8 +17,10 @@ assert.equal(firstSleepBlocker(bed,monsters)?.id,2);assert.equal(firstSleepBlock
 
 for(const entry of Object.values(BED_IDS)){
   const foot={x:40,y:72,z:-10},head={x:40+entry.dx,y:72,z:-10+entry.dz};
-  assert.deepEqual(bedSleepCheckPoint(foot,entry.foot),{x:40.5,y:72,z:-9.5});
-  assert.deepEqual(bedSleepCheckPoint(head,entry.head),{x:40.5,y:72,z:-9.5},'foot/head clicks must resolve to one canonical sleep-safety origin');
+  const expected={x:40.5,y:72,z:-9.5};
+  assert.deepEqual(bedSleepCheckPoint(foot,entry.foot),expected);
+  assert.deepEqual(bedSleepCheckPoint(head,entry.head),expected,'foot/head clicks must resolve to one canonical sleep-safety origin');
+  assert.deepEqual(bedSleepCheckPointFromRespawn(bedRespawnAnchor(head,entry.head)),expected,'sleep safety must not inherit the elevated respawn Y offset');
 }
 
 let summoned=null;const player={position:{x:1,y:2,z:3}},known=new Set(['zombie','skeleton','creeper','spider']);
@@ -28,7 +30,7 @@ assert.equal(executeCommand('/summon minecraft:skeleton',commandCtx).ok,true);as
 assert.equal(executeCommand('/summon cow',commandCtx).ok,false);assert.equal(executeCommand('/summon zombie 1 2',commandCtx).ok,false);assert.equal(executeCommand('/summon zombie a 2 3',commandCtx).ok,false);
 
 const hostile=readFileSync(new URL('../src/hostile-mobs.js',import.meta.url),'utf8'),main=readFileSync(new URL('../src/main.js',import.meta.url),'utf8'),commands=readFileSync(new URL('../src/commands.js',import.meta.url),'utf8');
-for(const token of ['sleepBlockerNear','firstSleepBlocker','SLEEP_MONSTER_HORIZONTAL'])assert.ok(hostile.includes(token),`hostile sleep query missing ${token}`);
-for(const token of ['bedSleepCheckPoint','hostileMobs?.sleepBlockerNear','附近有怪物，无法睡觉'])assert.ok(main.includes(token),`main sleep guard missing ${token}`);
+for(const token of ['sleepBlockerNear','firstSleepBlocker','SLEEP_MONSTER_HORIZONTAL','bedSleepCheckPointFromRespawn'])assert.ok(hostile.includes(token),`hostile sleep query missing ${token}`);
+for(const token of ['hostileMobs?.sleepBlockerNear','附近有怪物，无法睡觉'])assert.ok(main.includes(token),`main sleep guard missing ${token}`);
 assert.ok(commands.includes("name==='summon'"),'commands must expose a deterministic user-facing summon path for current hostile mobs');
 console.log('bed hostile-monster sleep safety + summon contracts: PASS');
