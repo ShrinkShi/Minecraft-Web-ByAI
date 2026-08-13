@@ -3,6 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {WebSocketServer} from 'ws';
 import {ClientInputSessionGate,assertClientSessionId} from '../src/client-input-envelope.js';
 import {MULTIPLAYER_SUBPROTOCOL,decodeClientHello,encodeServerWelcome} from '../src/multiplayer-handshake.js';
+import {encodeServerPlayerSnapshot} from '../src/server-player-snapshot.js';
 import {ServerPlayerInputState} from './player-input-state.mjs';
 
 export const DEFAULT_MULTIPLAYER_HOST='127.0.0.1';
@@ -154,6 +155,11 @@ export function createMultiplayerServer({
     get sessionCount(){return sessions.size;},
     getSessionInputState(session){const entry=sessions.get(assertClientSessionId(session));return entry?entry.inputState.snapshot():null;},
     drainSessionActions(session,limit){const entry=sessions.get(assertClientSessionId(session));return entry?entry.inputState.drainActions(limit):[];},
+    sendPlayerSnapshot(session,snapshot){
+      session=assertClientSessionId(session);const entry=sessions.get(session);if(!entry||entry.websocket.readyState!==1)return null;
+      if(!snapshot||snapshot.session!==session)throw new RangeError('player snapshot session must match target session');
+      const wire=encodeServerPlayerSnapshot(snapshot);entry.websocket.send(JSON.stringify(wire));return wire;
+    },
     async close(){
       for(const websocket of wss.clients)websocket.terminate();
       await new Promise(resolve=>wss.close(()=>resolve()));

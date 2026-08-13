@@ -1,6 +1,7 @@
 import {encodeClientInputEnvelope} from './client-input-envelope.js';
-import {nextNetworkSequence} from './network-sequence.js';
+import {nextNetworkSequence,NetworkSequenceGate} from './network-sequence.js';
 import {MULTIPLAYER_SUBPROTOCOL,decodeServerHandshake,encodeClientHello} from './multiplayer-handshake.js';
+import {decodeServerPlayerSnapshot} from './server-player-snapshot.js';
 
 export const WEBSOCKET_CLIENT_STATES=Object.freeze(['idle','connecting','handshaking','ready','rejected','closed','error']);
 export const DEFAULT_HANDSHAKE_TIMEOUT_MS=5000;
@@ -27,17 +28,18 @@ export function normalizeWebSocketUrl(value,{allowInsecure=false}={}){
   throw new RangeError('websocket url must use ws:// or wss://');
 }
 
-function parseServerMessage(data){
+function parseJsonServerMessage(data){
   if(typeof data!=='string')throw new TypeError('server websocket messages must be UTF-8 JSON text');
   let parsed;try{parsed=JSON.parse(data);}catch{throw new RangeError('server websocket message must contain valid JSON');}
-  return decodeServerHandshake(parsed);
+  if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw new TypeError('server websocket message must contain a JSON object');
+  return parsed;
 }
 
 export class MultiplayerWebSocketClient{
-  constructor({socketFactory=createBrowserWebSocket,onStateChange=()=>{},onProtocolError=()=>{},handshakeTimeoutMs=DEFAULT_HANDSHAKE_TIMEOUT_MS,setTimer=setTimeout,clearTimer=clearTimeout,allowInsecure=false}={}){
-    this.socketFactory=assertSocketFactory(socketFactory);this.onStateChange=assertCallback(onStateChange,'onStateChange');this.onProtocolError=assertCallback(onProtocolError,'onProtocolError');
+  constructor({socketFactory=createBrowserWebSocket,onStateChange=()=>{},onProtocolError=()=>{},onPlayerSnapshot=()=>{},handshakeTimeoutMs=DEFAULT_HANDSHAKE_TIMEOUT_MS,setTimer=setTimeout,clearTimer=clearTimeout,allowInsecure=false}={}){
+    this.socketFactory=assertSocketFactory(socketFactory);this.onStateChange=assertCallback(onStateChange,'onStateChange');this.onProtocolError=assertCallback(onProtocolError,'onProtocolError');this.onPlayerSnapshot=assertCallback(onPlayerSnapshot,'onPlayerSnapshot');
     this.handshakeTimeoutMs=assertTimeout(handshakeTimeoutMs);this.setTimer=assertCallback(setTimer,'setTimer');this.clearTimer=assertCallback(clearTimer,'clearTimer');this.allowInsecure=!!allowInsecure;
-    this.socket=null;this.state='idle';this.session=null;this.packetSeq=0;this.handshakeTimer=null;
+    this.socket=null;this.state='idle';this.session=null;this.packetSeq=0;this.handshakeTimer=null;this.snapshotGate=new NetworkSequenceGate();
   }
 
   setState(next,detail=null){if(this.state===next)return;this.state=next;this.onStateChange({state:next,detail});}
@@ -54,7 +56,7 @@ export class MultiplayerWebSocketClient{
   connect(url){
     if(!['idle','closed','rejected','error'].includes(this.state))throw new Error(`cannot connect while websocket client is ${this.state}`);
     const normalized=normalizeWebSocketUrl(url,{allowInsecure:this.allowInsecure});
-    this.clearHandshakeTimer();this.session=null;this.packetSeq=0;
+    this.clearHandshakeTimer();this.session=null;this.packetSeq=0;this.snapshotGate.reset();
     const socket=this.socketFactory(normalized,MULTIPLAYER_SUBPROTOCOL);
     if(!socket||typeof socket.addEventListener!=='function'||typeof socket.send!=='function'||typeof socket.close!=='function')throw new TypeError('socketFactory must return a WebSocket-compatible object');
     this.socket=socket;this.setState('connecting');
@@ -73,15 +75,21 @@ export class MultiplayerWebSocketClient{
 
   handleMessage(socket,event){
     if(socket!==this.socket)return;
-    if(this.state!=='handshaking'){
-      this.protocolFailure(new Error(`unexpected server message while websocket client is ${this.state}`),1002,'unexpected message');return;
+    let raw;try{raw=parseJsonServerMessage(event?.data);}catch(error){this.protocolFailure(error,1002,'invalid server message');return;}
+    if(this.state==='handshaking'){
+      let message;try{message=decodeServerHandshake(raw);}catch(error){this.protocolFailure(error,1002,'invalid handshake');return;}
+      this.clearHandshakeTimer();
+      if(message.kind==='reject'){
+        this.session=null;this.setState('rejected',message.code);socket.close(1000,'server rejected connection');return;
+      }
+      this.session=message.session;this.packetSeq=0;this.snapshotGate.reset();this.setState('ready',message.session);return;
     }
-    let message;try{message=parseServerMessage(event?.data);}catch(error){this.protocolFailure(error,1002,'invalid handshake');return;}
-    this.clearHandshakeTimer();
-    if(message.kind==='reject'){
-      this.session=null;this.setState('rejected',message.code);socket.close(1000,'server rejected connection');return;
+    if(this.state==='ready'){
+      let snapshot;try{snapshot=decodeServerPlayerSnapshot(raw,{expectedSession:this.session});}catch(error){this.protocolFailure(error,1002,'invalid player snapshot');return;}
+      if(!this.snapshotGate.accept(snapshot.tick)){this.protocolFailure(new Error('stale or duplicate server player snapshot tick'),1002,'stale player snapshot');return;}
+      try{this.onPlayerSnapshot(snapshot);}catch(error){this.protocolFailure(error,1011,'player snapshot handler failed');}return;
     }
-    this.session=message.session;this.packetSeq=0;this.setState('ready',message.session);
+    this.protocolFailure(new Error(`unexpected server message while websocket client is ${this.state}`),1002,'unexpected message');
   }
 
   handleError(socket,event){
@@ -109,7 +117,7 @@ export class MultiplayerWebSocketClient{
   }
 
   close(code=1000,reason='client closed connection'){
-    this.clearHandshakeTimer();this.session=null;
+    this.clearHandshakeTimer();this.session=null;this.snapshotGate.reset();
     const socket=this.socket;this.socket=null;
     if(socket)socket.close(code,reason);
     this.setState('closed',{code,reason});
