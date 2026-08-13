@@ -6,10 +6,11 @@ function editableY(value){value=integer(value,'target.y');if(value<0||value>=WOR
 function blockId(value,label){if(!Number.isInteger(value)||value<0||!BLOCKS[value])throw new RangeError(`${label} must reference a known block`);return value;}
 function worldLike(value){if(!value||typeof value!=='object'||typeof value.getBlock!=='function')throw new TypeError('world must expose getBlock');return value;}
 function targetLike(value){if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError('block target must be an object');return{x:integer(value.x,'target.x'),y:editableY(value.y),z:integer(value.z,'target.z'),id:blockId(value.id,'target.id')};}
+function mutationBoundary(value){if(typeof value!=='function')throw new TypeError('block break requires an explicit setBlock mutation boundary');return value;}
 function mutation(value){if(!value||typeof value!=='object'||typeof value.changed!=='boolean')throw new TypeError('block mutation must return a change result');return value;}
 
 export function applyAuthoritativeBlockBreak(world,target,{setBlock}={}){
-  world=worldLike(world);target=targetLike(target);const mutate=typeof setBlock==='function'?setBlock:typeof world.setBlock==='function'?world.setBlock.bind(world):null;if(!mutate)throw new TypeError('block break requires a setBlock mutation boundary');
+  world=worldLike(world);target=targetLike(target);const mutate=mutationBoundary(setBlock);
   const current=blockId(world.getBlock(target.x,target.y,target.z),'world block');
   if(current!==target.id)return Object.freeze({changed:false,reason:'stale-target',changes:Object.freeze([])});
   if(current===BLOCK.AIR||BLOCKS[current].liquid)return Object.freeze({changed:false,reason:'not-breakable',changes:Object.freeze([])});
