@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import WebSocket from 'ws';
+import './check-world-edit-replication.mjs';
+import {BLOCK} from '../src/blocks.js';
 import {encodeClientInputEnvelope} from '../src/client-input-envelope.js';
 import {encodePlayerControlFrame} from '../src/player-control-frame.js';
 import {encodePlayerViewFrame} from '../src/player-view-frame.js';
 import {MULTIPLAYER_SUBPROTOCOL,encodeClientHello} from '../src/multiplayer-handshake.js';
 import {decodeServerWorldInfo} from '../src/server-world-info.js';
 import {decodeServerPlayerSnapshot} from '../src/server-player-snapshot.js';
+import {WorldEditSyncAssembler} from '../src/world-edit-replication.js';
 import {createAuthoritativeServerRuntime} from '../server/runtime.mjs';
 import {normalizeRuntimeConfig,runtimeConfigFromEnv,DEFAULT_RUNTIME_PORT,DEFAULT_RUNTIME_WORLD_ID,DEFAULT_RUNTIME_WORLD_SEED,DEFAULT_RUNTIME_TERRAIN_PROMPT,DEFAULT_RUNTIME_MODE} from '../server/runtime-config.mjs';
 
@@ -24,19 +27,20 @@ function messageQueue(socket){const queued=[],waiters=[];socket.on('message',(da
 async function waitUntil(predicate,label){return Promise.race([new Promise(resolve=>{const poll=()=>predicate()?resolve():setTimeout(poll,10);poll();}),timeout(2500,label)]);}
 
 let tickCallback=null,tickDelay=null,clearedTimer=null;const logs=[],errors=[];
-const runtime=createAuthoritativeServerRuntime({
-  config:{host:'127.0.0.1',port:0,allowedOrigins:[ORIGIN],worldId:'runtime-world',seed:'golden-seed',prompt:'mountain forest',mode:'survival',spawnX:33,spawnZ:-17,prefetchRadius:1,terrainCacheChunks:32},
-  setIntervalFn:(callback,ms)=>(tickCallback=callback,tickDelay=ms,{timer:'runtime'}),clearIntervalFn:timer=>{clearedTimer=timer;},onLog:event=>logs.push(event),onError:event=>errors.push(event)
-});
+const runtime=createAuthoritativeServerRuntime({config:{host:'127.0.0.1',port:0,allowedOrigins:[ORIGIN],worldId:'runtime-world',seed:'golden-seed',prompt:'mountain forest',mode:'survival',spawnX:33,spawnZ:-17,prefetchRadius:1,terrainCacheChunks:32},setIntervalFn:(callback,ms)=>(tickCallback=callback,tickDelay=ms,{timer:'runtime'}),clearIntervalFn:timer=>{clearedTimer=timer;},onLog:event=>logs.push(event),onError:event=>errors.push(event)});
 assert.equal(runtime.state,'idle');assert.equal(runtime.running,false);assert.equal(runtime.authoritative.running,false);assert.equal(runtime.config.worldId,'runtime-world');assert.equal(runtime.world.seed,'golden-seed');
+const editX=100,editY=63,editZ=100,baseId=runtime.world.getBaseBlock(editX,editY,editZ),editId=baseId===BLOCK.AIR?BLOCK.STONE:BLOCK.AIR,seededEdit=runtime.world.setBlock(editX,editY,editZ,editId);assert.equal(seededEdit.changed,true);assert.equal(seededEdit.revision,1);assert.equal(runtime.world.revision,1);
 let socket=null;
 try{
   const address=await runtime.start();assert.equal(runtime.state,'running');assert.equal(runtime.running,true);assert.equal(runtime.address,address);assert.ok(address.port>0);assert.equal(tickDelay,50);assert.equal(typeof tickCallback,'function');assert.equal(runtime.authoritative.running,true);assert.equal(logs[0].event,'listening');assert.equal((await runtime.start()).port,address.port,'second start while running is idempotent');
   const health=await fetch(`http://127.0.0.1:${address.port}/healthz`);assert.equal(health.status,200);assert.deepEqual(await health.json(),{ok:true,protocol:MULTIPLAYER_SUBPROTOCOL});
 
   socket=await openClient(`ws://127.0.0.1:${address.port}${runtime.server.path}`);const messages=messageQueue(socket);socket.send(JSON.stringify(encodeClientHello()));
-  const welcome=await messages.next('runtime welcome');assert.equal(welcome.kind,'welcome');const worldInfo=decodeServerWorldInfo(await messages.next('runtime world info'),{expectedSession:welcome.session});const initial=decodeServerPlayerSnapshot(await messages.next('runtime initial snapshot'),{expectedSession:welcome.session});
-  assert.deepEqual({worldId:worldInfo.worldId,terrainVersion:worldInfo.terrainVersion,seed:worldInfo.seed,prompt:worldInfo.prompt,tickRate:worldInfo.tickRate},{worldId:'runtime-world',terrainVersion:1,seed:'golden-seed',prompt:'mountain forest',tickRate:20});assert.equal(initial.tick,0);assert.deepEqual(initial.position,{x:33.5,y:23.001,z:-16.5});assert.equal(runtime.server.sessionCount,1);assert.equal(runtime.authoritative.sessionCount,1);
+  const welcome=await messages.next('runtime welcome');assert.equal(welcome.kind,'welcome');
+  const worldInfo=decodeServerWorldInfo(await messages.next('runtime world info'),{expectedSession:welcome.session});assert.deepEqual({worldId:worldInfo.worldId,terrainVersion:worldInfo.terrainVersion,seed:worldInfo.seed,prompt:worldInfo.prompt,tickRate:worldInfo.tickRate},{worldId:'runtime-world',terrainVersion:1,seed:'golden-seed',prompt:'mountain forest',tickRate:20});
+  const editAssembler=new WorldEditSyncAssembler({session:welcome.session,worldId:worldInfo.worldId});let editSnapshot=null;while(!editSnapshot){const step=editAssembler.accept(await messages.next('runtime world edit sync'));if(step.complete)editSnapshot=step.result;}
+  assert.equal(editSnapshot.revision,1);assert.deepEqual(editSnapshot.edits,{[`${editX},${editY},${editZ}`]:editId});
+  const initial=decodeServerPlayerSnapshot(await messages.next('runtime initial snapshot'),{expectedSession:welcome.session});assert.equal(initial.tick,0);assert.deepEqual(initial.position,{x:33.5,y:23.001,z:-16.5});assert.equal(runtime.server.sessionCount,1);assert.equal(runtime.authoritative.sessionCount,1);
 
   const view=encodePlayerViewFrame({yaw:Math.PI/2,pitch:0},7),control=encodePlayerControlFrame({side:0,forward:1,jump:false,sneak:false,sprint:false,primary:false},8);socket.send(JSON.stringify(encodeClientInputEnvelope({session:welcome.session,packetSeq:0,kind:'view',payload:view})));socket.send(JSON.stringify(encodeClientInputEnvelope({session:welcome.session,packetSeq:1,kind:'control',payload:control})));
   await waitUntil(()=>runtime.server.getSessionInputState(welcome.session)?.control?.sequence===8,'runtime validated input state');const movedPromise=messages.next('runtime tick1 snapshot');tickCallback();const moved=decodeServerPlayerSnapshot(await movedPromise,{expectedSession:welcome.session});assert.equal(moved.tick,1);near(moved.position.x,33.5-4.3*.05,1e-9,'production runtime +90 W x');near(moved.position.z,-16.5,1e-9,'production runtime +90 W z');assert.equal(moved.grounded,true);assert.deepEqual(errors,[]);
@@ -45,4 +49,4 @@ try{
 }finally{if(runtime.state!=='stopped')await runtime.stop();if(socket&&socket.readyState===WebSocket.OPEN)socket.terminate();}
 
 assert.throws(()=>createAuthoritativeServerRuntime({config:null}),/runtime config/);assert.throws(()=>createAuthoritativeServerRuntime({onLog:null}),/onLog/);assert.throws(()=>createAuthoritativeServerRuntime({onError:null}),/onError/);
-console.log('production authoritative runtime config + welcome/world-info/snapshot/tick lifecycle: PASS');
+console.log('production authoritative runtime + initial world edit sync + tick lifecycle: PASS');
