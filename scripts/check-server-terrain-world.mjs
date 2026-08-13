@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import {BLOCK,CHUNK_SIZE,WORLD_HEIGHT} from '../src/blocks.js';
+import {ServerTerrainWorld,DEFAULT_SERVER_TERRAIN_CACHE_CHUNKS,MAX_SERVER_TERRAIN_CACHE_CHUNKS} from '../server/terrain-world.mjs';
+import {ServerPlayerSimulation} from '../server/player-simulation.mjs';
+
+function fnv1a(bytes){let hash=2166136261>>>0;for(const byte of bytes){hash^=byte;hash=Math.imul(hash,16777619);}return hash>>>0;}
+
+assert.equal(DEFAULT_SERVER_TERRAIN_CACHE_CHUNKS,256);assert.equal(MAX_SERVER_TERRAIN_CACHE_CHUNKS,4096);
+const world=new ServerTerrainWorld({seed:'golden-seed',prompt:'mountain forest',maxCacheChunks:8});assert.equal(world.cacheSize,0);assert.equal(Object.isFrozen(world.environment),true);
+
+assert.equal(world.getBlock(0,-1,0),BLOCK.STONE,'below-world boundary matches browser VoxelWorld');assert.equal(world.getBlock(0,WORLD_HEIGHT,0),BLOCK.AIR,'above-world boundary matches browser VoxelWorld');assert.equal(world.cacheSize,0,'vertical out-of-range queries do not generate chunks');
+assert.equal(world.getBlock(0,16,0),BLOCK.SAND);assert.equal(world.getBlock(0,17,0),BLOCK.WATER);assert.equal(world.getBlock(0,20,0),BLOCK.WATER);assert.equal(world.getBlock(0,21,0),BLOCK.AIR);assert.equal(world.highestSolid(0,0),16);assert.equal(world.isSolidBlock(0,16,0),true);assert.equal(world.isLiquidBlock(0,17,0),true);assert.equal(world.isSolidBlock(0,17,0),false);
+assert.equal(world.getBlock(-1,16,-1),BLOCK.SAND,'negative world coordinates use floor-div/mod chunk addressing');assert.equal(world.getBlock(-1,17,-1),BLOCK.WATER);assert.equal(world.hasCachedChunk(-1,-1),true);
+assert.equal(world.getBlock(33,22,-17),BLOCK.GRASS);assert.equal(world.getBlock(33,21,-17),BLOCK.DIRT);assert.equal(world.getBlock(33,23,-17),BLOCK.AIR);assert.equal(world.highestSolid(33.9,-16.1),22,'highestSolid floors X/Z like browser VoxelWorld');
+
+const snapshot=world.getChunkSnapshot(2,-1),checksum=fnv1a(snapshot);assert.equal(checksum,3280513530,'server chunk snapshot matches shared terrain golden');const original=snapshot[0];snapshot[0]=255;assert.equal(fnv1a(world.getChunkSnapshot(2,-1)),checksum,'caller mutation of chunk snapshot cannot mutate authoritative cache');assert.notEqual(snapshot[0],original);
+
+const lru=new ServerTerrainWorld({seed:'golden-seed',prompt:'mountain forest',maxCacheChunks:2});lru.getChunkSnapshot(0,0);lru.getChunkSnapshot(1,0);assert.equal(lru.cacheSize,2);lru.getBlock(0,0,0);lru.getChunkSnapshot(2,0);assert.equal(lru.hasCachedChunk(0,0),true,'recently touched chunk remains in LRU cache');assert.equal(lru.hasCachedChunk(1,0),false,'least-recently-used chunk is evicted at cache bound');assert.equal(lru.hasCachedChunk(2,0),true);assert.equal(lru.cacheSize,2);const regenerated=fnv1a(lru.getChunkSnapshot(1,0));lru.clearCache();assert.equal(lru.cacheSize,0);assert.equal(fnv1a(lru.getChunkSnapshot(1,0)),regenerated,'evicted/cleared chunks deterministically regenerate');
+
+const prefetch=new ServerTerrainWorld({seed:'ShrinkCraft-2026',prompt:'海',maxCacheChunks:16});const keys=prefetch.prefetchAround(-.2,-.2,1);assert.deepEqual(keys,['-1,-1','-2,-2','-2,-1','-2,0','-1,-2','-1,0','0,-2','0,-1','0,0']);assert.equal(prefetch.cacheSize,9);assert.equal(keys.every(chunkKey=>{const [cx,cz]=chunkKey.split(',').map(Number);return prefetch.hasCachedChunk(cx,cz);}),true);
+
+const physicsWorld=new ServerTerrainWorld({seed:'golden-seed',prompt:'mountain forest',maxCacheChunks:8}),simulation=new ServerPlayerSimulation(physicsWorld.environment),ground=physicsWorld.highestSolid(33,-17);assert.equal(ground,22);simulation.addSession('terrain-player',{position:{x:33.5,y:ground+1.001,z:-16.5}});const settled=simulation.step('terrain-player');assert.equal(settled.grounded,true,'real generated terrain blocks authoritative gravity');assert.equal(settled.position.y,ground+1.001);assert.equal(settled.velocity.y,0);assert.ok(physicsWorld.cacheSize>0);
+
+assert.throws(()=>new ServerTerrainWorld({maxCacheChunks:0}),/maxCacheChunks/);assert.throws(()=>new ServerTerrainWorld({maxCacheChunks:MAX_SERVER_TERRAIN_CACHE_CHUNKS+1}),/maxCacheChunks/);assert.throws(()=>world.getBlock(.5,0,0),/wx must be an integer/);assert.throws(()=>world.getBlock(0,1.5,0),/wy must be an integer/);assert.throws(()=>world.getChunkSnapshot(0.1,0),/cx must be an integer/);assert.throws(()=>world.prefetchAround(NaN,0,1),/worldX must be a finite number/);assert.throws(()=>world.prefetchAround(0,0,-1),/chunkRadius/);assert.throws(()=>world.prefetchAround(0,0,17),/chunkRadius/);
+assert.equal(CHUNK_SIZE,16);assert.equal(WORLD_HEIGHT,64);
+
+console.log('bounded deterministic server terrain world + authoritative physics environment integration: PASS');
