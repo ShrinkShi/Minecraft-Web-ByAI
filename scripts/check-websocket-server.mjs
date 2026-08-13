@@ -42,6 +42,8 @@ function expectUpgradeStatus(url,{origin=ORIGIN,protocol=null,status}){
   }),timeout(2500,`HTTP upgrade rejection ${status}`)]);
 }
 
+async function handshake(socket){const welcomePromise=nextJson(socket);socket.send(JSON.stringify(encodeClientHello()));return welcomePromise;}
+
 let sessionCounter=0;const readyEvents=[],inputs=[],closeEvents=[],socketErrors=[];
 const server=createMultiplayerServer({
   port:0,allowedOrigins:[ORIGIN],helloTimeoutMs:300,sessionFactory:()=>`test-session-${++sessionCounter}`,
@@ -64,8 +66,8 @@ try{
   await expectUpgradeStatus(wsUrl,{origin:'https://evil.example',protocol:MULTIPLAYER_SUBPROTOCOL,status:403});
 
   const socket=await openClient(wsUrl);assert.equal(socket.protocol,MULTIPLAYER_SUBPROTOCOL);
-  const welcomePromise=nextJson(socket);socket.send(JSON.stringify(encodeClientHello()));const welcome=await welcomePromise;
-  assert.deepEqual(welcome,{v:1,kind:'welcome',session:'test-session-1'});await waitUntil(()=>readyEvents.length===1,'server ready callback');assert.equal(readyEvents[0].session,'test-session-1');assert.equal(readyEvents[0].origin,ORIGIN);
+  const welcome=await handshake(socket);
+  assert.deepEqual(welcome,{v:1,kind:'welcome',session:'test-session-1'});await waitUntil(()=>readyEvents.length===1,'server ready callback');assert.equal(readyEvents[0].session,'test-session-1');assert.equal(readyEvents[0].origin,ORIGIN);assert.equal(readyEvents[0].inputState.pendingActionCount,0);assert.equal(server.sessionCount,1);
 
   const control=encodePlayerControlFrame({side:.2,forward:.8,jump:false,sneak:false,sprint:true,primary:false},10),view=encodePlayerViewFrame({yaw:.4,pitch:-.2},11),action=encodePlayerActionFrame({kind:'use',viewSeq:11},12);
   const envelopes=[
@@ -74,27 +76,38 @@ try{
     encodeClientInputEnvelope({session:welcome.session,packetSeq:2,kind:'action',payload:action})
   ];
   for(const envelope of envelopes)socket.send(JSON.stringify(envelope));await waitUntil(()=>inputs.length===3,'three authoritative input callbacks');
-  assert.deepEqual(inputs.map(event=>[event.message.kind,event.message.packetSequence]),[['control',0],['view',1],['action',2]]);assert.equal(inputs[2].message.payload.viewSequence,11);
+  assert.deepEqual(inputs.map(event=>[event.message.kind,event.message.packetSequence]),[['control',0],['view',1],['action',2]]);assert.equal(inputs[2].message.payload.viewSequence,11);assert.equal(inputs[2].application.reason,'action-queued');
+  assert.deepEqual(server.getSessionInputState(welcome.session),{session:welcome.session,control:{version:1,side:.2,forward:.8,jump:false,sneak:false,sprint:true,primary:false,sequence:10},view:{yaw:.4,pitch:-.2,sequence:11},selectedSlot:0,pendingActionCount:1,retainedViewCount:1});
+  assert.deepEqual(server.drainSessionActions(welcome.session),[{kind:'use',sequence:12,viewSequence:11,view:{yaw:.4,pitch:-.2,sequence:11}}]);assert.equal(server.getSessionInputState(welcome.session).pendingActionCount,0);
 
-  const duplicateClose=nextClose(socket);socket.send(JSON.stringify(envelopes[2]));assert.equal((await duplicateClose).code,1008,'reliable stream duplicate packetSeq is a protocol/policy violation');
+  const duplicateClose=nextClose(socket);socket.send(JSON.stringify(envelopes[2]));assert.equal((await duplicateClose).code,1008,'reliable stream duplicate packetSeq is a transport violation');
+  await waitUntil(()=>server.getSessionInputState(welcome.session)===null,'closed session input state cleanup');
 
-  const callbackFailure=await openClient(wsUrl);const callbackWelcomePromise=nextJson(callbackFailure);callbackFailure.send(JSON.stringify(encodeClientHello()));const callbackWelcome=await callbackWelcomePromise;
+  const semanticReplay=await openClient(wsUrl),semanticWelcome=await handshake(semanticReplay);const replayView=encodePlayerViewFrame({yaw:.8,pitch:.1},40),replayAction=encodePlayerActionFrame({kind:'use',viewSeq:40},41);
+  semanticReplay.send(JSON.stringify(encodeClientInputEnvelope({session:semanticWelcome.session,packetSeq:0,kind:'view',payload:replayView})));
+  semanticReplay.send(JSON.stringify(encodeClientInputEnvelope({session:semanticWelcome.session,packetSeq:1,kind:'action',payload:replayAction})));
+  await waitUntil(()=>server.getSessionInputState(semanticWelcome.session)?.pendingActionCount===1,'first semantic action accepted');
+  const semanticClose=nextClose(semanticReplay);semanticReplay.send(JSON.stringify(encodeClientInputEnvelope({session:semanticWelcome.session,packetSeq:2,kind:'action',payload:replayAction})));const semanticClosed=await semanticClose;assert.equal(semanticClosed.code,1008,'fresh packetSeq cannot replay an already consumed inner action sequence');assert.match(semanticClosed.reason,/stale-action-sequence/);
+
+  const missingView=await openClient(wsUrl),missingViewWelcome=await handshake(missingView);const missingViewAction=encodePlayerActionFrame({kind:'drop',viewSeq:999},50),missingViewClose=nextClose(missingView);missingView.send(JSON.stringify(encodeClientInputEnvelope({session:missingViewWelcome.session,packetSeq:0,kind:'action',payload:missingViewAction})));const missingViewClosed=await missingViewClose;assert.equal(missingViewClosed.code,1008);assert.match(missingViewClosed.reason,/unknown-action-view/);
+
+  const callbackFailure=await openClient(wsUrl);const callbackWelcome=await handshake(callbackFailure);
   const hotbar=encodePlayerActionFrame({kind:'hotbar-select',slot:2},13),callbackEnvelope=encodeClientInputEnvelope({session:callbackWelcome.session,packetSeq:0,kind:'action',payload:hotbar});
   const callbackClose=nextClose(callbackFailure);callbackFailure.send(JSON.stringify(callbackEnvelope));assert.equal((await callbackClose).code,1011,'application callback failures must close only the affected session');
-  await waitUntil(()=>socketErrors.some(event=>event.error?.message==='intentional input handler failure'),'input handler error callback');
+  await waitUntil(()=>socketErrors.some(event=>event.error?.message==='intentional input handler failure'),'input handler error callback');const hotbarEvent=inputs.find(event=>event.session===callbackWelcome.session);assert.equal(hotbarEvent.application.reason,'hotbar-updated');assert.equal(hotbarEvent.inputState.selectedSlot,2,'semantic state applies before downstream gameplay callback');
 
   const malformed=await openClient(wsUrl);const malformedClose=nextClose(malformed);malformed.send(JSON.stringify({v:1,kind:'hello',token:'secret'}));assert.equal((await malformedClose).code,1002);
 
   const binary=await openClient(wsUrl);const binaryClose=nextClose(binary);binary.send(Buffer.from([1,2,3]));assert.equal((await binaryClose).code,1003);
 
-  const mismatch=await openClient(wsUrl);const mismatchWelcomePromise=nextJson(mismatch);mismatch.send(JSON.stringify(encodeClientHello()));const mismatchWelcome=await mismatchWelcomePromise;
+  const mismatch=await openClient(wsUrl);const mismatchWelcome=await handshake(mismatch);
   const mismatchClose=nextClose(mismatch);mismatch.send(JSON.stringify(encodeClientInputEnvelope({session:'other-session',packetSeq:0,kind:'view',payload:view})));assert.equal((await mismatchClose).code,1002);assert.notEqual(mismatchWelcome.session,'other-session');
 
   const idle=await openClient(wsUrl);const idleClose=await nextClose(idle);assert.equal(idleClose.code,SERVER_HELLO_TIMEOUT_CLOSE_CODE);assert.match(idleClose.reason,/hello timeout/);
 
-  await waitUntil(()=>closeEvents.length>=6,'session close callbacks');
+  await waitUntil(()=>closeEvents.length>=8,'session close callbacks');
 }finally{
   await server.close();
 }
 
-console.log('real Node websocket upgrade + hello/session/input gate integration: PASS');
+console.log('real Node websocket + authoritative semantic input state integration: PASS');
