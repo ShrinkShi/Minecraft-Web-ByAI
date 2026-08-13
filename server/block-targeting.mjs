@@ -19,8 +19,7 @@ export function raycastAuthoritativeBlock(world,player,{maxDistance=DEFAULT_BLOC
   let x=rayCell(origin.x,direction.x),y=rayCell(origin.y,direction.y),z=rayCell(origin.z,direction.z),distance=0,previous=null;
   const ax=axis(origin.x,x,direction.x),ay=axis(origin.y,y,direction.y),az=axis(origin.z,z,direction.z);
   while(distance<=maxDistance+EPSILON){
-    if(y<0||y>=WORLD_HEIGHT)return null;
-    const id=world.getBlock(x,y,z);if(targetable(id))return Object.freeze({x,y,z,id,previous:previous?Object.freeze({...previous}):null,distance});
+    if(y>=0&&y<WORLD_HEIGHT){const id=world.getBlock(x,y,z);if(targetable(id))return Object.freeze({x,y,z,id,previous:previous?Object.freeze({...previous}):null,distance});}
     const next=Math.min(ax.next,ay.next,az.next);if(!Number.isFinite(next)||next>maxDistance+EPSILON)return null;
     const crossX=ax.next<=next+EPSILON,crossY=ay.next<=next+EPSILON,crossZ=az.next<=next+EPSILON;
     distance=Math.max(0,next);
