@@ -21,9 +21,12 @@ export class MultiplayerSessionBootstrap{
     onReady=()=>{},
     onWorldInfo=()=>{},
     onPlayerSnapshot=()=>{},
+    onRemotePlayerSpawn=()=>{},
+    onRemotePlayerSnapshot=()=>{},
+    onRemotePlayerDespawn=()=>{},
     onError=()=>{}
   }={}){
-    this.clientFactory=callback(clientFactory,'clientFactory');this.allowInsecure=!!allowInsecure;this.worldSyncTimeoutMs=timeout(worldSyncTimeoutMs);this.setTimer=callback(setTimer,'setTimer');this.clearTimer=callback(clearTimer,'clearTimer');this.onStateChange=callback(onStateChange,'onStateChange');this.onReady=callback(onReady,'onReady');this.onWorldInfo=callback(onWorldInfo,'onWorldInfo');this.onPlayerSnapshot=callback(onPlayerSnapshot,'onPlayerSnapshot');this.onError=callback(onError,'onError');
+    this.clientFactory=callback(clientFactory,'clientFactory');this.allowInsecure=!!allowInsecure;this.worldSyncTimeoutMs=timeout(worldSyncTimeoutMs);this.setTimer=callback(setTimer,'setTimer');this.clearTimer=callback(clearTimer,'clearTimer');this.onStateChange=callback(onStateChange,'onStateChange');this.onReady=callback(onReady,'onReady');this.onWorldInfo=callback(onWorldInfo,'onWorldInfo');this.onPlayerSnapshot=callback(onPlayerSnapshot,'onPlayerSnapshot');this.onRemotePlayerSpawn=callback(onRemotePlayerSpawn,'onRemotePlayerSpawn');this.onRemotePlayerSnapshot=callback(onRemotePlayerSnapshot,'onRemotePlayerSnapshot');this.onRemotePlayerDespawn=callback(onRemotePlayerDespawn,'onRemotePlayerDespawn');this.onError=callback(onError,'onError');
     this.client=null;this.state='idle';this.worldInfo=null;this.latestSnapshot=null;this.readyData=null;this.syncTimer=null;this.lastError=null;
   }
 
@@ -43,7 +46,10 @@ export class MultiplayerSessionBootstrap{
       onStateChange:event=>this.handleTransportState(event),
       onProtocolError:error=>this.handleProtocolError(error),
       onWorldInfo:info=>this.handleWorldInfo(info),
-      onPlayerSnapshot:snapshot=>this.handlePlayerSnapshot(snapshot)
+      onPlayerSnapshot:snapshot=>this.handlePlayerSnapshot(snapshot),
+      onRemotePlayerSpawn:message=>this.onRemotePlayerSpawn(message),
+      onRemotePlayerSnapshot:message=>this.onRemotePlayerSnapshot(message),
+      onRemotePlayerDespawn:message=>this.onRemotePlayerDespawn(message)
     });
     if(!client||typeof client.connect!=='function'||typeof client.close!=='function')throw new TypeError('clientFactory must return a MultiplayerWebSocketClient-compatible object');
     this.client=client;this.setState('connecting');
