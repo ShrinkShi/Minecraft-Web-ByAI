@@ -73,6 +73,11 @@ test('boots, swims, switches precipitation, persists armor, then clears equipmen
   const firstAir=Number(await oxygen.getAttribute('data-air'));expect(firstAir).toBeGreaterThan(13);expect(firstAir).toBeLessThanOrEqual(15);
   await page.waitForTimeout(500);
   const secondAir=Number(await oxygen.getAttribute('data-air'));expect(secondAir).toBeLessThan(firstAir-.2);
+
+  const swimStartY=await debugY(page);
+  await holdKey(page,'Space',350);
+  await page.waitForTimeout(80);
+  const swimUpY=await debugY(page);expect(swimUpY).toBeGreaterThan(swimStartY+.08);
   await holdKey(page,'ShiftLeft',650);
   await page.waitForTimeout(80);
   const swimDownY=await debugY(page);expect(swimDownY).toBeLessThan(swimUpY-.03);
