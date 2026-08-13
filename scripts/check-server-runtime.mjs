@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 import WebSocket from 'ws';
 import './check-world-edit-replication.mjs';
-import {BLOCK} from '../src/blocks.js';
+import {BLOCK,CHUNK_SIZE} from '../src/blocks.js';
 import {encodeClientInputEnvelope} from '../src/client-input-envelope.js';
 import {encodePlayerControlFrame} from '../src/player-control-frame.js';
 import {encodePlayerViewFrame} from '../src/player-view-frame.js';
 import {MULTIPLAYER_SUBPROTOCOL,encodeClientHello} from '../src/multiplayer-handshake.js';
 import {decodeServerWorldInfo} from '../src/server-world-info.js';
 import {decodeServerPlayerSnapshot} from '../src/server-player-snapshot.js';
-import {WorldEditSyncAssembler} from '../src/world-edit-replication.js';
+import {WorldEditSyncAssembler,authoritativeEditsToVoxelEdits} from '../src/world-edit-replication.js';
 import {createAuthoritativeServerRuntime} from '../server/runtime.mjs';
 import {normalizeRuntimeConfig,runtimeConfigFromEnv,DEFAULT_RUNTIME_PORT,DEFAULT_RUNTIME_WORLD_ID,DEFAULT_RUNTIME_WORLD_SEED,DEFAULT_RUNTIME_TERRAIN_PROMPT,DEFAULT_RUNTIME_MODE} from '../server/runtime-config.mjs';
 
@@ -40,6 +40,8 @@ try{
   const worldInfo=decodeServerWorldInfo(await messages.next('runtime world info'),{expectedSession:welcome.session});assert.deepEqual({worldId:worldInfo.worldId,terrainVersion:worldInfo.terrainVersion,seed:worldInfo.seed,prompt:worldInfo.prompt,tickRate:worldInfo.tickRate},{worldId:'runtime-world',terrainVersion:1,seed:'golden-seed',prompt:'mountain forest',tickRate:20});
   const editAssembler=new WorldEditSyncAssembler({session:welcome.session,worldId:worldInfo.worldId});let editSnapshot=null;while(!editSnapshot){const step=editAssembler.accept(await messages.next('runtime world edit sync'));if(step.complete)editSnapshot=step.result;}
   assert.equal(editSnapshot.revision,1);assert.deepEqual(editSnapshot.edits,{[`${editX},${editY},${editZ}`]:editId});
+  const voxelEdits=authoritativeEditsToVoxelEdits(editSnapshot.edits),localX=editX%CHUNK_SIZE,localZ=editZ%CHUNK_SIZE,localIndex=localX+CHUNK_SIZE*(localZ+CHUNK_SIZE*editY);assert.deepEqual(voxelEdits['6,6'],[[localIndex,editId]]);
+  assert.deepEqual(authoritativeEditsToVoxelEdits({'-1,10,-1':BLOCK.WATER})['-1,-1'],[[15+CHUNK_SIZE*(15+CHUNK_SIZE*10),BLOCK.WATER]]);assert.throws(()=>authoritativeEditsToVoxelEdits({'1,2,3':999}),/known block/);
   const initial=decodeServerPlayerSnapshot(await messages.next('runtime initial snapshot'),{expectedSession:welcome.session});assert.equal(initial.tick,0);assert.deepEqual(initial.position,{x:33.5,y:23.001,z:-16.5});assert.equal(runtime.server.sessionCount,1);assert.equal(runtime.authoritative.sessionCount,1);
 
   const view=encodePlayerViewFrame({yaw:Math.PI/2,pitch:0},7),control=encodePlayerControlFrame({side:0,forward:1,jump:false,sneak:false,sprint:false,primary:false},8);socket.send(JSON.stringify(encodeClientInputEnvelope({session:welcome.session,packetSeq:0,kind:'view',payload:view})));socket.send(JSON.stringify(encodeClientInputEnvelope({session:welcome.session,packetSeq:1,kind:'control',payload:control})));
@@ -49,4 +51,4 @@ try{
 }finally{if(runtime.state!=='stopped')await runtime.stop();if(socket&&socket.readyState===WebSocket.OPEN)socket.terminate();}
 
 assert.throws(()=>createAuthoritativeServerRuntime({config:null}),/runtime config/);assert.throws(()=>createAuthoritativeServerRuntime({onLog:null}),/onLog/);assert.throws(()=>createAuthoritativeServerRuntime({onError:null}),/onError/);
-console.log('production authoritative runtime + initial world edit sync + tick lifecycle: PASS');
+console.log('production authoritative runtime + initial world edit sync + voxel conversion + tick lifecycle: PASS');
