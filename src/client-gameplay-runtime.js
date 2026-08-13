@@ -23,8 +23,8 @@ export class ClientGameplayRuntime{
   }
 
   dispose(){
-    if(this.disposed)return false;this.disposed=true;
-    this.weatherSystem?.dispose();this.explosions?.dispose();this.projectiles?.dispose();this.hostileMobs?.dispose();this.passiveMobs?.dispose();this.experienceOrbs?.dispose();this.drops?.dispose();this.player?.dispose();this.world?.dispose();return true;
+    if(this.disposed)return false;
+    this.weatherSystem?.dispose();this.explosions?.dispose();this.projectiles?.dispose();this.hostileMobs?.dispose();this.passiveMobs?.dispose();this.experienceOrbs?.dispose();this.drops?.dispose();this.player?.dispose();this.world?.dispose();this.disposed=true;return true;
   }
 }
 
