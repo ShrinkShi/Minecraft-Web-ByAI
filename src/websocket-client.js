@@ -10,10 +10,17 @@ function assertSocketFactory(factory){if(typeof factory!=='function')throw new T
 function assertCallback(value,label){if(typeof value!=='function')throw new TypeError(`${label} must be a function`);return value;}
 function assertTimeout(value){if(!Number.isInteger(value)||value<250||value>60000)throw new RangeError('handshake timeout must be an integer from 250 to 60000 ms');return value;}
 
+export function createBrowserWebSocket(url,protocol){
+  const WebSocketCtor=globalThis.WebSocket;
+  if(typeof WebSocketCtor!=='function')throw new Error('WebSocket API is not available in this runtime');
+  return new WebSocketCtor(url,protocol);
+}
+
 export function normalizeWebSocketUrl(value,{allowInsecure=false}={}){
   if(typeof value!=='string'||!value.trim())throw new TypeError('websocket url must be a non-empty string');
   let url;try{url=new URL(value);}catch{throw new RangeError('websocket url must be an absolute URL');}
   if(url.username||url.password)throw new RangeError('websocket url must not contain embedded credentials');
+  if(url.hash)throw new RangeError('websocket url must not contain a fragment');
   if(url.protocol==='wss:')return url.href;
   if(url.protocol==='ws:'&&allowInsecure)return url.href;
   if(url.protocol==='ws:')throw new RangeError('insecure ws:// requires explicit allowInsecure=true');
@@ -27,7 +34,7 @@ function parseServerMessage(data){
 }
 
 export class MultiplayerWebSocketClient{
-  constructor({socketFactory,onStateChange=()=>{},onProtocolError=()=>{},handshakeTimeoutMs=DEFAULT_HANDSHAKE_TIMEOUT_MS,setTimer=setTimeout,clearTimer=clearTimeout,allowInsecure=false}={}){
+  constructor({socketFactory=createBrowserWebSocket,onStateChange=()=>{},onProtocolError=()=>{},handshakeTimeoutMs=DEFAULT_HANDSHAKE_TIMEOUT_MS,setTimer=setTimeout,clearTimer=clearTimeout,allowInsecure=false}={}){
     this.socketFactory=assertSocketFactory(socketFactory);this.onStateChange=assertCallback(onStateChange,'onStateChange');this.onProtocolError=assertCallback(onProtocolError,'onProtocolError');
     this.handshakeTimeoutMs=assertTimeout(handshakeTimeoutMs);this.setTimer=assertCallback(setTimer,'setTimer');this.clearTimer=assertCallback(clearTimer,'clearTimer');this.allowInsecure=!!allowInsecure;
     this.socket=null;this.state='idle';this.session=null;this.packetSeq=0;this.handshakeTimer=null;
