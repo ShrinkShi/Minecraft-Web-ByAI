@@ -33,8 +33,8 @@ export function planPlayerMotionStep({
   walkSpeed=PLAYER_WALK_SPEED,
   sprintSpeed=PLAYER_SPRINT_SPEED
 }={}){
-  const stepDt=Math.min(nonNegative(dt,'dt'),PLAYER_MAX_STEP_DT),angle=finite(yaw,'yaw'),input=normalizeControlState(control),current=velocity3(velocity),isFlying=bool(flying,'flying'),isGrounded=bool(grounded,'grounded');
-  walkSpeed=positiveSpeed(walkSpeed,'walkSpeed');sprintSpeed=positiveSpeed(sprintSpeed,'sprintSpeed');const water=isFlying?0:coverage(swimCoverage);
+  const stepDt=Math.min(nonNegative(dt,'dt'),PLAYER_MAX_STEP_DT),angle=finite(yaw,'yaw'),input=normalizeControlState(control),current=velocity3(velocity),isFlying=bool(flying,'flying'),isGrounded=bool(grounded,'grounded'),reportedCoverage=coverage(swimCoverage);
+  walkSpeed=positiveSpeed(walkSpeed,'walkSpeed');sprintSpeed=positiveSpeed(sprintSpeed,'sprintSpeed');const water=isFlying?0:reportedCoverage;
   const swim=stepSwimming({velocityY:current.y,coverage:water,dt:stepDt,up:input.jump,down:input.sneak});
   const baseSpeed=swim.active?walkSpeed:(input.sprint?sprintSpeed:walkSpeed),sneakFactor=swim.active?1:(input.sneak?PLAYER_SNEAK_SPEED_FACTOR:1),speed=baseSpeed*sneakFactor*swim.speedMultiplier;
   const moveAmount=Math.min(1,Math.hypot(input.forward,input.side));let inputX=0,inputZ=0;
