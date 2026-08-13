@@ -5,6 +5,7 @@ import {ClientInputSessionGate,assertClientSessionId} from '../src/client-input-
 import {MULTIPLAYER_SUBPROTOCOL,decodeClientHello,encodeServerWelcome} from '../src/multiplayer-handshake.js';
 import {encodeServerPlayerSnapshot} from '../src/server-player-snapshot.js';
 import {encodeServerWorldInfo} from '../src/server-world-info.js';
+import {encodeRemotePlayerSpawn,encodeRemotePlayerSnapshot,encodeRemotePlayerDespawn} from '../src/remote-player-replication.js';
 import {ServerPlayerInputState} from './player-input-state.mjs';
 
 export const DEFAULT_MULTIPLAYER_HOST='127.0.0.1';
@@ -146,6 +147,7 @@ export function createMultiplayerServer({
     });
   });
 
+  const sendEncoded=(session,wire)=>{session=assertClientSessionId(session);const entry=sessions.get(session);if(!entry||entry.websocket.readyState!==1)return null;entry.websocket.send(JSON.stringify(wire));return wire;};
   return{
     httpServer,wss,path,
     async listen(){
@@ -157,15 +159,14 @@ export function createMultiplayerServer({
     getSessionInputState(session){const entry=sessions.get(assertClientSessionId(session));return entry?entry.inputState.snapshot():null;},
     drainSessionActions(session,limit){const entry=sessions.get(assertClientSessionId(session));return entry?entry.inputState.drainActions(limit):[];},
     sendWorldInfo(session,info){
-      session=assertClientSessionId(session);const entry=sessions.get(session);if(!entry||entry.websocket.readyState!==1)return null;
-      if(!info||info.session!==session)throw new RangeError('world info session must match target session');
-      const wire=encodeServerWorldInfo(info);entry.websocket.send(JSON.stringify(wire));return wire;
+      session=assertClientSessionId(session);if(!info||info.session!==session)throw new RangeError('world info session must match target session');return sendEncoded(session,encodeServerWorldInfo(info));
     },
     sendPlayerSnapshot(session,snapshot){
-      session=assertClientSessionId(session);const entry=sessions.get(session);if(!entry||entry.websocket.readyState!==1)return null;
-      if(!snapshot||snapshot.session!==session)throw new RangeError('player snapshot session must match target session');
-      const wire=encodeServerPlayerSnapshot(snapshot);entry.websocket.send(JSON.stringify(wire));return wire;
+      session=assertClientSessionId(session);if(!snapshot||snapshot.session!==session)throw new RangeError('player snapshot session must match target session');return sendEncoded(session,encodeServerPlayerSnapshot(snapshot));
     },
+    sendRemotePlayerSpawn(session,state){return sendEncoded(session,encodeRemotePlayerSpawn(state));},
+    sendRemotePlayerSnapshot(session,state){return sendEncoded(session,encodeRemotePlayerSnapshot(state));},
+    sendRemotePlayerDespawn(session,playerId){return sendEncoded(session,encodeRemotePlayerDespawn(playerId));},
     async close(){
       for(const websocket of wss.clients)websocket.terminate();
       await new Promise(resolve=>wss.close(()=>resolve()));

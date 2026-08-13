@@ -3,6 +3,7 @@ import {nextNetworkSequence,NetworkSequenceGate} from './network-sequence.js';
 import {MULTIPLAYER_SUBPROTOCOL,decodeServerHandshake,encodeClientHello} from './multiplayer-handshake.js';
 import {decodeServerPlayerSnapshot} from './server-player-snapshot.js';
 import {SERVER_WORLD_INFO_KIND,decodeServerWorldInfo} from './server-world-info.js';
+import {REMOTE_PLAYER_SPAWN_KIND,REMOTE_PLAYER_SNAPSHOT_KIND,REMOTE_PLAYER_DESPAWN_KIND,decodeRemotePlayerReplication} from './remote-player-replication.js';
 
 export const WEBSOCKET_CLIENT_STATES=Object.freeze(['idle','connecting','handshaking','ready','rejected','closed','error']);
 export const DEFAULT_HANDSHAKE_TIMEOUT_MS=5000;
@@ -37,14 +38,15 @@ function parseJsonServerMessage(data){
 }
 
 export class MultiplayerWebSocketClient{
-  constructor({socketFactory=createBrowserWebSocket,onStateChange=()=>{},onProtocolError=()=>{},onWorldInfo=()=>{},onPlayerSnapshot=()=>{},handshakeTimeoutMs=DEFAULT_HANDSHAKE_TIMEOUT_MS,setTimer=setTimeout,clearTimer=clearTimeout,allowInsecure=false}={}){
-    this.socketFactory=assertSocketFactory(socketFactory);this.onStateChange=assertCallback(onStateChange,'onStateChange');this.onProtocolError=assertCallback(onProtocolError,'onProtocolError');this.onWorldInfo=assertCallback(onWorldInfo,'onWorldInfo');this.onPlayerSnapshot=assertCallback(onPlayerSnapshot,'onPlayerSnapshot');
+  constructor({socketFactory=createBrowserWebSocket,onStateChange=()=>{},onProtocolError=()=>{},onWorldInfo=()=>{},onPlayerSnapshot=()=>{},onRemotePlayerSpawn=()=>{},onRemotePlayerSnapshot=()=>{},onRemotePlayerDespawn=()=>{},handshakeTimeoutMs=DEFAULT_HANDSHAKE_TIMEOUT_MS,setTimer=setTimeout,clearTimer=clearTimeout,allowInsecure=false}={}){
+    this.socketFactory=assertSocketFactory(socketFactory);this.onStateChange=assertCallback(onStateChange,'onStateChange');this.onProtocolError=assertCallback(onProtocolError,'onProtocolError');this.onWorldInfo=assertCallback(onWorldInfo,'onWorldInfo');this.onPlayerSnapshot=assertCallback(onPlayerSnapshot,'onPlayerSnapshot');this.onRemotePlayerSpawn=assertCallback(onRemotePlayerSpawn,'onRemotePlayerSpawn');this.onRemotePlayerSnapshot=assertCallback(onRemotePlayerSnapshot,'onRemotePlayerSnapshot');this.onRemotePlayerDespawn=assertCallback(onRemotePlayerDespawn,'onRemotePlayerDespawn');
     this.handshakeTimeoutMs=assertTimeout(handshakeTimeoutMs);this.setTimer=assertCallback(setTimer,'setTimer');this.clearTimer=assertCallback(clearTimer,'clearTimer');this.allowInsecure=!!allowInsecure;
-    this.socket=null;this.state='idle';this.session=null;this.worldInfo=null;this.packetSeq=0;this.handshakeTimer=null;this.snapshotGate=new NetworkSequenceGate();
+    this.socket=null;this.state='idle';this.session=null;this.worldInfo=null;this.packetSeq=0;this.handshakeTimer=null;this.snapshotGate=new NetworkSequenceGate();this.remotePlayerGates=new Map();
   }
 
   setState(next,detail=null){if(this.state===next)return;this.state=next;this.onStateChange({state:next,detail});}
   clearHandshakeTimer(){if(this.handshakeTimer!==null){this.clearTimer(this.handshakeTimer);this.handshakeTimer=null;}}
+  resetRealtimeState(){this.snapshotGate.reset();this.remotePlayerGates.clear();}
   armHandshakeTimer(){
     this.clearHandshakeTimer();
     this.handshakeTimer=this.setTimer(()=>{
@@ -57,7 +59,7 @@ export class MultiplayerWebSocketClient{
   connect(url){
     if(!['idle','closed','rejected','error'].includes(this.state))throw new Error(`cannot connect while websocket client is ${this.state}`);
     const normalized=normalizeWebSocketUrl(url,{allowInsecure:this.allowInsecure});
-    this.clearHandshakeTimer();this.session=null;this.worldInfo=null;this.packetSeq=0;this.snapshotGate.reset();
+    this.clearHandshakeTimer();this.session=null;this.worldInfo=null;this.packetSeq=0;this.resetRealtimeState();
     const socket=this.socketFactory(normalized,MULTIPLAYER_SUBPROTOCOL);
     if(!socket||typeof socket.addEventListener!=='function'||typeof socket.send!=='function'||typeof socket.close!=='function')throw new TypeError('socketFactory must return a WebSocket-compatible object');
     this.socket=socket;this.setState('connecting');
@@ -74,6 +76,20 @@ export class MultiplayerWebSocketClient{
     this.setState('handshaking');socket.send(JSON.stringify(encodeClientHello()));this.armHandshakeTimer();
   }
 
+  handleRemotePlayerMessage(raw){
+    let message;try{message=decodeRemotePlayerReplication(raw);}catch(error){this.protocolFailure(error,1002,'invalid remote player replication');return;}
+    if(message.kind===REMOTE_PLAYER_SPAWN_KIND){
+      if(this.remotePlayerGates.has(message.playerId)){this.protocolFailure(new Error(`duplicate remote player spawn: ${message.playerId}`),1002,'duplicate remote player spawn');return;}
+      const gate=new NetworkSequenceGate();gate.accept(message.tick);this.remotePlayerGates.set(message.playerId,gate);try{this.onRemotePlayerSpawn(message);}catch(error){this.protocolFailure(error,1011,'remote player spawn handler failed');}return;
+    }
+    const gate=this.remotePlayerGates.get(message.playerId);if(!gate){this.protocolFailure(new Error(`unknown remote player: ${message.playerId}`),1002,'unknown remote player');return;}
+    if(message.kind===REMOTE_PLAYER_SNAPSHOT_KIND){
+      if(!gate.accept(message.tick)){this.protocolFailure(new Error(`stale or duplicate remote player tick: ${message.playerId}`),1002,'stale remote player snapshot');return;}
+      try{this.onRemotePlayerSnapshot(message);}catch(error){this.protocolFailure(error,1011,'remote player snapshot handler failed');}return;
+    }
+    if(message.kind===REMOTE_PLAYER_DESPAWN_KIND){this.remotePlayerGates.delete(message.playerId);try{this.onRemotePlayerDespawn(message);}catch(error){this.protocolFailure(error,1011,'remote player despawn handler failed');}return;}
+  }
+
   handleMessage(socket,event){
     if(socket!==this.socket)return;
     let raw;try{raw=parseJsonServerMessage(event?.data);}catch(error){this.protocolFailure(error,1002,'invalid server message');return;}
@@ -81,9 +97,9 @@ export class MultiplayerWebSocketClient{
       let message;try{message=decodeServerHandshake(raw);}catch(error){this.protocolFailure(error,1002,'invalid handshake');return;}
       this.clearHandshakeTimer();
       if(message.kind==='reject'){
-        this.session=null;this.worldInfo=null;this.setState('rejected',message.code);socket.close(1000,'server rejected connection');return;
+        this.session=null;this.worldInfo=null;this.resetRealtimeState();this.setState('rejected',message.code);socket.close(1000,'server rejected connection');return;
       }
-      this.session=message.session;this.worldInfo=null;this.packetSeq=0;this.snapshotGate.reset();this.setState('ready',message.session);return;
+      this.session=message.session;this.worldInfo=null;this.packetSeq=0;this.resetRealtimeState();this.setState('ready',message.session);return;
     }
     if(this.state==='ready'){
       if(raw.kind===SERVER_WORLD_INFO_KIND){
@@ -96,6 +112,7 @@ export class MultiplayerWebSocketClient{
         if(!this.snapshotGate.accept(snapshot.tick)){this.protocolFailure(new Error('stale or duplicate server player snapshot tick'),1002,'stale player snapshot');return;}
         try{this.onPlayerSnapshot(snapshot);}catch(error){this.protocolFailure(error,1011,'player snapshot handler failed');}return;
       }
+      if(raw.kind===REMOTE_PLAYER_SPAWN_KIND||raw.kind===REMOTE_PLAYER_SNAPSHOT_KIND||raw.kind===REMOTE_PLAYER_DESPAWN_KIND){this.handleRemotePlayerMessage(raw);return;}
       this.protocolFailure(new Error(`unsupported server realtime message kind: ${raw.kind}`),1002,'unsupported realtime message');return;
     }
     this.protocolFailure(new Error(`unexpected server message while websocket client is ${this.state}`),1002,'unexpected message');
@@ -103,17 +120,17 @@ export class MultiplayerWebSocketClient{
 
   handleError(socket,event){
     if(socket!==this.socket)return;
-    this.clearHandshakeTimer();this.session=null;this.worldInfo=null;this.setState('error',event||null);
+    this.clearHandshakeTimer();this.session=null;this.worldInfo=null;this.resetRealtimeState();this.setState('error',event||null);
   }
 
   handleClose(socket,event){
     if(socket!==this.socket)return;
-    this.clearHandshakeTimer();this.session=null;this.worldInfo=null;
+    this.clearHandshakeTimer();this.session=null;this.worldInfo=null;this.resetRealtimeState();
     if(this.state!=='rejected'&&this.state!=='error')this.setState('closed',event||null);
   }
 
   protocolFailure(error,code=1002,reason='protocol error'){
-    this.clearHandshakeTimer();this.session=null;this.worldInfo=null;this.onProtocolError(error);
+    this.clearHandshakeTimer();this.session=null;this.worldInfo=null;this.resetRealtimeState();this.onProtocolError(error);
     const socket=this.socket;this.setState('error',error?.message||String(error));
     if(socket)try{socket.close(code,reason);}catch{}
   }
@@ -126,7 +143,7 @@ export class MultiplayerWebSocketClient{
   }
 
   close(code=1000,reason='client closed connection'){
-    this.clearHandshakeTimer();this.session=null;this.worldInfo=null;this.snapshotGate.reset();
+    this.clearHandshakeTimer();this.session=null;this.worldInfo=null;this.resetRealtimeState();
     const socket=this.socket;this.socket=null;
     if(socket)socket.close(code,reason);
     this.setState('closed',{code,reason});
