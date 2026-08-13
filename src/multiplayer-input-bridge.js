@@ -1,6 +1,6 @@
 import {normalizeControlState} from './control-intents.js';
 import {encodePlayerControlFrame} from './player-control-frame.js';
-import {encodePlayerViewFrame} from './player-view-frame.js';
+import {encodePlayerViewFrame,normalizePlayerYaw,PLAYER_VIEW_MAX_PITCH} from './player-view-frame.js';
 import {encodePlayerActionFrame} from './player-action-frame.js';
 import {nextNetworkSequence} from './network-sequence.js';
 
@@ -9,7 +9,10 @@ function callback(value,label){if(typeof value!=='function')throw new TypeError(
 function finite(value,label){if(typeof value!=='number'||!Number.isFinite(value))throw new TypeError(`${label} must be a finite number`);return value;}
 function sameControl(a,b){return !!a&&!!b&&a.side===b.side&&a.forward===b.forward&&a.jump===b.jump&&a.sneak===b.sneak&&a.sprint===b.sprint&&a.primary===b.primary;}
 function sameView(a,b){return !!a&&!!b&&a.yaw===b.yaw&&a.pitch===b.pitch;}
-function viewState(value){value=object(value,'player view');return{yaw:finite(value.yaw,'player view yaw'),pitch:finite(value.pitch,'player view pitch')};}
+function viewState(value){
+  value=object(value,'player view');const pitch=finite(value.pitch,'player view pitch');if(pitch<-PLAYER_VIEW_MAX_PITCH||pitch>PLAYER_VIEW_MAX_PITCH)throw new RangeError('player view pitch is out of range');
+  return{yaw:normalizePlayerYaw(value.yaw),pitch};
+}
 
 export class MultiplayerInputBridge{
   constructor({transport,viewProvider,isReady=null}={}){
