@@ -1,9 +1,10 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
 import {BLOCKS} from './blocks.js';
 import {applyDamage,knockbackDirection} from './combat.js';
-import {waterCoverageFromSamples,stepSwimming} from './swim-rules.js';
+import {waterCoverageFromSamples} from './swim-rules.js';
 import {normalizeControlState} from './control-intents.js';
-import {horizontalMoveFromYaw,lookDirectionFromYawPitch} from './player-orientation-rules.js';
+import {lookDirectionFromYawPitch} from './player-orientation-rules.js';
+import {planPlayerMotionStep} from './player-motion-rules.js';
 
 export class PlayerController{
   constructor(camera,canvas,world,scene){
@@ -74,20 +75,16 @@ export class PlayerController{
   }
 
   update(dt){
-    dt=Math.min(dt,.05);
-    const {forward,side,sprint,sneak,jump:up}=this.controlState;
     this.swimCoverage=this.flying?0:this.waterCoverage();
-    const swim=stepSwimming({velocityY:this.velocity.y,coverage:this.swimCoverage,dt,up,down:sneak});
-    const baseSpeed=swim.active?this.walk:(sprint?this.sprint:this.walk),sneakFactor=swim.active?1:(sneak?.35:1),speed=baseSpeed*sneakFactor*swim.speedMultiplier,dir=new THREE.Vector3(),moveAmount=Math.min(1,Math.hypot(forward,side));
-    if(moveAmount){const horizontal=horizontalMoveFromYaw(this.yaw,{side,forward});dir.set(horizontal.x,0,horizontal.z).normalize().multiplyScalar(speed*dt*moveAmount);}
+    const jumpProbe=!this.flying&&this.swimCoverage===0&&this.controlState.jump&&this.isGroundedProbe();
+    const motion=planPlayerMotionStep({dt,yaw:this.yaw,control:this.controlState,velocity:this.velocity,flying:this.flying,swimCoverage:this.swimCoverage,grounded:jumpProbe,walkSpeed:this.walk,sprintSpeed:this.sprint});
+    this.velocity.set(motion.velocity.x,motion.velocity.y,motion.velocity.z);
     if(this.flying){
-      const vertical=((up?1:0)-(sneak?1:0))*7*dt;this.moveAxis('x',dir.x);this.moveAxis('z',dir.z);this.moveAxis('y',vertical);this.velocity.set(0,0,0);
+      this.moveAxis('x',motion.displacement.x);this.moveAxis('z',motion.displacement.z);this.moveAxis('y',motion.displacement.y);this.velocity.set(0,0,0);
     }else{
       this.grounded=false;
-      if(swim.active)this.velocity.y=swim.velocityY;
-      else{this.velocity.y-=24*dt;if(up&&this.isGroundedProbe())this.velocity.y=8.2;}
-      this.moveAxis('x',dir.x+this.velocity.x*dt);this.moveAxis('z',dir.z+this.velocity.z*dt);this.moveAxis('y',this.velocity.y*dt);
-      const drag=Math.exp(-(swim.active?5:8)*dt);this.velocity.x*=drag;this.velocity.z*=drag;
+      this.moveAxis('x',motion.displacement.x);this.moveAxis('z',motion.displacement.z);this.moveAxis('y',motion.displacement.y);
+      this.velocity.x*=motion.horizontalDrag;this.velocity.z*=motion.horizontalDrag;
       if(this.position.y<-10)this.hp=0;
     }
     this.syncCamera();
