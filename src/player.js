@@ -1,10 +1,18 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
 import {BLOCKS} from './blocks.js';
 import {applyDamage,knockbackDirection} from './combat.js';
-import {waterCoverageFromSamples} from './swim-rules.js';
 import {normalizeControlState} from './control-intents.js';
 import {lookDirectionFromYawPitch} from './player-orientation-rules.js';
 import {planPlayerMotionStep} from './player-motion-rules.js';
+import {
+  PLAYER_COLLISION_RADIUS,
+  PLAYER_COLLISION_HEIGHT,
+  PLAYER_EYE_HEIGHT,
+  playerCollidesBlocks,
+  resolvePlayerAxisMove,
+  probePlayerGrounded,
+  samplePlayerWaterCoverage
+} from './player-environment-rules.js';
 
 export class PlayerController{
   constructor(camera,canvas,world,scene){
@@ -12,7 +20,7 @@ export class PlayerController{
     this.position=new THREE.Vector3(0,40,0);this.velocity=new THREE.Vector3();
     this.yaw=0;this.pitch=0;this.controlState=normalizeControlState();this.grounded=false;this.flying=false;this.viewMode=0;this.swimCoverage=0;
     this.mode='survival';this.hp=20;this.hunger=20;this.saturation=5;this.hurtUntil=-Infinity;
-    this.eye=1.62;this.height=1.8;this.radius=.3;this.walk=4.3;this.sprint=5.6;
+    this.eye=PLAYER_EYE_HEIGHT;this.height=PLAYER_COLLISION_HEIGHT;this.radius=PLAYER_COLLISION_RADIUS;this.walk=4.3;this.sprint=5.6;
     this.avatar=this.createAvatar();
   }
 
@@ -62,16 +70,18 @@ export class PlayerController{
 
   collides(pos){
     if(this.mode==='spectator')return false;
-    const r=this.radius,h=this.height,eps=.001,minX=Math.floor(pos.x-r+eps),maxX=Math.floor(pos.x+r-eps),minY=Math.floor(pos.y+eps),maxY=Math.floor(pos.y+h-eps),minZ=Math.floor(pos.z-r+eps),maxZ=Math.floor(pos.z+r-eps);
-    for(let x=minX;x<=maxX;x++)for(let y=minY;y<=maxY;y++)for(let z=minZ;z<=maxZ;z++){if(BLOCKS[this.world.getBlock(x,y,z)]?.solid)return true;}return false;
+    return playerCollidesBlocks(pos,(x,y,z)=>!!BLOCKS[this.world.getBlock(x,y,z)]?.solid,{radius:this.radius,height:this.height});
   }
 
-  moveAxis(axis,amount){if(!amount)return;const next=this.position.clone();next[axis]+=amount;if(!this.collides(next)){this.position.copy(next);return true;}if(axis==='y'&&amount<0)this.grounded=true;this.velocity[axis]=0;return false;}
+  moveAxis(axis,amount){
+    if(!amount)return;
+    const result=resolvePlayerAxisMove({position:this.position,velocity:this.velocity,grounded:this.grounded,axis,amount,collides:position=>this.collides(position)});
+    this.position.set(result.position.x,result.position.y,result.position.z);this.velocity.set(result.velocity.x,result.velocity.y,result.velocity.z);this.grounded=result.grounded;return result.moved;
+  }
 
   waterCoverage(){
     if(this.flying||!this.world)return 0;
-    const x=Math.floor(this.position.x),z=Math.floor(this.position.z),sample=y=>!!BLOCKS[this.world.getBlock(x,Math.floor(y),z)]?.liquid;
-    return waterCoverageFromSamples([sample(this.position.y+.2),sample(this.position.y+.9),sample(this.position.y+this.eye)]);
+    return samplePlayerWaterCoverage(this.position,(x,y,z)=>!!BLOCKS[this.world.getBlock(x,y,z)]?.liquid,{eyeHeight:this.eye});
   }
 
   update(dt){
@@ -90,7 +100,7 @@ export class PlayerController{
     this.syncCamera();
   }
 
-  isGroundedProbe(){const p=this.position.clone();p.y-=.06;return this.collides(p);}
+  isGroundedProbe(){return probePlayerGrounded(this.position,position=>this.collides(position));}
   eyePosition(target=new THREE.Vector3()){return target.set(this.position.x,this.position.y+this.eye,this.position.z);}
   lookDirection(target=new THREE.Vector3()){const direction=lookDirectionFromYawPitch(this.yaw,this.pitch);return target.set(direction.x,direction.y,direction.z);}
   setLook(yaw,pitch){if(Number.isFinite(yaw))this.yaw=yaw;if(Number.isFinite(pitch))this.pitch=Math.max(-1.553,Math.min(1.553,pitch));this.syncCamera();}
