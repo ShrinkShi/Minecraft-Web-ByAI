@@ -12,7 +12,7 @@ async function setViewAndLock(page,yaw,pitch=0){const canvas=page.locator('#game
 
 test('two browsers render, interpolate and despawn each other by public playerId',async({browser})=>{
   let nextPlayer=0;const runtime=createAuthoritativeServerRuntime({config:{host:'127.0.0.1',port:0,allowedOrigins:[ORIGIN],worldId:'e2e-remote-world',seed:'golden-seed',prompt:'mountain forest',mode:'survival',spawnX:33,spawnZ:-17,prefetchRadius:1,terrainCacheChunks:32},playerIdFactory:()=>`p:e2e-${++nextPlayer}`});
-  const contextA=await browser.newContext(),contextB=await browser.newContext();const pageA=await contextA.newPage(),pageB=await contextB.newPage();
+  const contextA=await browser.newContext({baseURL:ORIGIN}),contextB=await browser.newContext({baseURL:ORIGIN});const pageA=await contextA.newPage(),pageB=await contextB.newPage();
   try{
     const address=await runtime.start(),url=`ws://127.0.0.1:${address.port}/ws`;await connect(pageA,url,'e2e-remote-world');await expect.poll(()=>remoteStates(pageA)).toEqual([]);
     await connect(pageB,url,'e2e-remote-world');
