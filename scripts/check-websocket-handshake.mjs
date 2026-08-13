@@ -66,7 +66,7 @@ assert.equal(controlEnvelope.packetSeq,0);assert.equal(viewEnvelope.packetSeq,1)
 socket.message(encodeServerPlayerSnapshot(snapshotState('world-session_7',40)));assert.equal(client.state,'ready');assert.equal(snapshots.length,1);assert.equal(snapshots[0].tick,40);assert.equal(snapshots[0].session,'world-session_7');assert.deepEqual(snapshots[0].position,{x:1,y:64,z:2});
 socket.message(encodeServerPlayerSnapshot(snapshotState('world-session_7',41,{position:{x:1,y:64,z:1.8}})));assert.equal(snapshots.length,2);assert.equal(snapshots[1].tick,41);
 
-socket.message(encodeServerWelcome('unexpected-second-welcome'));assert.equal(client.state,'error');assert.equal(socket.closed.at(-1).code,1002);assert.match(protocolErrors.at(-1),/snapshot|unexpected fields/);
+socket.message(encodeServerWelcome('unexpected-second-welcome'));assert.equal(client.state,'error');assert.equal(socket.closed.at(-1).code,1002);assert.match(protocolErrors.at(-1),/unsupported server realtime message kind|snapshot|unexpected fields/);
 
 const staleErrors=[],staleSnapshots=[],staleSocket=new FakeSocket('wss://example.com',MULTIPLAYER_SUBPROTOCOL),staleClient=new MultiplayerWebSocketClient({socketFactory:()=>staleSocket,onProtocolError:error=>staleErrors.push(error.message),onPlayerSnapshot:snapshot=>staleSnapshots.push(snapshot)});
 staleClient.connect('wss://example.com');staleSocket.open();staleSocket.message(encodeServerWelcome('stale-session'));const tick9=encodeServerPlayerSnapshot(snapshotState('stale-session',9));staleSocket.message(tick9);assert.equal(staleSnapshots.length,1);staleSocket.message(tick9);assert.equal(staleClient.state,'error');assert.equal(staleSocket.closed.at(-1).code,1002);assert.match(staleErrors.at(-1),/stale or duplicate/);
