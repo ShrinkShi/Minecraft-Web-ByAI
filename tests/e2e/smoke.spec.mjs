@@ -198,7 +198,7 @@ test('custom spawnpoint persists and explicit respawn returns to it',async({page
   expect(pageErrors).toEqual([]);expect(consoleErrors).toEqual([]);
 });
 
-test('bed placement sets the persistent respawn anchor',async({page})=>{
+test('bed placement persists respawn, sleeps, and blocks sleep near a real hostile',async({page})=>{
   const pageErrors=[],consoleErrors=[];page.on('pageerror',error=>pageErrors.push(error.message));page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
   await page.goto('/?e2e=1');await page.getByRole('button',{name:'单人游戏'}).click();await page.locator('#world-name').fill('CI Bed Anchor');await page.locator('#world-seed').fill('ci-bed-anchor-2026');await page.locator('#game-mode').selectOption('survival');await page.locator('#terrain-prompt').fill('平原');await page.getByRole('button',{name:'创建 / 进入'}).click();
   await expect(page.locator('#loading')).toHaveClass(/hidden/,{timeout:60_000});await expect(page.locator('#hud')).not.toHaveClass(/hidden/);
@@ -211,16 +211,25 @@ test('bed placement sets the persistent respawn anchor',async({page})=>{
   await key(page,'Escape');await expect(page.locator('#inventory')).toHaveClass(/hidden/);await expect(page.locator('#hotbar .hotbar-slot.selected')).toHaveAttribute('title','床');
   await placeBedWithRealAim(page);await expect(page.locator('#toast')).toContainText('放置 床',{timeout:2_000});
   await page.waitForTimeout(250);await rightClickCanvas(page);await expect(page.locator('#toast')).toContainText('重生点已设置',{timeout:5_000});
+
+  const anchorSaveStarted=await page.evaluate(()=>Date.now());await key(page,'Escape');await expect(page.locator('#pause-menu')).toHaveClass(/active/);
+  await expect.poll(async()=>{const record=(await savedWorlds(page)).find(world=>world.name==='CI Bed Anchor');if(!record||Number(record.updatedAt)<anchorSaveStarted||!record.respawnPoint)return null;const ids=Object.values(record.edits||{}).flat().map(entry=>Number(entry?.[1])).filter(id=>id>=11&&id<=18).sort((a,b)=>a-b);return{version:record.version,validPair:['11,12','13,14','15,16','17,18'].includes(ids.join(',')),hasRespawn:true};},{timeout:15_000,message:'bed pair and respawn anchor should persist before sleep-safety checks'}).toEqual({version:6,validPair:true,hasRespawn:true});
+  const initialBedRecord=(await savedWorlds(page)).find(world=>world.name==='CI Bed Anchor'),anchor=initialBedRecord.respawnPoint;expect(anchor).toBeTruthy();
+  await page.getByRole('button',{name:'返回游戏'}).click();await expect(page.locator('#pause-menu')).not.toHaveClass(/active/);
+
   await runCommand(page,'/time set night');await expect.poll(async()=>{const text=await page.locator('#debug').innerText(),match=text.match(/Time\s+(\d+)/);return Number(match?.[1])>=12990;},{timeout:5_000,message:'night command should move the shared world clock into the sleep window'}).toBe(true);
   await page.waitForTimeout(120);await rightClickCanvas(page);await expect(page.locator('#toast')).toContainText('已睡到清晨',{timeout:5_000});
   await expect.poll(async()=>{const text=await page.locator('#debug').innerText(),match=text.match(/Time\s+(\d+)/),time=Number(match?.[1]);return Number.isFinite(time)&&time>=1000&&time<1200;},{timeout:5_000,message:'using the same bed at night should advance the shared world clock to morning'}).toBe(true);
-  await runCommand(page,'/time set night');await runCommand(page,'/summon zombie ~2 ~ ~');await expect(page.locator('#debug')).toContainText('Hostile 1',{timeout:5_000});
+
+  const bedPlaneY=anchor.y-1.01;
+  await runCommand(page,'/time set night');await runCommand(page,`/summon zombie ${anchor.x+1} ${bedPlaneY} ${anchor.z}`);
+  await expect.poll(async()=>{const text=await page.locator('#debug').innerText(),match=text.match(/Hostile\s+(\d+)/);return Number(match?.[1])>=1;},{timeout:5_000,message:'the explicitly summoned bed-side zombie should exist even if natural night spawns change the total count'}).toBe(true);
   await rightClickCanvas(page);await expect(page.locator('#toast')).toContainText('附近有怪物，无法睡觉',{timeout:5_000});
   await expect.poll(async()=>{const text=await page.locator('#debug').innerText(),match=text.match(/Time\s+(\d+)/);return Number(match?.[1])>=12990;},{timeout:2_000,message:'nearby hostile monster must prevent the bed from skipping to morning'}).toBe(true);
+
   await key(page,'Escape');await expect(page.locator('#pause-menu')).toHaveClass(/active/);
   await expect.poll(async()=>{const record=(await savedWorlds(page)).find(world=>world.name==='CI Bed Anchor');if(!record||!record.respawnPoint)return null;const ids=Object.values(record.edits||{}).flat().map(entry=>Number(entry?.[1])).filter(id=>id>=11&&id<=18).sort((a,b)=>a-b);return{version:record.version,validPair:['11,12','13,14','15,16','17,18'].includes(ids.join(',')),hasRespawn:true};},{timeout:15_000,message:'valid bed pair and respawn anchor should persist together'}).toEqual({version:6,validPair:true,hasRespawn:true});
-  const bedRecord=(await savedWorlds(page)).find(world=>world.name==='CI Bed Anchor'),anchor=bedRecord.respawnPoint;expect(anchor).toBeTruthy();
-  await page.getByRole('button',{name:'返回游戏'}).click();await runCommand(page,'/tp -64 35 -64');await expect(page.locator('#debug')).toContainText('Hostile 0',{timeout:5_000});await runCommand(page,'/kill');await expect(page.locator('#death-menu')).toHaveClass(/active/,{timeout:10_000});await page.getByRole('button',{name:'重生'}).click();
+  await page.getByRole('button',{name:'返回游戏'}).click();await runCommand(page,'/time set day');await runCommand(page,'/tp -64 35 -64');await expect(page.locator('#debug')).toContainText('Hostile 0',{timeout:5_000});await runCommand(page,'/kill');await expect(page.locator('#death-menu')).toHaveClass(/active/,{timeout:10_000});await page.getByRole('button',{name:'重生'}).click();
   await expect.poll(async()=>{const pos=await debugXYZ(page);return Math.abs(pos.x-anchor.x)<.15&&Math.abs(pos.y-anchor.y)<.15&&Math.abs(pos.z-anchor.z)<.15;},{timeout:5_000,message:'explicit respawn should return to the bed anchor'}).toBe(true);
   expect(pageErrors).toEqual([]);expect(consoleErrors).toEqual([]);
 });
