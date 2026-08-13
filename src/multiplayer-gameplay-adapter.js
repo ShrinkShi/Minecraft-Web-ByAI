@@ -1,22 +1,9 @@
-import {CHUNK_SIZE,WORLD_HEIGHT} from './blocks.js';
 import {createClientGameplayRuntime} from './client-gameplay-runtime.js';
 import {RemotePlayerSystem} from './remote-player-system.js';
+import {authoritativeEditsToVoxelEdits} from './world-edit-replication.js';
 
 function object(value,label){if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError(`${label} must be an object`);return value;}
 function finite(value,label){if(typeof value!=='number'||!Number.isFinite(value))throw new TypeError(`${label} must be a finite number`);return value;}
-const floorDiv=(value,divisor)=>Math.floor(value/divisor);
-const mod=(value,divisor)=>((value%divisor)+divisor)%divisor;
-
-export function authoritativeEditsToVoxelEdits(edits){
-  edits=object(edits,'authoritative world edits');const output={};
-  for(const [coordinate,id] of Object.entries(edits)){
-    const parts=coordinate.split(',');if(parts.length!==3)throw new RangeError(`invalid authoritative world edit coordinate: ${coordinate}`);const [x,y,z]=parts.map(Number);
-    if(!Number.isSafeInteger(x)||!Number.isInteger(y)||y<0||y>=WORLD_HEIGHT||!Number.isSafeInteger(z)||!Number.isInteger(id)||id<0)throw new RangeError(`invalid authoritative world edit: ${coordinate}`);
-    const cx=floorDiv(x,CHUNK_SIZE),cz=floorDiv(z,CHUNK_SIZE),lx=mod(x,CHUNK_SIZE),lz=mod(z,CHUNK_SIZE),index=lx+CHUNK_SIZE*(lz+CHUNK_SIZE*y),key=`${cx},${cz}`;
-    (output[key]??=[]).push([index,id]);
-  }
-  return output;
-}
 
 export function applyAuthoritativePlayerState(player,state,{applyLook=false}={}){
   object(player,'player');state=object(state,'authoritative player state');const position=object(state.position,'authoritative player position'),velocity=object(state.velocity,'authoritative player velocity');
