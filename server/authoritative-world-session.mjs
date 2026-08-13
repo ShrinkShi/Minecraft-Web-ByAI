@@ -60,7 +60,9 @@ export class AuthoritativeWorldSession{
   join(session,{mode:playerMode=this.defaultMode,spawnX=this.spawnX,spawnZ=this.spawnZ,prefetchRadius:joinPrefetch=this.prefetchRadius}={}){
     session=assertClientSessionId(session);if(this.sessions.has(session)||this.simulation.hasSession(session))throw new Error(`authoritative world session already joined: ${session}`);playerMode=mode(playerMode);
     const spawn=this.spawnPosition(spawnX,spawnZ,joinPrefetch),snapshot=this.simulation.addSession(session,{position:spawn,mode:playerMode});this.sessions.add(session);
-    try{this.sendPlayerSnapshot(session,snapshot);}catch(error){this.sessions.delete(session);this.simulation.removeSession(session);throw error;}
+    try{
+      const wire=this.sendPlayerSnapshot(session,snapshot);if(wire===null||wire===undefined)throw new Error('initial authoritative snapshot transport is unavailable');
+    }catch(error){this.sessions.delete(session);this.simulation.removeSession(session);throw error;}
     return cloneJoinInfo({session,spawn,snapshot});
   }
 
