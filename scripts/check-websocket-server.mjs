@@ -7,7 +7,7 @@ import {encodeClientInputEnvelope} from '../src/client-input-envelope.js';
 import {MULTIPLAYER_SUBPROTOCOL,encodeClientHello} from '../src/multiplayer-handshake.js';
 import {createMultiplayerServer,SERVER_HELLO_TIMEOUT_CLOSE_CODE} from '../server/multiplayer-server.mjs';
 
-const ORIGIN='http://localhost:4173';
+const ORIGIN='http://localhost:4173',near=(actual,expected,label)=>assert.ok(Math.abs(actual-expected)<1e-12,`${label}: expected ${expected}, got ${actual}`);
 const timeout=(ms,label)=>new Promise((_,reject)=>setTimeout(()=>reject(new Error(`timeout waiting for ${label}`)),ms));
 
 function openClient(url,{origin=ORIGIN,protocol=MULTIPLAYER_SUBPROTOCOL}={}){
@@ -77,8 +77,8 @@ try{
   ];
   for(const envelope of envelopes)socket.send(JSON.stringify(envelope));await waitUntil(()=>inputs.length===3,'three authoritative input callbacks');
   assert.deepEqual(inputs.map(event=>[event.message.kind,event.message.packetSequence]),[['control',0],['view',1],['action',2]]);assert.equal(inputs[2].message.payload.viewSequence,11);assert.equal(inputs[2].application.reason,'action-queued');
-  assert.deepEqual(server.getSessionInputState(welcome.session),{session:welcome.session,control:{version:1,side:.2,forward:.8,jump:false,sneak:false,sprint:true,primary:false,sequence:10},view:{yaw:.4,pitch:-.2,sequence:11},selectedSlot:0,pendingActionCount:1,retainedViewCount:1});
-  assert.deepEqual(server.drainSessionActions(welcome.session),[{kind:'use',sequence:12,viewSequence:11,view:{yaw:.4,pitch:-.2,sequence:11}}]);assert.equal(server.getSessionInputState(welcome.session).pendingActionCount,0);
+  const liveState=server.getSessionInputState(welcome.session);assert.equal(liveState.session,welcome.session);assert.deepEqual(liveState.control,{version:1,side:.2,forward:.8,jump:false,sneak:false,sprint:true,primary:false,sequence:10});assert.equal(liveState.view.sequence,11);assert.equal(liveState.view.pitch,-.2);near(liveState.view.yaw,.4,'server-retained canonical view yaw');assert.equal(liveState.selectedSlot,0);assert.equal(liveState.pendingActionCount,1);assert.equal(liveState.retainedViewCount,1);
+  const drained=server.drainSessionActions(welcome.session);assert.equal(drained.length,1);assert.equal(drained[0].kind,'use');assert.equal(drained[0].sequence,12);assert.equal(drained[0].viewSequence,11);assert.equal(drained[0].view.sequence,11);assert.equal(drained[0].view.pitch,-.2);near(drained[0].view.yaw,.4,'drained action server view yaw');assert.equal(server.getSessionInputState(welcome.session).pendingActionCount,0);
 
   const duplicateClose=nextClose(socket);socket.send(JSON.stringify(envelopes[2]));assert.equal((await duplicateClose).code,1008,'reliable stream duplicate packetSeq is a transport violation');
   await waitUntil(()=>server.getSessionInputState(welcome.session)===null,'closed session input state cleanup');
