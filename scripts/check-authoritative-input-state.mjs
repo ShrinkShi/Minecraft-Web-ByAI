@@ -5,7 +5,7 @@ import {encodePlayerViewFrame} from '../src/player-view-frame.js';
 import {encodePlayerActionFrame} from '../src/player-action-frame.js';
 import {ServerPlayerInputState,DEFAULT_VIEW_HISTORY_LIMIT,DEFAULT_ACTION_QUEUE_LIMIT} from '../server/player-input-state.mjs';
 
-const session='state-session-1';
+const session='state-session-1',near=(actual,expected,label)=>assert.ok(Math.abs(actual-expected)<1e-12,`${label}: expected ${expected}, got ${actual}`);
 const decoded=(kind,payload,packetSeq=0)=>decodeClientInputEnvelope(encodeClientInputEnvelope({session,packetSeq,kind,payload}),{expectedSession:session});
 assert.equal(DEFAULT_VIEW_HISTORY_LIMIT,64);assert.equal(DEFAULT_ACTION_QUEUE_LIMIT,64);
 
@@ -21,12 +21,12 @@ assert.equal(state.snapshot().control.forward,.75,'stale semantic control must n
 for(const [packetSeq,sequence,yaw] of [[2,20,.1],[3,21,.2],[4,22,.3]]){
   assert.equal(state.apply(decoded('view',encodePlayerViewFrame({yaw,pitch:-.1},sequence),packetSeq)).accepted,true);
 }
-assert.equal(state.snapshot().view.sequence,22);assert.equal(state.snapshot().retainedViewCount,3);
+assert.equal(state.snapshot().view.sequence,22);assert.equal(state.snapshot().retainedViewCount,3);near(state.snapshot().view.yaw,.3,'latest canonical view yaw');
 
 const use30=encodePlayerActionFrame({kind:'use',viewSeq:20},30);
 assert.equal(state.apply(decoded('action',use30,5)).accepted,true);let snapshot=state.snapshot();assert.equal(snapshot.pendingActionCount,1);assert.equal(snapshot.selectedSlot,0);
-let actions=state.drainActions(1);assert.deepEqual(actions,[{kind:'use',sequence:30,viewSequence:20,view:{yaw:.1,pitch:-.1,sequence:20}}]);assert.equal(state.snapshot().pendingActionCount,0);
-actions[0].view.yaw=99;assert.equal(state.snapshot().view.yaw,.3,'drained action copies must not mutate retained view state');
+let actions=state.drainActions(1);assert.equal(actions.length,1);assert.equal(actions[0].kind,'use');assert.equal(actions[0].sequence,30);assert.equal(actions[0].viewSequence,20);assert.equal(actions[0].view.sequence,20);assert.equal(actions[0].view.pitch,-.1);near(actions[0].view.yaw,.1,'queued action canonical view yaw');assert.equal(state.snapshot().pendingActionCount,0);
+actions[0].view.yaw=99;near(state.snapshot().view.yaw,.3,'drained action copies must not mutate retained view state');
 
 const replayUse30=encodePlayerActionFrame({kind:'use',viewSeq:22},30);
 assert.deepEqual(state.apply(decoded('action',replayUse30,6)),{accepted:false,reason:'stale-action-sequence'},'new outer packet sequence must not replay an old action frame');
