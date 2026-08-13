@@ -17,7 +17,7 @@ function finite(value,label){const parsed=typeof value==='number'?value:Number(v
 function boolean(value,label){if(typeof value==='boolean')return value;if(value===undefined||value===null||value==='')return false;if(value==='1'||value==='true')return true;if(value==='0'||value==='false')return false;throw new RangeError(`${label} must be one of 1/0/true/false`);}
 function origins(value){
   if(value===undefined||value===null||value==='')return [...DEFAULT_ALLOWED_ORIGINS];
-  if(value==='*')return '*';
+  if(typeof value==='string'&&value.trim()==='*')return '*';
   const list=Array.isArray(value)?value.map(item=>String(item).trim()).filter(Boolean):String(value).split(',').map(item=>item.trim()).filter(Boolean);
   if(!list.length)throw new RangeError('allowed origins must contain at least one origin');return list;
 }
@@ -47,9 +47,9 @@ export function normalizeRuntimeConfig(input={}){
 
 export function runtimeConfigFromEnv(env=process.env){
   if(!env||typeof env!=='object')throw new TypeError('env must be an object');
-  return normalizeRuntimeConfig({
-    host:env.HOST,
-    port:env.PORT,
+  const config=normalizeRuntimeConfig({
+    host:env.MCWEB_WS_HOST??env.HOST,
+    port:env.MCWEB_WS_PORT??env.PORT,
     allowedOrigins:env.MCWEB_ALLOWED_ORIGINS,
     allowMissingOrigin:env.MCWEB_ALLOW_MISSING_ORIGIN,
     worldId:env.MCWEB_WORLD_ID,
@@ -61,4 +61,6 @@ export function runtimeConfigFromEnv(env=process.env){
     prefetchRadius:env.MCWEB_PREFETCH_RADIUS,
     terrainCacheChunks:env.MCWEB_TERRAIN_CACHE_CHUNKS
   });
+  if(config.port===0)throw new RangeError('MCWEB_WS_PORT/PORT must be an integer from 1 to 65535 for the production entrypoint');
+  return config;
 }
