@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {BLOCK,CHUNK_SIZE} from '../src/blocks.js';
+import {applyVoxelOverlay} from '../src/voxel-overlay.js';
+const index=(x,y,z)=>x+CHUNK_SIZE*(z+CHUNK_SIZE*y);
+const a={chunks:new Map(),edits:new Map(),index,requestMesh(){}};
+const first=applyVoxelOverlay(a,{x:33,y:20,z:-17,previous:BLOCK.AIR,id:BLOCK.STONE});
+assert.equal(first.chunkLoaded,false);assert.equal(a.edits.get('2,-2').get(first.index),BLOCK.STONE);
+const data=new Uint8Array(CHUNK_SIZE*CHUNK_SIZE*64),calls=[],b={chunks:new Map([['0,0',data]]),edits:new Map(),index,requestMesh:(x,z)=>calls.push(`${x},${z}`)};data[index(1,20,1)]=BLOCK.STONE;
+applyVoxelOverlay(b,{x:1,y:20,z:1,previous:BLOCK.STONE,id:BLOCK.WATER});
+assert.equal(data[index(1,20,1)],BLOCK.WATER);assert.deepEqual(calls,['0,0']);
+console.log('voxel overlay: PASS');
