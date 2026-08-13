@@ -16,11 +16,14 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 22
+      - name: Install logic/server runtime dependencies
+        run: npm install --omit=dev --ignore-scripts --no-audit --no-fund --no-package-lock
       - name: JavaScript syntax
         run: |
           set -e
           for file in src/*.js; do node --check "$file"; done
           for file in scripts/*.mjs; do node --check "$file"; done
+          for file in server/*.mjs; do node --check "$file"; done
       - name: Logic and worker regression checks
         run: npm run test:logic
 
