@@ -1,0 +1,87 @@
+import {MultiplayerWebSocketClient} from './websocket-client.js';
+
+export const MULTIPLAYER_BOOTSTRAP_STATES=Object.freeze(['idle','connecting','handshaking','synchronizing','ready','failed','closed']);
+export const DEFAULT_WORLD_SYNC_TIMEOUT_MS=10000;
+export const WORLD_SYNC_TIMEOUT_CLOSE_CODE=4002;
+
+function callback(value,label){if(typeof value!=='function')throw new TypeError(`${label} must be a function`);return value;}
+function timeout(value){if(!Number.isInteger(value)||value<1000||value>60000)throw new RangeError('world sync timeout must be an integer from 1000 to 60000 ms');return value;}
+function cloneInfo(value){return value?Object.freeze({...value}):null;}
+function cloneSnapshot(value){return value?Object.freeze({...value,position:Object.freeze({...value.position}),velocity:Object.freeze({...value.velocity})}):null;}
+function defaultClientFactory(options){return new MultiplayerWebSocketClient(options);}
+
+export class MultiplayerSessionBootstrap{
+  constructor({
+    clientFactory=defaultClientFactory,
+    allowInsecure=false,
+    worldSyncTimeoutMs=DEFAULT_WORLD_SYNC_TIMEOUT_MS,
+    setTimer=setTimeout,
+    clearTimer=clearTimeout,
+    onStateChange=()=>{},
+    onReady=()=>{},
+    onWorldInfo=()=>{},
+    onPlayerSnapshot=()=>{},
+    onError=()=>{}
+  }={}){
+    this.clientFactory=callback(clientFactory,'clientFactory');this.allowInsecure=!!allowInsecure;this.worldSyncTimeoutMs=timeout(worldSyncTimeoutMs);this.setTimer=callback(setTimer,'setTimer');this.clearTimer=callback(clearTimer,'clearTimer');this.onStateChange=callback(onStateChange,'onStateChange');this.onReady=callback(onReady,'onReady');this.onWorldInfo=callback(onWorldInfo,'onWorldInfo');this.onPlayerSnapshot=callback(onPlayerSnapshot,'onPlayerSnapshot');this.onError=callback(onError,'onError');
+    this.client=null;this.state='idle';this.worldInfo=null;this.latestSnapshot=null;this.readyData=null;this.syncTimer=null;this.lastError=null;
+  }
+
+  setState(next,detail=null){if(!MULTIPLAYER_BOOTSTRAP_STATES.includes(next))throw new RangeError(`unsupported multiplayer bootstrap state: ${next}`);if(this.state===next)return;this.state=next;this.onStateChange({state:next,detail});}
+  clearSyncTimer(){if(this.syncTimer!==null){this.clearTimer(this.syncTimer);this.syncTimer=null;}}
+  armSyncTimer(){
+    this.clearSyncTimer();this.syncTimer=this.setTimer(()=>{this.syncTimer=null;if(this.state==='synchronizing')this.fail(new Error('multiplayer world synchronization timed out'),WORLD_SYNC_TIMEOUT_CLOSE_CODE,'world sync timeout');},this.worldSyncTimeoutMs);
+  }
+  resetSessionState(){this.clearSyncTimer();this.worldInfo=null;this.latestSnapshot=null;this.readyData=null;this.lastError=null;}
+
+  connect(url){
+    if(!['idle','closed','failed'].includes(this.state))throw new Error(`cannot connect while multiplayer bootstrap is ${this.state}`);
+    if(this.client&&this.client.state!=='closed')try{this.client.close(1000,'reconnecting');}catch{}
+    this.resetSessionState();
+    const client=this.clientFactory({
+      allowInsecure:this.allowInsecure,
+      onStateChange:event=>this.handleTransportState(event),
+      onProtocolError:error=>this.handleProtocolError(error),
+      onWorldInfo:info=>this.handleWorldInfo(info),
+      onPlayerSnapshot:snapshot=>this.handlePlayerSnapshot(snapshot)
+    });
+    if(!client||typeof client.connect!=='function'||typeof client.close!=='function')throw new TypeError('clientFactory must return a MultiplayerWebSocketClient-compatible object');
+    this.client=client;this.setState('connecting');
+    try{return client.connect(url);}catch(error){this.fail(error,null,null,{closeTransport:false});throw error;}
+  }
+
+  handleTransportState({state,detail}={}){
+    if(state==='connecting'){if(this.state!=='connecting')this.setState('connecting',detail);return;}
+    if(state==='handshaking'){this.setState('handshaking',detail);return;}
+    if(state==='ready'){this.setState('synchronizing',detail);this.armSyncTimer();this.maybeReady();return;}
+    if(state==='rejected'){this.fail(new Error(`server rejected multiplayer connection: ${detail||'unknown'}`),null,null,{closeTransport:false});return;}
+    if(state==='error'){if(this.state!=='failed')this.fail(new Error(typeof detail==='string'?detail:'multiplayer transport error'),null,null,{closeTransport:false});return;}
+    if(state==='closed'){
+      this.clearSyncTimer();if(this.state!=='failed'){this.worldInfo=null;this.latestSnapshot=null;this.readyData=null;this.setState('closed',detail);}return;
+    }
+  }
+
+  handleProtocolError(error){if(this.state!=='failed')this.fail(error,null,null,{closeTransport:false});}
+  handleWorldInfo(info){
+    this.worldInfo=cloneInfo(info);this.onWorldInfo(this.worldInfo);this.maybeReady();
+  }
+  handlePlayerSnapshot(snapshot){
+    this.latestSnapshot=cloneSnapshot(snapshot);this.onPlayerSnapshot(this.latestSnapshot);this.maybeReady();
+  }
+  maybeReady(){
+    if(this.readyData||!this.worldInfo||!this.latestSnapshot)return null;
+    if(!this.client||this.client.state!=='ready')return null;
+    if(this.worldInfo.session!==this.latestSnapshot.session||this.worldInfo.session!==this.client.session){this.fail(new Error('multiplayer world/session bootstrap mismatch'),1002,'bootstrap session mismatch');return null;}
+    this.clearSyncTimer();const ready=Object.freeze({client:this.client,worldInfo:this.worldInfo,initialSnapshot:this.latestSnapshot});this.readyData=ready;this.setState('ready',{worldId:this.worldInfo.worldId,session:this.worldInfo.session,tick:this.latestSnapshot.tick});this.onReady(ready);return ready;
+  }
+
+  fail(error,closeCode=WORLD_SYNC_TIMEOUT_CLOSE_CODE,reason='multiplayer bootstrap failed',{closeTransport=true}={}){
+    const failure=error instanceof Error?error:new Error(String(error));this.clearSyncTimer();this.lastError=failure;this.worldInfo=null;this.latestSnapshot=null;this.readyData=null;this.setState('failed',failure.message);try{this.onError(failure);}catch{}
+    if(closeTransport&&closeCode!==null&&this.client&&this.client.state!=='closed'&&this.client.state!=='error')try{this.client.close(closeCode,reason);}catch{}
+    return failure;
+  }
+
+  close(code=1000,reason='multiplayer bootstrap closed'){
+    this.clearSyncTimer();const client=this.client;this.client=null;this.worldInfo=null;this.latestSnapshot=null;this.readyData=null;this.lastError=null;if(client&&client.state!=='closed')client.close(code,reason);this.setState('closed',{code,reason});
+  }
+}
