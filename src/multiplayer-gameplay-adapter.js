@@ -1,8 +1,22 @@
+import {CHUNK_SIZE,WORLD_HEIGHT} from './blocks.js';
 import {createClientGameplayRuntime} from './client-gameplay-runtime.js';
 import {RemotePlayerSystem} from './remote-player-system.js';
 
 function object(value,label){if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError(`${label} must be an object`);return value;}
 function finite(value,label){if(typeof value!=='number'||!Number.isFinite(value))throw new TypeError(`${label} must be a finite number`);return value;}
+const floorDiv=(value,divisor)=>Math.floor(value/divisor);
+const mod=(value,divisor)=>((value%divisor)+divisor)%divisor;
+
+export function authoritativeEditsToVoxelEdits(edits){
+  edits=object(edits,'authoritative world edits');const output={};
+  for(const [coordinate,id] of Object.entries(edits)){
+    const parts=coordinate.split(',');if(parts.length!==3)throw new RangeError(`invalid authoritative world edit coordinate: ${coordinate}`);const [x,y,z]=parts.map(Number);
+    if(!Number.isSafeInteger(x)||!Number.isInteger(y)||y<0||y>=WORLD_HEIGHT||!Number.isSafeInteger(z)||!Number.isInteger(id)||id<0)throw new RangeError(`invalid authoritative world edit: ${coordinate}`);
+    const cx=floorDiv(x,CHUNK_SIZE),cz=floorDiv(z,CHUNK_SIZE),lx=mod(x,CHUNK_SIZE),lz=mod(z,CHUNK_SIZE),index=lx+CHUNK_SIZE*(lz+CHUNK_SIZE*y),key=`${cx},${cz}`;
+    (output[key]??=[]).push([index,id]);
+  }
+  return output;
+}
 
 export function applyAuthoritativePlayerState(player,state,{applyLook=false}={}){
   object(player,'player');state=object(state,'authoritative player state');const position=object(state.position,'authoritative player position'),velocity=object(state.velocity,'authoritative player velocity');
@@ -11,12 +25,13 @@ export function applyAuthoritativePlayerState(player,state,{applyLook=false}={})
 }
 
 export async function createAuthoritativeMultiplayerGameplay({readyData,movement,scene,camera,canvas,controlState,onProgress=()=>{}}={}){
-  readyData=object(readyData,'multiplayer ready data');movement=object(movement,'multiplayer movement session');const info=object(readyData.worldInfo,'server world info'),initial=object(readyData.initialSnapshot,'initial authoritative snapshot'),position=object(initial.position,'initial authoritative position');
-  if(typeof onProgress!=='function')throw new TypeError('onProgress must be a function');
-  const runtime=await createClientGameplayRuntime({scene,camera,canvas,seed:info.seed,prompt:info.prompt,renderDistance:3,savedEdits:{},centerX:finite(position.x,'initial position.x'),centerZ:finite(position.z,'initial position.z'),mode:initial.mode,inventoryState:null,equipmentState:null,controlState,weather:'clear',onWorldEdit:()=>{},onWorldProgress:onProgress,onInventoryPickup:()=>{},onExperience:()=>{},onPlayerHit:()=>{},onPlayerBlast:()=>{},onMobDeath:()=>{},onHostileProjectile:()=>{},onHostileExplosion:()=>{}});
+  readyData=object(readyData,'multiplayer ready data');movement=object(movement,'multiplayer movement session');const info=object(readyData.worldInfo,'server world info'),worldEdits=object(readyData.worldEdits,'server world edits'),initial=object(readyData.initialSnapshot,'initial authoritative snapshot'),position=object(initial.position,'initial authoritative position');
+  if(worldEdits.session!==info.session||worldEdits.worldId!==info.worldId)throw new RangeError('multiplayer world edit snapshot identity mismatch');if(typeof onProgress!=='function')throw new TypeError('onProgress must be a function');
+  const savedEdits=authoritativeEditsToVoxelEdits(worldEdits.edits);
+  const runtime=await createClientGameplayRuntime({scene,camera,canvas,seed:info.seed,prompt:info.prompt,renderDistance:3,savedEdits,centerX:finite(position.x,'initial position.x'),centerZ:finite(position.z,'initial position.z'),mode:initial.mode,inventoryState:null,equipmentState:null,controlState,weather:'clear',onWorldEdit:()=>{},onWorldProgress:onProgress,onInventoryPickup:()=>{},onExperience:()=>{},onPlayerHit:()=>{},onPlayerBlast:()=>{},onMobDeath:()=>{},onHostileProjectile:()=>{},onHostileExplosion:()=>{}});
   let remotePlayers=null;
   try{remotePlayers=new RemotePlayerSystem(scene,{tickRate:info.tickRate});movement.attachRemotePlayerSystem(remotePlayers);}catch(error){runtime.dispose();throw error;}
   const authoritative=movement.step(1)||movement.current?.()||initial;applyAuthoritativePlayerState(runtime.player,authoritative,{applyLook:true});
-  if(globalThis.__minecraftE2E&&typeof globalThis.__minecraftE2E==='object')globalThis.__minecraftE2E.remotePlayers=()=>movement.remoteVisualStates();
-  return{runtime,remotePlayers,authoritative,worldInfo:{id:info.worldId,name:`服务器世界 ${info.worldId}`,seed:info.seed,prompt:info.prompt,mode:authoritative.mode,remote:true,session:info.session,tickRate:info.tickRate,terrainVersion:info.terrainVersion}};
+  if(globalThis.__minecraftE2E&&typeof globalThis.__minecraftE2E==='object'){globalThis.__minecraftE2E.remotePlayers=()=>movement.remoteVisualStates();globalThis.__minecraftE2E.worldBlock=(x,y,z)=>runtime.world.getBlock(x,y,z);}
+  return{runtime,remotePlayers,authoritative,worldInfo:{id:info.worldId,name:`服务器世界 ${info.worldId}`,seed:info.seed,prompt:info.prompt,mode:authoritative.mode,remote:true,session:info.session,tickRate:info.tickRate,terrainVersion:info.terrainVersion,worldRevision:worldEdits.revision}};
 }
