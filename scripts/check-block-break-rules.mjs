@@ -25,4 +25,6 @@ assert.deepEqual(result,{changed:false,reason:'stale-target',changes:[]});assert
 f=fixture([[3,10,3,BLOCK.WATER]]);result=applyAuthoritativeBlockBreak(f.world,{x:3,y:10,z:3,id:BLOCK.WATER},{setBlock:f.setBlock});
 assert.equal(result.reason,'not-breakable');assert.equal(f.calls.length,0);
 assert.throws(()=>applyAuthoritativeBlockBreak(f.world,{x:0,y:10,z:0,id:999},{setBlock:f.setBlock}),/known block/);
+assert.throws(()=>applyAuthoritativeBlockBreak(f.world,{x:0,y:-1,z:0,id:BLOCK.STONE},{setBlock:f.setBlock}),/target.y must be from 0 to 63/);
+assert.throws(()=>applyAuthoritativeBlockBreak(f.world,{x:0,y:64,z:0,id:BLOCK.STONE},{setBlock:f.setBlock}),/target.y must be from 0 to 63/);
 console.log('authoritative block break mutation rules: PASS');
