@@ -42,8 +42,17 @@ function expectUpgradeStatus(url,{origin=ORIGIN,protocol=null,status}){
   }),timeout(2500,`HTTP upgrade rejection ${status}`)]);
 }
 
-let sessionCounter=0;const readyEvents=[],inputs=[],closeEvents=[];
-const server=createMultiplayerServer({port:0,allowedOrigins:[ORIGIN],helloTimeoutMs:300,sessionFactory:()=>`test-session-${++sessionCounter}`,onSessionReady:event=>readyEvents.push(event),onInput:event=>inputs.push(event),onSessionClose:event=>closeEvents.push(event)});
+let sessionCounter=0;const readyEvents=[],inputs=[],closeEvents=[],socketErrors=[];
+const server=createMultiplayerServer({
+  port:0,allowedOrigins:[ORIGIN],helloTimeoutMs:300,sessionFactory:()=>`test-session-${++sessionCounter}`,
+  onSessionReady:event=>readyEvents.push(event),
+  onInput:event=>{
+    inputs.push(event);
+    if(event.message.kind==='action'&&event.message.payload.kind==='hotbar-select')throw new Error('intentional input handler failure');
+  },
+  onSessionClose:event=>closeEvents.push(event),
+  onSocketError:event=>socketErrors.push(event)
+});
 
 try{
   const address=await server.listen();assert.equal(address.address,'127.0.0.1');assert.ok(address.port>0);
@@ -69,6 +78,11 @@ try{
 
   const duplicateClose=nextClose(socket);socket.send(JSON.stringify(envelopes[2]));assert.equal((await duplicateClose).code,1008,'reliable stream duplicate packetSeq is a protocol/policy violation');
 
+  const callbackFailure=await openClient(wsUrl);const callbackWelcomePromise=nextJson(callbackFailure);callbackFailure.send(JSON.stringify(encodeClientHello()));const callbackWelcome=await callbackWelcomePromise;
+  const hotbar=encodePlayerActionFrame({kind:'hotbar-select',slot:2},13),callbackEnvelope=encodeClientInputEnvelope({session:callbackWelcome.session,packetSeq:0,kind:'action',payload:hotbar});
+  const callbackClose=nextClose(callbackFailure);callbackFailure.send(JSON.stringify(callbackEnvelope));assert.equal((await callbackClose).code,1011,'application callback failures must close only the affected session');
+  await waitUntil(()=>socketErrors.some(event=>event.error?.message==='intentional input handler failure'),'input handler error callback');
+
   const malformed=await openClient(wsUrl);const malformedClose=nextClose(malformed);malformed.send(JSON.stringify({v:1,kind:'hello',token:'secret'}));assert.equal((await malformedClose).code,1002);
 
   const binary=await openClient(wsUrl);const binaryClose=nextClose(binary);binary.send(Buffer.from([1,2,3]));assert.equal((await binaryClose).code,1003);
@@ -78,7 +92,7 @@ try{
 
   const idle=await openClient(wsUrl);const idleClose=await nextClose(idle);assert.equal(idleClose.code,SERVER_HELLO_TIMEOUT_CLOSE_CODE);assert.match(idleClose.reason,/hello timeout/);
 
-  await waitUntil(()=>closeEvents.length>=5,'session close callbacks');
+  await waitUntil(()=>closeEvents.length>=6,'session close callbacks');
 }finally{
   await server.close();
 }
