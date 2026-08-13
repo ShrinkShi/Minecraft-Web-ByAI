@@ -3,6 +3,7 @@ import {BLOCKS} from './blocks.js';
 import {applyDamage,knockbackDirection} from './combat.js';
 import {waterCoverageFromSamples,stepSwimming} from './swim-rules.js';
 import {normalizeControlState} from './control-intents.js';
+import {horizontalMoveFromYaw,lookDirectionFromYawPitch} from './player-orientation-rules.js';
 
 export class PlayerController{
   constructor(camera,canvas,world,scene){
@@ -78,7 +79,7 @@ export class PlayerController{
     this.swimCoverage=this.flying?0:this.waterCoverage();
     const swim=stepSwimming({velocityY:this.velocity.y,coverage:this.swimCoverage,dt,up,down:sneak});
     const baseSpeed=swim.active?this.walk:(sprint?this.sprint:this.walk),sneakFactor=swim.active?1:(sneak?.35:1),speed=baseSpeed*sneakFactor*swim.speedMultiplier,dir=new THREE.Vector3(),moveAmount=Math.min(1,Math.hypot(forward,side));
-    if(moveAmount)dir.set(Math.sin(this.yaw)*forward+Math.cos(this.yaw)*side,0,-Math.cos(this.yaw)*forward+Math.sin(this.yaw)*side).normalize().multiplyScalar(speed*dt*moveAmount);
+    if(moveAmount){const horizontal=horizontalMoveFromYaw(this.yaw,{side,forward});dir.set(horizontal.x,0,horizontal.z).normalize().multiplyScalar(speed*dt*moveAmount);}
     if(this.flying){
       const vertical=((up?1:0)-(sneak?1:0))*7*dt;this.moveAxis('x',dir.x);this.moveAxis('z',dir.z);this.moveAxis('y',vertical);this.velocity.set(0,0,0);
     }else{
@@ -94,7 +95,7 @@ export class PlayerController{
 
   isGroundedProbe(){const p=this.position.clone();p.y-=.06;return this.collides(p);}
   eyePosition(target=new THREE.Vector3()){return target.set(this.position.x,this.position.y+this.eye,this.position.z);}
-  lookDirection(target=new THREE.Vector3()){const cp=Math.cos(this.pitch);return target.set(Math.sin(this.yaw)*cp,Math.sin(this.pitch),-Math.cos(this.yaw)*cp).normalize();}
+  lookDirection(target=new THREE.Vector3()){const direction=lookDirectionFromYawPitch(this.yaw,this.pitch);return target.set(direction.x,direction.y,direction.z);}
   setLook(yaw,pitch){if(Number.isFinite(yaw))this.yaw=yaw;if(Number.isFinite(pitch))this.pitch=Math.max(-1.553,Math.min(1.553,pitch));this.syncCamera();}
 
   syncCamera(){
