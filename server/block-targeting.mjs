@@ -15,16 +15,18 @@ function axis(origin,cell,direction){if(Math.abs(direction)<EPSILON)return{step:
 export function raycastAuthoritativeBlock(world,player,{maxDistance=DEFAULT_BLOCK_REACH,eyeHeight=PLAYER_EYE_HEIGHT}={}){
   world=worldLike(world);player=playerLike(player);maxDistance=positive(maxDistance,'maxDistance');eyeHeight=positive(eyeHeight,'eyeHeight');
   const origin={x:player.position.x,y:player.position.y+eyeHeight,z:player.position.z},direction=lookDirectionFromYawPitch(player.yaw,player.pitch);
-  let x=Math.floor(origin.x),y=Math.floor(origin.y),z=Math.floor(origin.z),distance=0,previous={x,y,z};
+  let x=Math.floor(origin.x),y=Math.floor(origin.y),z=Math.floor(origin.z),distance=0,previous=null;
   const ax=axis(origin.x,x,direction.x),ay=axis(origin.y,y,direction.y),az=axis(origin.z,z,direction.z);
   while(distance<=maxDistance+EPSILON){
     if(y<0||y>=WORLD_HEIGHT)return null;
-    const id=world.getBlock(x,y,z);if(targetable(id))return Object.freeze({x,y,z,id,previous:Object.freeze({...previous}),distance});
+    const id=world.getBlock(x,y,z);if(targetable(id))return Object.freeze({x,y,z,id,previous:previous?Object.freeze({...previous}):null,distance});
     const next=Math.min(ax.next,ay.next,az.next);if(!Number.isFinite(next)||next>maxDistance+EPSILON)return null;
-    previous={x,y,z};distance=Math.max(0,next);
-    if(ax.next<=next+EPSILON){x+=ax.step;ax.next+=ax.delta;}
-    if(ay.next<=next+EPSILON){y+=ay.step;ay.next+=ay.delta;}
-    if(az.next<=next+EPSILON){z+=az.step;az.next+=az.delta;}
+    const crossX=ax.next<=next+EPSILON,crossY=ay.next<=next+EPSILON,crossZ=az.next<=next+EPSILON;
+    distance=Math.max(0,next);
+    if(crossX){x+=ax.step;ax.next+=ax.delta;}
+    if(crossY){y+=ay.step;ay.next+=ay.delta;}
+    if(crossZ){z+=az.step;az.next+=az.delta;}
+    if(crossX)previous={x:x-ax.step,y,z};else if(crossY)previous={x,y:y-ay.step,z};else previous={x,y,z:z-az.step};
   }
   return null;
 }
