@@ -12,7 +12,10 @@ import {
   planPlayerMotionStep
 } from '../src/player-motion-rules.js';
 
-const close=(actual,expected,epsilon=1e-12,label='value')=>assert.ok(Math.abs(actual-expected)<=epsilon,`${label}: expected ${expected}, got ${actual}`);
+const close=(actual,expected,epsilonOrLabel=1e-12,label='value')=>{
+  const epsilon=typeof epsilonOrLabel==='number'?epsilonOrLabel:1e-12;if(typeof epsilonOrLabel==='string')label=epsilonOrLabel;
+  assert.ok(Math.abs(actual-expected)<=epsilon,`${label}: expected ${expected}, got ${actual}`);
+};
 const base={yaw:0,control:{side:0,forward:1,jump:false,sneak:false,sprint:false,primary:false},velocity:{x:0,y:0,z:0},flying:false,swimCoverage:0,grounded:false};
 
 assert.equal(PLAYER_MAX_STEP_DT,.05);assert.equal(PLAYER_WALK_SPEED,4.3);assert.equal(PLAYER_SPRINT_SPEED,5.6);assert.equal(PLAYER_SNEAK_SPEED_FACTOR,.35);assert.equal(PLAYER_FLIGHT_VERTICAL_SPEED,7);assert.equal(PLAYER_GRAVITY,24);assert.equal(PLAYER_JUMP_SPEED,8.2);assert.equal(PLAYER_GROUND_HORIZONTAL_DRAG,8);assert.equal(PLAYER_SWIM_HORIZONTAL_DRAG,5);
