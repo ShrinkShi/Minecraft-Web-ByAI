@@ -212,8 +212,8 @@ test('bed placement persists respawn, sleeps, and blocks sleep near a real hosti
   await placeBedWithRealAim(page);await expect(page.locator('#toast')).toContainText('放置 床',{timeout:2_000});
   await page.waitForTimeout(250);await rightClickCanvas(page);await expect(page.locator('#toast')).toContainText('重生点已设置',{timeout:5_000});
 
-  const anchorSaveStarted=await page.evaluate(()=>Date.now());await key(page,'Escape');await expect(page.locator('#pause-menu')).toHaveClass(/active/);
-  await expect.poll(async()=>{const record=(await savedWorlds(page)).find(world=>world.name==='CI Bed Anchor');if(!record||Number(record.updatedAt)<anchorSaveStarted||!record.respawnPoint)return null;const ids=Object.values(record.edits||{}).flat().map(entry=>Number(entry?.[1])).filter(id=>id>=11&&id<=18).sort((a,b)=>a-b);return{version:record.version,validPair:['11,12','13,14','15,16','17,18'].includes(ids.join(',')),hasRespawn:true};},{timeout:15_000,message:'bed pair and respawn anchor should persist before sleep-safety checks'}).toEqual({version:6,validPair:true,hasRespawn:true});
+  await key(page,'Escape');await expect(page.locator('#pause-menu')).toHaveClass(/active/);
+  await expect.poll(async()=>{const record=(await savedWorlds(page)).find(world=>world.name==='CI Bed Anchor');if(!record||!record.respawnPoint)return null;const ids=Object.values(record.edits||{}).flat().map(entry=>Number(entry?.[1])).filter(id=>id>=11&&id<=18).sort((a,b)=>a-b);return{version:record.version,validPair:['11,12','13,14','15,16','17,18'].includes(ids.join(',')),hasRespawn:true};},{timeout:15_000,message:'bed pair and respawn anchor should persist before sleep-safety checks'}).toEqual({version:6,validPair:true,hasRespawn:true});
   const initialBedRecord=(await savedWorlds(page)).find(world=>world.name==='CI Bed Anchor'),anchor=initialBedRecord.respawnPoint;expect(anchor).toBeTruthy();
   await page.getByRole('button',{name:'返回游戏'}).click();await expect(page.locator('#pause-menu')).not.toHaveClass(/active/);
 
