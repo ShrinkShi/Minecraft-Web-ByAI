@@ -24,5 +24,5 @@ assert.equal(movement.ready,true);assert.equal(ready.length,1);assert.equal(read
 const next={...initial,tick:1,position:{x:.285,y:25.001,z:.5},velocity:{x:-4.3,y:0,z:0},yaw:Math.PI/2};bootstrapHooks.onPlayerSnapshot(next);assert.equal(snapshots.length,1);assert.equal(movement.step(.025).tick,1);
 movement.setControl({side:0,forward:1,jump:false,sneak:false,sprint:false,primary:false});movement.setView({yaw:Math.PI/2,pitch:0});assert.equal(bridgeCalls.at(-2)[0],'control');assert.equal(bridgeCalls.at(-1)[0],'view');assert.equal(movement.sendHotbarSelect(4).slot,4);
 movement.close();assert.equal(movement.state,'closed');assert.equal(bootstrap.state,'closed');assert.equal(movement.current(),null);
-assert.throws(()=>new MultiplayerMovementSession({bootstrapFactory:null}),/bootstrapFactory/);assert.throws(()=>new MultiplayerMovementSession().setView({yaw:0,pitch:99}),/pitch/);
+assert.throws(()=>new MultiplayerMovementSession({bootstrapFactory:null}),/bootstrapFactory/);assert.throws(()=>new MultiplayerMovementSession({bootstrapOptions:{clientFactory:null}}).connect('wss://example.test/ws'),/clientFactory/);assert.throws(()=>new MultiplayerMovementSession().setView({yaw:0,pitch:99}),/pitch/);
 console.log('movement session composes world edits + input bridge + authoritative display state: PASS');

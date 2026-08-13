@@ -4,6 +4,8 @@ import {MultiplayerSessionBootstrap} from './multiplayer-session-bootstrap.js';
 import {MultiplayerInputBridge} from './multiplayer-input-bridge.js';
 import {AuthoritativePlayerInterpolator} from './authoritative-player-interpolator.js';
 import {assertRemotePlayerId} from './remote-player-replication.js';
+import {LiveWorldWebSocketClient} from './live-world-websocket-client.js';
+import {OrderedChangeBuffer} from './ordered-change-buffer.js';
 
 export const MULTIPLAYER_MOVEMENT_STATES=Object.freeze(['idle','connecting','handshaking','synchronizing','ready','failed','closed']);
 
@@ -25,12 +27,15 @@ function remoteSystem(value){value=object(value,'remote player system');for(cons
 export class MultiplayerMovementSession{
   constructor({allowInsecure=false,bootstrapOptions={},bootstrapFactory=defaultBootstrapFactory,bridgeFactory=defaultBridgeFactory,interpolatorFactory=defaultInterpolatorFactory,onStateChange=()=>{},onReady=()=>{},onSnapshot=()=>{},onRemotePlayerSpawn=()=>{},onRemotePlayerSnapshot=()=>{},onRemotePlayerDespawn=()=>{},onError=()=>{}}={}){
     this.allowInsecure=!!allowInsecure;this.bootstrapOptions={...plainOptions(bootstrapOptions,'bootstrapOptions')};this.bootstrapFactory=callback(bootstrapFactory,'bootstrapFactory');this.bridgeFactory=callback(bridgeFactory,'bridgeFactory');this.interpolatorFactory=callback(interpolatorFactory,'interpolatorFactory');this.onStateChange=callback(onStateChange,'onStateChange');this.onReady=callback(onReady,'onReady');this.onSnapshot=callback(onSnapshot,'onSnapshot');this.onRemotePlayerSpawn=callback(onRemotePlayerSpawn,'onRemotePlayerSpawn');this.onRemotePlayerSnapshot=callback(onRemotePlayerSnapshot,'onRemotePlayerSnapshot');this.onRemotePlayerDespawn=callback(onRemotePlayerDespawn,'onRemotePlayerDespawn');this.onError=callback(onError,'onError');
+    this.worldBlockBuffer=new OrderedChangeBuffer();if(this.bootstrapOptions.clientFactory===undefined)this.bootstrapOptions.clientFactory=clientOptions=>new LiveWorldWebSocketClient({...clientOptions,onWorldBlockChange:change=>this.worldBlockBuffer.push(Object.freeze({...change}))});
     this.bootstrap=null;this.bridge=null;this.interpolator=null;this.remotePlayerSystem=null;this.state='idle';this.latestControl=normalizeControlState();this.latestView={yaw:0,pitch:0};this.hasExplicitView=false;this.latestSnapshot=null;this.readyData=null;this.remotePlayers=new Map();
   }
 
   setState(next,detail=null){if(!MULTIPLAYER_MOVEMENT_STATES.includes(next))throw new RangeError(`unsupported multiplayer movement state: ${next}`);if(this.state===next)return;this.state=next;this.onStateChange({state:next,detail});}
   get ready(){return this.state==='ready'&&!!this.bridge&&!!this.interpolator;}
   get transport(){return this.bootstrap?.client||null;}
+  get worldRevision(){return this.transport?.worldRevision??this.readyData?.worldEdits?.revision??null;}
+  get pendingWorldBlockChangeCount(){return this.worldBlockBuffer.size;}
   current(){return this.interpolator?.current()||null;}
   remotePlayerStates(){return [...this.remotePlayers.values()].map(cloneRemote);}
   remotePlayerState(playerId){return cloneRemote(this.remotePlayers.get(assertRemotePlayerId(playerId))||null);}
@@ -38,7 +43,9 @@ export class MultiplayerMovementSession{
 
   detachRemotePlayerSystem(){const system=this.remotePlayerSystem;this.remotePlayerSystem=null;if(system)system.dispose();return system;}
   attachRemotePlayerSystem(system){system=remoteSystem(system);if(this.remotePlayerSystem)throw new Error('remote player system is already attached');this.remotePlayerSystem=system;try{for(const state of this.remotePlayers.values())system.spawn(cloneRemote(state));}catch(error){this.remotePlayerSystem=null;try{system.dispose();}catch{}throw error;}return system;}
-  resetRuntimeState(){this.detachRemotePlayerSystem();this.bridge=null;this.interpolator=null;this.latestSnapshot=null;this.readyData=null;this.latestControl=normalizeControlState();this.latestView={yaw:0,pitch:0};this.hasExplicitView=false;this.remotePlayers.clear();}
+  attachWorldBlockApplier(applier){return{drained:this.worldBlockBuffer.attach(callback(applier,'worldBlockApplier')),revision:this.worldRevision};}
+  detachWorldBlockApplier(){return this.worldBlockBuffer.detach();}
+  resetRuntimeState(){this.detachRemotePlayerSystem();this.worldBlockBuffer.clear();this.bridge=null;this.interpolator=null;this.latestSnapshot=null;this.readyData=null;this.latestControl=normalizeControlState();this.latestView={yaw:0,pitch:0};this.hasExplicitView=false;this.remotePlayers.clear();}
 
   connect(url){if(!['idle','closed','failed'].includes(this.state))throw new Error(`cannot connect while multiplayer movement session is ${this.state}`);if(this.bootstrap&&this.bootstrap.state!=='closed')try{this.bootstrap.close(1000,'reconnecting multiplayer movement session');}catch{}this.resetRuntimeState();const bootstrap=this.bootstrapFactory({...this.bootstrapOptions,allowInsecure:this.allowInsecure,onStateChange:event=>this.handleBootstrapState(event),onReady:data=>this.handleBootstrapReady(data),onPlayerSnapshot:snapshot=>this.handleBootstrapSnapshot(snapshot),onRemotePlayerSpawn:message=>this.handleRemotePlayerSpawn(message),onRemotePlayerSnapshot:message=>this.handleRemotePlayerSnapshot(message),onRemotePlayerDespawn:message=>this.handleRemotePlayerDespawn(message),onError:error=>this.handleBootstrapError(error)});if(!bootstrap||typeof bootstrap.connect!=='function'||typeof bootstrap.close!=='function')throw new TypeError('bootstrapFactory must return a MultiplayerSessionBootstrap-compatible object');this.bootstrap=bootstrap;return bootstrap.connect(url);}
 
@@ -59,5 +66,5 @@ export class MultiplayerMovementSession{
   sendHotbarSelect(slot){return this.bridge?.sendHotbarSelect(slot)||null;}
   sendUse(view=this.latestView){return this.bridge?.sendUse(view)||null;}
   sendDrop(view=this.latestView){return this.bridge?.sendDrop(view)||null;}
-  close(code=1000,reason='multiplayer movement session closed'){const bootstrap=this.bootstrap,system=this.remotePlayerSystem;this.bootstrap=null;this.bridge=null;this.interpolator=null;this.remotePlayerSystem=null;this.latestSnapshot=null;this.readyData=null;this.remotePlayers.clear();if(bootstrap&&bootstrap.state!=='closed')bootstrap.close(code,reason);if(system)system.dispose();this.setState('closed',{code,reason});return true;}
+  close(code=1000,reason='multiplayer movement session closed'){const bootstrap=this.bootstrap,system=this.remotePlayerSystem;this.bootstrap=null;this.bridge=null;this.interpolator=null;this.remotePlayerSystem=null;this.worldBlockBuffer.clear();this.latestSnapshot=null;this.readyData=null;this.remotePlayers.clear();if(bootstrap&&bootstrap.state!=='closed')bootstrap.close(code,reason);if(system)system.dispose();this.setState('closed',{code,reason});return true;}
 }
