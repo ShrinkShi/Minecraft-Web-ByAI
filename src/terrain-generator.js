@@ -1,5 +1,6 @@
 import {BLOCK,CHUNK_SIZE,WORLD_HEIGHT} from './blocks.js';
 
+export const TERRAIN_GENERATOR_VERSION=1;
 const DEFAULT_SEED='1';
 const DEFAULT_PROMPT='';
 const FNV_OFFSET=2166136261>>>0;
