@@ -3,6 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {WebSocketServer} from 'ws';
 import {ClientInputSessionGate,assertClientSessionId} from '../src/client-input-envelope.js';
 import {MULTIPLAYER_SUBPROTOCOL,decodeClientHello,encodeServerWelcome} from '../src/multiplayer-handshake.js';
+import {ServerPlayerInputState} from './player-input-state.mjs';
 
 export const DEFAULT_MULTIPLAYER_HOST='127.0.0.1';
 export const DEFAULT_MULTIPLAYER_PORT=0;
@@ -70,6 +71,7 @@ export function createMultiplayerServer({
   maxPayload=DEFAULT_MAX_PAYLOAD,
   helloTimeoutMs=DEFAULT_SERVER_HELLO_TIMEOUT_MS,
   sessionFactory=defaultSessionFactory,
+  playerInputOptions={},
   onSessionReady=()=>{},
   onInput=()=>{},
   onSessionClose=()=>{},
@@ -80,9 +82,11 @@ export function createMultiplayerServer({
   path=assertPath(path);const originPolicy=normalizeAllowedOrigins(allowedOrigins);
   maxPayload=assertPositiveInteger(maxPayload,'maxPayload',{min:1024,max:1024*1024});helloTimeoutMs=assertPositiveInteger(helloTimeoutMs,'helloTimeoutMs',{min:250,max:60000});
   if(typeof sessionFactory!=='function')throw new TypeError('sessionFactory must be a function');
+  if(!playerInputOptions||typeof playerInputOptions!=='object'||Array.isArray(playerInputOptions))throw new TypeError('playerInputOptions must be an object');
   for(const [name,callback] of Object.entries({onSessionReady,onInput,onSessionClose,onSocketError}))if(typeof callback!=='function')throw new TypeError(`${name} must be a function`);
 
   const reportSocketError=(session,error)=>{try{onSocketError({session,error});}catch{}};
+  const sessions=new Map();
   const httpServer=createServer((request,response)=>{
     if(request.method==='GET'&&request.url==='/healthz'){
       const body=JSON.stringify({ok:true,protocol:MULTIPLAYER_SUBPROTOCOL});response.writeHead(200,{'content-type':'application/json; charset=utf-8','content-length':Buffer.byteLength(body),'cache-control':'no-store'});response.end(body);return;
@@ -102,7 +106,7 @@ export function createMultiplayerServer({
   });
 
   wss.on('connection',(websocket,request)=>{
-    const state={phase:'await-hello',session:null,gate:null,helloTimer:null,origin:request.headers.origin||null};
+    const state={phase:'await-hello',session:null,gate:null,inputState:null,helloTimer:null,origin:request.headers.origin||null};
     state.helloTimer=setTimeout(()=>{state.helloTimer=null;if(state.phase==='await-hello')websocket.close(SERVER_HELLO_TIMEOUT_CLOSE_CODE,'hello timeout');},helloTimeoutMs);
 
     websocket.on('message',(data,isBinary)=>{
@@ -113,21 +117,30 @@ export function createMultiplayerServer({
       if(state.phase==='await-hello'){
         try{decodeClientHello(message);}catch{websocket.close(1002,'invalid client hello');return;}
         clearTimeout(state.helloTimer);state.helloTimer=null;
-        let session;try{session=assertClientSessionId(sessionFactory());}catch(error){reportSocketError(null,error);websocket.close(1011,'session allocation failed');return;}
-        state.session=session;state.gate=new ClientInputSessionGate(session);state.phase='ready';
+        let session,inputState;
+        try{
+          session=assertClientSessionId(sessionFactory());
+          if(sessions.has(session))throw new Error(`duplicate active session id: ${session}`);
+          inputState=new ServerPlayerInputState(session,playerInputOptions);
+        }catch(error){reportSocketError(null,error);websocket.close(1011,'session allocation failed');return;}
+        state.session=session;state.gate=new ClientInputSessionGate(session);state.inputState=inputState;state.phase='ready';sessions.set(session,{websocket,inputState});
         websocket.send(JSON.stringify(encodeServerWelcome(session)));
-        try{onSessionReady({session,origin:state.origin,remoteAddress:request.socket.remoteAddress||null});}catch(error){reportSocketError(session,error);websocket.close(1011,'session ready handler failed');}return;
+        try{onSessionReady({session,origin:state.origin,remoteAddress:request.socket.remoteAddress||null,inputState:inputState.snapshot()});}catch(error){reportSocketError(session,error);websocket.close(1011,'session ready handler failed');}return;
       }
 
       let result;try{result=state.gate.accept(message);}catch{websocket.close(1002,'invalid client input envelope');return;}
       if(!result.accepted){websocket.close(1008,'stale or duplicate packet');return;}
-      try{onInput({session:state.session,message:result.message});}catch(error){reportSocketError(state.session,error);websocket.close(1011,'input handler failed');}
+      let application;try{application=state.inputState.apply(result.message);}catch(error){reportSocketError(state.session,error);websocket.close(1011,'input state failure');return;}
+      if(!application.accepted){websocket.close(1008,application.reason);return;}
+      try{onInput({session:state.session,message:result.message,application,inputState:state.inputState.snapshot()});}catch(error){reportSocketError(state.session,error);websocket.close(1011,'input handler failed');}
     });
 
     websocket.on('error',error=>reportSocketError(state.session,error));
     websocket.on('close',(code,reason)=>{
       if(state.helloTimer!==null){clearTimeout(state.helloTimer);state.helloTimer=null;}
-      state.phase='closed';try{onSessionClose({session:state.session,code,reason:reason.toString('utf8')});}catch(error){reportSocketError(state.session,error);}
+      state.phase='closed';
+      if(state.session&&sessions.get(state.session)?.websocket===websocket)sessions.delete(state.session);
+      try{onSessionClose({session:state.session,code,reason:reason.toString('utf8')});}catch(error){reportSocketError(state.session,error);}
     });
   });
 
@@ -138,9 +151,13 @@ export function createMultiplayerServer({
       return new Promise((resolve,reject)=>{const onError=error=>{httpServer.off('listening',onListening);reject(error);},onListening=()=>{httpServer.off('error',onError);resolve(httpServer.address());};httpServer.once('error',onError);httpServer.once('listening',onListening);httpServer.listen(port,host);});
     },
     address(){return httpServer.address();},
+    get sessionCount(){return sessions.size;},
+    getSessionInputState(session){const entry=sessions.get(assertClientSessionId(session));return entry?entry.inputState.snapshot():null;},
+    drainSessionActions(session,limit){const entry=sessions.get(assertClientSessionId(session));return entry?entry.inputState.drainActions(limit):[];},
     async close(){
       for(const websocket of wss.clients)websocket.terminate();
       await new Promise(resolve=>wss.close(()=>resolve()));
+      sessions.clear();
       if(httpServer.listening)await new Promise((resolve,reject)=>httpServer.close(error=>error?reject(error):resolve()));
     }
   };
