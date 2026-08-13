@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="./oxygen.css" />
   <link rel="stylesheet" href="./death.css" />
   <link rel="stylesheet" href="./mobile.css" />
+  <link rel="stylesheet" href="./multiplayer.css" />
 </head>
 <body>
   <div id="app">
@@ -49,12 +50,28 @@
       </div>
     </section>
 
+    <section id="multiplayer-menu" class="screen">
+      <div class="world-card">
+        <h1>连接多人服务器</h1>
+        <label>WebSocket 服务器地址
+          <input id="multiplayer-url" value="ws://127.0.0.1:8080/ws" maxlength="300" spellcheck="false" autocomplete="off" />
+        </label>
+        <label class="multiplayer-checkbox"><input id="multiplayer-insecure" type="checkbox" /> 明确允许本地 / 开发环境使用明文 ws://</label>
+        <p id="multiplayer-status" class="multiplayer-status" role="status" aria-live="polite">未连接</p>
+        <p class="hint">当前多人阶段由服务器权威决定玩家移动和碰撞。方块破坏/放置、背包、战斗、命令和持久化尚未服务端化，因此联机时暂时禁用，避免客户端伪造权威状态。</p>
+        <div class="button-row">
+          <button class="mc-button primary" data-action="connect-multiplayer">连接服务器</button>
+          <button class="mc-button" data-action="back-main">取消</button>
+        </div>
+      </div>
+    </section>
+
     <section id="pause-menu" class="screen pause-layer">
       <div class="pause-card">
         <h2>游戏菜单</h2>
         <button class="mc-button" data-action="resume">返回游戏</button>
         <button class="mc-button" data-action="options">选项</button>
-        <button class="mc-button" data-action="save-main">保存并返回标题画面</button>
+        <button id="return-main-button" class="mc-button" data-action="save-main">保存并返回标题画面</button>
       </div>
     </section>
 

@@ -19,6 +19,8 @@ import {DesktopControls} from './desktop-controls.js';
 import {ControlIntentBus} from './control-intents.js';
 import {detectDeviceProfile} from './device-profile.js';
 import {createClientGameplayRuntime} from './client-gameplay-runtime.js';
+import {MultiplayerMovementSession} from './multiplayer-movement-session.js';
+import {createAuthoritativeMultiplayerGameplay,applyAuthoritativePlayerState} from './multiplayer-gameplay-adapter.js';
 
 const canvas=document.querySelector('#game-canvas');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:false,powerPreference:'high-performance'});
@@ -40,22 +42,24 @@ let world=null,player=null,inventory=null,equipment=null,drops=null,experienceOr
 let running=false,paused=false,last=performance.now(),selectedTarget=null,breakStart=0,lastSecond=0,frames=0,fps=0,worldInfo=null,lastAttackAt=-Infinity;
 let saveDirty=false,saveInFlight=null,lastSaveAt=0,lastSavedPosition=null,gameTime=6000,weather='clear',totalXp=0;
 let oxygenState=createOxygenState(),headSubmerged=false;
-let deathState=null,respawnPoint=null;
+let deathState=null,respawnPoint=null,sessionKind=null,multiplayerMovement=null,multiplayerStarting=false;
 const controlBus=new ControlIntentBus({
-  onState:state=>player?.setControlState(state),
-  onLook:({yawDelta,pitchDelta})=>{if(canControl())player?.applyLookIntent(yawDelta,pitchDelta);},
-  onPrimary:pressed=>{if(pressed)primaryActionStart();else primaryActionEnd();},
+  onState:state=>{player?.setControlState(state);if(sessionKind==='multiplayer')multiplayerMovement?.setControl(state);},
+  onLook:({yawDelta,pitchDelta})=>{if(canControl()&&player){player.applyLookIntent(yawDelta,pitchDelta);syncMultiplayerView();}},
+  onPrimary:pressed=>{if(sessionKind==='multiplayer'){if(pressed&&canControl())ui.showToast('联机方块/战斗权威尚未接入，当前禁止本地攻击或破坏');return;}if(pressed)primaryActionStart();else primaryActionEnd();},
   onAction:intent=>handleControlIntent(intent)
 });
 
-function modeScreen(name){ui.showScreen(name==='main'?ui.main:name==='world'?ui.worldMenu:name==='pause'?ui.pause:name==='death'?deathScreen.root:null);}
+function modeScreen(name){ui.showScreen(name==='main'?ui.main:name==='world'?ui.worldMenu:name==='multiplayer'?ui.multiplayerMenu:name==='pause'?ui.pause:name==='death'?deathScreen.root:null);}
 function controlActive(){return running&&!paused&&!deathState&&!ui.hasOpenPanel()&&!ui.isChatOpen();}
 function pointer(){if(controlActive()&&!deviceProfile.mobile)canvas.requestPointerLock().catch(()=>{});}
 function canControl(){const active=controlActive();return active&&(deviceProfile.mobile?deviceProfile.orientation==='landscape':document.pointerLockElement===canvas);}
-function markSaveDirty(){saveDirty=true;}
-function clearPlayerInput(){controlBus.resetAll();player?.clearControlState?.();}
+function markSaveDirty(){if(sessionKind==='singleplayer')saveDirty=true;}
+function syncMultiplayerView(){if(sessionKind==='multiplayer'&&player)multiplayerMovement?.setView({yaw:player.yaw,pitch:player.pitch});}
+function setPlayerLook(yaw,pitch){if(!player)return false;player.setLook(yaw,pitch);syncMultiplayerView();return true;}
+function clearPlayerInput(){controlBus.resetAll();player?.clearControlState?.();if(sessionKind==='multiplayer'){multiplayerMovement?.setControl(controlBus.snapshot());multiplayerMovement?.flush();}}
 function syncControlAdapters(){const active=controlActive();desktopControls?.setGameplayEnabled(active&&!deviceProfile.mobile&&document.pointerLockElement===canvas);mobileControls?.setGameplayEnabled(active&&deviceProfile.mobile);}
-if(e2eEnabled)Object.defineProperty(globalThis,'__minecraftE2E',{value:{setLook:(yaw,pitch)=>{player?.setLook(yaw,pitch);return !!player;}},configurable:true});
+if(e2eEnabled)Object.defineProperty(globalThis,'__minecraftE2E',{value:{setLook:setPlayerLook,multiplayer:()=>({sessionKind,state:multiplayerMovement?.state||null,ready:multiplayerMovement?.ready||false,worldId:worldInfo?.id||null,tick:multiplayerMovement?.current()?.tick??null})},configurable:true});
 function setRespawnPoint(value){const point=normalizeRespawnPoint(value);if(!point)return false;respawnPoint=point;markSaveDirty();return true;}
 function renderPlayerStatus(){if(!player)return;const xp=experienceState(totalXp);ui.renderStatus(player.hp,player.hunger,xp.progress*100,xp.level,equipment?.armorPoints()||0);}
 function resetOxygen(){oxygenState=createOxygenState();headSubmerged=false;ui.renderOxygen(MAX_AIR_SECONDS,MAX_AIR_SECONDS,false);}
@@ -69,16 +73,16 @@ async function respawnAtPreferredPoint(){
 }
 
 function disposeWorld(){
-  running=false;deathState=null;deathScreen.hide();document.exitPointerLock?.();ui.closeChat();ui.inventory.classList.add('hidden');ui.workbench.classList.add('hidden');resetOxygen();
+  running=false;clearPlayerInput();const movement=multiplayerMovement;multiplayerMovement=null;multiplayerStarting=false;sessionKind=null;try{movement?.close(1000,'leaving multiplayer world');}catch(error){console.warn('关闭多人连接失败',error);}deathState=null;deathScreen.hide();document.exitPointerLock?.();ui.closeChat();ui.inventory.classList.add('hidden');ui.workbench.classList.add('hidden');resetOxygen();ui.setBreak(0);
   gameplayRuntime?.dispose();gameplayRuntime=null;
-  weatherSystem=null;explosions=null;projectiles=null;hostileMobs=null;passiveMobs=null;experienceOrbs=null;drops=null;player=null;world=null;inventory=null;equipment=null;worldInfo=null;respawnPoint=null;saveDirty=false;lastSavedPosition=null;lastAttackAt=-Infinity;totalXp=0;
+  weatherSystem=null;explosions=null;projectiles=null;hostileMobs=null;passiveMobs=null;experienceOrbs=null;drops=null;player=null;world=null;inventory=null;equipment=null;worldInfo=null;respawnPoint=null;saveDirty=false;lastSavedPosition=null;lastAttackAt=-Infinity;totalXp=0;ui.setReturnMainLabel(false);
 }
 
 async function persistWorld(force=false){
-  if(!world||!player||!worldInfo||!inventory||!equipment)return;
+  if(sessionKind!=='singleplayer'||!world||!player||!worldInfo||!inventory||!equipment)return;
   if(force)saveDirty=true;if(saveInFlight)return saveInFlight;if(!saveDirty)return;
   const drain=(async()=>{try{
-    while(world&&player&&worldInfo&&inventory&&equipment&&saveDirty){
+    while(sessionKind==='singleplayer'&&world&&player&&worldInfo&&inventory&&equipment&&saveDirty){
       const record={id:worldInfo.id,name:worldInfo.name,seed:worldInfo.seed,prompt:worldInfo.prompt,mode:player.mode,updatedAt:Date.now(),player:player.snapshot(),inventory:inventory.snapshot(),equipment:equipment.snapshot(),edits:world.exportEdits(),gameTime,weather,totalXp,respawnPoint:respawnPoint?{...respawnPoint}:null,version:6};
       saveDirty=false;
       try{await storage.putWorld(record);lastSaveAt=performance.now();lastSavedPosition=player?.position.clone()||null;}
@@ -95,7 +99,7 @@ function drainDeathStacks(){
 }
 
 function beginPlayerDeath(reason='你死了'){
-  if(!player||deathState)return;
+  if(sessionKind!=='singleplayer'||!player||deathState)return;
   const deathPosition=player.position.clone(),previousXp=totalXp,plan=deathLossPlan({mode:player.mode,totalXp:previousXp,position:deathPosition}),stacks=plan.losesInventory?drainDeathStacks():[];
   let detail=plan.losesInventory?'':'当前模式不会损失携带物品或经验。';
   if(plan.losesInventory){
@@ -111,38 +115,38 @@ function beginPlayerDeath(reason='你死了'){
 }
 
 async function completeRespawn(){
-  if(!player||!deathState||deathState.respawning)return;const activeDeath=deathState;activeDeath.respawning=true;ui.showToast('正在加载重生区域');const result=await respawnAtPreferredPoint();if(!player||deathState!==activeDeath)return;lastAttackAt=-Infinity;resetOxygen();deathState=null;deathScreen.hide();modeScreen(null);renderPlayerStatus();markSaveDirty();ui.showToast(result.custom?'已在自定义重生点重生':'已在世界出生点重生');pointer();
+  if(sessionKind!=='singleplayer'||!player||!deathState||deathState.respawning)return;const activeDeath=deathState;activeDeath.respawning=true;ui.showToast('正在加载重生区域');const result=await respawnAtPreferredPoint();if(!player||deathState!==activeDeath)return;lastAttackAt=-Infinity;resetOxygen();deathState=null;deathScreen.hide();modeScreen(null);renderPlayerStatus();markSaveDirty();ui.showToast(result.custom?'已在自定义重生点重生':'已在世界出生点重生');pointer();
 }
 
 function protectedDamage(amount){return mitigateArmorDamage(amount,equipment?.armorPoints()||0);}
 
 function handlePlayerHit({amount,source}){
-  if(!player||deathState)return;const result=player.takeDamage(protectedDamage(amount),performance.now(),source);if(!result.applied)return;markSaveDirty();renderPlayerStatus();if(result.dead)beginPlayerDeath();
+  if(sessionKind!=='singleplayer'||!player||deathState)return;const result=player.takeDamage(protectedDamage(amount),performance.now(),source);if(!result.applied)return;markSaveDirty();renderPlayerStatus();if(result.dead)beginPlayerDeath();
 }
 
 function handlePlayerBlast({amount,source,knockback}){
-  if(!player||deathState)return;const result=player.takeDamage(protectedDamage(amount),performance.now(),null);if(!result.applied)return;
+  if(sessionKind!=='singleplayer'||!player||deathState)return;const result=player.takeDamage(protectedDamage(amount),performance.now(),null);if(!result.applied)return;
   if(source&&Number.isFinite(knockback)&&knockback>0)player.knockbackFrom(source.x,source.z,Math.max(.25,knockback),Math.min(.55,.18+knockback*.3));markSaveDirty();renderPlayerStatus();if(result.dead)beginPlayerDeath('你被爆炸击倒了');
 }
 
 function handleHostileProjectile({kind,damage,speed,source,target}){
-  if(kind!=='arrow'||!projectiles||!source||!target)return;projectiles.spawnArrow(new THREE.Vector3(source.x,source.y,source.z),new THREE.Vector3(target.x,target.y,target.z),{damage,speed,source});
+  if(sessionKind!=='singleplayer'||kind!=='arrow'||!projectiles||!source||!target)return;projectiles.spawnArrow(new THREE.Vector3(source.x,source.y,source.z),new THREE.Vector3(target.x,target.y,target.z),{damage,speed,source});
 }
 
 function handleHostileExplosion({position,radius,damageRadius,maxDamage}){
-  if(!explosions||!position)return;explosions.explode(new THREE.Vector3(position.x,position.y,position.z),{radius,damageRadius,maxDamage,player});markSaveDirty();
+  if(sessionKind!=='singleplayer'||!explosions||!position)return;explosions.explode(new THREE.Vector3(position.x,position.y,position.z),{radius,damageRadius,maxDamage,player});markSaveDirty();
 }
 
 function addExperience(value){
-  if(!Number.isFinite(value)||value<=0)return;const before=experienceState(totalXp);totalXp+=Math.floor(value);const after=experienceState(totalXp);renderPlayerStatus();markSaveDirty();if(after.level>before.level)ui.showToast(`经验等级提升至 ${after.level}`);
+  if(sessionKind!=='singleplayer'||!Number.isFinite(value)||value<=0)return;const before=experienceState(totalXp);totalXp+=Math.floor(value);const after=experienceState(totalXp);renderPlayerStatus();markSaveDirty();if(after.level>before.level)ui.showToast(`经验等级提升至 ${after.level}`);
 }
 
 function handleMobDeath({type,position}){
-  if(!drops||!experienceOrbs||!position)return;const origin=new THREE.Vector3(position.x,position.y+.45,position.z);for(const stack of rollMobLoot(type))drops.spawn(stack.id,stack.count,origin.clone());const xp=rollMobXp(type);if(xp>0)experienceOrbs.spawn(xp,origin.clone().add(new THREE.Vector3(0,.18,0)));
+  if(sessionKind!=='singleplayer'||!drops||!experienceOrbs||!position)return;const origin=new THREE.Vector3(position.x,position.y+.45,position.z);for(const stack of rollMobLoot(type))drops.spawn(stack.id,stack.count,origin.clone());const xp=rollMobXp(type);if(xp>0)experienceOrbs.spawn(xp,origin.clone().add(new THREE.Vector3(0,.18,0)));
 }
 
 async function startWorld(){
-  disposeWorld();const seed=document.querySelector('#world-seed').value||String(Date.now()),prompt=document.querySelector('#terrain-prompt').value,selectedMode=document.querySelector('#game-mode').value,name=document.querySelector('#world-name').value||'新的世界',id=worldIdFor(name,seed);let saved=null;
+  disposeWorld();sessionKind='singleplayer';ui.setReturnMainLabel(false);const seed=document.querySelector('#world-seed').value||String(Date.now()),prompt=document.querySelector('#terrain-prompt').value,selectedMode=document.querySelector('#game-mode').value,name=document.querySelector('#world-name').value||'新的世界',id=worldIdFor(name,seed);let saved=null;
   try{saved=await storage.getWorld(id);}catch(error){console.warn('无法读取 IndexedDB 存档，将启动无持久化会话',error);}
   const mode=saved?.mode||selectedMode;worldInfo={id,seed:saved?.seed||seed,prompt:saved?.prompt||prompt,mode,name:saved?.name||name};gameTime=Number.isFinite(saved?.gameTime)?saved.gameTime:6000;weather=saved?.weather||'clear';totalXp=Number.isFinite(saved?.totalXp)?Math.max(0,Math.floor(saved.totalXp)):0;respawnPoint=normalizeRespawnPoint(saved?.respawnPoint);
   const savedDead=Number.isFinite(saved?.player?.hp)&&saved.player.hp<=0,startPosition=savedDead?(respawnPoint||{x:0,z:0}):saved?.player?.position,centerX=Number.isFinite(startPosition?.x)?startPosition.x:0,centerZ=Number.isFinite(startPosition?.z)?startPosition.z:0;modeScreen(null);ui.showLoading(true,saved?'读取世界存档':'启动地形 Worker',2);
@@ -152,42 +156,78 @@ async function startWorld(){
   ui.bindInventory(inventory,{equipment,onChanged:()=>{markSaveDirty();renderPlayerStatus();},onOverflow:spawnOverflow});running=true;paused=false;saveDirty=!saved;lastSavedPosition=player.position.clone();lastAttackAt=-Infinity;ui.hud.classList.remove('hidden');ui.showLoading(false);renderPlayerStatus();applySky();ui.chatMessage('夜间敌对池包括僵尸、骷髅、苦力怕和蜘蛛；水下会消耗氧气；天气指令会切换降雨粒子。');ui.showToast(saved?'已从浏览器存档恢复世界':mode==='creative'?'创造模式':'生存模式');pointer();
 }
 
+function multiplayerStateText(state,detail){
+  if(state==='connecting')return'正在建立 WebSocket 连接...';if(state==='handshaking')return'正在进行 minecraft-web-v1 协议握手...';if(state==='synchronizing')return'正在同步服务器世界信息与权威出生状态...';if(state==='ready')return'协议同步完成，正在生成服务器世界...';if(state==='failed')return`连接失败：${detail||'未知错误'}`;if(state==='closed')return`连接已关闭${detail?.reason?`：${detail.reason}`:''}`;return'未连接';
+}
+function handleMultiplayerState(movement,{state,detail}={}){
+  if(movement!==multiplayerMovement)return;const failed=state==='failed'||state==='closed';ui.setMultiplayerStatus(multiplayerStateText(state,detail),{error:failed});if(failed){multiplayerStarting=false;if(sessionKind==='multiplayer'&&running)queueMicrotask(()=>disconnectMultiplayerToMenu(movement,state==='failed'?'服务器连接发生协议/网络错误':'服务器已断开连接'));}
+}
+function disconnectMultiplayerToMenu(movement,message){if(movement!==multiplayerMovement||sessionKind!=='multiplayer')return;disposeWorld();ui.hud.classList.add('hidden');ui.showLoading(false);ui.setMultiplayerStatus(message,{error:true});modeScreen('multiplayer');}
+async function startMultiplayerWorld(readyData,movement){
+  if(movement!==multiplayerMovement||movement.state!=='ready')return;multiplayerStarting=true;modeScreen(null);ui.showLoading(true,'读取服务器世界信息',3);
+  let created=null;
+  try{created=await createAuthoritativeMultiplayerGameplay({readyData,movement,scene,camera,canvas,controlState:controlBus.snapshot(),onProgress:(done,total)=>ui.showLoading(true,`生成服务器区块 ${done}/${total}`,total?Math.round(done/total*100):100)});}catch(error){console.error('创建多人世界失败',error);if(movement===multiplayerMovement){multiplayerMovement=null;multiplayerStarting=false;try{movement.close(1011,'client world setup failed');}catch{}ui.showLoading(false);ui.setMultiplayerStatus(`无法创建服务器世界：${error.message||error}`,{error:true});modeScreen('multiplayer');}return;}
+  if(movement!==multiplayerMovement||movement.state!=='ready'){created.runtime.dispose();return;}
+  gameplayRuntime=created.runtime;({world,player,inventory,equipment,drops,experienceOrbs,projectiles,explosions,passiveMobs,hostileMobs,weatherSystem}=gameplayRuntime);worldInfo=created.worldInfo;sessionKind='multiplayer';gameTime=6000;weather='clear';totalXp=0;respawnPoint=null;saveDirty=false;lastSavedPosition=null;lastAttackAt=-Infinity;resetOxygen();
+  ui.bindInventory(inventory,{equipment,onChanged:()=>{},onOverflow:()=>{}});multiplayerMovement.setControl(controlBus.snapshot());multiplayerMovement.setView({yaw:player.yaw,pitch:player.pitch});multiplayerMovement.flush();running=true;paused=false;multiplayerStarting=false;ui.setReturnMainLabel(true);ui.hud.classList.remove('hidden');ui.showLoading(false);ui.setMultiplayerStatus(`已连接世界 ${worldInfo.id} · ${worldInfo.tickRate} Hz`);renderPlayerStatus();applySky();ui.chatMessage('多人移动已由服务器权威接管。方块、背包、战斗、命令和本地存档暂时禁用，直到对应服务端执行器完成。');ui.showToast('已进入服务器权威移动模式');pointer();
+}
+function connectMultiplayer(){
+  if(multiplayerStarting)return;disposeWorld();ui.hud.classList.add('hidden');ui.setReturnMainLabel(false);modeScreen('multiplayer');const url=ui.multiplayerUrl?.value?.trim()||'';if(!url){ui.setMultiplayerStatus('请输入 WebSocket 服务器地址',{error:true});return;}
+  let movement=null;movement=new MultiplayerMovementSession({allowInsecure:!!ui.multiplayerInsecure?.checked,onStateChange:event=>handleMultiplayerState(movement,event),onReady:data=>{void startMultiplayerWorld(data,movement);},onError:error=>{if(movement===multiplayerMovement)ui.setMultiplayerStatus(`连接错误：${error.message||error}`,{error:true});}});multiplayerMovement=movement;multiplayerStarting=true;ui.setMultiplayerStatus('准备连接...');
+  try{movement.connect(url);}catch(error){if(movement===multiplayerMovement){multiplayerStarting=false;multiplayerMovement=null;try{movement.close(1000,'connection setup failed');}catch{}ui.setMultiplayerStatus(`无法连接：${error.message||error}`,{error:true});}}
+}
+
 function pauseGame(){if(!running||deathState)return;paused=true;clearPlayerInput();document.exitPointerLock?.();modeScreen('pause');persistWorld();}
 function resume(){if(deathState)return;paused=false;modeScreen(null);pointer();}
-function toggleInventory(){if(!running||paused||deathState||ui.isChatOpen())return;if(ui.hasOpenPanel()){ui.closePanels();pointer();}else{clearPlayerInput();document.exitPointerLock?.();ui.openInventory();}}
-function openWorkbench(){if(!running||paused||deathState)return;clearPlayerInput();document.exitPointerLock?.();ui.openWorkbench();}
+function toggleInventory(){if(sessionKind==='multiplayer'){ui.showToast('联机背包权威尚未接入');return;}if(!running||paused||deathState||ui.isChatOpen())return;if(ui.hasOpenPanel()){ui.closePanels();pointer();}else{clearPlayerInput();document.exitPointerLock?.();ui.openInventory();}}
+function openWorkbench(){if(sessionKind==='multiplayer'){ui.showToast('联机工作台权威尚未接入');return;}if(!running||paused||deathState)return;clearPlayerInput();document.exitPointerLock?.();ui.openWorkbench();}
 function cycleViewMode(){if(!running||!player)return;const view=player.cycleView();ui.showToast(['第一人称','第三人称背面','第三人称正面'][view]);markSaveDirty();}
-function openChatInput(prefix=''){if(!running||paused||deathState||ui.hasOpenPanel())return;clearPlayerInput();document.exitPointerLock?.();ui.openChat(prefix);}
+function openChatInput(prefix=''){if(sessionKind==='multiplayer'){ui.showToast('联机聊天/命令协议尚未接入');return;}if(!running||paused||deathState||ui.hasOpenPanel())return;clearPlayerInput();document.exitPointerLock?.();ui.openChat(prefix);}
 
 async function handleAction(action){
-  if(action==='singleplayer')modeScreen('world');else if(action==='back-main')modeScreen('main');else if(action==='create-world')await startWorld();else if(action==='resume')resume();else if(action==='respawn')await completeRespawn();else if(action==='mobile-close-panel'){ui.closePanels();pointer();}else if(action==='mobile-close-chat'){ui.closeChat();pointer();}else if(action==='death-main'){ui.showLoading(true,'正在保存死亡结算',85);await persistWorld(true);disposeWorld();ui.hud.classList.add('hidden');ui.showLoading(false);modeScreen('main');}else if(action==='save-main'){ui.showLoading(true,'正在写入浏览器存档',85);await persistWorld(true);disposeWorld();ui.hud.classList.add('hidden');ui.showLoading(false);modeScreen('main');}else if(action==='options')ui.showToast('选项系统将在后续阶段接入');else if(action==='multiplayer'||action==='realms')ui.showToast('网络层将在后续阶段接入');else if(action==='quit')ui.showToast('浏览器页面不能由网页强制关闭');
+  if(action==='singleplayer')modeScreen('world');
+  else if(action==='multiplayer'){ui.setMultiplayerStatus(multiplayerMovement?'连接处理中...':'未连接');modeScreen('multiplayer');}
+  else if(action==='back-main'){if(multiplayerMovement&&!running)disposeWorld();modeScreen('main');}
+  else if(action==='create-world')await startWorld();
+  else if(action==='connect-multiplayer')connectMultiplayer();
+  else if(action==='resume')resume();
+  else if(action==='respawn')await completeRespawn();
+  else if(action==='mobile-close-panel'){ui.closePanels();pointer();}
+  else if(action==='mobile-close-chat'){ui.closeChat();pointer();}
+  else if(action==='death-main'){ui.showLoading(true,'正在保存死亡结算',85);await persistWorld(true);disposeWorld();ui.hud.classList.add('hidden');ui.showLoading(false);modeScreen('main');}
+  else if(action==='save-main'){if(sessionKind==='multiplayer'){ui.showLoading(true,'正在断开服务器',85);disposeWorld();ui.hud.classList.add('hidden');ui.showLoading(false);modeScreen('main');}else{ui.showLoading(true,'正在写入浏览器存档',85);await persistWorld(true);disposeWorld();ui.hud.classList.add('hidden');ui.showLoading(false);modeScreen('main');}}
+  else if(action==='options')ui.showToast('选项系统将在后续阶段接入');
+  else if(action==='realms')ui.showToast('Realms 服务将在后续阶段接入');
+  else if(action==='quit')ui.showToast('浏览器页面不能由网页强制关闭');
 }
 
 document.addEventListener('click',e=>{const button=e.target.closest('[data-action]');if(button)handleAction(button.dataset.action);});window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight,false);});document.addEventListener('pointerlockchange',syncControlAdapters);
+function multiplayerUnsupported(message){ui.showToast(message);return false;}
+function sendMultiplayerHotbar(){if(sessionKind==='multiplayer'&&multiplayerMovement?.ready)multiplayerMovement.sendHotbarSelect(ui.selected);}
 function handleControlIntent({name,payload}={}){
   if(name==='focus'){pointer();return true;}if(deathState)return false;
   if(name==='escape'){if(ui.isChatOpen()){ui.closeChat();pointer();return true;}if(ui.hasOpenPanel()){ui.closePanels();pointer();return true;}if(running&&!paused){pauseGame();return true;}return false;}
   if(name==='pause'){if(running&&!paused){pauseGame();return true;}return false;}
-  if(name==='inventory'){const allowed=running&&!paused&&!deathState&&!ui.isChatOpen();if(allowed)toggleInventory();return allowed;}
+  if(name==='inventory'){if(sessionKind==='multiplayer')return multiplayerUnsupported('联机背包权威尚未接入');const allowed=running&&!paused&&!deathState&&!ui.isChatOpen();if(allowed)toggleInventory();return allowed;}
   if(name==='view'){if(!running)return false;cycleViewMode();return true;}
-  if(name==='chat'){const allowed=running&&!paused&&!ui.hasOpenPanel();if(allowed)openChatInput(payload?.prefix||'');return allowed;}
-  if(name==='drop'){if(!canControl())return false;dropSelected();return true;}
-  if(name==='hotbar-select'){if(!running||!Number.isInteger(payload?.index)||payload.index<0||payload.index>8)return false;ui.select(payload.index);return true;}
-  if(name==='hotbar-step'){if(!running||ui.hasOpenPanel()||!Number.isFinite(payload?.step))return false;ui.select(ui.selected+(payload.step>0?1:-1));return true;}
-  if(name==='secondary'){if(!canControl())return false;secondaryAction();return true;}return false;
+  if(name==='chat'){if(sessionKind==='multiplayer')return multiplayerUnsupported('联机聊天/命令协议尚未接入');const allowed=running&&!paused&&!ui.hasOpenPanel();if(allowed)openChatInput(payload?.prefix||'');return allowed;}
+  if(name==='drop'){if(sessionKind==='multiplayer')return multiplayerUnsupported('联机丢弃/物品权威尚未接入');if(!canControl())return false;dropSelected();return true;}
+  if(name==='hotbar-select'){if(!running||!Number.isInteger(payload?.index)||payload.index<0||payload.index>8)return false;ui.select(payload.index);sendMultiplayerHotbar();return true;}
+  if(name==='hotbar-step'){if(!running||ui.hasOpenPanel()||!Number.isFinite(payload?.step))return false;ui.select(ui.selected+(payload.step>0?1:-1));sendMultiplayerHotbar();return true;}
+  if(name==='secondary'){if(sessionKind==='multiplayer')return multiplayerUnsupported('联机放置/使用权威尚未接入');if(!canControl())return false;secondaryAction();return true;}return false;
 }
 ui.chatInput.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Escape'){e.preventDefault();ui.closeChat();pointer();return;}if(e.key==='Enter'){e.preventDefault();const text=ui.chatInput.value;ui.closeChat();if(text.trim())runCommand(text);pointer();}});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 function primaryActionStart(){
-  if(!canControl()||!player||player.mode==='spectator')return;const entityHit=aimEntity(),blockHit=aim();
+  if(sessionKind==='multiplayer'){ui.showToast('联机方块/战斗权威尚未接入');return;}if(!canControl()||!player||player.mode==='spectator')return;const entityHit=aimEntity(),blockHit=aim();
   if(entityHit&&(!blockHit||entityHit.distance<=blockHit.distance)){const now=performance.now();breakStart=0;ui.setBreak(0);if(player.mode!=='creative'&&!canAttack(lastAttackAt,now))return;lastAttackAt=now;const selected=ui.selectedItem(),damage=player.mode==='creative'?100:(ITEMS[selected?.id]?.attackDamage||1);entityHit.system.hurt(entityHit.entity,damage,player.position,now);return;}
   if(player.mode!=='adventure')breakStart=performance.now();
 }
 function primaryActionEnd(){breakStart=0;ui.setBreak(0);}
 function secondaryAction(){
-  if(!canControl()||!player)return;const hit=aim();if(hit&&isBedBlock(hit.id)){if(player.mode!=='spectator')activateBed(hit);return;}if(hit?.id===9){openWorkbench();return;}if(player.mode==='spectator'||player.mode==='adventure'||!hit)return;const selected=ui.selectedItem(),def=ITEMS[selected?.id];if(def?.placeKind==='bed'){const plan=placeBed(hit.previous);if(!plan){ui.showToast('这里无法放置床');return;}if(player.mode!=='creative')ui.consumeSelected(1);ui.showToast(`放置 ${def.name}`);markSaveDirty();return;}if(!def?.blockId||def.blockId===8)return;const p=hit.previous;if(playerOccupies(p.x,p.y,p.z))return;if(world.setBlock(p.x,p.y,p.z,def.blockId)){if(player.mode!=='creative')ui.consumeSelected(1);ui.showToast(`放置 ${def.name}`);markSaveDirty();}
+  if(sessionKind==='multiplayer'){ui.showToast('联机放置/使用权威尚未接入');return;}if(!canControl()||!player)return;const hit=aim();if(hit&&isBedBlock(hit.id)){if(player.mode!=='spectator')activateBed(hit);return;}if(hit?.id===9){openWorkbench();return;}if(player.mode==='spectator'||player.mode==='adventure'||!hit)return;const selected=ui.selectedItem(),def=ITEMS[selected?.id];if(def?.placeKind==='bed'){const plan=placeBed(hit.previous);if(!plan){ui.showToast('这里无法放置床');return;}if(player.mode!=='creative')ui.consumeSelected(1);ui.showToast(`放置 ${def.name}`);markSaveDirty();return;}if(!def?.blockId||def.blockId===8)return;const p=hit.previous;if(playerOccupies(p.x,p.y,p.z))return;if(world.setBlock(p.x,p.y,p.z,def.blockId)){if(player.mode!=='creative')ui.consumeSelected(1);ui.showToast(`放置 ${def.name}`);markSaveDirty();}
 }
-document.addEventListener('visibilitychange',()=>{if(document.hidden){clearPlayerInput();persistWorld();}});window.addEventListener('beforeunload',()=>{persistWorld();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){clearPlayerInput();persistWorld();}});window.addEventListener('beforeunload',()=>{try{multiplayerMovement?.close(1000,'page unload');}catch{}persistWorld();});
 
 function playerOccupies(x,y,z){if(!player)return false;const minX=player.position.x-player.radius,maxX=player.position.x+player.radius,minY=player.position.y,maxY=player.position.y+player.height,minZ=player.position.z-player.radius,maxZ=player.position.z+player.radius;return x+1>minX&&x<maxX&&y+1>minY&&y<maxY&&z+1>minZ&&z<maxZ;}
 function placeBed(cell){
@@ -214,8 +254,8 @@ function aimEntity(){if(!player)return null;const dir=player.lookDirection(new T
 
 function toolMultiplier(blockId){const block=BLOCKS[blockId],selected=ui.selectedItem(),tool=ITEMS[selected?.id]?.tool;if(!tool)return 1;if(block?.requires===tool.kind)return 2.5*tool.speed;return 1.2;}
 function canHarvest(blockId){const block=BLOCKS[blockId];if(!block?.requires)return true;return ITEMS[ui.selectedItem()?.id]?.tool?.kind===block.requires;}
-function interaction(now){if(!canControl()||!player||player.mode==='spectator'||player.mode==='adventure'){ui.setBreak(0);return;}selectedTarget=aim();if(!breakStart||!selectedTarget){ui.setBreak(0);return;}const block=BLOCKS[selectedTarget.id],hardness=block?.hardness||1,creative=player.mode==='creative',duration=creative?70:Math.max(120,hardness*900/toolMultiplier(selectedTarget.id)),progress=(now-breakStart)/duration;ui.setBreak(Math.min(1,progress));if(progress>=1){const broken={...selectedTarget},removed=isBedBlock(broken.id)?breakBed(broken):world.setBlock(broken.x,broken.y,broken.z,0);if(removed){if(player.mode!=='creative'&&canHarvest(broken.id)&&block?.drops)drops.spawn(block.drops,1,new THREE.Vector3(broken.x+.5,broken.y+.6,broken.z+.5));ui.showToast(`破坏 ${block.name}`);markSaveDirty();}breakStart=now+70;}}
-function dropSelected(){const selected=ui.selectedItem();if(!selected||!drops||!player)return;const stack=player.mode==='creative'?{id:selected.id,count:1}:ui.consumeSelected(1);if(!stack)return;const dir=player.lookDirection(new THREE.Vector3()),origin=player.eyePosition(new THREE.Vector3()).addScaledVector(dir,.55),velocity=dir.clone().multiplyScalar(4).add(new THREE.Vector3(0,1.5,0));drops.spawn(stack.id,stack.count,origin,velocity);markSaveDirty();}
+function interaction(now){if(sessionKind!=='singleplayer'||!canControl()||!player||player.mode==='spectator'||player.mode==='adventure'){ui.setBreak(0);return;}selectedTarget=aim();if(!breakStart||!selectedTarget){ui.setBreak(0);return;}const block=BLOCKS[selectedTarget.id],hardness=block?.hardness||1,creative=player.mode==='creative',duration=creative?70:Math.max(120,hardness*900/toolMultiplier(selectedTarget.id)),progress=(now-breakStart)/duration;ui.setBreak(Math.min(1,progress));if(progress>=1){const broken={...selectedTarget},removed=isBedBlock(broken.id)?breakBed(broken):world.setBlock(broken.x,broken.y,broken.z,0);if(removed){if(player.mode!=='creative'&&canHarvest(broken.id)&&block?.drops)drops.spawn(block.drops,1,new THREE.Vector3(broken.x+.5,broken.y+.6,broken.z+.5));ui.showToast(`破坏 ${block.name}`);markSaveDirty();}breakStart=now+70;}}
+function dropSelected(){if(sessionKind==='multiplayer'){ui.showToast('联机丢弃/物品权威尚未接入');return;}const selected=ui.selectedItem();if(!selected||!drops||!player)return;const stack=player.mode==='creative'?{id:selected.id,count:1}:ui.consumeSelected(1);if(!stack)return;const dir=player.lookDirection(new THREE.Vector3()),origin=player.eyePosition(new THREE.Vector3()).addScaledVector(dir,.55),velocity=dir.clone().multiplyScalar(4).add(new THREE.Vector3(0,1.5,0));drops.spawn(stack.id,stack.count,origin,velocity);markSaveDirty();}
 function updateSurvival(dt){if(player.mode!=='survival')return;player.saturation=Math.max(0,player.saturation-dt*.012);if(player.saturation===0)player.hunger=Math.max(0,player.hunger-dt*.007);if(player.hunger>=18&&player.hp<20)player.hp=Math.min(20,player.hp+dt*.08);renderPlayerStatus();}
 function updateOxygen(dt,now){
   if(!player||!world||deathState)return;const eye=player.eyePosition(new THREE.Vector3()),id=world.getBlock(Math.floor(eye.x),Math.floor(eye.y),Math.floor(eye.z));headSubmerged=!!BLOCKS[id]?.liquid;
@@ -225,19 +265,26 @@ function updateOxygen(dt,now){
     const hit=player.takeDamage(DROWN_DAMAGE,now,null);if(!hit.applied)continue;markSaveDirty();renderPlayerStatus();if(hit.dead){beginPlayerDeath('你溺水了');break;}
   }
 }
-function updateAutosave(now){if(!player||!world)return;if(!lastSavedPosition||player.position.distanceToSquared(lastSavedPosition)>.5)saveDirty=true;if(saveDirty&&now-lastSaveAt>5000)persistWorld();}
-function runCommand(text){const result=executeCommand(text,{player,inventory,inventoryChanged:()=>{ui.refreshInventory();markSaveDirty();},setMode:mode=>{player.setMode(mode);worldInfo.mode=mode;if(!usesOxygen(mode))resetOxygen();markSaveDirty();},setSpawnpoint:(x,y,z)=>setRespawnPoint({x,y,z}),summon:(type,x,y,z)=>!!hostileMobs?.spawn(type,{x,y,z}),addXp:value=>addExperience(value),kill:()=>{if(deathState)return;player.hp=0;player.velocity.set(0,0,0);beginPlayerDeath('你被杀死了');},teleport:(x,y,z)=>{player.position.set(x,y,z);player.velocity.set(0,0,0);world.ensureAround(x,z);player.syncCamera();markSaveDirty();},setTime:value=>{gameTime=value;applySky();markSaveDirty();},setWeather:value=>{weather=value;weatherSystem?.setWeather(value);applySky();markSaveDirty();}});ui.chatMessage(result.message,result.ok?'system':'error');}
+function updateAutosave(now){if(sessionKind!=='singleplayer'||!player||!world)return;if(!lastSavedPosition||player.position.distanceToSquared(lastSavedPosition)>.5)saveDirty=true;if(saveDirty&&now-lastSaveAt>5000)persistWorld();}
+function runCommand(text){if(sessionKind==='multiplayer'){ui.chatMessage('联机命令尚未服务端化，客户端命令已禁用','error');return;}const result=executeCommand(text,{player,inventory,inventoryChanged:()=>{ui.refreshInventory();markSaveDirty();},setMode:mode=>{player.setMode(mode);worldInfo.mode=mode;if(!usesOxygen(mode))resetOxygen();markSaveDirty();},setSpawnpoint:(x,y,z)=>setRespawnPoint({x,y,z}),summon:(type,x,y,z)=>!!hostileMobs?.spawn(type,{x,y,z}),addXp:value=>addExperience(value),kill:()=>{if(deathState)return;player.hp=0;player.velocity.set(0,0,0);beginPlayerDeath('你被杀死了');},teleport:(x,y,z)=>{player.position.set(x,y,z);player.velocity.set(0,0,0);world.ensureAround(x,z);player.syncCamera();markSaveDirty();},setTime:value=>{gameTime=value;applySky();markSaveDirty();},setWeather:value=>{weather=value;weatherSystem?.setWeather(value);applySky();markSaveDirty();}});ui.chatMessage(result.message,result.ok?'system':'error');}
 function applySky(){const angle=(gameTime-6000)/24000*Math.PI*2,sunHeight=Math.cos(angle),daylight=Math.max(.08,Math.min(1,(sunHeight+.25)/1.25)),storm=weather==='clear'?1:weather==='rain' ? .72 : .55,night=new THREE.Color(0x061126),day=new THREE.Color(0x86bff2),color=night.clone().lerp(day,daylight*storm);scene.background=color;scene.fog.color.copy(color);hemi.intensity=.35+2.05*daylight*storm;sun.intensity=Math.max(0,2.2*daylight*storm);sun.position.set(Math.cos(angle)*100,Math.sin(Math.PI/2-angle)*110,45);}
+function updateMultiplayer(dt){
+  const movement=multiplayerMovement;if(!movement?.ready||!world||!player)return;movement.flush();const authoritative=movement.step(dt);if(authoritative){applyAuthoritativePlayerState(player,authoritative);if(worldInfo)worldInfo.mode=authoritative.mode;}world.ensureAround(player.position.x,player.position.z);selectedTarget=null;ui.setBreak(0);ui.renderOxygen(MAX_AIR_SECONDS,MAX_AIR_SECONDS,false);
+  const current=movement.current(),p=player.position;ui.debug.textContent=`Minecraft Web By AI v0.4-dev\nFPS ${fps} · WebGL ${renderer.capabilities.isWebGL2?'2':'1'}\nXYZ ${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}\nChunks ${world.chunks.size} · Meshes ${world.meshes.size} · MeshQ ${world.meshQueue.size}\nNetwork server-authoritative · ${worldInfo?.tickRate||20} Hz · Tick ${current?.tick??'-'}\nWorld ${worldInfo?.id||'-'} · Session ${worldInfo?.session||'-'}\n模式 ${player.mode} · Seed ${worldInfo?.seed}`;
+}
 
 function animate(now){
   requestAnimationFrame(animate);const dt=Math.min((now-last)/1000,.05);last=now;frames++;if(now-lastSecond>1000){fps=frames;frames=0;lastSecond=now;}syncControlAdapters();
   if(running&&!paused&&player&&!deathState){
-    if(!ui.hasOpenPanel()&&!ui.isChatOpen())player.update(dt);
-    if(player.hp<=0)beginPlayerDeath(player.position.y<-10?'你掉入了虚空':'你死了');
-    if(!deathState){
-      world.ensureAround(player.position.x,player.position.z);interaction(now);updateSurvival(dt);updateOxygen(dt,now);
-      if(!deathState){drops?.update(dt,player);experienceOrbs?.update(dt,player);passiveMobs?.update(dt,player);hostileMobs?.update(dt,player,gameTime);projectiles?.update(dt,player);explosions?.update(dt);weatherSystem?.update(dt,player);updateAutosave(now);gameTime=(gameTime+dt*20)%24000;applySky();}
-      const p=player.position,xp=experienceState(totalXp),armor=equipment?.armorPoints()||0,air=oxygenState.air,weatherFx=weatherSystem?.activeCount||0,aimText=selectedTarget?`Aim ${selectedTarget.x}/${selectedTarget.y}/${selectedTarget.z} -> ${selectedTarget.previous.x}/${selectedTarget.previous.y}/${selectedTarget.previous.z}`:'Aim -';ui.debug.textContent=`Minecraft Web By AI v0.4-dev\nFPS ${fps} · WebGL ${renderer.capabilities.isWebGL2?'2':'1'}\nXYZ ${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}\nChunks ${world.chunks.size} · Meshes ${world.meshes.size} · MeshQ ${world.meshQueue.size}\nPassive ${passiveMobs?.size||0} · Hostile ${hostileMobs?.size||0} · Projectiles ${projectiles?.size||0} · FX ${explosions?.size||0}\nWeatherFX ${weatherSystem?.type||weather}:${weatherFx}\n${aimText}\nDrops ${drops?.drops.length||0} · XPOrbs ${experienceOrbs?.size||0} · XP ${xp.total} / Lv.${xp.level}\nHP ${player.hp.toFixed(1)} · Armor ${armor} · Air ${air.toFixed(1)} · ${headSubmerged?'Submerged':'Dry'}\nTime ${Math.floor(gameTime)} · ${weather}\n模式 ${player.mode} · Seed ${worldInfo?.seed}`;
+    if(sessionKind==='multiplayer')updateMultiplayer(dt);
+    else{
+      if(!ui.hasOpenPanel()&&!ui.isChatOpen())player.update(dt);
+      if(player.hp<=0)beginPlayerDeath(player.position.y<-10?'你掉入了虚空':'你死了');
+      if(!deathState){
+        world.ensureAround(player.position.x,player.position.z);interaction(now);updateSurvival(dt);updateOxygen(dt,now);
+        if(!deathState){drops?.update(dt,player);experienceOrbs?.update(dt,player);passiveMobs?.update(dt,player);hostileMobs?.update(dt,player,gameTime);projectiles?.update(dt,player);explosions?.update(dt);weatherSystem?.update(dt,player);updateAutosave(now);gameTime=(gameTime+dt*20)%24000;applySky();}
+        const p=player.position,xp=experienceState(totalXp),armor=equipment?.armorPoints()||0,air=oxygenState.air,weatherFx=weatherSystem?.activeCount||0,aimText=selectedTarget?`Aim ${selectedTarget.x}/${selectedTarget.y}/${selectedTarget.z} -> ${selectedTarget.previous.x}/${selectedTarget.previous.y}/${selectedTarget.previous.z}`:'Aim -';ui.debug.textContent=`Minecraft Web By AI v0.4-dev\nFPS ${fps} · WebGL ${renderer.capabilities.isWebGL2?'2':'1'}\nXYZ ${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}\nChunks ${world.chunks.size} · Meshes ${world.meshes.size} · MeshQ ${world.meshQueue.size}\nPassive ${passiveMobs?.size||0} · Hostile ${hostileMobs?.size||0} · Projectiles ${projectiles?.size||0} · FX ${explosions?.size||0}\nWeatherFX ${weatherSystem?.type||weather}:${weatherFx}\n${aimText}\nDrops ${drops?.drops.length||0} · XPOrbs ${experienceOrbs?.size||0} · XP ${xp.total} / Lv.${xp.level}\nHP ${player.hp.toFixed(1)} · Armor ${armor} · Air ${air.toFixed(1)} · ${headSubmerged?'Submerged':'Dry'}\nTime ${Math.floor(gameTime)} · ${weather}\n模式 ${player.mode} · Seed ${worldInfo?.seed}`;
+      }
     }
   }
   renderer.render(scene,camera);

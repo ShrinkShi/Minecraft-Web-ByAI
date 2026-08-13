@@ -5,7 +5,8 @@ import {EQUIPMENT_SLOTS} from './equipment.js';
 
 export class UI{
   constructor(){
-    this.main=document.querySelector('#main-menu');this.worldMenu=document.querySelector('#world-menu');this.pause=document.querySelector('#pause-menu');
+    this.main=document.querySelector('#main-menu');this.worldMenu=document.querySelector('#world-menu');this.multiplayerMenu=document.querySelector('#multiplayer-menu');this.pause=document.querySelector('#pause-menu');
+    this.multiplayerUrl=document.querySelector('#multiplayer-url');this.multiplayerInsecure=document.querySelector('#multiplayer-insecure');this.multiplayerStatus=document.querySelector('#multiplayer-status');this.returnMainButton=document.querySelector('#return-main-button');
     this.hud=document.querySelector('#hud');this.inventory=document.querySelector('#inventory');this.workbench=document.querySelector('#workbench');this.loading=document.querySelector('#loading');
     this.hotbar=document.querySelector('#hotbar');this.invGrid=document.querySelector('#inventory-grid');this.invHotbar=document.querySelector('#inventory-hotbar');this.equipmentSlots=document.querySelector('#equipment-slots');
     this.workbenchGrid=document.querySelector('#workbench-grid');this.workbenchHotbar=document.querySelector('#workbench-hotbar');
@@ -18,6 +19,8 @@ export class UI{
   }
 
   showScreen(el){for(const s of document.querySelectorAll('.screen'))s.classList.remove('active');if(el)el.classList.add('active');}
+  setMultiplayerStatus(text,{error=false}={}){if(!this.multiplayerStatus)return;this.multiplayerStatus.textContent=String(text||'');this.multiplayerStatus.classList.toggle('error',!!error);}
+  setReturnMainLabel(multiplayer=false){if(this.returnMainButton)this.returnMainButton.textContent=multiplayer?'断开连接并返回标题画面':'保存并返回标题画面';}
 
   bindInventory(model,{equipment=null,onChanged=()=>{},onOverflow=()=>{}}={}){
     this.inventoryModel=model;this.equipmentModel=equipment;this.onChanged=onChanged;this.onOverflow=onOverflow;this.refreshInventory();
