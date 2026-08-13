@@ -10,7 +10,7 @@ function positive(value,label){value=finite(value,label);if(value<=0||value>16)t
 function worldLike(value){if(!value||typeof value!=='object'||typeof value.getBlock!=='function')throw new TypeError('world must expose getBlock');return value;}
 function playerLike(value){if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError('player state must be an object');const position=value.position;if(!position||typeof position!=='object'||Array.isArray(position))throw new TypeError('player position must be an object');return{position:{x:finite(position.x,'player.position.x'),y:finite(position.y,'player.position.y'),z:finite(position.z,'player.position.z')},yaw:finite(value.yaw,'player.yaw'),pitch:finite(value.pitch,'player.pitch')};}
 function targetable(id){if(id===BLOCK.AIR)return false;const block=BLOCKS[id];if(!block)throw new RangeError(`world returned unknown block id: ${id}`);return !block.liquid;}
-function rayCell(value,direction){return Math.floor(value+direction*EPSILON);}
+function rayCell(value,direction){const cell=Math.floor(value);return direction<-EPSILON&&Number.isInteger(value)?cell-1:cell;}
 function axis(origin,cell,direction){if(Math.abs(direction)<EPSILON)return{step:0,next:Infinity,delta:Infinity};const step=direction>0?1:-1,boundary=step>0?cell+1:cell;return{step,next:(boundary-origin)/direction,delta:Math.abs(1/direction)};}
 
 export function raycastAuthoritativeBlock(world,player,{maxDistance=DEFAULT_BLOCK_REACH,eyeHeight=PLAYER_EYE_HEIGHT}={}){
