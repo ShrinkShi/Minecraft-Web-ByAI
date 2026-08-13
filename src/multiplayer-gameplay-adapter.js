@@ -1,4 +1,5 @@
 import {createClientGameplayRuntime} from './client-gameplay-runtime.js';
+import {RemotePlayerSystem} from './remote-player-system.js';
 
 function object(value,label){if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError(`${label} must be an object`);return value;}
 function finite(value,label){if(typeof value!=='number'||!Number.isFinite(value))throw new TypeError(`${label} must be a finite number`);return value;}
@@ -13,6 +14,9 @@ export async function createAuthoritativeMultiplayerGameplay({readyData,movement
   readyData=object(readyData,'multiplayer ready data');movement=object(movement,'multiplayer movement session');const info=object(readyData.worldInfo,'server world info'),initial=object(readyData.initialSnapshot,'initial authoritative snapshot'),position=object(initial.position,'initial authoritative position');
   if(typeof onProgress!=='function')throw new TypeError('onProgress must be a function');
   const runtime=await createClientGameplayRuntime({scene,camera,canvas,seed:info.seed,prompt:info.prompt,renderDistance:3,savedEdits:{},centerX:finite(position.x,'initial position.x'),centerZ:finite(position.z,'initial position.z'),mode:initial.mode,inventoryState:null,equipmentState:null,controlState,weather:'clear',onWorldEdit:()=>{},onWorldProgress:onProgress,onInventoryPickup:()=>{},onExperience:()=>{},onPlayerHit:()=>{},onPlayerBlast:()=>{},onMobDeath:()=>{},onHostileProjectile:()=>{},onHostileExplosion:()=>{}});
+  let remotePlayers=null;
+  try{remotePlayers=new RemotePlayerSystem(scene,{tickRate:info.tickRate});movement.attachRemotePlayerSystem(remotePlayers);}catch(error){runtime.dispose();throw error;}
   const authoritative=movement.step(1)||movement.current?.()||initial;applyAuthoritativePlayerState(runtime.player,authoritative,{applyLook:true});
-  return{runtime,authoritative,worldInfo:{id:info.worldId,name:`服务器世界 ${info.worldId}`,seed:info.seed,prompt:info.prompt,mode:authoritative.mode,remote:true,session:info.session,tickRate:info.tickRate,terrainVersion:info.terrainVersion}};
+  if(globalThis.__minecraftE2E&&typeof globalThis.__minecraftE2E==='object')globalThis.__minecraftE2E.remotePlayers=()=>movement.remoteVisualStates();
+  return{runtime,remotePlayers,authoritative,worldInfo:{id:info.worldId,name:`服务器世界 ${info.worldId}`,seed:info.seed,prompt:info.prompt,mode:authoritative.mode,remote:true,session:info.session,tickRate:info.tickRate,terrainVersion:info.terrainVersion}};
 }
