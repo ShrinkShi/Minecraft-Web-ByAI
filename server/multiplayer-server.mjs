@@ -50,7 +50,7 @@ function offeredProtocols(header){
 
 function rejectUpgrade(socket,statusCode,statusText,extraHeaders=[]){
   const body=`${statusCode} ${statusText}\n`,headers=[`HTTP/1.1 ${statusCode} ${statusText}`,'Connection: close','Content-Type: text/plain; charset=utf-8',`Content-Length: ${Buffer.byteLength(body)}`,...extraHeaders,'',''];
-  try{socket.write(headers.join('\r\n'));socket.write(body);}finally{socket.destroy();}
+  try{socket.end(headers.join('\r\n')+body);}catch{socket.destroy();}
 }
 
 function parseJsonText(data){
@@ -82,6 +82,7 @@ export function createMultiplayerServer({
   if(typeof sessionFactory!=='function')throw new TypeError('sessionFactory must be a function');
   for(const [name,callback] of Object.entries({onSessionReady,onInput,onSessionClose,onSocketError}))if(typeof callback!=='function')throw new TypeError(`${name} must be a function`);
 
+  const reportSocketError=(session,error)=>{try{onSocketError({session,error});}catch{}};
   const httpServer=createServer((request,response)=>{
     if(request.method==='GET'&&request.url==='/healthz'){
       const body=JSON.stringify({ok:true,protocol:MULTIPLAYER_SUBPROTOCOL});response.writeHead(200,{'content-type':'application/json; charset=utf-8','content-length':Buffer.byteLength(body),'cache-control':'no-store'});response.end(body);return;
@@ -89,7 +90,6 @@ export function createMultiplayerServer({
     response.writeHead(404,{'content-type':'text/plain; charset=utf-8','cache-control':'no-store'});response.end('Not Found\n');
   });
   const wss=new WebSocketServer({noServer:true,perMessageDeflate:false,maxPayload,handleProtocols:protocols=>protocols.has(MULTIPLAYER_SUBPROTOCOL)?MULTIPLAYER_SUBPROTOCOL:false});
-  const connectionState=new WeakMap();
 
   httpServer.on('upgrade',(request,socket,head)=>{
     let pathname;try{pathname=new URL(request.url||'/',`http://${request.headers.host||'localhost'}`).pathname;}catch{rejectUpgrade(socket,400,'Bad Request');return;}
@@ -102,7 +102,7 @@ export function createMultiplayerServer({
   });
 
   wss.on('connection',(websocket,request)=>{
-    const state={phase:'await-hello',session:null,gate:null,helloTimer:null,origin:request.headers.origin||null};connectionState.set(websocket,state);
+    const state={phase:'await-hello',session:null,gate:null,helloTimer:null,origin:request.headers.origin||null};
     state.helloTimer=setTimeout(()=>{state.helloTimer=null;if(state.phase==='await-hello')websocket.close(SERVER_HELLO_TIMEOUT_CLOSE_CODE,'hello timeout');},helloTimeoutMs);
 
     websocket.on('message',(data,isBinary)=>{
@@ -113,21 +113,21 @@ export function createMultiplayerServer({
       if(state.phase==='await-hello'){
         try{decodeClientHello(message);}catch{websocket.close(1002,'invalid client hello');return;}
         clearTimeout(state.helloTimer);state.helloTimer=null;
-        let session;try{session=assertClientSessionId(sessionFactory());}catch{websocket.close(1011,'session allocation failed');return;}
+        let session;try{session=assertClientSessionId(sessionFactory());}catch(error){reportSocketError(null,error);websocket.close(1011,'session allocation failed');return;}
         state.session=session;state.gate=new ClientInputSessionGate(session);state.phase='ready';
         websocket.send(JSON.stringify(encodeServerWelcome(session)));
-        onSessionReady({session,origin:state.origin,remoteAddress:request.socket.remoteAddress||null});return;
+        try{onSessionReady({session,origin:state.origin,remoteAddress:request.socket.remoteAddress||null});}catch(error){reportSocketError(session,error);websocket.close(1011,'session ready handler failed');}return;
       }
 
       let result;try{result=state.gate.accept(message);}catch{websocket.close(1002,'invalid client input envelope');return;}
       if(!result.accepted){websocket.close(1008,'stale or duplicate packet');return;}
-      onInput({session:state.session,message:result.message});
+      try{onInput({session:state.session,message:result.message});}catch(error){reportSocketError(state.session,error);websocket.close(1011,'input handler failed');}
     });
 
-    websocket.on('error',error=>onSocketError({session:state.session,error}));
+    websocket.on('error',error=>reportSocketError(state.session,error));
     websocket.on('close',(code,reason)=>{
       if(state.helloTimer!==null){clearTimeout(state.helloTimer);state.helloTimer=null;}
-      state.phase='closed';onSessionClose({session:state.session,code,reason:reason.toString('utf8')});
+      state.phase='closed';try{onSessionClose({session:state.session,code,reason:reason.toString('utf8')});}catch(error){reportSocketError(state.session,error);}
     });
   });
 
