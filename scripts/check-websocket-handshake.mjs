@@ -17,6 +17,7 @@ import {
   WEBSOCKET_CLIENT_STATES,
   DEFAULT_HANDSHAKE_TIMEOUT_MS,
   HANDSHAKE_TIMEOUT_CLOSE_CODE,
+  createBrowserWebSocket,
   normalizeWebSocketUrl,
   MultiplayerWebSocketClient
 } from '../src/websocket-client.js';
@@ -41,8 +42,9 @@ assert.throws(()=>decodeClientHello({v:1,kind:'hello',token:'secret'}),/unexpect
 
 assert.equal(normalizeWebSocketUrl('wss://example.com/game'),'wss://example.com/game');
 assert.equal(normalizeWebSocketUrl('ws://127.0.0.1:8080/socket',{allowInsecure:true}),'ws://127.0.0.1:8080/socket');
-assert.throws(()=>normalizeWebSocketUrl('ws://127.0.0.1:8080/socket'),/allowInsecure/);assert.throws(()=>normalizeWebSocketUrl('https://example.com/socket'),/ws:\/\/ or wss:\/\//);assert.throws(()=>normalizeWebSocketUrl('wss://user:pass@example.com/socket'),/embedded credentials/);assert.throws(()=>normalizeWebSocketUrl('relative/socket'),/absolute URL/);
+assert.throws(()=>normalizeWebSocketUrl('ws://127.0.0.1:8080/socket'),/allowInsecure/);assert.throws(()=>normalizeWebSocketUrl('https://example.com/socket'),/ws:\/\/ or wss:\/\//);assert.throws(()=>normalizeWebSocketUrl('wss://user:pass@example.com/socket'),/embedded credentials/);assert.throws(()=>normalizeWebSocketUrl('wss://example.com/socket#debug'),/fragment/);assert.throws(()=>normalizeWebSocketUrl('relative/socket'),/absolute URL/);
 assert.deepEqual(WEBSOCKET_CLIENT_STATES,['idle','connecting','handshaking','ready','rejected','closed','error']);assert.equal(DEFAULT_HANDSHAKE_TIMEOUT_MS,5000);assert.equal(HANDSHAKE_TIMEOUT_CLOSE_CODE,4000);
+const browserDefaultClient=new MultiplayerWebSocketClient();assert.equal(browserDefaultClient.socketFactory,createBrowserWebSocket,'browser WebSocket must be the default runtime factory');
 
 const states=[],protocolErrors=[],created=[];
 const client=new MultiplayerWebSocketClient({
