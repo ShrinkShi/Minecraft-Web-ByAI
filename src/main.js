@@ -1,6 +1,4 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
-import {VoxelWorld} from './world.js';
-import {PlayerController} from './player.js';
 import {UI} from './ui.js';
 import {DeathScreen} from './death-screen.js';
 import {BLOCKS,WORLD_HEIGHT} from './blocks.js';
@@ -8,27 +6,19 @@ import {normalizeRespawnPoint,resolveRespawnPosition} from './respawn-rules.js';
 import {bedPlacement,bedPartner,bedRespawnAnchor,isBedBlock} from './bed-rules.js';
 import {resolveSleep} from './sleep-rules.js';
 import {ITEMS} from './items.js';
-import {Inventory} from './inventory.js';
-import {Equipment} from './equipment.js';
 import {mitigateArmorDamage} from './armor-rules.js';
 import {createOxygenState,stepOxygen,usesOxygen,MAX_AIR_SECONDS,DROWN_DAMAGE} from './oxygen-rules.js';
-import {DropSystem} from './drops.js';
 import {WorldStorage,worldIdFor} from './storage.js';
 import {executeCommand} from './commands.js';
-import {PassiveMobSystem} from './passive-mobs.js';
-import {HostileMobSystem} from './hostile-mobs.js';
 import {canAttack} from './combat.js';
-import {ExperienceOrbSystem} from './experience-orbs.js';
 import {experienceState} from './experience.js';
 import {rollMobLoot,rollMobXp} from './mobs.js';
-import {ProjectileSystem} from './projectiles.js';
-import {ExplosionSystem} from './explosions.js';
-import {WeatherSystem} from './weather-system.js';
 import {deathLossPlan} from './death-rules.js';
 import {MobileControls} from './mobile-controls.js';
 import {DesktopControls} from './desktop-controls.js';
 import {ControlIntentBus} from './control-intents.js';
 import {detectDeviceProfile} from './device-profile.js';
+import {createClientGameplayRuntime} from './client-gameplay-runtime.js';
 
 const canvas=document.querySelector('#game-canvas');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:false,powerPreference:'high-performance'});
@@ -45,7 +35,7 @@ const sun=new THREE.DirectionalLight(0xfff1c2,2.1);sun.position.set(80,120,60);s
 
 const ui=new UI(),storage=new WorldStorage(),deathScreen=new DeathScreen();
 const e2eEnabled=new URLSearchParams(location.search).get('e2e')==='1';
-let deviceProfile=detectDeviceProfile(),desktopControls=null,mobileControls=null;
+let deviceProfile=detectDeviceProfile(),desktopControls=null,mobileControls=null,gameplayRuntime=null;
 let world=null,player=null,inventory=null,equipment=null,drops=null,experienceOrbs=null,projectiles=null,explosions=null,passiveMobs=null,hostileMobs=null,weatherSystem=null;
 let running=false,paused=false,last=performance.now(),selectedTarget=null,breakStart=0,lastSecond=0,frames=0,fps=0,worldInfo=null,lastAttackAt=-Infinity;
 let saveDirty=false,saveInFlight=null,lastSaveAt=0,lastSavedPosition=null,gameTime=6000,weather='clear',totalXp=0;
@@ -80,7 +70,7 @@ async function respawnAtPreferredPoint(){
 
 function disposeWorld(){
   running=false;deathState=null;deathScreen.hide();document.exitPointerLock?.();ui.closeChat();ui.inventory.classList.add('hidden');ui.workbench.classList.add('hidden');resetOxygen();
-  weatherSystem?.dispose();explosions?.dispose();projectiles?.dispose();hostileMobs?.dispose();passiveMobs?.dispose();experienceOrbs?.dispose();drops?.dispose();player?.dispose();world?.dispose();
+  gameplayRuntime?.dispose();gameplayRuntime=null;
   weatherSystem=null;explosions=null;projectiles=null;hostileMobs=null;passiveMobs=null;experienceOrbs=null;drops=null;player=null;world=null;inventory=null;equipment=null;worldInfo=null;respawnPoint=null;saveDirty=false;lastSavedPosition=null;lastAttackAt=-Infinity;totalXp=0;
 }
 
@@ -156,9 +146,9 @@ async function startWorld(){
   try{saved=await storage.getWorld(id);}catch(error){console.warn('无法读取 IndexedDB 存档，将启动无持久化会话',error);}
   const mode=saved?.mode||selectedMode;worldInfo={id,seed:saved?.seed||seed,prompt:saved?.prompt||prompt,mode,name:saved?.name||name};gameTime=Number.isFinite(saved?.gameTime)?saved.gameTime:6000;weather=saved?.weather||'clear';totalXp=Number.isFinite(saved?.totalXp)?Math.max(0,Math.floor(saved.totalXp)):0;respawnPoint=normalizeRespawnPoint(saved?.respawnPoint);
   const savedDead=Number.isFinite(saved?.player?.hp)&&saved.player.hp<=0,startPosition=savedDead?(respawnPoint||{x:0,z:0}):saved?.player?.position,centerX=Number.isFinite(startPosition?.x)?startPosition.x:0,centerZ=Number.isFinite(startPosition?.z)?startPosition.z:0;modeScreen(null);ui.showLoading(true,saved?'读取世界存档':'启动地形 Worker',2);
-  world=new VoxelWorld(scene,{seed:worldInfo.seed,prompt:worldInfo.prompt,renderDistance:3,savedEdits:saved?.edits||{},onEdit:markSaveDirty,onProgress:(done,total)=>ui.showLoading(true,`生成区块 ${done}/${total}`,total?Math.round(done/total*100):100)});await world.generateArea(centerX,centerZ);
-  inventory=new Inventory(mode,saved?.inventory||null);equipment=new Equipment(saved?.equipment||null);player=new PlayerController(camera,canvas,world,scene);player.setControlState(controlBus.snapshot());player.setMode(mode);const restored=!savedDead&&saved?.player?player.restore(saved.player):false;if(!restored)player.spawn(centerX,centerZ);if(savedDead)await respawnAtPreferredPoint();resetOxygen();
-  drops=new DropSystem(scene,world,inventory,()=>{ui.refreshInventory();markSaveDirty();});experienceOrbs=new ExperienceOrbSystem(scene,world,addExperience);projectiles=new ProjectileSystem(scene,world,{onPlayerHit:handlePlayerHit});explosions=new ExplosionSystem(scene,world,{onPlayerBlast:handlePlayerBlast});passiveMobs=new PassiveMobSystem(scene,world,{onDeath:handleMobDeath});hostileMobs=new HostileMobSystem(scene,world,{onPlayerHit:handlePlayerHit,onProjectile:handleHostileProjectile,onExplosion:handleHostileExplosion,onDeath:handleMobDeath});weatherSystem=new WeatherSystem(scene);weatherSystem.setWeather(weather);
+  gameplayRuntime=await createClientGameplayRuntime({scene,camera,canvas,seed:worldInfo.seed,prompt:worldInfo.prompt,renderDistance:3,savedEdits:saved?.edits||{},centerX,centerZ,mode,inventoryState:saved?.inventory||null,equipmentState:saved?.equipment||null,controlState:controlBus.snapshot(),weather,onWorldEdit:markSaveDirty,onWorldProgress:(done,total)=>ui.showLoading(true,`生成区块 ${done}/${total}`,total?Math.round(done/total*100):100),onInventoryPickup:()=>{ui.refreshInventory();markSaveDirty();},onExperience:addExperience,onPlayerHit:handlePlayerHit,onPlayerBlast:handlePlayerBlast,onMobDeath:handleMobDeath,onHostileProjectile:handleHostileProjectile,onHostileExplosion:handleHostileExplosion});
+  ({world,player,inventory,equipment,drops,experienceOrbs,projectiles,explosions,passiveMobs,hostileMobs,weatherSystem}=gameplayRuntime);
+  const restored=!savedDead&&saved?.player?player.restore(saved.player):false;if(!restored)player.spawn(centerX,centerZ);if(savedDead)await respawnAtPreferredPoint();resetOxygen();
   ui.bindInventory(inventory,{equipment,onChanged:()=>{markSaveDirty();renderPlayerStatus();},onOverflow:spawnOverflow});running=true;paused=false;saveDirty=!saved;lastSavedPosition=player.position.clone();lastAttackAt=-Infinity;ui.hud.classList.remove('hidden');ui.showLoading(false);renderPlayerStatus();applySky();ui.chatMessage('夜间敌对池包括僵尸、骷髅、苦力怕和蜘蛛；水下会消耗氧气；天气指令会切换降雨粒子。');ui.showToast(saved?'已从浏览器存档恢复世界':mode==='creative'?'创造模式':'生存模式');pointer();
 }
 
@@ -247,17 +237,7 @@ function animate(now){
     if(!deathState){
       world.ensureAround(player.position.x,player.position.z);interaction(now);updateSurvival(dt);updateOxygen(dt,now);
       if(!deathState){drops?.update(dt,player);experienceOrbs?.update(dt,player);passiveMobs?.update(dt,player);hostileMobs?.update(dt,player,gameTime);projectiles?.update(dt,player);explosions?.update(dt);weatherSystem?.update(dt,player);updateAutosave(now);gameTime=(gameTime+dt*20)%24000;applySky();}
-      const p=player.position,xp=experienceState(totalXp),armor=equipment?.armorPoints()||0,air=oxygenState.air,weatherFx=weatherSystem?.activeCount||0,aimText=selectedTarget?`Aim ${selectedTarget.x}/${selectedTarget.y}/${selectedTarget.z} -> ${selectedTarget.previous.x}/${selectedTarget.previous.y}/${selectedTarget.previous.z}`:'Aim -';ui.debug.textContent=`Minecraft Web By AI v0.4-dev
-FPS ${fps} · WebGL ${renderer.capabilities.isWebGL2?'2':'1'}
-XYZ ${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}
-Chunks ${world.chunks.size} · Meshes ${world.meshes.size} · MeshQ ${world.meshQueue.size}
-Passive ${passiveMobs?.size||0} · Hostile ${hostileMobs?.size||0} · Projectiles ${projectiles?.size||0} · FX ${explosions?.size||0}
-WeatherFX ${weatherSystem?.type||weather}:${weatherFx}
-${aimText}
-Drops ${drops?.drops.length||0} · XPOrbs ${experienceOrbs?.size||0} · XP ${xp.total} / Lv.${xp.level}
-HP ${player.hp.toFixed(1)} · Armor ${armor} · Air ${air.toFixed(1)} · ${headSubmerged?'Submerged':'Dry'}
-Time ${Math.floor(gameTime)} · ${weather}
-模式 ${player.mode} · Seed ${worldInfo?.seed}`;
+      const p=player.position,xp=experienceState(totalXp),armor=equipment?.armorPoints()||0,air=oxygenState.air,weatherFx=weatherSystem?.activeCount||0,aimText=selectedTarget?`Aim ${selectedTarget.x}/${selectedTarget.y}/${selectedTarget.z} -> ${selectedTarget.previous.x}/${selectedTarget.previous.y}/${selectedTarget.previous.z}`:'Aim -';ui.debug.textContent=`Minecraft Web By AI v0.4-dev\nFPS ${fps} · WebGL ${renderer.capabilities.isWebGL2?'2':'1'}\nXYZ ${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}\nChunks ${world.chunks.size} · Meshes ${world.meshes.size} · MeshQ ${world.meshQueue.size}\nPassive ${passiveMobs?.size||0} · Hostile ${hostileMobs?.size||0} · Projectiles ${projectiles?.size||0} · FX ${explosions?.size||0}\nWeatherFX ${weatherSystem?.type||weather}:${weatherFx}\n${aimText}\nDrops ${drops?.drops.length||0} · XPOrbs ${experienceOrbs?.size||0} · XP ${xp.total} / Lv.${xp.level}\nHP ${player.hp.toFixed(1)} · Armor ${armor} · Air ${air.toFixed(1)} · ${headSubmerged?'Submerged':'Dry'}\nTime ${Math.floor(gameTime)} · ${weather}\n模式 ${player.mode} · Seed ${worldInfo?.seed}`;
     }
   }
   renderer.render(scene,camera);
