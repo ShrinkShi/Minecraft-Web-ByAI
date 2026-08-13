@@ -4,7 +4,7 @@
 
 > 稳定发布基线：`v0.3.0`。当前 `main` 开发线为 `v0.4.0-dev`：实体数据层、第一批被动生物、四种敌对生物、基础战斗、箭矢/爆炸、战利品/经验、生存死亡损失、显式死亡界面/重生、持久化自定义重生点、两格床重生锚点与夜间睡眠跳夜、第一版护甲装备系统、水独立透明渲染 pass、水下氧气/溺水、基础游泳/浮力，可见降雨/雷雨粒子，以及手机浏览器自动识别 + 横屏触控底座已经落库；流体传播、完整冲刺游泳、自动天气周期/闪电和完整伤害公式等仍属于后续工作。
 
-在线构建：`https://shrinkshi.github.io/Minecraft-Web-ByAI/`
+在线构建：[https://shrinkshi.github.io/Minecraft-Web-ByAI/](https://shrinkshi.github.io/Minecraft-Web-ByAI/)
 
 ## 当前可玩内容
 
