@@ -11,4 +11,7 @@ const boundary={getBlock:(x,y,z)=>y===11&&z===0?(x===-1?BLOCK.STONE:x===0?BLOCK.
 hit=raycastAuthoritativeBlock(boundary,{position:{x:0,y:10,z:.5},yaw:Math.PI/2,pitch:0});
 assert.deepEqual({x:hit.x,y:hit.y,z:hit.z,id:hit.id},{x:-1,y:11,z:0,id:BLOCK.STONE});
 assert.equal(hit.distance,0);
+hit=raycastAuthoritativeBlock(boundary,{position:{x:1e-12,y:10,z:.5},yaw:Math.PI/2,pitch:0});
+assert.deepEqual({x:hit.x,y:hit.y,z:hit.z,id:hit.id},{x:0,y:11,z:0,id:BLOCK.DIRT},'near-boundary points remain in their actual voxel');
+assert.equal(hit.distance,0);
 console.log('authoritative block target face/boundary rules: PASS');
