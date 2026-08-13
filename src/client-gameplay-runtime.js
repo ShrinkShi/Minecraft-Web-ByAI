@@ -24,7 +24,7 @@ export class ClientGameplayRuntime{
 
   dispose(){
     if(this.disposed)return false;this.disposed=true;
-    safeDispose(this.weatherSystem);safeDispose(this.explosions);safeDispose(this.projectiles);safeDispose(this.hostileMobs);safeDispose(this.passiveMobs);safeDispose(this.experienceOrbs);safeDispose(this.drops);safeDispose(this.player);safeDispose(this.world);return true;
+    this.weatherSystem?.dispose();this.explosions?.dispose();this.projectiles?.dispose();this.hostileMobs?.dispose();this.passiveMobs?.dispose();this.experienceOrbs?.dispose();this.drops?.dispose();this.player?.dispose();this.world?.dispose();return true;
   }
 }
 
