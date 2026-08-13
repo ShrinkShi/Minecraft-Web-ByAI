@@ -5,7 +5,8 @@ import {EQUIPMENT_SLOTS} from './equipment.js';
 
 export class UI{
   constructor(){
-    this.main=document.querySelector('#main-menu');this.worldMenu=document.querySelector('#world-menu');this.pause=document.querySelector('#pause-menu');
+    this.main=document.querySelector('#main-menu');this.worldMenu=document.querySelector('#world-menu');this.multiplayerMenu=document.querySelector('#multiplayer-menu');this.pause=document.querySelector('#pause-menu');
+    this.multiplayerUrl=document.querySelector('#multiplayer-url');this.multiplayerInsecure=document.querySelector('#multiplayer-insecure');this.multiplayerStatus=document.querySelector('#multiplayer-status');this.returnMainButton=document.querySelector('#return-main-button');
     this.hud=document.querySelector('#hud');this.inventory=document.querySelector('#inventory');this.workbench=document.querySelector('#workbench');this.loading=document.querySelector('#loading');
     this.hotbar=document.querySelector('#hotbar');this.invGrid=document.querySelector('#inventory-grid');this.invHotbar=document.querySelector('#inventory-hotbar');this.equipmentSlots=document.querySelector('#equipment-slots');
     this.workbenchGrid=document.querySelector('#workbench-grid');this.workbenchHotbar=document.querySelector('#workbench-hotbar');
@@ -18,6 +19,8 @@ export class UI{
   }
 
   showScreen(el){for(const s of document.querySelectorAll('.screen'))s.classList.remove('active');if(el)el.classList.add('active');}
+  setMultiplayerStatus(text,{error=false}={}){if(!this.multiplayerStatus)return;this.multiplayerStatus.textContent=String(text||'');this.multiplayerStatus.classList.toggle('error',!!error);}
+  setReturnMainLabel(multiplayer=false){if(this.returnMainButton)this.returnMainButton.textContent=multiplayer?'断开连接并返回标题画面':'保存并返回标题画面';}
 
   bindInventory(model,{equipment=null,onChanged=()=>{},onOverflow=()=>{}}={}){
     this.inventoryModel=model;this.equipmentModel=equipment;this.onChanged=onChanged;this.onOverflow=onOverflow;this.refreshInventory();
@@ -97,92 +100,50 @@ export class UI{
 
   makeSlot(stack,{key=null,index=null,equipmentSlot=null,craftIndex=null,craftSize=null,result=null,hud=false}={}){
     const s=document.createElement(hud?'div':'button');s.className=hud?'inv-slot hotbar-slot':'inv-slot';if(equipmentSlot!==null)s.classList.add('equipment-slot');if(s.tagName==='BUTTON')s.type='button';
-    if(index!==null)s.dataset.invIndex=index;
-    if(equipmentSlot!==null)s.dataset.equipmentSlot=equipmentSlot;
-    if(craftIndex!==null){s.dataset.craftIndex=craftIndex;s.dataset.craftSize=craftSize;}
-    if(result!==null)s.dataset.craftResult=result;
-    if(stack){s.append(this.makeIcon(stack.id));const c=document.createElement('span');c.className='slot-count';if(stack.count>1)c.textContent=stack.count;s.append(c);s.title=ITEMS[stack.id]?.name||stack.id;}
-    if(key){const k=document.createElement('span');k.className='slot-key';k.textContent=key;s.append(k);}
-    return s;
+    if(index!==null)s.dataset.invIndex=index;if(equipmentSlot!==null)s.dataset.equipmentSlot=equipmentSlot;if(craftIndex!==null){s.dataset.craftIndex=craftIndex;s.dataset.craftSize=craftSize;}if(result!==null)s.dataset.craftResult=result;if(key!==null){const k=document.createElement('span');k.className='slot-key';k.textContent=key;s.append(k);}if(stack){s.append(this.makeIcon(stack.id));if(stack.count>1){const c=document.createElement('span');c.className='slot-count';c.textContent=stack.count;s.append(c);}}return s;
   }
 
-  refreshInventory(){this.renderHotbar();this.renderInventoryPanels();this.renderEquipment();this.renderCrafting();this.renderCursor();}
-
-  renderHotbar(){
-    this.hotbar.textContent='';
-    for(let i=0;i<9;i++){
-      const stack=this.inventoryModel?.hotbar(i)||null,s=this.makeSlot(stack,{key:String(i+1),hud:true});s.dataset.hotbarIndex=i;if(i===this.selected)s.classList.add('selected');this.hotbar.append(s);
-    }
-  }
-
-  renderInventoryPanels(){
-    const build=(main,hot)=>{
-      main.textContent='';hot.textContent='';
-      for(let i=0;i<27;i++)main.append(this.makeSlot(this.inventoryModel?.slots[i],{index:i}));
-      for(let i=27;i<36;i++)hot.append(this.makeSlot(this.inventoryModel?.slots[i],{index:i}));
-    };
-    build(this.invGrid,this.invHotbar);build(this.workbenchGrid,this.workbenchHotbar);
-  }
+  renderHotbar(){this.hotbar.innerHTML='';for(let i=0;i<9;i++){const slot=this.inventoryModel?.get(i)||null,s=this.makeSlot(slot,{key:i+1,hud:true});s.dataset.hotbarIndex=i;if(i===this.selected)s.classList.add('selected');this.hotbar.append(s);}}
+  select(index){this.selected=((index%9)+9)%9;this.renderHotbar();this.refreshInventory();return this.selected;}
+  selectedItem(){return this.inventoryModel?.get(this.selected)||null;}
+  consumeSelected(count=1){if(!this.inventoryModel)return null;const stack=this.inventoryModel.remove(this.selected,count);if(stack)this.changed();return stack;}
 
   renderEquipment(){
-    if(!this.equipmentSlots)return;this.equipmentSlots.textContent='';
-    for(const slot of EQUIPMENT_SLOTS)this.equipmentSlots.append(this.makeSlot(this.equipmentModel?.get(slot)||null,{equipmentSlot:slot}));
+    if(!this.equipmentSlots)return;this.equipmentSlots.innerHTML='';for(const slotName of EQUIPMENT_SLOTS){const stack=this.equipmentModel?.get(slotName)||null,slot=this.makeSlot(stack,{equipmentSlot:slotName});slot.title=slotName;this.equipmentSlots.append(slot);}
   }
 
-  renderCrafting(){
-    const build=(grid,container,resultEl,size)=>{
-      container.textContent='';grid.slots.forEach((stack,i)=>container.append(this.makeSlot(stack,{craftIndex:i,craftSize:String(size)})));
-      resultEl.textContent='';const r=grid.refresh();resultEl.append(this.makeSlot(r,{result:String(size)}));
-    };
-    build(this.craft2,this.craftGrid2,this.craftResult2,2);build(this.craft3,this.craftGrid3,this.craftResult3,3);
+  refreshInventory(){
+    this.renderHotbar();this.renderEquipment();
+    if(!this.inventoryModel)return;
+    this.invGrid.innerHTML='';for(let i=9;i<36;i++)this.invGrid.append(this.makeSlot(this.inventoryModel.get(i),{index:i}));
+    this.invHotbar.innerHTML='';this.workbenchHotbar.innerHTML='';for(let i=0;i<9;i++){this.invHotbar.append(this.makeSlot(this.inventoryModel.get(i),{index:i}));this.workbenchHotbar.append(this.makeSlot(this.inventoryModel.get(i),{index:i}));}
+    this.workbenchGrid.innerHTML='';for(let i=9;i<36;i++)this.workbenchGrid.append(this.makeSlot(this.inventoryModel.get(i),{index:i}));
+    this.renderCraft(this.craft2,this.craftGrid2,this.craftResult2,'2');this.renderCraft(this.craft3,this.craftGrid3,this.craftResult3,'3');this.renderCursor();
   }
 
-  renderCursor(){
-    this.cursorStack.textContent='';const cursor=this.inventoryModel?.cursor;
-    this.cursorStack.classList.toggle('hidden',!cursor);if(cursor)this.cursorStack.append(this.makeSlot(cursor,{hud:true}));
+  renderCraft(grid,gridEl,resultEl,size){
+    grid.refresh();gridEl.innerHTML='';grid.slots.forEach((stack,index)=>gridEl.append(this.makeSlot(stack,{craftIndex:index,craftSize:size})));
+    resultEl.innerHTML='';const result=grid.match?.recipe?.result;if(result)resultEl.append(this.makeSlot(result,{result:size}));
   }
+  renderCursor(){this.cursorStack.innerHTML='';const stack=this.inventoryModel?.cursor;if(!stack){this.cursorStack.classList.add('hidden');return;}this.cursorStack.classList.remove('hidden');this.cursorStack.append(this.makeSlot(stack));}
 
-  select(i){this.selected=(i+9)%9;this.renderHotbar();const stack=this.selectedItem();if(stack)this.showToast(ITEMS[stack.id]?.name||stack.id);}
-  selectedItem(){return this.inventoryModel?.hotbar(this.selected)||null;}
-  consumeSelected(count=1){if(!this.inventoryModel)return null;const result=this.inventoryModel.removeAt(27+this.selected,count);if(result)this.changed();return result;}
+  openInventory(){this.inventory.classList.remove('hidden');this.workbench.classList.add('hidden');this.refreshInventory();}
+  openWorkbench(){this.workbench.classList.remove('hidden');this.inventory.classList.add('hidden');this.refreshInventory();}
+  closePanels(){this.inventory.classList.add('hidden');this.workbench.classList.add('hidden');this.flushCrafting();}
+  hasOpenPanel(){return!this.inventory.classList.contains('hidden')||!this.workbench.classList.contains('hidden');}
+  flushCrafting(){if(!this.inventoryModel)return;for(const grid of [this.craft2,this.craft3])for(const stack of grid.drain()){const left=this.inventoryModel.add(stack.id,stack.count);if(left>0)this.onOverflow([{id:stack.id,count:left}]);}this.changed();}
 
-  hasOpenPanel(){return !this.inventory.classList.contains('hidden')||!this.workbench.classList.contains('hidden');}
-  openInventory(){this.workbench.classList.add('hidden');this.inventory.classList.remove('hidden');this.refreshInventory();}
-  openWorkbench(){this.inventory.classList.add('hidden');this.workbench.classList.remove('hidden');this.refreshInventory();}
-  closePanels(){
-    if(!this.inventoryModel)return[];
-    const overflow=[...this.craft2.clearTo(this.inventoryModel),...this.craft3.clearTo(this.inventoryModel)];
-    const cursorOverflow=this.inventoryModel.returnCursor();if(cursorOverflow)overflow.push(cursorOverflow);
-    this.inventory.classList.add('hidden');this.workbench.classList.add('hidden');this.changed();if(overflow.length)this.onOverflow(overflow);return overflow;
+  renderStatus(hp,hunger,xpPercent,xpLevel,armorPoints=0){
+    const count=(root,cls,value,max=10)=>{root.innerHTML='';for(let i=0;i<max;i++){const e=document.createElement('i');e.className=cls+(i*2+1<value?'':' empty');root.append(e);}};count(this.hearts,'heart',hp);count(this.hunger,'food',hunger);this.xp.style.width=`${Math.max(0,Math.min(100,xpPercent))}%`;this.level.textContent=xpLevel;this.renderArmor(armorPoints);
   }
+  renderArmor(points=0){if(!this.armorRow)return;this.armorRow.innerHTML='';for(let i=0;i<10;i++){const e=document.createElement('i');e.className='armor-icon'+(i*2+1<points?'':' empty');this.armorRow.append(e);}this.armorRow.classList.toggle('visible',points>0);}
+  renderOxygen(air,maxAir,visible){if(!this.oxygen)return;this.oxygen.innerHTML='';this.oxygen.classList.toggle('hidden',!visible);if(!visible)return;const bubbles=Math.max(0,Math.min(10,Math.ceil(air/maxAir*10)));for(let i=0;i<10;i++){const b=document.createElement('i');b.className='oxygen-bubble'+(i<bubbles?'':' empty');this.oxygen.append(b);}}
 
-  openChat(prefix=''){
-    this.chatWrap.classList.remove('hidden');this.chatInput.value=prefix;this.chatInput.focus();requestAnimationFrame(()=>this.chatInput.setSelectionRange(this.chatInput.value.length,this.chatInput.value.length));
-  }
+  setBreak(value){this.breakMeter.classList.toggle('hidden',!value);this.breakMeter.querySelector('span').style.width=`${Math.max(0,Math.min(1,value))*100}%`;}
+  showLoading(show,detail='准备区块',percent=0){this.loading.classList.toggle('hidden',!show);this.loadingDetail.textContent=detail;this.loadingBar.style.width=`${Math.max(0,Math.min(100,percent))}%`;}
+  showToast(text){this.toast.textContent=text;this.toast.classList.remove('hidden');clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>this.toast.classList.add('hidden'),1800);}
+  chatMessage(text,type='system'){const line=document.createElement('div');line.className=`chat-line ${type}`;line.textContent=text;this.chatLog.append(line);while(this.chatLog.children.length>8)this.chatLog.firstChild.remove();clearTimeout(line._fade);line._fade=setTimeout(()=>line.classList.add('faded'),6500);}
+  openChat(prefix=''){this.chatWrap.classList.remove('hidden');this.chatInput.value=prefix;this.chatInput.focus();}
   closeChat(){this.chatWrap.classList.add('hidden');this.chatInput.blur();}
-  isChatOpen(){return !this.chatWrap.classList.contains('hidden');}
-  chatMessage(text,type='system'){
-    const line=document.createElement('div');line.className=`chat-line ${type}`;line.textContent=text;this.chatLog.append(line);while(this.chatLog.children.length>8)this.chatLog.firstChild.remove();
-    clearTimeout(line._timer);line._timer=setTimeout(()=>line.classList.add('faded'),9000);
-  }
-
-  renderStatus(hp,hunger,xp,level,armorPoints=0){
-    this.hearts.textContent='';this.hunger.textContent='';this.armorRow.textContent='';
-    for(let i=0;i<10;i++){
-      const h=document.createElement('i');h.className='heart'+(hp>=i*2+1?'':' empty');this.hearts.append(h);
-      const f=document.createElement('i');f.className='food'+(hunger>=i*2+1?'':' empty');this.hunger.append(f);
-      const a=document.createElement('i'),remaining=armorPoints-i*2;a.className='armor-icon'+(remaining>=2?' full':remaining>=1?' half':'');this.armorRow.append(a);
-    }
-    this.xp.style.width=`${Math.max(0,Math.min(100,xp))}%`;this.level.textContent=level;
-  }
-
-  renderOxygen(air,maxAir,visible){
-    if(!this.oxygen)return;const safeMax=Math.max(.001,Number(maxAir)||1),safeAir=Math.max(0,Math.min(safeMax,Number(air)||0)),filled=Math.ceil(safeAir/safeMax*10);
-    this.oxygen.textContent='';this.oxygen.classList.toggle('hidden',!visible);this.oxygen.dataset.air=safeAir.toFixed(2);this.oxygen.setAttribute('aria-label',`氧气 ${safeAir.toFixed(1)} / ${safeMax.toFixed(0)} 秒`);
-    for(let i=0;i<10;i++){const bubble=document.createElement('i');bubble.className='oxygen-bubble'+(i<filled?'':' empty');this.oxygen.append(bubble);}
-  }
-
-  showLoading(show,detail='准备区块',p=0){this.loading.classList.toggle('hidden',!show);this.loadingDetail.textContent=detail;this.loadingBar.style.width=`${p}%`;}
-  showToast(text){this.toast.textContent=text;this.toast.classList.remove('hidden');clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>this.toast.classList.add('hidden'),900);}
-  setBreak(p){this.breakMeter.classList.toggle('hidden',p<=0||p>=1);this.breakMeter.querySelector('span').style.width=`${p*100}%`;}
+  isChatOpen(){return!this.chatWrap.classList.contains('hidden');}
 }
