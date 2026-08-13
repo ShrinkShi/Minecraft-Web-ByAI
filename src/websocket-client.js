@@ -60,6 +60,7 @@ export class MultiplayerWebSocketClient{
 
   handleOpen(socket){
     if(socket!==this.socket||this.state!=='connecting')return;
+    if(typeof socket.protocol==='string'&&socket.protocol!==MULTIPLAYER_SUBPROTOCOL){this.protocolFailure(new Error(`server did not negotiate websocket subprotocol ${MULTIPLAYER_SUBPROTOCOL}`),1002,'subprotocol mismatch');return;}
     this.setState('handshaking');socket.send(JSON.stringify(encodeClientHello()));this.armHandshakeTimer();
   }
 
