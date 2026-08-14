@@ -1,4 +1,5 @@
 import {createClientGameplayRuntime} from './client-gameplay-runtime.js';
+import {installMultiplayerSecondaryRouting} from './multiplayer-secondary-routing.js';
 import {RemotePlayerSystem} from './remote-player-system.js';
 import {authoritativeEditsToVoxelEdits} from './world-edit-replication.js';
 import {applyVoxelOverlay} from './voxel-overlay.js';
@@ -17,8 +18,9 @@ export async function createAuthoritativeMultiplayerGameplay({readyData,movement
   if(worldEdits.session!==info.session||worldEdits.worldId!==info.worldId)throw new RangeError('multiplayer world edit snapshot identity mismatch');if(typeof onProgress!=='function')throw new TypeError('onProgress must be a function');
   const savedEdits=authoritativeEditsToVoxelEdits(worldEdits.edits);
   const runtime=await createClientGameplayRuntime({scene,camera,canvas,seed:info.seed,prompt:info.prompt,renderDistance:3,savedEdits,centerX:finite(position.x,'initial position.x'),centerZ:finite(position.z,'initial position.z'),mode:initial.mode,inventoryState:null,equipmentState:null,controlState,weather:'clear',onWorldEdit:()=>{},onWorldProgress:onProgress,onInventoryPickup:()=>{},onExperience:()=>{},onPlayerHit:()=>{},onPlayerBlast:()=>{},onMobDeath:()=>{},onHostileProjectile:()=>{},onHostileExplosion:()=>{}});
-  let remotePlayers=null;
-  try{if(typeof movement.attachWorldBlockApplier==='function')movement.attachWorldBlockApplier(change=>applyVoxelOverlay(runtime.world,change));remotePlayers=new RemotePlayerSystem(scene,{tickRate:info.tickRate});movement.attachRemotePlayerSystem(remotePlayers);}catch(error){runtime.dispose();throw error;}
+  let remotePlayers=null,releaseSecondary=null;
+  try{if(typeof movement.attachWorldBlockApplier==='function')movement.attachWorldBlockApplier(change=>applyVoxelOverlay(runtime.world,change));remotePlayers=new RemotePlayerSystem(scene,{tickRate:info.tickRate});movement.attachRemotePlayerSystem(remotePlayers);releaseSecondary=installMultiplayerSecondaryRouting({runtime,movement});}catch(error){releaseSecondary?.();runtime.dispose();throw error;}
+  const disposeRuntime=runtime.dispose.bind(runtime);let disposed=false;runtime.dispose=()=>{if(disposed)return;disposed=true;releaseSecondary?.();return disposeRuntime();};
   const authoritative=movement.step(1)||movement.current?.()||initial;applyAuthoritativePlayerState(runtime.player,authoritative,{applyLook:true});
   if(globalThis.__minecraftE2E&&typeof globalThis.__minecraftE2E==='object'){globalThis.__minecraftE2E.remotePlayers=()=>movement.remoteVisualStates();globalThis.__minecraftE2E.worldBlock=(x,y,z)=>runtime.world.getBlock(x,y,z);}
   return{runtime,remotePlayers,authoritative,worldInfo:{id:info.worldId,name:`服务器世界 ${info.worldId}`,seed:info.seed,prompt:info.prompt,mode:authoritative.mode,remote:true,session:info.session,tickRate:info.tickRate,terrainVersion:info.terrainVersion,worldRevision:movement.worldRevision??worldEdits.revision}};
