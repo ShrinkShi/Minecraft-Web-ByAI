@@ -22,7 +22,7 @@ export class DesktopControls{
       else if(code==='F5')handled=!!this.bus.action(this.source,'view');
       else if(code==='KeyT')handled=!!this.bus.action(this.source,'chat',{prefix:''});
       else if(code==='Slash')handled=!!this.bus.action(this.source,'chat',{prefix:'/'});
-      else if(code==='KeyQ')handled=!!this.bus.action(this.source,'drop');
+      else if(code==='KeyQ'&&this.gameplayEnabled)handled=!!this.bus.action(this.source,'drop');
       else if(/^Digit[1-9]$/.test(code))handled=!!this.bus.action(this.source,'hotbar-select',{index:Number(code.slice(-1))-1});
       if(handled)e.preventDefault();
     };
