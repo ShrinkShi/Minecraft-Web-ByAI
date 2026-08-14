@@ -67,7 +67,8 @@ creative 不走 survival durability 消耗。
 - 目标坐标或 block id 变化时丢弃旧累计，但新目标仍会获得当前这一段 progress slice，与服务器 tick 语义一致；
 - 切换工具只影响切换后的 progress slice，不会把此前空手或其它工具已经消耗的时间按新工具速度追溯重算；
 - 每一段单机 mining dt 最多 50ms，与主循环模拟上限和服务器 20Hz tick 对齐，因此主线程卡顿不会在恢复后一次性“补挖”整段墙钟时间；
-- controller 要求时间单调递增，拒绝倒退时间输入。
+- controller 要求时间单调递增，拒绝倒退时间输入；
+- 单机旧存档可能保留已经从当前 `ITEMS` 删除的历史 itemId。此类未知手持物在 mining 中按普通非工具处理：不会得到工具加速/工具 harvest 权限，也不会进入严格耐久 mutation，但仍可正常破坏本来就允许空手 harvest 的方块，不能因为兼容旧存档而把游戏循环打崩。
 
 一次成功单机 Survival 破坏的顺序固定为：
 
