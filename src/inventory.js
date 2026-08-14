@@ -1,7 +1,8 @@
 import {CREATIVE_START,maxStack} from './items.js';
 import {HOTBAR_START,HOTBAR_SIZE,INVENTORY_SLOT_COUNT,creativeSeedSlot} from './inventory-layout.js';
+import {cloneItemStack,itemStacksCanMerge,normalizeItemStack} from './item-stack.js';
 
-const cloneStack=stack=>stack?{id:stack.id,count:stack.count}:null;
+const cloneStack=stack=>cloneItemStack(stack);
 const MAIN_RANGE=Object.freeze([0,HOTBAR_START]);
 const HOTBAR_RANGE=Object.freeze([HOTBAR_START,HOTBAR_START+HOTBAR_SIZE]);
 
@@ -10,11 +11,11 @@ function snapshotSlots(snapshot){
   const slots=Array(INVENTORY_SLOT_COUNT).fill(null);
   for(let i=0;i<INVENTORY_SLOT_COUNT;i++){
     const stack=snapshot.slots[i];if(!stack)continue;
-    if(typeof stack.id!=='string'||!stack.id||!Number.isFinite(stack.count)||stack.count<=0)continue;
-    slots[i]={id:stack.id,count:Math.min(maxStack(stack.id),Math.floor(stack.count))};
+    try{slots[i]=normalizeItemStack(stack,{label:`inventory slot ${i}`});}catch{}
   }
   return slots;
 }
+function stackCount(value){return value?.count??0;}
 
 export class Inventory{
   constructor(mode='survival',snapshot=null){
@@ -30,8 +31,7 @@ export class Inventory{
 
   restore(snapshot){
     const restored=snapshotSlots(snapshot);if(!restored)return false;this.slots=restored;
-    const legacyOverflow=snapshot.slots[INVENTORY_SLOT_COUNT];
-    if(legacyOverflow?.id&&Number.isFinite(legacyOverflow.count)&&legacyOverflow.count>0)this.add(legacyOverflow.id,Math.min(maxStack(legacyOverflow.id),Math.floor(legacyOverflow.count)));
+    const legacyOverflow=snapshot.slots[INVENTORY_SLOT_COUNT];if(legacyOverflow)try{this.addStack(legacyOverflow);}catch{}
     return true;
   }
 
@@ -44,30 +44,32 @@ export class Inventory{
 
   hotbar(index){return this.slots[HOTBAR_START+index]||null;}
 
-  capacityFor(itemId){const limit=maxStack(itemId);let capacity=0;for(const slot of this.slots){if(!slot)capacity+=limit;else if(slot.id===itemId)capacity+=Math.max(0,limit-slot.count);}return capacity;}
+  capacityFor(itemId){const incoming={id:itemId,count:1},limit=maxStack(itemId);let capacity=0;for(const slot of this.slots){if(!slot)capacity+=limit;else if(itemStacksCanMerge(slot,incoming))capacity+=Math.max(0,limit-slot.count);}return capacity;}
 
-  add(itemId,count=1){
-    let remaining=Math.max(0,Math.floor(count));const limit=maxStack(itemId);
-    for(const slot of this.slots){if(!slot||slot.id!==itemId||slot.count>=limit)continue;const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;if(!remaining)return 0;}
-    for(let i=0;i<this.slots.length;i++){if(this.slots[i])continue;const moved=Math.min(remaining,limit);this.slots[i]={id:itemId,count:moved};remaining-=moved;if(!remaining)return 0;}
+  add(itemId,count=1){return this.addStack({id:itemId,count:Math.max(1,Math.floor(count))});}
+  addStack(value){
+    const incoming=normalizeItemStack(value),limit=maxStack(incoming.id);let remaining=incoming.count;
+    for(const slot of this.slots){if(!itemStacksCanMerge(slot,incoming)||slot.count>=limit)continue;const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;if(!remaining)return 0;}
+    for(let i=0;i<this.slots.length;i++){if(this.slots[i])continue;const moved=Math.min(remaining,limit);this.slots[i]={...incoming,count:moved};remaining-=moved;if(!remaining)return 0;}
     return remaining;
   }
 
-  addPickup(itemId,count=1){
-    let remaining=Math.max(0,Math.floor(count));const limit=maxStack(itemId);
+  addPickup(itemId,count=1){return this.addPickupStack({id:itemId,count:Math.max(1,Math.floor(count))});}
+  addPickupStack(value){
+    const incoming=normalizeItemStack(value),limit=maxStack(incoming.id);let remaining=incoming.count;
     for(const [start,end] of [HOTBAR_RANGE,MAIN_RANGE]){
-      for(let i=start;i<end&&remaining;i++){const slot=this.slots[i];if(!slot||slot.id!==itemId||slot.count>=limit)continue;const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;}
-      for(let i=start;i<end&&remaining;i++){if(this.slots[i])continue;const moved=Math.min(remaining,limit);this.slots[i]={id:itemId,count:moved};remaining-=moved;}
+      for(let i=start;i<end&&remaining;i++){const slot=this.slots[i];if(!itemStacksCanMerge(slot,incoming)||slot.count>=limit)continue;const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;}
+      for(let i=start;i<end&&remaining;i++){if(this.slots[i])continue;const moved=Math.min(remaining,limit);this.slots[i]={...incoming,count:moved};remaining-=moved;}
     }
     return remaining;
   }
 
-  removeAt(index,count=1){const slot=this.slots[index];if(!slot)return null;const taken=Math.min(slot.count,Math.max(1,Math.floor(count))),result={id:slot.id,count:taken};slot.count-=taken;if(slot.count<=0)this.slots[index]=null;return result;}
+  removeAt(index,count=1){const slot=this.slots[index];if(!slot)return null;const taken=Math.min(slot.count,Math.max(1,Math.floor(count))),result={...slot,count:taken};slot.count-=taken;if(slot.count<=0)this.slots[index]=null;return cloneStack(result);}
 
   moveBetween(index){
     const slot=this.slots[index];if(!slot)return false;const targets=index<HOTBAR_START?[HOTBAR_START,INVENTORY_SLOT_COUNT]:[0,HOTBAR_START];let remaining=slot.count,changed=false,limit=maxStack(slot.id);
-    for(let i=targets[0];i<targets[1];i++){const target=this.slots[i];if(!target||target.id!==slot.id||target.count>=limit)continue;const moved=Math.min(remaining,limit-target.count);target.count+=moved;remaining-=moved;changed=changed||moved>0;if(!remaining)break;}
-    for(let i=targets[0];i<targets[1]&&remaining;i++){if(this.slots[i])continue;const moved=Math.min(remaining,limit);this.slots[i]={id:slot.id,count:moved};remaining-=moved;changed=true;}
+    for(let i=targets[0];i<targets[1];i++){const target=this.slots[i];if(!itemStacksCanMerge(target,slot)||target.count>=limit)continue;const moved=Math.min(remaining,limit-target.count);target.count+=moved;remaining-=moved;changed=changed||moved>0;if(!remaining)break;}
+    for(let i=targets[0];i<targets[1]&&remaining;i++){if(this.slots[i])continue;const moved=Math.min(remaining,limit);this.slots[i]={...slot,count:moved};remaining-=moved;changed=true;}
     if(changed){if(remaining)this.slots[index].count=remaining;else this.slots[index]=null;}return changed;
   }
 
@@ -76,16 +78,16 @@ export class Inventory{
     if(button===0){
       if(!this.cursor&&slot){this.cursor=slot;this.slots[index]=null;return true;}
       if(this.cursor&&!slot){this.slots[index]=this.cursor;this.cursor=null;return true;}
-      if(this.cursor&&slot&&this.cursor.id===slot.id){const moved=Math.min(this.cursor.count,maxStack(slot.id)-slot.count);if(!moved)return false;slot.count+=moved;this.cursor.count-=moved;if(this.cursor.count<=0)this.cursor=null;return true;}
+      if(this.cursor&&slot&&itemStacksCanMerge(this.cursor,slot)){const moved=Math.min(this.cursor.count,maxStack(slot.id)-slot.count);if(!moved)return false;slot.count+=moved;this.cursor.count-=moved;if(this.cursor.count<=0)this.cursor=null;return true;}
       if(this.cursor&&slot){this.slots[index]=this.cursor;this.cursor=slot;return true;}return false;
     }
     if(button===2){
-      if(!this.cursor&&slot){const take=Math.ceil(slot.count/2);this.cursor={id:slot.id,count:take};slot.count-=take;if(slot.count<=0)this.slots[index]=null;return true;}
-      if(this.cursor&&!slot){this.slots[index]={id:this.cursor.id,count:1};this.cursor.count--;if(this.cursor.count<=0)this.cursor=null;return true;}
-      if(this.cursor&&slot&&this.cursor.id===slot.id&&slot.count<maxStack(slot.id)){slot.count++;this.cursor.count--;if(this.cursor.count<=0)this.cursor=null;return true;}
+      if(!this.cursor&&slot){const take=Math.ceil(slot.count/2);this.cursor={...slot,count:take};slot.count-=take;if(slot.count<=0)this.slots[index]=null;return true;}
+      if(this.cursor&&!slot){this.slots[index]={...this.cursor,count:1};this.cursor.count--;if(this.cursor.count<=0)this.cursor=null;return true;}
+      if(this.cursor&&slot&&itemStacksCanMerge(this.cursor,slot)&&slot.count<maxStack(slot.id)){slot.count++;this.cursor.count--;if(this.cursor.count<=0)this.cursor=null;return true;}
     }
     return false;
   }
 
-  returnCursor(){if(!this.cursor)return null;const remainder=this.add(this.cursor.id,this.cursor.count),overflow=remainder?{id:this.cursor.id,count:remainder}:null;this.cursor=null;return overflow;}
+  returnCursor(){if(!this.cursor)return null;const original=cloneStack(this.cursor),remainder=this.addStack(original),overflow=remainder?{...original,count:remainder}:null;this.cursor=null;return overflow;}
 }
