@@ -10,7 +10,7 @@ const state=new ServerPlayerInputState(session);
 assert.equal(state.apply(decoded('view',encodePlayerViewFrame({yaw:.25,pitch:-.1},10),0)).accepted,true);
 assert.equal(state.apply(decoded('action',encodePlayerActionFrame({kind:'hotbar-select',slot:2},20),1)).accepted,true);
 const queued=state.apply(decoded('action',encodePlayerActionFrame({kind:'use',viewSeq:10},21),2));
-assert.deepEqual(queued,{accepted:true,reason:'action-queued',sequence:21,viewSequence:10,selectedSlot:2});
+assert.deepEqual(queued,{accepted:true,reason:'action-queued',sequence:21,viewSequence:10},'selectedSlot stays an internal queued-action snapshot instead of expanding the input application API');
 assert.equal(state.apply(decoded('action',encodePlayerActionFrame({kind:'hotbar-select',slot:8},22),3)).accepted,true);
 assert.equal(state.snapshot().selectedSlot,8,'live selected slot should advance after the queued use');
 const [use]=state.drainActions();
