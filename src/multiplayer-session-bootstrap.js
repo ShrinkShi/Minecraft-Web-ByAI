@@ -1,4 +1,5 @@
 import {MultiplayerWebSocketClient} from './websocket-client.js';
+import {publishMultiplayerCommandResult} from './multiplayer-command-channel.js';
 
 export const MULTIPLAYER_BOOTSTRAP_STATES=Object.freeze(['idle','connecting','handshaking','synchronizing','ready','failed','closed']);
 export const DEFAULT_WORLD_SYNC_TIMEOUT_MS=10000;
@@ -12,7 +13,7 @@ function cloneInventory(value){return value?Object.freeze({...value,slots:Object
 function defaultClientFactory(options){return new MultiplayerWebSocketClient(options);}
 
 export class MultiplayerSessionBootstrap{
-  constructor({clientFactory=defaultClientFactory,allowInsecure=false,worldSyncTimeoutMs=DEFAULT_WORLD_SYNC_TIMEOUT_MS,setTimer=setTimeout,clearTimer=clearTimeout,onStateChange=()=>{},onReady=()=>{},onWorldInfo=()=>{},onInventorySnapshot=()=>{},onPlayerSnapshot=()=>{},onRemotePlayerSpawn=()=>{},onRemotePlayerSnapshot=()=>{},onRemotePlayerDespawn=()=>{},onItemEntitySpawn=()=>{},onItemEntitySnapshot=()=>{},onItemEntityDespawn=()=>{},onMiningProgress=()=>{},onCommandResult=()=>{},onError=()=>{}}={}){
+  constructor({clientFactory=defaultClientFactory,allowInsecure=false,worldSyncTimeoutMs=DEFAULT_WORLD_SYNC_TIMEOUT_MS,setTimer=setTimeout,clearTimer=clearTimeout,onStateChange=()=>{},onReady=()=>{},onWorldInfo=()=>{},onInventorySnapshot=()=>{},onPlayerSnapshot=()=>{},onRemotePlayerSpawn=()=>{},onRemotePlayerSnapshot=()=>{},onRemotePlayerDespawn=()=>{},onItemEntitySpawn=()=>{},onItemEntitySnapshot=()=>{},onItemEntityDespawn=()=>{},onMiningProgress=()=>{},onCommandResult=publishMultiplayerCommandResult,onError=()=>{}}={}){
     this.clientFactory=callback(clientFactory,'clientFactory');this.allowInsecure=!!allowInsecure;this.worldSyncTimeoutMs=timeout(worldSyncTimeoutMs);this.setTimer=callback(setTimer,'setTimer');this.clearTimer=callback(clearTimer,'clearTimer');this.onStateChange=callback(onStateChange,'onStateChange');this.onReady=callback(onReady,'onReady');this.onWorldInfo=callback(onWorldInfo,'onWorldInfo');this.onInventorySnapshot=callback(onInventorySnapshot,'onInventorySnapshot');this.onPlayerSnapshot=callback(onPlayerSnapshot,'onPlayerSnapshot');this.onRemotePlayerSpawn=callback(onRemotePlayerSpawn,'onRemotePlayerSpawn');this.onRemotePlayerSnapshot=callback(onRemotePlayerSnapshot,'onRemotePlayerSnapshot');this.onRemotePlayerDespawn=callback(onRemotePlayerDespawn,'onRemotePlayerDespawn');this.onItemEntitySpawn=callback(onItemEntitySpawn,'onItemEntitySpawn');this.onItemEntitySnapshot=callback(onItemEntitySnapshot,'onItemEntitySnapshot');this.onItemEntityDespawn=callback(onItemEntityDespawn,'onItemEntityDespawn');this.onMiningProgress=callback(onMiningProgress,'onMiningProgress');this.onCommandResult=callback(onCommandResult,'onCommandResult');this.onError=callback(onError,'onError');this.client=null;this.state='idle';this.worldInfo=null;this.inventorySnapshot=null;this.latestSnapshot=null;this.readyData=null;this.syncTimer=null;this.lastError=null;
   }
 
