@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {BLOCKS} from '../src/blocks.js';
-import {ITEMS,maxStack} from '../src/items.js';
+import {normalizeItemStack} from '../src/item-stack.js';
 import {nextNetworkSequence} from '../src/network-sequence.js';
 import {assertItemEntityId} from '../src/item-entity-replication.js';
 
@@ -15,10 +15,8 @@ const HORIZONTAL_DAMPING=.15;
 function callback(value,label){if(typeof value!=='function')throw new TypeError(`${label} must be a function`);return value;}
 function finite(value,label){if(typeof value!=='number'||!Number.isFinite(value))throw new TypeError(`${label} must be a finite number`);return value;}
 function vector(value,label){if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError(`${label} must be an object`);return{x:finite(value.x,`${label}.x`),y:finite(value.y,`${label}.y`),z:finite(value.z,`${label}.z`)};}
-function itemId(value){if(typeof value!=='string'||!ITEMS[value])throw new RangeError('server item entity must reference a known item');return value;}
-function itemCount(value,id){if(!Number.isInteger(value)||value<1||value>maxStack(id))throw new RangeError(`server item entity count must be an integer from 1 to ${maxStack(id)}`);return value;}
 function defaultEntityIdFactory(){return `i:${randomUUID()}`;}
-function cloneState(entity){return Object.freeze({entityId:entity.entityId,revision:entity.revision,itemId:entity.itemId,count:entity.count,position:Object.freeze({...entity.position}),velocity:Object.freeze({...entity.velocity}),age:entity.age,pickupDelay:entity.pickupDelay});}
+function cloneState(entity){return Object.freeze({entityId:entity.entityId,revision:entity.revision,itemId:entity.itemId,count:entity.count,damage:entity.damage,position:Object.freeze({...entity.position}),velocity:Object.freeze({...entity.velocity}),age:entity.age,pickupDelay:entity.pickupDelay});}
 
 export class ServerItemEntityHub{
   constructor({entityIdFactory=defaultEntityIdFactory,onSpawn=()=>{},onSnapshot=()=>{},onDespawn=()=>{},onError=()=>{}}={}){
@@ -32,10 +30,11 @@ export class ServerItemEntityHub{
   report(error,phase,entityId=null){try{this.onError({error,phase,entityId});}catch{}}
   emit(kind,entity,reason=null){const state=cloneState(entity);try{if(kind==='spawn')this.onSpawn(state);else if(kind==='snapshot')this.onSnapshot(state);else this.onDespawn({entityId:state.entityId,revision:state.revision,reason});}catch(error){this.report(error,kind,state.entityId);}return state;}
 
-  spawn(id,count,position,{velocity={x:0,y:0,z:0},pickupDelay=SERVER_ITEM_PICKUP_DELAY,entityId=null}={}){
-    id=itemId(id);count=itemCount(count,id);position=vector(position,'server item entity position');velocity=vector(velocity,'server item entity velocity');pickupDelay=finite(pickupDelay,'server item entity pickupDelay');if(pickupDelay<0||pickupDelay>60)throw new RangeError('server item entity pickupDelay must be between 0 and 60 seconds');
+  spawn(id,count,position,{damage=0,...options}={}){return this.spawnStack({id,count,...(damage>0?{damage}:{})},position,options);}
+  spawnStack(value,position,{velocity={x:0,y:0,z:0},pickupDelay=SERVER_ITEM_PICKUP_DELAY,entityId=null}={}){
+    const stack=normalizeItemStack(value,{label:'server item entity stack'});position=vector(position,'server item entity position');velocity=vector(velocity,'server item entity velocity');pickupDelay=finite(pickupDelay,'server item entity pickupDelay');if(pickupDelay<0||pickupDelay>60)throw new RangeError('server item entity pickupDelay must be between 0 and 60 seconds');
     entityId=assertItemEntityId(entityId??this.entityIdFactory());if(this.entities.has(entityId))throw new Error(`duplicate item entity id: ${entityId}`);
-    const entity={entityId,revision:0,itemId:id,count,position,velocity,age:0,pickupDelay};this.entities.set(entityId,entity);this.emit('spawn',entity);return cloneState(entity);
+    const entity={entityId,revision:0,itemId:stack.id,count:stack.count,damage:stack.damage??0,position,velocity,age:0,pickupDelay};this.entities.set(entityId,entity);this.emit('spawn',entity);return cloneState(entity);
   }
 
   remove(entityId,reason='removed'){
