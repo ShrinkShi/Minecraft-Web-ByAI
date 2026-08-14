@@ -1,5 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
 import {BLOCKS,CHUNK_SIZE,WORLD_HEIGHT} from './blocks.js';
+import {requireAssetUrl} from './asset-manifest.js';
 
 const key=(cx,cz)=>`${cx},${cz}`;
 const floorDiv=(n,d)=>Math.floor(n/d);
@@ -36,7 +37,7 @@ export class VoxelWorld{
   }
 
   makeAtlasTexture(){
-    const tex=new THREE.TextureLoader().load('./assets/textures/atlas.png');
+    const tex=new THREE.TextureLoader().load(requireAssetUrl('terrain.block_atlas'));
     tex.magFilter=THREE.NearestFilter;
     tex.minFilter=THREE.NearestMipmapNearestFilter;
     tex.colorSpace=THREE.SRGBColorSpace;
@@ -57,7 +58,7 @@ export class VoxelWorld{
     const result=new Map();
     for(const [chunkKey,entries] of Object.entries(saved||{})){
       if(!Array.isArray(entries)||entries.length===0)continue;
-      result.set(chunkKey,new Map(entries.map(([i,id])=>[Number(i),Number(id)])));
+      result.set(chunkKey,new Map(entries.map(([i,id])=>[Number(i),Number(id)]));
     }
     return result;
   }
@@ -162,7 +163,7 @@ export class VoxelWorld{
     if(saved)for(const [i,id] of saved)if(i>=0&&i<data.length)data[i]=id;
     this.chunks.set(chunkKey,data);
     this.requestMesh(m.cx,m.cz);
-    this.requestMesh(m.cx-1,m.cz);this.requestMesh(m.cx+1,m.cz);this.requestMesh(m.cx,m.cz-1);this.requestMesh(m.cx,m.cz+1);
+    this.requestMesh(m.cx-1,m.cz);this.requestMesh(m.cx+1,m.cz);this.requestMesh(m.cx,cz-1);this.requestMesh(m.cx,m.cz+1);
     if(this.initialPending.delete(chunkKey))this.reportInitialProgress();
   }
 
