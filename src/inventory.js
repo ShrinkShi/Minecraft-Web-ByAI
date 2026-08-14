@@ -23,6 +23,8 @@ export class Inventory{
       const s=snapshot.slots[i];
       if(s?.id&&Number.isFinite(s.count)&&s.count>0)this.slots[i]={id:s.id,count:Math.min(maxStack(s.id),Math.floor(s.count))};
     }
+    const legacyOverflow=snapshot.slots[INVENTORY_SLOT_COUNT];
+    if(legacyOverflow?.id&&Number.isFinite(legacyOverflow.count)&&legacyOverflow.count>0)this.add(legacyOverflow.id,Math.min(maxStack(legacyOverflow.id),Math.floor(legacyOverflow.count)));
     return true;
   }
 
