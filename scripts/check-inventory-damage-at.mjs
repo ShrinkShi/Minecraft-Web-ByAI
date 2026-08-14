@@ -1,0 +1,7 @@
+import assert from 'node:assert/strict';
+import {Inventory} from '../src/inventory.js';
+import {HOTBAR_START} from '../src/inventory-layout.js';
+
+const inventory=new Inventory('survival');assert.equal(inventory.addPickupStack({id:'wooden_pickaxe',count:1,damage:57}),0);const events=[];inventory.subscribe(event=>events.push(event.source));let result=inventory.damageAt(HOTBAR_START,'wooden_pickaxe',1);assert.equal(result.changed,true);assert.equal(result.broken,false);assert.deepEqual(result.stack,{id:'wooden_pickaxe',count:1,damage:58});assert.deepEqual(inventory.slots[HOTBAR_START],{id:'wooden_pickaxe',count:1,damage:58});assert.deepEqual(events,['durability']);result=inventory.damageAt(HOTBAR_START,'wooden_pickaxe',1);assert.equal(result.changed,true);assert.equal(result.broken,true);assert.equal(result.stack,null);assert.equal(inventory.slots[HOTBAR_START],null);assert.deepEqual(events,['durability','durability']);const empty=inventory.damageAt(HOTBAR_START,'wooden_pickaxe',1);assert.equal(empty.changed,false);assert.equal(empty.reason,'empty-slot');assert.deepEqual(events,['durability','durability']);
+const stick=new Inventory('survival');stick.addPickup('stick',1);const ignored=stick.damageAt(HOTBAR_START,'stick',1);assert.equal(ignored.changed,false);assert.equal(ignored.reason,'not-damageable');assert.deepEqual(stick.slots[HOTBAR_START],{id:'stick',count:1});assert.throws(()=>stick.damageAt(-1,'stick',1),/inventory slot/);
+console.log('local Inventory damageAt emits only real durability mutations and removes broken tools: PASS');

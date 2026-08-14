@@ -1,10 +1,10 @@
-# 多人物品实例与工具耐久权威边界
+# 物品实例与工具耐久边界
 
 ## 目标
 
-工具耐久不能只作为一个 UI 数字存在。只要磨损状态没有贯穿 Inventory、网络和地面 item entity，玩家就可以通过丢弃/拾取、重连或其它状态转换把磨损工具错误恢复成新品。
+工具耐久不能只作为一个 UI 数字存在。只要磨损状态没有贯穿 Inventory、网络、地面 item entity、单机存档和实际挖掘事务，玩家就可以通过丢弃/拾取、重连、死亡或其它状态转换把磨损工具错误恢复成新品。
 
-当前多人服务器权威链已经完整贯穿挖掘、Inventory、Q 丢弃、地面实体、拾取和客户端槽位显示。单机仍使用同一个共享 `item-stack` 数据模型，但单机挖掘入口的耐久扣除将在后续先从巨大 `main.js` 中抽离后接入，避免为了一个副作用整文件手工重写入口。
+当前多人服务器权威链已经完整贯穿挖掘、Inventory、Q 丢弃、地面实体、拾取和客户端槽位显示。单机 Survival 也已经接入同一个 `item-stack` 与 `mining-rules` 规则，不再在 `main.js` 中维护第二套挖掘速度/harvest 公式。
 
 ## Item stack 实例状态
 
@@ -25,6 +25,8 @@
 
 本地客户端另有 `returnExistingStack()`，只用于把已经存在于本地 UI/旧存档中的 stack 放回背包。它不是网络或新物品创建入口，因此能在不放宽网络严格校验的前提下继续保留历史未知 itemId。
 
+`Inventory.damageAt()` 是单机显式耐久 mutation 入口。它要求槽位和 expected itemId 都匹配，只有真实 damage/break 才写回 stack 并发布 `durability` 变更通知；非 damageable item、空槽或 item 已改变都不会伪造一次损耗。
+
 ## 多人协议 v2
 
 引入实例状态后，旧多人 wire 已不再兼容，因此整体 WebSocket subprotocol 从 `minecraft-web-v1` 升为 `minecraft-web-v2`，握手版本同步升为 2。旧客户端应在协议协商/hello 阶段被拒绝，而不是完成连接后才在 Inventory 消息阶段失败。
@@ -36,7 +38,7 @@ Inventory snapshot 同步升为 v2：
 
 Item entity replication 同步升为 v2，并在 spawn/snapshot 中显式携带数字 `damage`；普通物品为 0。地面实体生命周期中 itemId 和 damage 都视为实例身份的一部分，不能在 snapshot 中被任意替换。
 
-## 服务器权威耐久消费
+## 多人服务器权威耐久消费
 
 多人 survival 挖掘仍先执行已有权威流程：目标、挖掘时间、harvest、world mutation 和掉落判定都不变。
 
@@ -53,28 +55,55 @@ Item entity replication 同步升为 v2，并在 spawn/snapshot 中显式携带�
 
 creative 不走 survival durability 消耗。
 
-## 丢弃与拾取
+## 单机 Survival 挖掘
 
-Q 丢弃时不能重新构造 `{id,count:1}`。survival runtime 使用 Inventory 真正 `remove()` 出来的 stack 作为地面实体输入，所以 wear 会随工具一起丢出。
+`src/singleplayer-mining-controller.js` 把原先散落在巨大 `main.js` 中的单机挖掘计时、harvest 和耐久事务抽成显式 controller。
 
-如果 item entity spawn 失败，回滚也必须调用 `addPickupStack()`，不能按 itemId 新建新品。
+它直接复用 `src/mining-rules.js`：
 
-拾取时服务器 item entity 把完整实例状态交给 Inventory；Inventory hotbar-first 路由仍保留，但不会抹掉 damage。
+- `miningProgressDelta()` 按每一段真实模拟时间和当时选中的工具累计进度；
+- `canHarvestBlock()` 决定是否产生方块掉落；
+- adventure / spectator 不进入有效挖掘；
+- 目标坐标或 block id 变化时丢弃旧累计，但新目标仍会获得当前这一段 progress slice，与服务器 tick 语义一致；
+- 切换工具只影响切换后的 progress slice，不会把此前空手或其它工具已经消耗的时间按新工具速度追溯重算；
+- 每一段单机 mining dt 最多 50ms，与主循环模拟上限和服务器 20Hz tick 对齐，因此主线程卡顿不会在恢复后一次性“补挖”整段墙钟时间；
+- controller 要求时间单调递增，拒绝倒退时间输入；
+- 单机旧存档可能保留已经从当前 `ITEMS` 删除的历史 itemId。此类未知手持物在 mining 中按普通非工具处理：不会得到工具加速/工具 harvest 权限，也不会进入严格耐久 mutation，但仍可正常破坏本来就允许空手 harvest 的方块，不能因为兼容旧存档而把游戏循环打崩。
 
-客户端 DropSystem 也保存 damage，使网络权威地面工具的 debug/state/最终单机复用都不会丢失实例信息。
+一次成功单机 Survival 破坏的顺序固定为：
 
-## 槽位耐久显示
+1. 使用当前 selected stack 计算最终 harvest；
+2. world mutation 成功；
+3. 产生该次 harvest 掉落；
+4. 对同一个 selected item 调用 `Inventory.damageAt()` 扣 1 耐久；
+5. 如达到最大耐久则工具损坏；
+6. 更新 HUD / 存档 dirty 状态。
 
-`src/item-durability-display.js` 只根据 stack 中已经存在的权威 `damage` 计算显示数据，不自行推测使用次数。
+因此 damage=58 的木镐仍能完成最后一次有效 harvest，然后才从快捷栏消失；world mutation 失败则不会扣耐久。creative 破坏不会消耗工具耐久，也不会产生 Survival harvest drop。
+
+`main.js` 不再保留旧的 `toolMultiplier()` / `canHarvest()` / `breakStart` 第二套规则，只负责把真实 aim、世界修改、DropSystem、Inventory 和 UI 回调接入 controller。
+
+## 丢弃、死亡与拾取
+
+Q 丢弃不能重新构造 `{id,count:1}`。多人 survival runtime 使用 Inventory 真正 `remove()` 出来的 stack 作为地面实体输入；单机也把 `ui.consumeSelected()` 返回的完整 stack 直接交给 `DropSystem.spawnStack()`。
+
+单机死亡掉落、面板 overflow 也都走 `spawnStack()`，因此磨损工具不会通过死亡、关闭界面或异常 overflow 自动恢复满耐久。creative Q 丢弃复制当前 selected stack 的实例 metadata，而不是只复制 itemId。
+
+如果多人 item entity spawn 失败，回滚必须调用 `addPickupStack()`，不能按 itemId 新建新品。
+
+拾取时 item entity 把完整实例状态交给 Inventory；hotbar-first 路由仍保留，但不会抹掉 damage。
+
+## 槽位耐久显示与 model 同步
+
+`src/item-durability-display.js` 只根据 stack 中已经存在的 `damage` 计算显示数据，不自行推测使用次数。
 
 - 满耐久工具不显示耐久条；
 - 首次磨损后显示 Minecraft 风格的底部细条；
 - 长度表示剩余耐久比例；
 - 颜色根据剩余比例由绿色逐步过渡到红色；
 - title / aria-label 同时提供 `耐久 remaining / maximum`；
-- 服务器 Inventory revision 到达浏览器后，快捷栏、背包、工作台背包区和 cursor stack 都由同一 `UI.makeSlot()` 重绘，因此没有独立的“多人耐久 UI 状态”。
-
-最终一次使用使服务器删除工具后，新 Inventory snapshot 会直接移除槽位物品和耐久条。
+- `UI.bindInventory()` 会先注销旧 Inventory listener，再订阅当前 model；多人 authoritative `replaceSnapshot()` 与单机 `damageAt()` 因此都通过同一 `UI.makeSlot()` 路径实时刷新快捷栏、背包、工作台背包区和 cursor stack，不再出现“model 已更新但 HUD 仍旧”的状态；
+- 最终一次使用删除工具后，Inventory slot 变为 `null`，对应槽位物品与耐久条一起消失。
 
 ## 合成界面的实例安全
 
@@ -87,14 +116,21 @@ Q 丢弃时不能重新构造 `{id,count:1}`。survival runtime 使用 Inventory
 - `CraftingGrid.drain()` 和 `clearTo()` 保留完整 stack，而不是降级成 `{id,count}`；
 - 关闭面板时既不会修复磨损工具，也不会吞掉历史未知本地物品。
 
+## 浏览器回归边界
+
+多人耐久 E2E 直接从服务器同步 damage=57 的木镐，验证 HUD 2/59、第一次权威破坏后的 1/59，以及第 59 次成功使用后客户端 Inventory slot 明确为 `null` 且耐久条消失。
+
+单机耐久 E2E 会先把 damage=57 持久化进真实 IndexedDB 世界存档，再重新进入世界。按住左键连续挖掘本身是正确的游戏行为，因此测试不能依赖 Playwright 在第一块破坏完成后“足够快”地发送 mouseup。`?e2e=1` bridge 提供 `prepareSingleplayerMiningTarget()`：它只在 E2E 模式和单机 session 中可用，会把当前视线前 6 格同高度空间清空，只在第 2 格构造一块指定石头，并重置当前本地 mining 状态。正常游戏不会暴露该 helper。测试仍然使用真实鼠标 primary、真实 controller、真实 world mutation 和真实 Inventory/HUD，只移除了随机地形以及连续第二目标造成的调度竞态。
+
+该 fixture 只构造测试几何，不直接调用 `Inventory.damageAt()`、不推进 mining progress、也不替代真实 `world.setBlock(...,AIR)` 破坏事务，所以 E2E 仍能捕获 controller、输入、世界修改和 UI 同步之间的真实集成错误。
+
 ## 当前明确未完成
 
 当前仍不把以下内容伪装成已经完成：
 
-- 单机挖掘成功后的耐久扣除；
 - 铁镐、石镐、钻石镐等更多工具与 harvest tier；
 - 工具耐久随机减免、附魔等；
 - 武器/工具攻击时的耐久消费；
 - 装备耐久。
 
-下一阶段优先抽离单机 mining interaction，再接同一个共享 item-stack durability 规则；之后再扩展更多工具 tier，而不是先堆一套没有实际工具差异可验证的抽象层。
+下一阶段应先加入真正有可验证差异的工具 tier 与 harvest level，再扩展更多方块需求；不要先堆一套没有实际物品/方块差异支撑的空抽象层。
