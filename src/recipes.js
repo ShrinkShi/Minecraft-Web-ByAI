@@ -66,14 +66,18 @@ export class CraftingGrid{
   drain(){
     const stacks=[];
     for(let i=0;i<this.slots.length;i++){
-      const slot=this.slots[i];if(slot)stacks.push({id:slot.id,count:slot.count});this.slots[i]=null;
+      const slot=this.slots[i];if(slot)stacks.push({...slot});this.slots[i]=null;
     }
     this.refresh();return stacks;
   }
   clearTo(inventory){
     const overflow=[];
     for(let i=0;i<this.slots.length;i++){
-      const slot=this.slots[i];if(!slot)continue;const left=inventory.add(slot.id,slot.count);if(left)overflow.push({id:slot.id,count:left});this.slots[i]=null;
+      const slot=this.slots[i];if(!slot)continue;
+      let left;
+      if((slot.damage??0)>0&&typeof inventory.addStack==='function')left=inventory.addStack({...slot});
+      else left=inventory.add(slot.id,slot.count);
+      if(left)overflow.push({...slot,count:left});this.slots[i]=null;
     }
     this.refresh();return overflow;
   }
