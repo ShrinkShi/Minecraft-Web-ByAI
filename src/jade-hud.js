@@ -21,11 +21,11 @@ export class JadeHud{
     if(Number.isFinite(info.tile)){
       const tileSize=58;this.icon.className='jade-icon jade-block-icon';const tx=info.tile%ATLAS_COLS,ty=Math.floor(info.tile/ATLAS_COLS);this.icon.style.backgroundSize=`${ATLAS_COLS*tileSize}px ${ATLAS_ROWS*tileSize}px`;this.icon.style.backgroundPosition=`-${tx*tileSize}px -${ty*tileSize}px`;
     }else this.icon.className='jade-icon';
-    const rows=[];
-    rows.push(`工具：${info.requiredToolName}${info.requiredTool&&!info.toolCorrect?'（当前不匹配）':''}`);
-    if(info.liquid)rows.push('掉落：不可直接采集');
-    else if(!info.hasDrop)rows.push('掉落：无');
-    else rows.push(`掉落：${info.canDrop?'是':'否'}${info.dropName?` · ${info.dropName}`:''}`);
+    const rows=[],toolState=info.toolCorrect?'✓':'✕';
+    rows.push(`工具：${info.requiredToolName} ${toolState}`);
+    if(info.liquid)rows.push('挖掘掉落：不可直接采集');
+    else if(!info.hasDrop)rows.push('挖掘掉落：无');
+    else rows.push(`挖掘掉落：${info.canDrop?'是':'否'}${info.dropName?` · ${info.dropName}`:''}`);
     if(Number.isFinite(info.hardness))rows.push(`硬度：${info.hardness}`);
     for(const value of rows){const row=document.createElement('div');row.className='jade-detail-row';row.textContent=value;this.details.append(row);}
   }
