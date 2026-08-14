@@ -24,7 +24,12 @@ export class MultiplayerInputBridge{
     this.controlSeq=0;this.viewSeq=0;this.actionSeq=0;this.pendingControl=null;this.pendingView=null;this.sentControl=null;this.sentView=null;this.lastSentViewSequence=null;return this;
   }
 
-  setControl(state){const normalized=normalizeControlState(state);if(!sameControl(this.pendingControl,normalized)){this.pendingControl=normalized;return true;}return false;}
+  setControl(state){
+    const normalized=normalizeControlState(state);if(sameControl(this.pendingControl,normalized))return false;
+    const primaryChanged=this.pendingControl!==null&&this.pendingControl.primary!==normalized.primary;this.pendingControl=normalized;
+    if(primaryChanged&&this.isReady())this.flush();
+    return true;
+  }
   setView(view){const normalized=viewState(view);if(!sameView(this.pendingView,normalized)){this.pendingView=normalized;return true;}return false;}
   prime(control,view=this.viewProvider()){this.setControl(control);this.setView(view);this.sentControl=null;this.sentView=null;return this;}
 
