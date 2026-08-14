@@ -26,7 +26,11 @@ export function createAuthoritativeServerRuntime({config={},setIntervalFn=setInt
   server=createMultiplayerServer({host:normalized.host,port:normalized.port,allowedOrigins:normalized.allowedOrigins,allowMissingOrigin:normalized.allowMissingOrigin,onSessionReady:({session})=>{
     const info=server.sendWorldInfo(session,{session,worldId:normalized.worldId,terrainVersion:TERRAIN_GENERATOR_VERSION,seed:normalized.seed,prompt:normalized.prompt,tickRate:DEFAULT_SERVER_TICK_RATE});if(info===null)throw new Error('world info transport is unavailable');
     const worldEdits=server.sendWorldEditSync(session,{worldId:normalized.worldId,revision:world.revision,edits:world.editEntries()});if(worldEdits===null)throw new Error('world edit sync transport is unavailable');
-    const joined=authoritative.join(session,{mode:normalized.mode});try{inventories.join(session,{mode:joined.snapshot.mode});replication.join(session,joined.snapshot);}catch(error){if(inventories.has(session))inventories.leave(session);authoritative.leave(session);creativeBreak.remove(session);throw error;}
+    const joined=authoritative.join(session,{mode:normalized.mode});try{
+      inventories.join(session,{mode:joined.snapshot.mode});
+      const inventory=server.sendInventorySnapshot(session,inventories.snapshot(session));if(inventory===null)throw new Error('inventory snapshot transport is unavailable');
+      replication.join(session,joined.snapshot);
+    }catch(error){if(inventories.has(session))inventories.leave(session);authoritative.leave(session);creativeBreak.remove(session);throw error;}
   },onInput:({session,message})=>{if(message?.kind==='control')creativeBreak.observePrimary(session,message.payload.primary);},onSessionClose:({session})=>{if(session){creativeBreak.remove(session);if(inventories.has(session))inventories.leave(session);replication.leave(session);authoritative.leave(session);}},onSocketError:event=>report({source:'socket',...event})});
 
   let state='idle',address=null,stopPromise=null;

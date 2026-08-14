@@ -3,6 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {WebSocketServer} from 'ws';
 import {ClientInputSessionGate,assertClientSessionId} from '../src/client-input-envelope.js';
 import {MULTIPLAYER_SUBPROTOCOL,decodeClientHello,encodeServerWelcome} from '../src/multiplayer-handshake.js';
+import {encodeServerInventorySnapshot} from '../src/server-inventory-snapshot.js';
 import {encodeServerPlayerSnapshot} from '../src/server-player-snapshot.js';
 import {encodeServerWorldInfo} from '../src/server-world-info.js';
 import {encodeRemotePlayerSpawn,encodeRemotePlayerSnapshot,encodeRemotePlayerDespawn} from '../src/remote-player-replication.js';
@@ -47,6 +48,7 @@ export function createMultiplayerServer({host=DEFAULT_MULTIPLAYER_HOST,port=DEFA
     sendWorldInfo(session,info){session=assertClientSessionId(session);if(!info||info.session!==session)throw new RangeError('world info session must match target session');return sendEncoded(session,encodeServerWorldInfo(info));},
     sendWorldEditSync(session,{worldId,revision,edits}){session=assertClientSessionId(session);const wires=encodeWorldEditSync({session,worldId,revision,edits});for(const wire of wires)if(sendEncoded(session,wire)===null)return null;return wires;},
     sendWorldBlockChange(session,{worldId,revision,x,y,z,previous,id}){session=assertClientSessionId(session);return sendEncoded(session,encodeWorldBlockChange({session,worldId,revision,x,y,z,previous,id}));},
+    sendInventorySnapshot(session,snapshot){session=assertClientSessionId(session);if(!snapshot||snapshot.session!==session)throw new RangeError('inventory snapshot session must match target session');return sendEncoded(session,encodeServerInventorySnapshot(snapshot));},
     sendPlayerSnapshot(session,snapshot){session=assertClientSessionId(session);if(!snapshot||snapshot.session!==session)throw new RangeError('player snapshot session must match target session');return sendEncoded(session,encodeServerPlayerSnapshot(snapshot));},
     sendRemotePlayerSpawn(session,state){return sendEncoded(session,encodeRemotePlayerSpawn(state));},sendRemotePlayerSnapshot(session,state){return sendEncoded(session,encodeRemotePlayerSnapshot(state));},sendRemotePlayerDespawn(session,playerId){return sendEncoded(session,encodeRemotePlayerDespawn(playerId));},
     async close(){for(const websocket of wss.clients)websocket.terminate();await new Promise(resolve=>wss.close(()=>resolve()));sessions.clear();if(httpServer.listening)await new Promise((resolve,reject)=>httpServer.close(error=>error?reject(error):resolve()));}
