@@ -50,9 +50,22 @@ export class Inventory{
     return capacity;
   }
 
-  addAcrossRanges(itemId,count,ranges){
+  add(itemId,count=1){
     let remaining=Math.max(0,Math.floor(count));const limit=maxStack(itemId);
-    for(const [start,end] of ranges){
+    for(const slot of this.slots){
+      if(!slot||slot.id!==itemId||slot.count>=limit)continue;
+      const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;if(!remaining)return 0;
+    }
+    for(let i=0;i<this.slots.length;i++){
+      if(this.slots[i])continue;
+      const moved=Math.min(remaining,limit);this.slots[i]={id:itemId,count:moved};remaining-=moved;if(!remaining)return 0;
+    }
+    return remaining;
+  }
+
+  addPickup(itemId,count=1){
+    let remaining=Math.max(0,Math.floor(count));const limit=maxStack(itemId);
+    for(const [start,end] of [HOTBAR_RANGE,MAIN_RANGE]){
       for(let i=start;i<end&&remaining;i++){
         const slot=this.slots[i];if(!slot||slot.id!==itemId||slot.count>=limit)continue;
         const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;
@@ -63,9 +76,6 @@ export class Inventory{
     }
     return remaining;
   }
-
-  add(itemId,count=1){return this.addAcrossRanges(itemId,count,[MAIN_RANGE,HOTBAR_RANGE]);}
-  addPickup(itemId,count=1){return this.addAcrossRanges(itemId,count,[HOTBAR_RANGE,MAIN_RANGE]);}
 
   removeAt(index,count=1){
     const slot=this.slots[index];if(!slot)return null;
