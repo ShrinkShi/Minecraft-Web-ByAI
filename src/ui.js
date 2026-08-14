@@ -19,7 +19,7 @@ export class UI{
     this.cursorStack=document.querySelector('#cursor-stack');this.hearts=document.querySelector('#hearts');this.hunger=document.querySelector('#hunger');this.armorRow=document.querySelector('#armor-row');this.oxygen=document.querySelector('#oxygen');this.xp=document.querySelector('#xp-bar');this.level=document.querySelector('#xp-level');
     this.debug=document.querySelector('#debug');this.toast=document.querySelector('#toast');this.breakMeter=document.querySelector('#break-meter');this.loadingBar=document.querySelector('#loading-bar');this.loadingDetail=document.querySelector('#loading-detail');
     this.chatLog=document.querySelector('#chat-log');this.chatWrap=document.querySelector('#chat-input-wrap');this.chatInput=document.querySelector('#chat-input');
-    this.selected=0;this.inventoryModel=null;this.equipmentModel=null;this.craft2=new CraftingGrid(2);this.craft3=new CraftingGrid(3);this.onChanged=()=>{};this.onOverflow=()=>{};this.localBreakProgress=0;this.authoritativeBreakProgress=null;
+    this.selected=0;this.inventoryModel=null;this.inventorySubscription=null;this.equipmentModel=null;this.craft2=new CraftingGrid(2);this.craft3=new CraftingGrid(3);this.onChanged=()=>{};this.onOverflow=()=>{};this.localBreakProgress=0;this.authoritativeBreakProgress=null;
     this.releaseMiningProgress=subscribeMultiplayerMiningProgress(state=>{this.authoritativeBreakProgress=state?.active?state.progress:null;this.renderBreak();});
     this.renderStatus(20,20,0,0,0);this.renderOxygen(15,15,false);this.bindSlotEvents();this.renderHotbar();
   }
@@ -29,7 +29,9 @@ export class UI{
   setReturnMainLabel(multiplayer=false){if(this.returnMainButton)this.returnMainButton.textContent=multiplayer?'断开连接并返回标题画面':'保存并返回标题画面';}
 
   bindInventory(model,{equipment=null,onChanged=()=>{},onOverflow=()=>{}}={}){
-    this.inventoryModel=model;this.equipmentModel=equipment;this.onChanged=onChanged;this.onOverflow=onOverflow;this.refreshInventory();
+    this.inventorySubscription?.();this.inventorySubscription=null;this.inventoryModel=model;this.equipmentModel=equipment;this.onChanged=onChanged;this.onOverflow=onOverflow;
+    if(model&&typeof model.subscribe==='function')this.inventorySubscription=model.subscribe(()=>this.refreshInventory());
+    this.refreshInventory();
   }
 
   bindSlotEvents(){
