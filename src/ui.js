@@ -2,6 +2,7 @@ import {ATLAS_COLS,ATLAS_ROWS} from './blocks.js';
 import {ITEMS,maxStack} from './items.js';
 import {CraftingGrid} from './recipes.js';
 import {EQUIPMENT_SLOTS} from './equipment.js';
+import {subscribeMultiplayerMiningProgress} from './multiplayer-mining-progress-channel.js';
 
 export class UI{
   constructor(){
@@ -14,7 +15,8 @@ export class UI{
     this.cursorStack=document.querySelector('#cursor-stack');this.hearts=document.querySelector('#hearts');this.hunger=document.querySelector('#hunger');this.armorRow=document.querySelector('#armor-row');this.oxygen=document.querySelector('#oxygen');this.xp=document.querySelector('#xp-bar');this.level=document.querySelector('#xp-level');
     this.debug=document.querySelector('#debug');this.toast=document.querySelector('#toast');this.breakMeter=document.querySelector('#break-meter');this.loadingBar=document.querySelector('#loading-bar');this.loadingDetail=document.querySelector('#loading-detail');
     this.chatLog=document.querySelector('#chat-log');this.chatWrap=document.querySelector('#chat-input-wrap');this.chatInput=document.querySelector('#chat-input');
-    this.selected=0;this.inventoryModel=null;this.equipmentModel=null;this.craft2=new CraftingGrid(2);this.craft3=new CraftingGrid(3);this.onChanged=()=>{};this.onOverflow=()=>{};
+    this.selected=0;this.inventoryModel=null;this.equipmentModel=null;this.craft2=new CraftingGrid(2);this.craft3=new CraftingGrid(3);this.onChanged=()=>{};this.onOverflow=()=>{};this.localBreakProgress=0;this.authoritativeBreakProgress=null;
+    this.releaseMiningProgress=subscribeMultiplayerMiningProgress(state=>{this.authoritativeBreakProgress=state?.active?state.progress:null;this.renderBreak();});
     this.renderStatus(20,20,0,0,0);this.renderOxygen(15,15,false);this.bindSlotEvents();this.renderHotbar();
   }
 
@@ -187,5 +189,6 @@ export class UI{
 
   showLoading(show,detail='准备区块',p=0){this.loading.classList.toggle('hidden',!show);this.loadingDetail.textContent=detail;this.loadingBar.style.width=`${p}%`;}
   showToast(text){this.toast.textContent=text;this.toast.classList.remove('hidden');clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>this.toast.classList.add('hidden'),900);}
-  setBreak(p){this.breakMeter.classList.toggle('hidden',p<=0||p>=1);this.breakMeter.querySelector('span').style.width=`${p*100}%`;}
+  renderBreak(){const p=this.authoritativeBreakProgress??this.localBreakProgress;this.breakMeter.classList.toggle('hidden',p<=0||p>=1);this.breakMeter.querySelector('span').style.width=`${p*100}%`;}
+  setBreak(p){this.localBreakProgress=Math.max(0,Math.min(1,Number(p)||0));this.renderBreak();}
 }
