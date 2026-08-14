@@ -15,7 +15,7 @@ function snapshotSlots(snapshot){
   }
   return slots;
 }
-function stackCount(value){return value?.count??0;}
+function requestedCount(value){if(!Number.isFinite(value))return 0;return Math.max(0,Math.floor(value));}
 
 export class Inventory{
   constructor(mode='survival',snapshot=null){
@@ -46,7 +46,7 @@ export class Inventory{
 
   capacityFor(itemId){const incoming={id:itemId,count:1},limit=maxStack(itemId);let capacity=0;for(const slot of this.slots){if(!slot)capacity+=limit;else if(itemStacksCanMerge(slot,incoming))capacity+=Math.max(0,limit-slot.count);}return capacity;}
 
-  add(itemId,count=1){return this.addStack({id:itemId,count:Math.max(1,Math.floor(count))});}
+  add(itemId,count=1){const amount=requestedCount(count);return amount?this.addStack({id:itemId,count:amount}):0;}
   addStack(value){
     const incoming=normalizeItemStack(value),limit=maxStack(incoming.id);let remaining=incoming.count;
     for(const slot of this.slots){if(!itemStacksCanMerge(slot,incoming)||slot.count>=limit)continue;const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;if(!remaining)return 0;}
@@ -54,7 +54,7 @@ export class Inventory{
     return remaining;
   }
 
-  addPickup(itemId,count=1){return this.addPickupStack({id:itemId,count:Math.max(1,Math.floor(count))});}
+  addPickup(itemId,count=1){const amount=requestedCount(count);return amount?this.addPickupStack({id:itemId,count:amount}):0;}
   addPickupStack(value){
     const incoming=normalizeItemStack(value),limit=maxStack(incoming.id);let remaining=incoming.count;
     for(const [start,end] of [HOTBAR_RANGE,MAIN_RANGE]){
