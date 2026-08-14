@@ -74,6 +74,7 @@ export class Inventory{
   addStack(value){const incoming=normalizeItemStack(value);return this.insertExistingStack(incoming,[[0,INVENTORY_SLOT_COUNT]]);}
   addPickup(itemId,count=1){return this.insertBulk(itemId,count,[HOTBAR_RANGE,MAIN_RANGE]);}
   addPickupStack(value){const incoming=normalizeItemStack(value);return this.insertExistingStack(incoming,[HOTBAR_RANGE,MAIN_RANGE]);}
+  returnExistingStack(value){return this.insertExistingStack(value,[[0,INVENTORY_SLOT_COUNT]]);}
 
   removeAt(index,count=1){const slot=this.slots[index];if(!slot)return null;const taken=Math.min(slot.count,Math.max(1,Math.floor(count))),result={...slot,count:taken};slot.count-=taken;if(slot.count<=0)this.slots[index]=null;return cloneStack(result);}
 
@@ -100,5 +101,5 @@ export class Inventory{
     return false;
   }
 
-  returnCursor(){if(!this.cursor)return null;const original=cloneStack(this.cursor);if(!original){this.cursor=null;return null;}const remainder=this.insertExistingStack(original,[[0,INVENTORY_SLOT_COUNT]]),overflow=remainder?{...original,count:remainder}:null;this.cursor=null;return overflow;}
+  returnCursor(){if(!this.cursor)return null;const original=cloneStack(this.cursor);if(!original){this.cursor=null;return null;}const remainder=this.returnExistingStack(original),overflow=remainder?{...original,count:remainder}:null;this.cursor=null;return overflow;}
 }
