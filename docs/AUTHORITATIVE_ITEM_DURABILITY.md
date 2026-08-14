@@ -93,7 +93,7 @@ Q 丢弃不能重新构造 `{id,count:1}`。多人 survival runtime 使用 Inven
 
 拾取时 item entity 把完整实例状态交给 Inventory；hotbar-first 路由仍保留，但不会抹掉 damage。
 
-## 槽位耐久显示
+## 槽位耐久显示与 model 同步
 
 `src/item-durability-display.js` 只根据 stack 中已经存在的 `damage` 计算显示数据，不自行推测使用次数。
 
@@ -102,9 +102,8 @@ Q 丢弃不能重新构造 `{id,count:1}`。多人 survival runtime 使用 Inven
 - 长度表示剩余耐久比例；
 - 颜色根据剩余比例由绿色逐步过渡到红色；
 - title / aria-label 同时提供 `耐久 remaining / maximum`；
-- Inventory model 变更后，快捷栏、背包、工作台背包区和 cursor stack 都由同一 `UI.makeSlot()` 重绘。
-
-最终一次使用删除工具后，新 Inventory state 会直接移除槽位物品和耐久条。
+- `UI.bindInventory()` 会先注销旧 Inventory listener，再订阅当前 model；多人 authoritative `replaceSnapshot()` 与单机 `damageAt()` 因此都通过同一 `UI.makeSlot()` 路径实时刷新快捷栏、背包、工作台背包区和 cursor stack，不再出现“model 已更新但 HUD 仍旧”的状态；
+- 最终一次使用删除工具后，Inventory slot 变为 `null`，对应槽位物品与耐久条一起消失。
 
 ## 合成界面的实例安全
 
@@ -116,6 +115,12 @@ Q 丢弃不能重新构造 `{id,count:1}`。多人 survival runtime 使用 Inven
 - Shift 从合成格移回背包使用 `returnExistingStack()`；
 - `CraftingGrid.drain()` 和 `clearTo()` 保留完整 stack，而不是降级成 `{id,count}`；
 - 关闭面板时既不会修复磨损工具，也不会吞掉历史未知本地物品。
+
+## 浏览器回归边界
+
+多人耐久 E2E 直接从服务器同步 damage=57 的木镐，验证 HUD 2/59、第一次权威破坏后的 1/59，以及第 59 次成功使用后客户端 Inventory slot 明确为 `null` 且耐久条消失。
+
+单机耐久 E2E 会先把 damage=57 持久化进真实 IndexedDB 世界存档，再重新进入世界。按住左键连续挖掘本身是正确的游戏行为，因此测试不能依赖 Playwright 在第一块破坏完成后“足够快”地发送 mouseup。`?e2e=1` bridge 提供 `prepareSingleplayerMiningTarget()`：它只在 E2E 模式和单机 session 中可用，会把当前视线前 6 格同高度空间清空，只在第 2 格构造一块指定石头，并重置当前本地 mining 状态。正常游戏不会暴露该 helper。测试仍然使用真实鼠标 primary、真实 controller、真实 world mutation 和真实 Inventory/HUD，只移除了随机地形以及连续第二目标造成的调度竞态。
 
 ## 当前明确未完成
 
