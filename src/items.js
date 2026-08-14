@@ -14,8 +14,11 @@ export const ITEMS={
   'block:7':{name:'橡树树叶',stack:64,blockId:7,tile:8},
   'block:9':{name:'工作台',stack:64,blockId:9,tile:10},
   'block:10':{name:'圆石',stack:64,blockId:10,tile:13},
+  'block:19':{name:'铁矿石',stack:64,blockId:19,tile:3},
   stick:{name:'木棍',stack:64,texture:'./assets/items/stick.png'},
   wooden_pickaxe:{name:'木镐',stack:1,texture:'./assets/items/wooden_pickaxe.png',attackDamage:2,tool:{kind:'pickaxe',tier:'wood',speed:2,durability:59}},
+  stone_pickaxe:{name:'石镐',stack:1,texture:'./assets/items/stone_pickaxe.svg',attackDamage:3,tool:{kind:'pickaxe',tier:'stone',speed:4,durability:131}},
+  raw_iron:{name:'粗铁',stack:64,color:0xc78462,texture:'./assets/items/raw_iron.svg'},
   bed:{name:'床',stack:1,placeKind:'bed',texture:bedIcon()},
   leather_helmet:{name:'皮革帽子',stack:1,armorSlot:'head',armorPoints:1,texture:armorIcon('8b5a2b','M4 4h8l1 3-2 4H5L3 7z')},
   leather_chestplate:{name:'皮革外套',stack:1,armorSlot:'chest',armorPoints:3,texture:armorIcon('8b5a2b','M3 4l3-2h4l3 2-2 3v6H5V7z')},
@@ -35,6 +38,6 @@ export const ITEMS={
   string:{name:'线',stack:64,color:0xe3e1dc,texture:solidIcon('e3e1dc')}
 };
 
-export const CREATIVE_START=['block:1','block:2','block:3','block:4','block:5','block:6','block:7','block:9','wooden_pickaxe','bed'];
+export const CREATIVE_START=['block:1','block:2','block:3','block:4','block:5','block:6','block:7','block:9','wooden_pickaxe','stone_pickaxe','block:19','raw_iron','bed'];
 export const itemForBlock=blockId=>ITEMS[`block:${blockId}`]?`block:${blockId}`:BLOCKS[blockId]?.drops||null;
 export const maxStack=itemId=>ITEMS[itemId]?.stack||64;
