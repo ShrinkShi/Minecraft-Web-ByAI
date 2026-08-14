@@ -1,4 +1,5 @@
 import {watchDeviceProfile} from './device-profile.js';
+import {ensureChatCommandCompletion} from './chat-command-completion.js';
 
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 const actionName=name=>name==='use'?'secondary':name;
@@ -7,7 +8,7 @@ export class MobileControls{
   constructor(bus,{onProfile=()=>{}}={}){
     this.bus=bus;this.onProfile=onProfile;this.source='touch';this.root=document.querySelector('#mobile-controls');this.joystick=document.querySelector('#mobile-joystick');this.knob=document.querySelector('#mobile-joystick-knob');this.lookZone=document.querySelector('#mobile-look-zone');
     this.profile={mobile:false,orientation:'landscape'};this.gameplayEnabled=false;this.movePointer=null;this.lookPointer=null;this.lookLast=null;this.holds=new Map();this.toggles={sprint:false,sneak:false};
-    this.bind();this.stopWatch=watchDeviceProfile(profile=>{this.profile=profile;this.onProfile(profile);this.sync();});
+    ensureChatCommandCompletion();this.bind();this.stopWatch=watchDeviceProfile(profile=>{this.profile=profile;this.onProfile(profile);this.sync();});
   }
 
   bind(){
