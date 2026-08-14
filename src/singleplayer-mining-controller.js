@@ -2,6 +2,7 @@ import {BLOCKS} from './blocks.js';
 import {itemDurability} from './item-stack.js';
 import {canHarvestBlock,miningProgressDelta} from './mining-rules.js';
 
+export const MAX_SINGLEPLAYER_MINING_DT=.05;
 const COMPLETION_EPSILON=1e-9;
 function callback(value,label){if(typeof value!=='function')throw new TypeError(`${label} must be a function`);return value;}
 function finite(value,label){if(typeof value!=='number'||!Number.isFinite(value))throw new TypeError(`${label} must be a finite number`);return value;}
@@ -20,7 +21,7 @@ export class SingleplayerMiningController{
   step(now){
     now=finite(now,'mining time');const mode=this.getMode();
     if(!this.held||mode==='spectator'||mode==='adventure')return this.cancel();
-    const dtSeconds=Math.max(0,(now-this.lastAt)/1000);this.lastAt=now;const aimed=this.aim();
+    if(now<this.lastAt)throw new RangeError('mining time must be monotonic');const dtSeconds=Math.min(MAX_SINGLEPLAYER_MINING_DT,(now-this.lastAt)/1000);this.lastAt=now;const aimed=this.aim();
     if(!aimed){this.target=null;this.key=null;this.startedAt=now;this.progress=0;this.onProgress(0);return this.snapshot();}
     const selected=this.getSelectedStack(),selectedId=selected?.id??null,nextKey=targetKey(aimed),sameTarget=nextKey===this.key;this.target=cloneTarget(aimed);this.key=nextKey;if(!sameTarget){this.startedAt=now;this.progress=0;}
     this.progress=Math.min(1,this.progress+miningProgressDelta(aimed.id,selectedId,dtSeconds,mode));this.onProgress(this.progress);
