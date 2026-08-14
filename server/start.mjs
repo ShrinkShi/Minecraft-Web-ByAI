@@ -14,6 +14,7 @@ const runtime=createAuthoritativeServerRuntime({
 await runtime.start();
 console.log(`[multiplayer] allowed origins: ${config.allowedOrigins==='*'?'*':config.allowedOrigins.join(', ')}`);
 console.log(`[multiplayer] terrain seed=${JSON.stringify(config.seed)} prompt=${JSON.stringify(config.prompt)} mode=${config.mode}`);
+console.log(`[multiplayer] cheat commands: ${config.allowCommands?'enabled for connected clients':'disabled (set MCWEB_ALLOW_COMMANDS=true to enable)'}`);
 
 let shuttingDown=false;
 async function shutdown(signal){
