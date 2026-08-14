@@ -8,5 +8,6 @@ inv=new Inventory('survival');inv.slots[HOTBAR_START]={id:'stick',count:63};inv.
 
 inv=new Inventory('survival');for(let i=HOTBAR_START;i<36;i++)inv.slots[i]={id:'wooden_pickaxe',count:1};inv.slots[0]={id:'stick',count:20};assert.equal(inv.addPickup('stick',3),0);assert.equal(inv.slots[0].count,23,'full hotbar falls back to main inventory merging');
 
-inv=new Inventory('survival');assert.equal(inv.add('stick',1),0);assert.deepEqual(inv.slots[0],{id:'stick',count:1});assert.equal(inv.slots[HOTBAR_START],null,'non-pickup add keeps existing main-inventory-first semantics');
-console.log('ground pickup hotbar priority: PASS');
+inv=new Inventory('survival');assert.equal(inv.add('stick',1),0);assert.deepEqual(inv.slots[0],{id:'stick',count:1});assert.equal(inv.slots[HOTBAR_START],null,'non-pickup add keeps existing main-inventory-first empty-slot semantics');
+inv=new Inventory('survival');inv.slots[HOTBAR_START]={id:'stick',count:63};assert.equal(inv.add('stick',1),0);assert.equal(inv.slots[HOTBAR_START].count,64);assert.equal(inv.slots[0],null,'ordinary add must preserve the legacy global merge-before-empty behavior');
+console.log('ground pickup hotbar priority + ordinary add compatibility: PASS');
