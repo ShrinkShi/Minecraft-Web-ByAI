@@ -2,6 +2,7 @@ import {ATLAS_COLS,ATLAS_ROWS} from './blocks.js';
 import {ITEMS,maxStack} from './items.js';
 import {CraftingGrid} from './recipes.js';
 import {EQUIPMENT_SLOTS} from './equipment.js';
+import {subscribeMultiplayerMiningProgress} from './multiplayer-mining-progress-channel.js';
 
 export class UI{
   constructor(){
@@ -15,6 +16,7 @@ export class UI{
     this.debug=document.querySelector('#debug');this.toast=document.querySelector('#toast');this.breakMeter=document.querySelector('#break-meter');this.loadingBar=document.querySelector('#loading-bar');this.loadingDetail=document.querySelector('#loading-detail');
     this.chatLog=document.querySelector('#chat-log');this.chatWrap=document.querySelector('#chat-input-wrap');this.chatInput=document.querySelector('#chat-input');
     this.selected=0;this.inventoryModel=null;this.equipmentModel=null;this.craft2=new CraftingGrid(2);this.craft3=new CraftingGrid(3);this.onChanged=()=>{};this.onOverflow=()=>{};
+    this.releaseMiningProgress=subscribeMultiplayerMiningProgress(state=>this.setBreak(state?.active?state.progress:0));
     this.renderStatus(20,20,0,0,0);this.renderOxygen(15,15,false);this.bindSlotEvents();this.renderHotbar();
   }
 
