@@ -5,6 +5,7 @@ const MOVEMENT_CODES=new Set(['KeyW','KeyA','KeyS','KeyD']);
 const BUTTON_CODES=new Map([['Space','jump'],['ShiftLeft','sneak'],['ShiftRight','sneak'],['KeyR','sprint']]);
 export const DESKTOP_SPRINT_HOLD_CODE='KeyR';
 export const DESKTOP_BROWSER_RESERVED_CODES=Object.freeze(['ControlLeft','ControlRight','Tab']);
+export const desktopButtonForCode=code=>BUTTON_CODES.get(code)||null;
 
 export class DesktopControls{
   constructor(canvas,bus){
