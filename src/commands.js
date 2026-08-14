@@ -1,6 +1,6 @@
 import {ITEMS} from './items.js';
 
-const ITEM_ALIASES={
+export const ITEM_ALIASES={
   grass:'block:1',grass_block:'block:1','minecraft:grass_block':'block:1',
   dirt:'block:2','minecraft:dirt':'block:2',stone:'block:3','minecraft:stone':'block:3',
   sand:'block:4','minecraft:sand':'block:4',planks:'block:5',oak_planks:'block:5','minecraft:oak_planks':'block:5',
