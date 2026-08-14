@@ -24,11 +24,13 @@ test('creative browser secondary waits for authoritative tick before placing a b
 
     const [session]=[...runtime.authoritative.sessions];expect(session).toBeTruthy();const snapshot=runtime.authoritative.snapshot(session),position=snapshot.position,x=Math.floor(position.x),y=Math.floor(position.y+PLAYER_EYE_HEIGHT),anchorZ=Math.floor(position.z)-2,placeZ=anchorZ+1;
     runtime.setBlock(x,y,placeZ,BLOCK.AIR);runtime.setBlock(x,y,anchorZ,BLOCK.STONE);
+    expect(runtime.world.getBlock(x,y,anchorZ)).toBe(BLOCK.STONE);expect(runtime.world.getBlock(x,y,placeZ)).toBe(BLOCK.AIR);
     await expect.poll(()=>page.evaluate(({x,y,z})=>globalThis.__minecraftE2E?.worldBlock(x,y,z),{x,y,z:anchorZ}),{timeout:5_000}).toBe(BLOCK.STONE);await expect.poll(()=>page.evaluate(({x,y,z})=>globalThis.__minecraftE2E?.worldBlock(x,y,z),{x,y,z:placeZ}),{timeout:5_000}).toBe(BLOCK.AIR);
 
-    await setViewAndLock(page,0,0);const canvas=page.locator('#game-canvas');await canvas.click({button:'right',position:{x:40,y:40}});
+    await setViewAndLock(page,0,0);
+    await page.mouse.down({button:'right'});await page.mouse.up({button:'right'});
     await expect.poll(()=>runtime.server.getSessionInputState(session)?.pendingActionCount,{timeout:5_000}).toBe(1);
-    expect(runtime.world.getBlock(x,y,placeZ)).toBe(BLOCK.AIR);expect(await page.evaluate(({x,y,z})=>globalThis.__minecraftE2E?.worldBlock(x,y,z),{x,y,z:placeZ})).toBe(BLOCK.AIR);
+    expect(runtime.world.getBlock(x,y,anchorZ)).toBe(BLOCK.STONE);expect(runtime.world.getBlock(x,y,placeZ)).toBe(BLOCK.AIR);expect(await page.evaluate(({x,y,z})=>globalThis.__minecraftE2E?.worldBlock(x,y,z),{x,y,z:placeZ})).toBe(BLOCK.AIR);
 
     tick();await expect.poll(()=>runtime.world.getBlock(x,y,placeZ),{timeout:5_000}).toBe(BLOCK.GRASS);await expect.poll(()=>page.evaluate(({x,y,z})=>globalThis.__minecraftE2E?.worldBlock(x,y,z),{x,y,z:placeZ}),{timeout:5_000}).toBe(BLOCK.GRASS);expect(runtime.server.getSessionInputState(session).pendingActionCount).toBe(0);
   }finally{await runtime.stop();}
