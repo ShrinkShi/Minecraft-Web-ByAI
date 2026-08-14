@@ -47,7 +47,7 @@ export class DropSystem{
   }
 
   snapshotAuthoritative(state){
-    const drop=this.authoritativeDrops.get(state?.entityId);if(!drop||drop.itemId!==state.itemId||!state.position)return false;drop.count=state.count;drop.age=state.age??drop.age;drop.pickupDelay=state.pickupDelay??drop.pickupDelay;drop.revision=state.revision??drop.revision;drop.target.set(state.position.x,state.position.y,state.position.z);drop.velocity.set(state.velocity?.x||0,state.velocity?.y||0,state.velocity?.z||0);return true;
+    const drop=this.authoritativeDrops.get(state?.entityId);if(!drop||drop.itemId!==state.itemId||!state.position)return false;drop.count=state.count;drop.age=state.age??drop.age;drop.pickupDelay=state.pickupDelay??drop.pickupDelay;drop.revision=state.revision??drop.revision;drop.target.set(state.position.x,state.position.y,state.position.z);drop.visual.position.copy(drop.target);drop.velocity.set(state.velocity?.x||0,state.velocity?.y||0,state.velocity?.z||0);return true;
   }
 
   despawnAuthoritative(entityId){const drop=this.authoritativeDrops.get(entityId);if(!drop)return false;this.authoritativeDrops.delete(entityId);this.remove(drop);return true;}
