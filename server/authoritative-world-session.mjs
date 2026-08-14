@@ -36,6 +36,7 @@ export class AuthoritativeWorldSession{
     setIntervalFn=setInterval,
     clearIntervalFn=clearInterval,
     onSessionError=()=>{},
+    onTick=()=>{},
     defaultMode='survival',
     spawnX=DEFAULT_AUTHORITATIVE_SPAWN_X,
     spawnZ=DEFAULT_AUTHORITATIVE_SPAWN_Z,
@@ -43,7 +44,7 @@ export class AuthoritativeWorldSession{
   }={}){
     if(world===null){if(!worldOptions||typeof worldOptions!=='object'||Array.isArray(worldOptions))throw new TypeError('worldOptions must be an object');world=new ServerTerrainWorld(worldOptions);}
     this.world=worldLike(world);this.simulation=simulation===null?new ServerPlayerSimulation(this.world.environment):simulationLike(simulation);
-    this.getInputState=callback(getInputState,'getInputState');this.sendPlayerSnapshot=callback(sendPlayerSnapshot,'sendPlayerSnapshot');this.setIntervalFn=callback(setIntervalFn,'setIntervalFn');this.clearIntervalFn=callback(clearIntervalFn,'clearIntervalFn');this.onSessionError=callback(onSessionError,'onSessionError');
+    this.getInputState=callback(getInputState,'getInputState');this.sendPlayerSnapshot=callback(sendPlayerSnapshot,'sendPlayerSnapshot');this.setIntervalFn=callback(setIntervalFn,'setIntervalFn');this.clearIntervalFn=callback(clearIntervalFn,'clearIntervalFn');this.onSessionError=callback(onSessionError,'onSessionError');this.onTick=callback(onTick,'onTick');
     this.defaultMode=mode(defaultMode);this.spawnX=finite(spawnX,'spawnX');this.spawnZ=finite(spawnZ,'spawnZ');this.prefetchRadius=prefetchRadius(initialPrefetchRadius);this.sessions=new Set();this.timer=null;
   }
 
@@ -83,7 +84,9 @@ export class AuthoritativeWorldSession{
   }
 
   tickOnce(){
-    const results=[];for(const session of [...this.sessions])results.push(this.tickSession(session));return results;
+    const results=[];for(const session of [...this.sessions])results.push(this.tickSession(session));
+    try{this.onTick(Object.freeze({dt:SERVER_PLAYER_TICK_DT,results:Object.freeze(results)}));}catch(error){this.reportSessionError(null,error,'post-tick');}
+    return results;
   }
 
   start(){
