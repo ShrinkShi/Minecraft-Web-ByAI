@@ -5,11 +5,12 @@
   "type": "module",
   "engines": {"node": ">=22"},
   "scripts": {
-    "serve": "node scripts/serve.mjs",
+    "prepare:static": "node scripts/prepare-static.mjs",
+    "serve": "npm run prepare:static && node scripts/serve.mjs",
     "server": "node server/start.mjs",
     "test:logic": "node scripts/run-logic-checks.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "npm run prepare:static && playwright test"
   },
-  "dependencies": {"ws": "8.21.1"},
+  "dependencies": {"three": "0.169.0", "ws": "8.21.1"},
   "devDependencies": {"@playwright/test": "1.62.0"}
 }
