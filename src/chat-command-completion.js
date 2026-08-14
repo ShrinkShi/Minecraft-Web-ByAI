@@ -2,9 +2,10 @@ import {suggestCommands} from './command-suggestions.js';
 
 let installed=null;
 
+function documentReady(){return typeof document!=='undefined'&&typeof document.querySelector==='function'&&typeof document.createElement==='function';}
 function ensureStyles(){
-  if(typeof document==='undefined'||document.querySelector('link[data-command-completion-style]'))return;
-  const link=document.createElement('link');link.rel='stylesheet';link.href=new URL('../command-completion.css',import.meta.url).href;link.dataset.commandCompletionStyle='1';document.head.append(link);
+  if(!documentReady()||document.querySelector('link[data-command-completion-style]'))return;
+  const link=document.createElement('link');link.rel='stylesheet';link.href=new URL('../command-completion.css',import.meta.url).href;link.dataset.commandCompletionStyle='1';document.head?.append?.(link);
 }
 function applyableIndices(suggestions){const result=[];for(let i=0;i<suggestions.length;i++)if(typeof suggestions[i]?.replacement==='string')result.push(i);return result;}
 
@@ -68,5 +69,5 @@ export class ChatCommandCompletion{
 }
 
 export function ensureChatCommandCompletion(){
-  if(typeof document==='undefined')return null;if(installed)return installed;const input=document.querySelector('#chat-input'),wrap=document.querySelector('#chat-input-wrap');if(!input||!wrap)return null;installed=new ChatCommandCompletion({input,wrap});return installed;
+  if(!documentReady())return null;if(installed)return installed;const input=document.querySelector('#chat-input'),wrap=document.querySelector('#chat-input-wrap');if(!input||!wrap)return null;installed=new ChatCommandCompletion({input,wrap});return installed;
 }
