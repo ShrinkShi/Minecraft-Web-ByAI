@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {BLOCK} from '../src/blocks.js';
-import {SingleplayerMiningController} from '../src/singleplayer-mining-controller.js';
+import {MAX_SINGLEPLAYER_MINING_DT,SingleplayerMiningController} from '../src/singleplayer-mining-controller.js';
 
+assert.equal(MAX_SINGLEPLAYER_MINING_DT,.05);
 let nowTarget={x:1,y:64,z:0,id:BLOCK.STONE,previous:{x:1,y:64,z:1}},mode='survival',selected={id:'wooden_pickaxe',count:1,damage:57},progress=[],drops=[],wear=[],breaks=[];
 const controller=new SingleplayerMiningController({
   aim:()=>nowTarget?{...nowTarget,previous:{...nowTarget.previous}}:null,
@@ -18,9 +19,11 @@ controller.cancel();assert.equal(controller.snapshot().progress,0);assert.equal(
 
 let switchedItem=null,switchedBreaks=0;const switched=new SingleplayerMiningController({aim:()=>({x:3,y:40,z:2,id:BLOCK.STONE,previous:{x:3,y:40,z:3}}),getMode:()=> 'survival',getSelectedStack:()=>switchedItem,breakTarget:()=>{switchedBreaks++;return true;},spawnDrop:()=>{},damageSelected:()=>({changed:true})});switched.start(0);switched.step(0);for(let t=50;t<=200;t+=50)switched.step(t);const handProgress=switched.snapshot().progress;assert.ok(handProgress>.14&&handProgress<.15,'200ms empty-hand mining should retain only its own slow progress');switchedItem={id:'wooden_pickaxe',count:1};switched.step(250);const afterSwitch=switched.snapshot().progress;assert.ok(afterSwitch>.32&&afterSwitch<.34,'switching to a pickaxe must accelerate only the new 50ms slice, not retroactively re-rate earlier hand mining');assert.equal(switchedBreaks,0,'tool switching must not instantly complete the target from retroactive speed recalculation');
 
+let stalledBreaks=0;const stalled=new SingleplayerMiningController({aim:()=>({x:9,y:9,z:9,id:BLOCK.STONE,previous:{x:9,y:9,z:10}}),getMode:()=> 'survival',getSelectedStack:()=>({id:'wooden_pickaxe',count:1}),breakTarget:()=>{stalledBreaks++;return true;},spawnDrop:()=>{},damageSelected:()=>({changed:true})});stalled.start(0);stalled.step(1000);const stalledProgress=stalled.snapshot().progress;assert.ok(stalledProgress>.18&&stalledProgress<.19,'a one-second main-thread stall must contribute at most one 50ms mining slice');assert.equal(stalledBreaks,0);assert.throws(()=>stalled.step(999),/monotonic/);
+
 let finalSelected={id:'wooden_pickaxe',count:1,damage:58},finalDrop=0,finalBroken=false;const finalUse=new SingleplayerMiningController({aim:()=>({x:0,y:10,z:0,id:BLOCK.STONE,previous:{x:0,y:10,z:1}}),getMode:()=> 'survival',getSelectedStack:()=>finalSelected,breakTarget:()=>true,spawnDrop:()=>finalDrop++,damageSelected:()=>{finalBroken=true;finalSelected=null;return{changed:true,broken:true,stack:null};}});finalUse.start(0);finalUse.step(0);for(let t=50;t<=300;t+=50)finalUse.step(t);assert.equal(finalDrop,1,'final durability use must still harvest before tool break');assert.equal(finalBroken,true);assert.equal(finalSelected,null);
 
-let creativeWear=0,creativeDrop=0;const creative=new SingleplayerMiningController({aim:()=>({x:0,y:5,z:0,id:BLOCK.STONE,previous:{x:0,y:5,z:1}}),getMode:()=> 'creative',getSelectedStack:()=>({id:'wooden_pickaxe',count:1,damage:58}),breakTarget:()=>true,spawnDrop:()=>creativeDrop++,damageSelected:()=>creativeWear++});creative.start(0);creative.step(0);creative.step(70);assert.equal(creativeWear,0);assert.equal(creativeDrop,0,'creative mining must not spawn survival harvest drops');
+let creativeWear=0,creativeDrop=0;const creative=new SingleplayerMiningController({aim:()=>({x:0,y:5,z:0,id:BLOCK.STONE,previous:{x:0,y:5,z:1}}),getMode:()=> 'creative',getSelectedStack:()=>({id:'wooden_pickaxe',count:1,damage:58}),breakTarget:()=>true,spawnDrop:()=>creativeDrop++,damageSelected:()=>creativeWear++});creative.start(0);creative.step(0);creative.step(70);assert.equal(creativeDrop,0,'a stalled 70ms frame is capped to 50ms simulation and must not complete a 70ms creative break yet');creative.step(90);assert.equal(creativeWear,0);assert.equal(creativeDrop,0,'creative mining must never spawn survival harvest drops');
 
 let failedWear=0;const failed=new SingleplayerMiningController({aim:()=>({x:0,y:5,z:0,id:BLOCK.STONE,previous:{x:0,y:5,z:1}}),getMode:()=> 'survival',getSelectedStack:()=>({id:'wooden_pickaxe',count:1,damage:3}),breakTarget:()=>false,spawnDrop:()=>{},damageSelected:()=>failedWear++});failed.start(0);failed.step(0);for(let t=50;t<=300;t+=50)failed.step(t);assert.equal(failedWear,0,'failed world mutation must not consume tool durability');
-console.log('singleplayer incremental mining + target reset + tool-switch + harvest-before-wear semantics: PASS');
+console.log('singleplayer incremental mining + slice cap + target/tool switching + durability ordering: PASS');
