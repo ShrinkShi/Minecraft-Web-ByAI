@@ -6,6 +6,7 @@ import {encodeClientInputEnvelope} from '../src/client-input-envelope.js';
 import {encodePlayerActionFrame} from '../src/player-action-frame.js';
 import {encodePlayerViewFrame} from '../src/player-view-frame.js';
 import {MULTIPLAYER_SUBPROTOCOL,encodeClientHello} from '../src/multiplayer-handshake.js';
+import {decodeServerInventorySnapshot} from '../src/server-inventory-snapshot.js';
 import {decodeServerPlayerSnapshot} from '../src/server-player-snapshot.js';
 import {decodeWorldEditReplication,WORLD_BLOCK_CHANGE_KIND,WORLD_EDIT_SYNC_END_KIND} from '../src/world-edit-replication.js';
 import {createAuthoritativeServerRuntime} from '../server/runtime.mjs';
@@ -20,6 +21,7 @@ let tick=null;const errors=[];const runtime=createAuthoritativeServerRuntime({co
 try{
   const address=await runtime.start();socket=await open(`ws://127.0.0.1:${address.port}${runtime.server.path}`);const messages=queue(socket);socket.send(JSON.stringify(encodeClientHello()));const welcome=await messages.next('placement welcome');assert.equal(welcome.kind,'welcome');await messages.next('placement world info');for(;;){const message=await messages.next('placement initial edit sync');if(message.kind===WORLD_EDIT_SYNC_END_KIND)break;}
   const initial=decodeServerPlayerSnapshot(await messages.next('placement initial snapshot'),{expectedSession:welcome.session});assert.equal(initial.mode,'creative');
+  const inventory=decodeServerInventorySnapshot(await messages.next('placement initial inventory'),{expectedSession:welcome.session});assert.equal(inventory.mode,'creative');assert.equal(inventory.revision,0);
   const x=Math.floor(initial.position.x),y=Math.floor(initial.position.y+PLAYER_EYE_HEIGHT),anchorZ=Math.floor(initial.position.z)-2,placeZ=anchorZ+1;
   const clear=runtime.setBlock(x,y,placeZ,BLOCK.AIR);if(clear.changed){const wire=decodeWorldEditReplication(await messages.next('placement clear change'),{expectedSession:welcome.session,expectedWorldId:'creative-placement-runtime'});assert.equal(wire.revision,clear.revision);}
   const anchor=runtime.setBlock(x,y,anchorZ,BLOCK.STONE);assert.equal(anchor.changed,true);const anchorWire=decodeWorldEditReplication(await messages.next('placement anchor change'),{expectedSession:welcome.session,expectedWorldId:'creative-placement-runtime'});assert.equal(anchorWire.kind,WORLD_BLOCK_CHANGE_KIND);assert.equal(anchorWire.revision,anchor.revision);assert.equal(runtime.world.getBlock(x,y,placeZ),BLOCK.AIR);
@@ -35,4 +37,4 @@ try{
   const placed=decodeWorldEditReplication(await messages.next('placement authoritative block change'),{expectedSession:welcome.session,expectedWorldId:'creative-placement-runtime'});assert.equal(placed.kind,WORLD_BLOCK_CHANGE_KIND);assert.deepEqual({x:placed.x,y:placed.y,z:placed.z,previous:placed.previous,id:placed.id},{x,y,z:placeZ,previous:BLOCK.AIR,id:BLOCK.GRASS},'queued use must place the block selected and aimed at when use was accepted, not the later hotbar/view state');assert.equal(placed.revision,(revisionBeforeUse+1)>>>0);assert.equal(runtime.world.getBlock(x,y,placeZ),BLOCK.GRASS);assert.deepEqual(errors,[]);
 }finally{if(runtime.state!=='stopped')await runtime.stop();if(socket&&socket.readyState===WebSocket.OPEN)socket.terminate();}
 
-console.log('websocket use snapshot -> authoritative creative placement runtime: PASS');
+console.log('websocket inventory bootstrap + use snapshot -> authoritative creative placement runtime: PASS');
