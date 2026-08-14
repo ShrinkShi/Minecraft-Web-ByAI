@@ -1,4 +1,5 @@
 import {BLOCKS} from './blocks.js';
+import {requireAssetUrl} from './asset-manifest.js';
 
 const solidIcon=hex=>`data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='2' fill='%23${hex}'/%3E%3Crect x='2' y='2' width='12' height='12' fill='none' stroke='%23000000' stroke-opacity='.28'/%3E%3C/svg%3E`;
 const armorIcon=(hex,part)=>`data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='2' fill='%23${hex}'/%3E%3Cpath d='${part}' fill='%23d7a064' stroke='%235e3d20' stroke-width='1'/%3E%3C/svg%3E`;
@@ -14,8 +15,8 @@ export const ITEMS={
   'block:7':{name:'橡树树叶',stack:64,blockId:7,tile:8},
   'block:9':{name:'工作台',stack:64,blockId:9,tile:10},
   'block:10':{name:'圆石',stack:64,blockId:10,tile:13},
-  stick:{name:'木棍',stack:64,assetKey:'item.stick'},
-  wooden_pickaxe:{name:'木镐',stack:1,assetKey:'item.wooden_pickaxe',attackDamage:2,tool:{kind:'pickaxe',tier:'wood',speed:2,durability:59}},
+  stick:{name:'木棍',stack:64,assetKey:'item.stick',texture:requireAssetUrl('item.stick')},
+  wooden_pickaxe:{name:'木镐',stack:1,assetKey:'item.wooden_pickaxe',texture:requireAssetUrl('item.wooden_pickaxe'),attackDamage:2,tool:{kind:'pickaxe',tier:'wood',speed:2,durability:59}},
   bed:{name:'床',stack:1,placeKind:'bed',texture:bedIcon()},
   leather_helmet:{name:'皮革帽子',stack:1,armorSlot:'head',armorPoints:1,texture:armorIcon('8b5a2b','M4 4h8l1 3-2 4H5L3 7z')},
   leather_chestplate:{name:'皮革外套',stack:1,armorSlot:'chest',armorPoints:3,texture:armorIcon('8b5a2b','M3 4l3-2h4l3 2-2 3v6H5V7z')},
