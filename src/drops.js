@@ -5,7 +5,7 @@ import {ITEMS} from './items.js';
 export class DropSystem{
   constructor(scene,world,inventory,onInventoryChanged=()=>{}){
     this.scene=scene;this.world=world;this.inventory=inventory;this.onInventoryChanged=onInventoryChanged;
-    this.drops=[];this.blockGeometries=new Map();this.itemMaterials=new Map();
+    this.drops=[];this.authoritativeDrops=new Map();this.blockGeometries=new Map();this.itemMaterials=new Map();
   }
 
   geometryForTile(tile){
@@ -38,15 +38,28 @@ export class DropSystem{
     if(!ITEMS[itemId]||count<=0)return null;
     const visual=this.createVisual(itemId);if(!visual)return null;
     visual.position.copy(position);this.scene.add(visual);
-    const drop={itemId,count,visual,age:0,pickupDelay:.45,velocity:velocity?.clone()||new THREE.Vector3((Math.random()-.5)*1.8,2.8,(Math.random()-.5)*1.8)};
+    const drop={itemId,count,visual,age:0,pickupDelay:.45,velocity:velocity?.clone()||new THREE.Vector3((Math.random()-.5)*1.8,2.8,(Math.random()-.5)*1.8),authoritative:false};
     this.drops.push(drop);return drop;
   }
 
-  remove(drop){const i=this.drops.indexOf(drop);if(i>=0)this.drops.splice(i,1);this.scene.remove(drop.visual);}
+  spawnAuthoritative(state){
+    const entityId=state?.entityId;if(typeof entityId!=='string'||this.authoritativeDrops.has(entityId)||!ITEMS[state?.itemId]||!state?.position)return null;const visual=this.createVisual(state.itemId);if(!visual)return null;visual.position.set(state.position.x,state.position.y,state.position.z);this.scene.add(visual);const target=new THREE.Vector3(state.position.x,state.position.y,state.position.z),drop={entityId,itemId:state.itemId,count:state.count,visual,target,age:state.age??0,pickupDelay:state.pickupDelay??0,velocity:new THREE.Vector3(state.velocity?.x||0,state.velocity?.y||0,state.velocity?.z||0),authoritative:true,revision:state.revision??0};this.drops.push(drop);this.authoritativeDrops.set(entityId,drop);return drop;
+  }
+
+  snapshotAuthoritative(state){
+    const drop=this.authoritativeDrops.get(state?.entityId);if(!drop||drop.itemId!==state.itemId||!state.position)return false;drop.count=state.count;drop.age=state.age??drop.age;drop.pickupDelay=state.pickupDelay??drop.pickupDelay;drop.revision=state.revision??drop.revision;drop.target.set(state.position.x,state.position.y,state.position.z);drop.visual.position.copy(drop.target);drop.velocity.set(state.velocity?.x||0,state.velocity?.y||0,state.velocity?.z||0);return true;
+  }
+
+  despawnAuthoritative(entityId){const drop=this.authoritativeDrops.get(entityId);if(!drop)return false;this.authoritativeDrops.delete(entityId);this.remove(drop);return true;}
+  authoritativeStates(){return [...this.authoritativeDrops.values()].map(drop=>({entityId:drop.entityId,itemId:drop.itemId,count:drop.count,revision:drop.revision,position:{x:drop.target.x,y:drop.target.y,z:drop.target.z}}));}
+
+  remove(drop){const i=this.drops.indexOf(drop);if(i>=0)this.drops.splice(i,1);if(drop.entityId)this.authoritativeDrops.delete(drop.entityId);this.scene.remove(drop.visual);}
 
   update(dt,player){
     for(let i=this.drops.length-1;i>=0;i--){
-      const drop=this.drops[i];drop.age+=dt;if(drop.age>=300){this.remove(drop);continue;}
+      const drop=this.drops[i];
+      if(drop.authoritative){const alpha=Math.min(1,Math.max(0,dt)*14);drop.visual.position.lerp(drop.target,alpha);if(!drop.visual.isSprite)drop.visual.rotation.y+=dt*1.7;continue;}
+      drop.age+=dt;if(drop.age>=300){this.remove(drop);continue;}
       drop.pickupDelay=Math.max(0,drop.pickupDelay-dt);
       drop.velocity.y-=14*dt;drop.velocity.x*=Math.pow(.15,dt);drop.velocity.z*=Math.pow(.15,dt);
       const next=drop.visual.position.clone().addScaledVector(drop.velocity,dt);
@@ -70,6 +83,6 @@ export class DropSystem{
     for(const drop of [...this.drops])this.remove(drop);
     for(const geometry of this.blockGeometries.values())geometry.dispose();
     for(const material of this.itemMaterials.values()){material.map?.dispose();material.dispose();}
-    this.blockGeometries.clear();this.itemMaterials.clear();
+    this.authoritativeDrops.clear();this.blockGeometries.clear();this.itemMaterials.clear();
   }
 }
