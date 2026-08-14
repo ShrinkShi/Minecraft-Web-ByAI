@@ -1,10 +1,11 @@
 import {assertClientSessionId} from '../src/client-input-envelope.js';
 import {CREATIVE_START,ITEMS,maxStack} from '../src/items.js';
+import {cloneItemStack,damageItemStack,freezeItemStack,itemStacksCanMerge,normalizeItemStack} from '../src/item-stack.js';
 import {HOTBAR_START,HOTBAR_SIZE,INVENTORY_SLOT_COUNT,assertHotbarSlot,creativeSeedSlot} from '../src/inventory-layout.js';
 import {nextNetworkSequence} from '../src/network-sequence.js';
 
 const PLAYER_MODES=new Set(['survival','creative','adventure','spectator']);
-const cloneStack=value=>value?Object.freeze({id:value.id,count:value.count}):null;
+const cloneStack=value=>freezeItemStack(value);
 const MAIN_RANGE=Object.freeze([0,HOTBAR_START]);
 const HOTBAR_RANGE=Object.freeze([HOTBAR_START,HOTBAR_START+HOTBAR_SIZE]);
 
@@ -30,24 +31,43 @@ export class ServerPlayerInventoryState{
   hotbar(slot){return cloneStack(this.slots[HOTBAR_START+assertHotbarSlot(slot)]);}
   selectedStack(selectedSlot){return this.hotbar(selectedSlot);}
 
-  add(id,count=1){
-    id=itemId(id);const requested=itemCount(count);let remaining=requested,limit=maxStack(id);
-    for(const slot of this.slots){if(!remaining)break;if(!slot||slot.id!==id||slot.count>=limit)continue;const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;}
-    for(let i=0;i<this.slots.length&&remaining;i++){if(this.slots[i])continue;const moved=Math.min(remaining,limit);this.slots[i]={id,count:moved};remaining-=moved;}
-    if(remaining!==requested)this.advanceRevision();return remaining;
-  }
-
-  addPickup(id,count=1){
-    id=itemId(id);const requested=itemCount(count);let remaining=requested,limit=maxStack(id);
-    for(const [start,end] of [HOTBAR_RANGE,MAIN_RANGE]){
-      for(let i=start;i<end&&remaining;i++){const slot=this.slots[i];if(!slot||slot.id!==id||slot.count>=limit)continue;const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;}
-      for(let i=start;i<end&&remaining;i++){if(this.slots[i])continue;const moved=Math.min(remaining,limit);this.slots[i]={id,count:moved};remaining-=moved;}
+  insertStack(stack,{pickup=false}={}){
+    const incoming=normalizeItemStack(stack),requested=incoming.count,limit=maxStack(incoming.id),ranges=pickup?[HOTBAR_RANGE,MAIN_RANGE]:[[0,INVENTORY_SLOT_COUNT]];let remaining=requested;
+    for(const [start,end] of ranges){
+      for(let i=start;i<end&&remaining;i++){const slot=this.slots[i];if(!itemStacksCanMerge(slot,incoming)||slot.count>=limit)continue;const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;}
+      for(let i=start;i<end&&remaining;i++){if(this.slots[i])continue;const moved=Math.min(remaining,limit);this.slots[i]={...incoming,count:moved};remaining-=moved;}
     }
     if(remaining!==requested)this.advanceRevision();return remaining;
   }
 
+  add(id,count=1){
+    id=itemId(id);const requested=itemCount(count),limit=maxStack(id),prototype={id,count:1};let remaining=requested;
+    for(const slot of this.slots){if(!remaining)break;if(!itemStacksCanMerge(slot,prototype)||slot.count>=limit)continue;const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;}
+    for(let i=0;i<this.slots.length&&remaining;i++){if(this.slots[i])continue;const moved=Math.min(remaining,limit);this.slots[i]={id,count:moved};remaining-=moved;}
+    if(remaining!==requested)this.advanceRevision();return remaining;
+  }
+  addStack(stack){return this.insertStack(stack,{pickup:false});}
+
+  addPickup(id,count=1){
+    id=itemId(id);const requested=itemCount(count),limit=maxStack(id),prototype={id,count:1};let remaining=requested;
+    for(const [start,end] of [HOTBAR_RANGE,MAIN_RANGE]){
+      for(let i=start;i<end&&remaining;i++){const slot=this.slots[i];if(!itemStacksCanMerge(slot,prototype)||slot.count>=limit)continue;const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;}
+      for(let i=start;i<end&&remaining;i++){if(this.slots[i])continue;const moved=Math.min(remaining,limit);this.slots[i]={id,count:moved};remaining-=moved;}
+    }
+    if(remaining!==requested)this.advanceRevision();return remaining;
+  }
+  addPickupStack(stack){return this.insertStack(stack,{pickup:true});}
+
   remove(slot,count=1){
-    slot=inventorySlot(slot);count=itemCount(count);const current=this.slots[slot];if(!current)return null;const taken=Math.min(count,current.count),result={id:current.id,count:taken};current.count-=taken;if(current.count===0)this.slots[slot]=null;this.advanceRevision();return cloneStack(result);
+    slot=inventorySlot(slot);count=itemCount(count);const current=this.slots[slot];if(!current)return null;const taken=Math.min(count,current.count),result={...current,count:taken};current.count-=taken;if(current.count===0)this.slots[slot]=null;this.advanceRevision();return cloneStack(result);
+  }
+
+  damageSelected(selectedSlot,expectedId,amount=1){
+    selectedSlot=assertHotbarSlot(selectedSlot);expectedId=itemId(expectedId);const index=HOTBAR_START+selectedSlot,current=this.slots[index];
+    if(!current)return Object.freeze({changed:false,broken:false,reason:'empty-selected-slot',result:null,snapshot:this.snapshot()});
+    if(current.id!==expectedId)return Object.freeze({changed:false,broken:false,reason:'selected-item-changed',result:null,snapshot:this.snapshot()});
+    const result=damageItemStack(current,amount,{label:'selected item stack'});if(!result.changed)return Object.freeze({changed:false,broken:false,reason:result.reason,result,snapshot:this.snapshot()});
+    this.slots[index]=result.stack?cloneItemStack(result.stack):null;this.advanceRevision();return Object.freeze({changed:true,broken:result.broken,reason:result.reason,result,snapshot:this.snapshot()});
   }
 
   commitSelected(selectedSlot,expectedId,count,commit){
@@ -56,7 +76,7 @@ export class ServerPlayerInventoryState{
     if(current.id!==expectedId)return Object.freeze({committed:false,reason:'selected-item-changed',consumed:null,result:null,snapshot:this.snapshot()});
     if(current.count<count)return Object.freeze({committed:false,reason:'insufficient-selected-count',consumed:null,result:null,snapshot:this.snapshot()});
     const result=transactionResult(commit(cloneStack(current)));if(!result.changed)return Object.freeze({committed:false,reason:result.reason||'transaction-declined',consumed:null,result,snapshot:this.snapshot()});
-    current.count-=count;if(current.count===0)this.slots[index]=null;this.advanceRevision();return Object.freeze({committed:true,reason:'committed',consumed:Object.freeze({id:expectedId,count}),result,snapshot:this.snapshot()});
+    const consumed=cloneStack({...current,count});current.count-=count;if(current.count===0)this.slots[index]=null;this.advanceRevision();return Object.freeze({committed:true,reason:'committed',consumed,result,snapshot:this.snapshot()});
   }
 
   snapshot(){return Object.freeze({session:this.session,mode:this.mode,revision:this.revision,slots:Object.freeze(this.slots.map(cloneStack))});}
@@ -72,8 +92,11 @@ export class ServerPlayerInventoryHub{
   snapshot(session){return this.state(session).snapshot();}
   selectedStack(session,selectedSlot){return this.state(session).selectedStack(selectedSlot);}
   add(session,id,count=1){return this.state(session).add(id,count);}
+  addStack(session,stack){return this.state(session).addStack(stack);}
   addPickup(session,id,count=1){return this.state(session).addPickup(id,count);}
+  addPickupStack(session,stack){return this.state(session).addPickupStack(stack);}
   remove(session,slot,count=1){return this.state(session).remove(slot,count);}
+  damageSelected(session,selectedSlot,expectedId,amount=1){return this.state(session).damageSelected(selectedSlot,expectedId,amount);}
   commitSelected(session,selectedSlot,expectedId,count,commit){return this.state(session).commitSelected(selectedSlot,expectedId,count,commit);}
   close(){this.states.clear();}
 }

@@ -1,7 +1,7 @@
 import {assertClientSessionId} from './client-input-envelope.js';
 
-export const MULTIPLAYER_HANDSHAKE_VERSION=1;
-export const MULTIPLAYER_SUBPROTOCOL='minecraft-web-v1';
+export const MULTIPLAYER_HANDSHAKE_VERSION=2;
+export const MULTIPLAYER_SUBPROTOCOL='minecraft-web-v2';
 export const SERVER_REJECT_CODES=Object.freeze(['protocol-mismatch','server-full','world-unavailable','policy']);
 const REJECT_CODE_SET=new Set(SERVER_REJECT_CODES);
 const HELLO_KEYS=Object.freeze(['kind','v']);

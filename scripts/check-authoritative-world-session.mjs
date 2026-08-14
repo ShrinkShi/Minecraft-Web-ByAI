@@ -3,7 +3,7 @@ import WebSocket from 'ws';
 import {encodeClientInputEnvelope} from '../src/client-input-envelope.js';
 import {encodePlayerControlFrame} from '../src/player-control-frame.js';
 import {encodePlayerViewFrame} from '../src/player-view-frame.js';
-import {MULTIPLAYER_SUBPROTOCOL,encodeClientHello} from '../src/multiplayer-handshake.js';
+import {MULTIPLAYER_HANDSHAKE_VERSION,MULTIPLAYER_SUBPROTOCOL,encodeClientHello} from '../src/multiplayer-handshake.js';
 import {decodeServerPlayerSnapshot} from '../src/server-player-snapshot.js';
 import {createMultiplayerServer} from '../server/multiplayer-server.mjs';
 import {ServerTerrainWorld} from '../server/terrain-world.mjs';
@@ -61,7 +61,7 @@ const authoritative=new AuthoritativeWorldSession({world:realWorld,getInputState
 server=createMultiplayerServer({port:0,allowedOrigins:[ORIGIN],sessionFactory:()=> 'real-world-session',onSessionReady:({session})=>authoritative.join(session),onSessionClose:({session})=>{if(session)authoritative.leave(session);},onSocketError:event=>realErrors.push({...event,phase:'socket'})});
 try{
   const address=await server.listen(),url=`ws://127.0.0.1:${address.port}${server.path}`,socket=await openClient(url),messages=messageQueue(socket);
-  socket.send(JSON.stringify(encodeClientHello()));const welcome=await messages.next('welcome'),initialWire=await messages.next('initial authoritative snapshot');assert.deepEqual(welcome,{v:1,kind:'welcome',session:'real-world-session'});const initial=decodeServerPlayerSnapshot(initialWire,{expectedSession:welcome.session});assert.equal(initial.tick,0);assert.deepEqual(initial.position,{x:33.5,y:23.001,z:-16.5});assert.equal(authoritative.hasSession(welcome.session),true);assert.equal(server.getSessionInputState(welcome.session).control,null);
+  socket.send(JSON.stringify(encodeClientHello()));const welcome=await messages.next('welcome'),initialWire=await messages.next('initial authoritative snapshot');assert.deepEqual(welcome,{v:MULTIPLAYER_HANDSHAKE_VERSION,kind:'welcome',session:'real-world-session'});const initial=decodeServerPlayerSnapshot(initialWire,{expectedSession:welcome.session});assert.equal(initial.tick,0);assert.deepEqual(initial.position,{x:33.5,y:23.001,z:-16.5});assert.equal(authoritative.hasSession(welcome.session),true);assert.equal(server.getSessionInputState(welcome.session).control,null);
 
   const viewFrame=encodePlayerViewFrame({yaw:Math.PI/2,pitch:0},10),controlFrame=encodePlayerControlFrame({side:0,forward:1,jump:false,sneak:false,sprint:false,primary:false},11);
   socket.send(JSON.stringify(encodeClientInputEnvelope({session:welcome.session,packetSeq:0,kind:'view',payload:viewFrame})));

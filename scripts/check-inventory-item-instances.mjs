@@ -1,0 +1,9 @@
+import assert from 'node:assert/strict';
+import {Inventory} from '../src/inventory.js';
+import {HOTBAR_START} from '../src/inventory-layout.js';
+
+const bulk=new Inventory('survival');assert.equal(bulk.add('stick',65),0);assert.deepEqual(bulk.slots[0],{id:'stick',count:64});assert.deepEqual(bulk.slots[1],{id:'stick',count:1});assert.equal(bulk.add('stick',0),0);assert.deepEqual(bulk.slots[1],{id:'stick',count:1});
+const inventory=new Inventory('survival');assert.equal(inventory.addPickupStack({id:'wooden_pickaxe',count:1,damage:7}),0);assert.deepEqual(inventory.slots[HOTBAR_START],{id:'wooden_pickaxe',count:1,damage:7});assert.equal(inventory.moveBetween(HOTBAR_START),true);assert.deepEqual(inventory.slots[0],{id:'wooden_pickaxe',count:1,damage:7});assert.equal(inventory.slots[HOTBAR_START],null);assert.equal(inventory.moveBetween(0),true);assert.deepEqual(inventory.slots[HOTBAR_START],{id:'wooden_pickaxe',count:1,damage:7});
+const snapshot=inventory.snapshot(),restored=new Inventory('survival',snapshot);assert.deepEqual(restored.slots[HOTBAR_START],{id:'wooden_pickaxe',count:1,damage:7});restored.click(HOTBAR_START,0,false);assert.deepEqual(restored.cursor,{id:'wooden_pickaxe',count:1,damage:7});assert.equal(restored.click(HOTBAR_START+1,0,false),true);assert.deepEqual(restored.slots[HOTBAR_START+1],{id:'wooden_pickaxe',count:1,damage:7});
+const separate=new Inventory('survival');assert.equal(separate.addStack({id:'wooden_pickaxe',count:1,damage:1}),0);assert.equal(separate.addStack({id:'wooden_pickaxe',count:1,damage:2}),0);assert.deepEqual(separate.slots[0],{id:'wooden_pickaxe',count:1,damage:1});assert.deepEqual(separate.slots[1],{id:'wooden_pickaxe',count:1,damage:2},'different damage states must remain distinct item instances');
+console.log('client Inventory bulk semantics + item instance preservation: PASS');

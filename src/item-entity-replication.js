@@ -1,7 +1,8 @@
 import {ITEMS,maxStack} from './items.js';
+import {itemDamage} from './item-stack.js';
 import {assertNetworkSequence} from './network-sequence.js';
 
-export const ITEM_ENTITY_REPLICATION_VERSION=1;
+export const ITEM_ENTITY_REPLICATION_VERSION=2;
 export const ITEM_ENTITY_SPAWN_KIND='item-entity-spawn';
 export const ITEM_ENTITY_SNAPSHOT_KIND='item-entity-snapshot';
 export const ITEM_ENTITY_DESPAWN_KIND='item-entity-despawn';
@@ -9,7 +10,7 @@ export const ITEM_ENTITY_DESPAWN_REASONS=Object.freeze(['picked','expired','remo
 export const ITEM_ENTITY_ID_MAX_LENGTH=96;
 const ID_PATTERN=/^i:[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const DESPAWN_REASON_SET=new Set(ITEM_ENTITY_DESPAWN_REASONS);
-const STATE_KEYS=Object.freeze(['age','count','entityId','itemId','kind','pickupDelay','position','revision','v','velocity']);
+const STATE_KEYS=Object.freeze(['age','count','damage','entityId','itemId','kind','pickupDelay','position','revision','v','velocity']);
 const DESPAWN_KEYS=Object.freeze(['entityId','kind','reason','revision','v']);
 
 function object(value,label){if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError(`${label} must be an object`);return value;}
@@ -26,11 +27,11 @@ export function assertItemEntityId(value){if(typeof value!=='string'||value.leng
 
 function encodeState(kind,state){
   state=object(state,'item entity state');const id=itemId(state.itemId),position=vectorObject(state.position,'item entity position'),velocity=vectorObject(state.velocity,'item entity velocity');
-  return{v:ITEM_ENTITY_REPLICATION_VERSION,kind,entityId:assertItemEntityId(state.entityId),revision:assertNetworkSequence(state.revision,'item entity revision'),itemId:id,count:count(state.count,id),position:[position.x,position.y,position.z],velocity:[velocity.x,velocity.y,velocity.z],age:nonNegative(state.age,'item entity age',300),pickupDelay:nonNegative(state.pickupDelay,'item entity pickupDelay',60)};
+  return{v:ITEM_ENTITY_REPLICATION_VERSION,kind,entityId:assertItemEntityId(state.entityId),revision:assertNetworkSequence(state.revision,'item entity revision'),itemId:id,count:count(state.count,id),damage:itemDamage(state.damage,id,'item entity damage'),position:[position.x,position.y,position.z],velocity:[velocity.x,velocity.y,velocity.z],age:nonNegative(state.age,'item entity age',300),pickupDelay:nonNegative(state.pickupDelay,'item entity pickupDelay',60)};
 }
 function decodeState(value){
-  exactKeys(value,STATE_KEYS,'item entity state');if(value.v!==ITEM_ENTITY_REPLICATION_VERSION)throw new RangeError(`unsupported item entity replication version: ${value.v}`);if(value.kind!==ITEM_ENTITY_SPAWN_KIND&&value.kind!==ITEM_ENTITY_SNAPSHOT_KIND)throw new RangeError(`unsupported item entity replication kind: ${value.kind}`);const id=itemId(value.itemId);
-  return{version:ITEM_ENTITY_REPLICATION_VERSION,kind:value.kind,entityId:assertItemEntityId(value.entityId),revision:assertNetworkSequence(value.revision,'item entity revision'),itemId:id,count:count(value.count,id),position:vectorWire(value.position,'item entity position'),velocity:vectorWire(value.velocity,'item entity velocity'),age:nonNegative(value.age,'item entity age',300),pickupDelay:nonNegative(value.pickupDelay,'item entity pickupDelay',60)};
+  exactKeys(value,STATE_KEYS,'item entity state');if(value.v!==ITEM_ENTITY_REPLICATION_VERSION)throw new RangeError(`unsupported item entity replication version: ${value.v}`);if(value.kind!==ITEM_ENTITY_SPAWN_KIND&&value.kind!==ITEM_ENTITY_SNAPSHOT_KIND)throw new RangeError(`unsupported item entity replication kind: ${value.kind}`);const id=itemId(value.itemId),damage=itemDamage(value.damage,id,'item entity damage');
+  return{version:ITEM_ENTITY_REPLICATION_VERSION,kind:value.kind,entityId:assertItemEntityId(value.entityId),revision:assertNetworkSequence(value.revision,'item entity revision'),itemId:id,count:count(value.count,id),damage,position:vectorWire(value.position,'item entity position'),velocity:vectorWire(value.velocity,'item entity velocity'),age:nonNegative(value.age,'item entity age',300),pickupDelay:nonNegative(value.pickupDelay,'item entity pickupDelay',60)};
 }
 
 export function encodeItemEntitySpawn(state){return encodeState(ITEM_ENTITY_SPAWN_KIND,state);}

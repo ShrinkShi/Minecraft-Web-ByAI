@@ -1,6 +1,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
 import {ATLAS_COLS,ATLAS_ROWS,BLOCKS} from './blocks.js';
 import {ITEMS} from './items.js';
+import {normalizeItemStack} from './item-stack.js';
 
 export class DropSystem{
   constructor(scene,world,inventory,onInventoryChanged=()=>{}){
@@ -34,24 +35,25 @@ export class DropSystem{
     const sprite=new THREE.Sprite(material);sprite.scale.set(.48,.48,.48);return sprite;
   }
 
-  spawn(itemId,count,position,velocity=null){
-    if(!ITEMS[itemId]||count<=0)return null;
-    const visual=this.createVisual(itemId);if(!visual)return null;
+  spawn(itemId,count,position,velocity=null){return this.spawnStack({id:itemId,count},position,velocity);}
+  spawnStack(value,position,velocity=null){
+    let stack;try{stack=normalizeItemStack(value,{label:'local drop stack'});}catch{return null;}
+    const visual=this.createVisual(stack.id);if(!visual)return null;
     visual.position.copy(position);this.scene.add(visual);
-    const drop={itemId,count,visual,age:0,pickupDelay:.45,velocity:velocity?.clone()||new THREE.Vector3((Math.random()-.5)*1.8,2.8,(Math.random()-.5)*1.8),authoritative:false};
+    const drop={itemId:stack.id,count:stack.count,damage:stack.damage??0,visual,age:0,pickupDelay:.45,velocity:velocity?.clone()||new THREE.Vector3((Math.random()-.5)*1.8,2.8,(Math.random()-.5)*1.8),authoritative:false};
     this.drops.push(drop);return drop;
   }
 
   spawnAuthoritative(state){
-    const entityId=state?.entityId;if(typeof entityId!=='string'||this.authoritativeDrops.has(entityId)||!ITEMS[state?.itemId]||!state?.position)return null;const visual=this.createVisual(state.itemId);if(!visual)return null;visual.position.set(state.position.x,state.position.y,state.position.z);this.scene.add(visual);const target=new THREE.Vector3(state.position.x,state.position.y,state.position.z),drop={entityId,itemId:state.itemId,count:state.count,visual,target,age:state.age??0,pickupDelay:state.pickupDelay??0,velocity:new THREE.Vector3(state.velocity?.x||0,state.velocity?.y||0,state.velocity?.z||0),authoritative:true,revision:state.revision??0};this.drops.push(drop);this.authoritativeDrops.set(entityId,drop);return drop;
+    const entityId=state?.entityId;if(typeof entityId!=='string'||this.authoritativeDrops.has(entityId)||!ITEMS[state?.itemId]||!state?.position)return null;let stack;try{stack=normalizeItemStack({id:state.itemId,count:state.count,...((state.damage??0)>0?{damage:state.damage}:{})},{label:'authoritative drop stack'});}catch{return null;}const visual=this.createVisual(stack.id);if(!visual)return null;visual.position.set(state.position.x,state.position.y,state.position.z);this.scene.add(visual);const target=new THREE.Vector3(state.position.x,state.position.y,state.position.z),drop={entityId,itemId:stack.id,count:stack.count,damage:stack.damage??0,visual,target,age:state.age??0,pickupDelay:state.pickupDelay??0,velocity:new THREE.Vector3(state.velocity?.x||0,state.velocity?.y||0,state.velocity?.z||0),authoritative:true,revision:state.revision??0};this.drops.push(drop);this.authoritativeDrops.set(entityId,drop);return drop;
   }
 
   snapshotAuthoritative(state){
-    const drop=this.authoritativeDrops.get(state?.entityId);if(!drop||drop.itemId!==state.itemId||!state.position)return false;drop.count=state.count;drop.age=state.age??drop.age;drop.pickupDelay=state.pickupDelay??drop.pickupDelay;drop.revision=state.revision??drop.revision;drop.target.set(state.position.x,state.position.y,state.position.z);drop.visual.position.copy(drop.target);drop.velocity.set(state.velocity?.x||0,state.velocity?.y||0,state.velocity?.z||0);return true;
+    const drop=this.authoritativeDrops.get(state?.entityId);if(!drop||drop.itemId!==state.itemId||drop.damage!==(state.damage??0)||!state.position)return false;drop.count=state.count;drop.age=state.age??drop.age;drop.pickupDelay=state.pickupDelay??drop.pickupDelay;drop.revision=state.revision??drop.revision;drop.target.set(state.position.x,state.position.y,state.position.z);drop.visual.position.copy(drop.target);drop.velocity.set(state.velocity?.x||0,state.velocity?.y||0,state.velocity?.z||0);return true;
   }
 
   despawnAuthoritative(entityId){const drop=this.authoritativeDrops.get(entityId);if(!drop)return false;this.authoritativeDrops.delete(entityId);this.remove(drop);return true;}
-  authoritativeStates(){return [...this.authoritativeDrops.values()].map(drop=>({entityId:drop.entityId,itemId:drop.itemId,count:drop.count,revision:drop.revision,position:{x:drop.target.x,y:drop.target.y,z:drop.target.z}}));}
+  authoritativeStates(){return [...this.authoritativeDrops.values()].map(drop=>({entityId:drop.entityId,itemId:drop.itemId,count:drop.count,damage:drop.damage,revision:drop.revision,position:{x:drop.target.x,y:drop.target.y,z:drop.target.z}}));}
 
   remove(drop){const i=this.drops.indexOf(drop);if(i>=0)this.drops.splice(i,1);if(drop.entityId)this.authoritativeDrops.delete(drop.entityId);this.scene.remove(drop.visual);}
 
@@ -70,8 +72,7 @@ export class DropSystem{
       if(drop.pickupDelay===0&&player){
         const dx=player.position.x-next.x,dy=player.position.y+.8-next.y,dz=player.position.z-next.z,dist2=dx*dx+dy*dy+dz*dz;
         if(dist2<2.4){
-          const add=typeof this.inventory.addPickup==='function'?this.inventory.addPickup.bind(this.inventory):this.inventory.add.bind(this.inventory);
-          const remaining=add(drop.itemId,drop.count),picked=drop.count-remaining;
+          const stack={id:drop.itemId,count:drop.count,...(drop.damage>0?{damage:drop.damage}:{})};const remaining=typeof this.inventory.addPickupStack==='function'?this.inventory.addPickupStack(stack):(typeof this.inventory.addPickup==='function'?this.inventory.addPickup(drop.itemId,drop.count):this.inventory.add(drop.itemId,drop.count)),picked=drop.count-remaining;
           if(picked>0){drop.count=remaining;this.onInventoryChanged();}
           if(drop.count<=0)this.remove(drop);
         }
