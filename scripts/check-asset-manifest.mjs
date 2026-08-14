@@ -15,7 +15,7 @@ assert.ok(ASSET_KEYS.includes('block.iron_ore'));
 for(const key of ASSET_KEYS){
   const record=assetRecord(key);assert.ok(record,`${key} must resolve to a manifest record`);assert.ok(Object.values(ASSET_SOURCE).includes(record.source));
   if(record.url!==null){
-    assert.match(record.url(/^\.\/assets\//),`${key} must remain inside ./assets/`);
+    assert.match(record.url,/^\.\/assets\//,`${key} must remain inside ./assets/`);
     assert.equal(existsSync(resolve(process.cwd(),record.url)),true,`${key} must point at a tracked runtime file`);
   }
 }
