@@ -1,5 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
 import {BLOCKS,CHUNK_SIZE,WORLD_HEIGHT} from './blocks.js';
+import {requireAssetUrl} from './asset-manifest.js';
 
 const key=(cx,cz)=>`${cx},${cz}`;
 const floorDiv=(n,d)=>Math.floor(n/d);
@@ -36,7 +37,7 @@ export class VoxelWorld{
   }
 
   makeAtlasTexture(){
-    const tex=new THREE.TextureLoader().load('./assets/textures/atlas.png');
+    const tex=new THREE.TextureLoader().load(requireAssetUrl('terrain.block_atlas'));
     tex.magFilter=THREE.NearestFilter;
     tex.minFilter=THREE.NearestMipmapNearestFilter;
     tex.colorSpace=THREE.SRGBColorSpace;
