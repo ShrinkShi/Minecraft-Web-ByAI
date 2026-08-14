@@ -63,7 +63,7 @@ export class ServerPlayerInputState{
     if(!view)return{accepted:false,reason:'unknown-action-view'};
     if(this.actions.length>=this.actionQueueLimit)return{accepted:false,reason:'action-queue-full'};
     const action={kind:payload.kind,sequence:payload.sequence,viewSequence:payload.viewSequence,view:cloneView(view),selectedSlot:this.selectedSlot};this.actions.push(action);
-    return{accepted:true,reason:'action-queued',sequence:payload.sequence,viewSequence:payload.viewSequence,selectedSlot:this.selectedSlot};
+    return{accepted:true,reason:'action-queued',sequence:payload.sequence,viewSequence:payload.viewSequence};
   }
 
   snapshot(){
