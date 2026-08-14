@@ -1,16 +1,21 @@
 import {DoubleTapForwardSprint} from './sprint-gesture.js';
+import {ensureChatCommandCompletion} from './chat-command-completion.js';
 
 const MOVEMENT_CODES=new Set(['KeyW','KeyA','KeyS','KeyD']);
-const BUTTON_CODES=new Map([['Space','jump'],['ShiftLeft','sneak'],['ShiftRight','sneak'],['ControlLeft','sprint'],['ControlRight','sprint']]);
+const BUTTON_CODES=new Map([['Space','jump'],['ShiftLeft','sneak'],['ShiftRight','sneak'],['KeyR','sprint']]);
+export const DESKTOP_SPRINT_HOLD_CODE='KeyR';
+export const DESKTOP_BROWSER_RESERVED_CODES=Object.freeze(['ControlLeft','ControlRight','Tab']);
+export const desktopButtonForCode=code=>BUTTON_CODES.get(code)||null;
 
 export class DesktopControls{
   constructor(canvas,bus){
-    this.canvas=canvas;this.bus=bus;this.source='desktop';this.gameplayEnabled=false;this.keys=new Set();this.forwardSprint=new DoubleTapForwardSprint();this.bind();
+    this.canvas=canvas;this.bus=bus;this.source='desktop';this.gameplayEnabled=false;this.keys=new Set();this.forwardSprint=new DoubleTapForwardSprint();ensureChatCommandCompletion();this.bind();
   }
 
   bind(){
     this.onKeyDown=e=>{
       const code=e.code;
+      if(code==='Tab'&&this.gameplayEnabled){e.preventDefault();return;}
       if((MOVEMENT_CODES.has(code)||BUTTON_CODES.has(code))&&this.gameplayEnabled){
         if(code==='KeyW'&&!e.repeat)this.forwardSprint.press(Number.isFinite(e.timeStamp)?e.timeStamp:performance.now());
         this.keys.add(code);this.syncContinuous();if(code==='Space')e.preventDefault();
