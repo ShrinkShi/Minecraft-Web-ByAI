@@ -20,9 +20,10 @@ export class SingleplayerMiningController{
   step(now){
     now=finite(now,'mining time');const mode=this.getMode();
     if(!this.held||mode==='spectator'||mode==='adventure')return this.cancel();
-    const aimed=this.aim();if(!aimed){this.target=null;this.key=null;this.startedAt=now;this.lastAt=now;this.progress=0;this.onProgress(0);return this.snapshot();}
-    const nextKey=targetKey(aimed);if(nextKey!==this.key){this.target=cloneTarget(aimed);this.key=nextKey;this.startedAt=now;this.lastAt=now;this.progress=0;this.onProgress(0);return this.snapshot();}
-    this.target=cloneTarget(aimed);const selected=this.getSelectedStack(),selectedId=selected?.id??null,dtSeconds=Math.max(0,(now-this.lastAt)/1000);this.lastAt=now;this.progress=Math.min(1,this.progress+miningProgressDelta(aimed.id,selectedId,dtSeconds,mode));this.onProgress(this.progress);
+    const dtSeconds=Math.max(0,(now-this.lastAt)/1000);this.lastAt=now;const aimed=this.aim();
+    if(!aimed){this.target=null;this.key=null;this.startedAt=now;this.progress=0;this.onProgress(0);return this.snapshot();}
+    const selected=this.getSelectedStack(),selectedId=selected?.id??null,nextKey=targetKey(aimed),sameTarget=nextKey===this.key;this.target=cloneTarget(aimed);this.key=nextKey;if(!sameTarget){this.startedAt=now;this.progress=0;}
+    this.progress=Math.min(1,this.progress+miningProgressDelta(aimed.id,selectedId,dtSeconds,mode));this.onProgress(this.progress);
     if(this.progress<1-COMPLETION_EPSILON)return this.snapshot();
     const block=BLOCKS[aimed.id],broken=cloneTarget(aimed),removed=!!this.breakTarget(broken);let harvested=false,wear=null;
     if(removed){
@@ -30,7 +31,7 @@ export class SingleplayerMiningController{
       if(mode!=='creative'&&selectedId&&itemDurability(selectedId)!==null)wear=this.damageSelected(selectedId,1);
       this.onBreak({target:broken,block,selected:selected?{...selected}:null,harvested,wear});
     }
-    this.target=null;this.key=null;this.startedAt=now;this.lastAt=now;this.progress=0;this.onProgress(0);return Object.freeze({...this.snapshot(),completed:removed,harvested,wear});
+    this.target=null;this.key=null;this.startedAt=now;this.progress=0;this.onProgress(0);return Object.freeze({...this.snapshot(),completed:removed,harvested,wear});
   }
 
   snapshot(){return Object.freeze({held:this.held,startedAt:this.startedAt,lastAt:this.lastAt,target:this.target?Object.freeze(cloneTarget(this.target)):null,progress:this.progress});}
