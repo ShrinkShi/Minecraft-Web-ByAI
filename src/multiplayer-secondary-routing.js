@@ -10,7 +10,7 @@ export function installMultiplayerSecondaryRouting({runtime,movement}={}){
     if(intent.name==='drop'){
       if(player.mode==='spectator')return false;if(movement.ready===false)return false;const sent=movement.sendDrop({yaw:finite(player.yaw,'player.yaw'),pitch:finite(player.pitch,'player.pitch')});return sent!==null;
     }
-    if(intent.name!=='secondary'||player.mode!=='creative')return undefined;
+    if(intent.name!=='secondary'||(player.mode!=='creative'&&player.mode!=='survival'))return undefined;
     if(movement.ready===false)return false;
     const sent=movement.sendUse({yaw:finite(player.yaw,'player.yaw'),pitch:finite(player.pitch,'player.pitch')});return sent!==null;
   });
