@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import {BLOCK} from '../src/blocks.js';
 import {chooseLookTargetInfo,inspectBlockTarget,inspectMobTarget} from '../src/target-inspector.js';
 
-let info=inspectBlockTarget(BLOCK.STONE,{selectedItemId:null});assert.equal(info.name,'石头');assert.equal(info.requiredToolName,'镐');assert.equal(info.toolCorrect,false);assert.equal(info.canDrop,false);assert.equal(info.dropName,'圆石');
-info=inspectBlockTarget(BLOCK.STONE,{selectedItemId:'wooden_pickaxe'});assert.equal(info.toolCorrect,true);assert.equal(info.canDrop,true);
-info=inspectBlockTarget(BLOCK.DIRT,{selectedItemId:null});assert.equal(info.requiredToolName,'任意');assert.equal(info.canDrop,true);assert.equal(info.dropName,'泥土');
+let info=inspectBlockTarget(BLOCK.STONE,{selectedItemId:null});assert.equal(info.name,'石头');assert.equal(info.requiredToolName,'镐');assert.equal(info.requiredToolTier,'wood');assert.equal(info.requiredToolTierName,'木质');assert.equal(info.toolCorrect,false);assert.equal(info.canDrop,false);assert.equal(info.dropName,'圆石');
+info=inspectBlockTarget(BLOCK.STONE,{selectedItemId:'wooden_pickaxe'});assert.equal(info.toolCorrect,true);assert.equal(info.heldTool,'pickaxe');assert.equal(info.heldToolTier,'wood');assert.equal(info.heldToolTierName,'木质');assert.equal(info.canDrop,true);
+info=inspectBlockTarget(BLOCK.IRON_ORE,{selectedItemId:'wooden_pickaxe'});assert.equal(info.name,'铁矿石');assert.equal(info.requiredToolName,'镐');assert.equal(info.requiredToolTier,'stone');assert.equal(info.requiredToolTierName,'石质');assert.equal(info.toolCorrect,false);assert.equal(info.canDrop,false);assert.equal(info.dropName,'粗铁');
+info=inspectBlockTarget(BLOCK.IRON_ORE,{selectedItemId:'stone_pickaxe'});assert.equal(info.toolCorrect,true);assert.equal(info.heldToolTier,'stone');assert.equal(info.canDrop,true);
+info=inspectBlockTarget(BLOCK.DIRT,{selectedItemId:null});assert.equal(info.requiredToolName,'任意');assert.equal(info.requiredToolTier,null);assert.equal(info.canDrop,true);assert.equal(info.dropName,'泥土');
 info=inspectBlockTarget(BLOCK.LEAVES,{selectedItemId:'wooden_pickaxe'});assert.equal(info.hasDrop,false);assert.equal(info.canDrop,false);
 assert.equal(inspectBlockTarget(BLOCK.AIR),null);
 
@@ -13,5 +15,5 @@ const zombie={id:8,type:'zombie',components:{hp:19}};info=inspectMobTarget(zombi
 assert.equal(inspectMobTarget({type:'missing',components:{hp:1}}),null);
 
 info=chooseLookTargetInfo({blockHit:{id:BLOCK.STONE,distance:3},entityHit:{entity:cow,distance:2},selectedItemId:'wooden_pickaxe'});assert.equal(info.kind,'entity');
-info=chooseLookTargetInfo({blockHit:{id:BLOCK.STONE,distance:2},entityHit:{entity:cow,distance:3},selectedItemId:'wooden_pickaxe'});assert.equal(info.kind,'block');assert.equal(info.canDrop,true);
-console.log('Jade-style block/entity target inspection: PASS');
+info=chooseLookTargetInfo({blockHit:{id:BLOCK.IRON_ORE,distance:2},entityHit:{entity:cow,distance:3},selectedItemId:'stone_pickaxe'});assert.equal(info.kind,'block');assert.equal(info.canDrop,true);assert.equal(info.requiredToolTierName,'石质');
+console.log('Jade-style block/entity target inspection + minimum harvest tiers: PASS');
