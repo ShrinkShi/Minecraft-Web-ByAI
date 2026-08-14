@@ -28,8 +28,10 @@ async function testEnabledAuthority(){
     socket.send(JSON.stringify(encodeMultiplayerCommandRequest({session,requestId:1,text:'/gamemode creative'})));
     let modeInventory=null,modeResult=null;for(let i=0;i<20&&(!modeInventory||!modeResult);i++){const message=await connected.messages.next('enabled gamemode response');if(message.kind===SERVER_INVENTORY_SNAPSHOT_KIND)modeInventory=message;else if(message.kind===MULTIPLAYER_COMMAND_RESULT_KIND)modeResult=message;}
     const modeSnapshot=decodeServerInventorySnapshot(modeInventory,{expectedSession:session}),commandResult=decodeMultiplayerCommandResult(modeResult,{expectedSession:session});assert.equal(commandResult.ok,true);assert.equal(modeSnapshot.mode,'creative');assert.equal(modeSnapshot.revision,2);assert.deepEqual(modeSnapshot.slots[0],{id:'stick',count:3},'gamemode must preserve carried inventory');assert.equal(runtime.authoritative.snapshot(session).mode,'creative');assert.equal(runtime.inventories.snapshot(session).mode,'creative');assert.deepEqual(errors,[]);
+
+    const closed=Promise.race([new Promise(resolve=>socket.once('close',(code,reason)=>resolve({code,reason:reason.toString('utf8')}))),timeout(3000,'replayed command close')]);socket.send(JSON.stringify(encodeMultiplayerCommandRequest({session,requestId:1,text:'/give stick 1'})));const closeEvent=await closed;assert.equal(closeEvent.code,1008);assert.match(closeEvent.reason,/stale or duplicate command request/);assert.equal(runtime.inventories.snapshot(session).revision,2,'replayed request must not execute a second mutation');
   }finally{if(socket?.readyState===WebSocket.OPEN)socket.terminate();await runtime.stop();}
 }
 
 await testDeniedByDefault();await testEnabledAuthority();
-console.log('real WebSocket deny-by-default + authoritative /give and /gamemode runtime: PASS');
+console.log('real WebSocket deny-by-default + authoritative commands + replay rejection: PASS');
