@@ -19,7 +19,7 @@ export class JadeHud{
   renderBlock(info){
     this.health?.parentElement?.classList.add('hidden');
     if(Number.isFinite(info.tile)){
-      this.icon.className='jade-icon jade-block-icon';const tx=info.tile%ATLAS_COLS,ty=Math.floor(info.tile/ATLAS_COLS);this.icon.style.backgroundSize=`${ATLAS_COLS*48}px ${ATLAS_ROWS*48}px`;this.icon.style.backgroundPosition=`-${tx*48}px -${ty*48}px`;
+      const tileSize=58;this.icon.className='jade-icon jade-block-icon';const tx=info.tile%ATLAS_COLS,ty=Math.floor(info.tile/ATLAS_COLS);this.icon.style.backgroundSize=`${ATLAS_COLS*tileSize}px ${ATLAS_ROWS*tileSize}px`;this.icon.style.backgroundPosition=`-${tx*tileSize}px -${ty*tileSize}px`;
     }else this.icon.className='jade-icon';
     const rows=[];
     rows.push(`工具：${info.requiredToolName}${info.requiredTool&&!info.toolCorrect?'（当前不匹配）':''}`);
