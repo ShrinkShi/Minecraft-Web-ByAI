@@ -57,7 +57,8 @@ export class DropSystem{
       if(drop.pickupDelay===0&&player){
         const dx=player.position.x-next.x,dy=player.position.y+.8-next.y,dz=player.position.z-next.z,dist2=dx*dx+dy*dy+dz*dz;
         if(dist2<2.4){
-          const remaining=this.inventory.add(drop.itemId,drop.count);const picked=drop.count-remaining;
+          const add=typeof this.inventory.addPickup==='function'?this.inventory.addPickup.bind(this.inventory):this.inventory.add.bind(this.inventory);
+          const remaining=add(drop.itemId,drop.count),picked=drop.count-remaining;
           if(picked>0){drop.count=remaining;this.onInventoryChanged();}
           if(drop.count<=0)this.remove(drop);
         }
