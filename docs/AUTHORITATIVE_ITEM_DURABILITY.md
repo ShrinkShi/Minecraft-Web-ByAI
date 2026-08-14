@@ -61,10 +61,13 @@ creative 不走 survival durability 消耗。
 
 它直接复用 `src/mining-rules.js`：
 
-- `miningDurationMs()` 决定创造/生存破坏时间；
+- `miningProgressDelta()` 按每一段真实模拟时间和当时选中的工具累计进度；
 - `canHarvestBlock()` 决定是否产生方块掉落；
 - adventure / spectator 不进入有效挖掘；
-- 目标坐标或 block id 变化时累计进度立即从 0 重新开始，不把旧目标进度带到新方块。
+- 目标坐标或 block id 变化时丢弃旧累计，但新目标仍会获得当前这一段 progress slice，与服务器 tick 语义一致；
+- 切换工具只影响切换后的 progress slice，不会把此前空手或其它工具已经消耗的时间按新工具速度追溯重算；
+- 每一段单机 mining dt 最多 50ms，与主循环模拟上限和服务器 20Hz tick 对齐，因此主线程卡顿不会在恢复后一次性“补挖”整段墙钟时间；
+- controller 要求时间单调递增，拒绝倒退时间输入。
 
 一次成功单机 Survival 破坏的顺序固定为：
 
