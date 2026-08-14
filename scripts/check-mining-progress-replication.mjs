@@ -11,6 +11,6 @@ assert.throws(()=>encodeMiningProgress({session:'s:mining-progress',tick:1,activ
 assert.throws(()=>encodeMiningProgress({session:'s:mining-progress',tick:1,active:true,progress:1,target:{x:0,y:0,z:0,id:BLOCK.STONE}}),/less than 1/);
 assert.throws(()=>encodeMiningProgress({session:'s:mining-progress',tick:1,active:false,progress:.1,target:null}),/inactive/);
 assert.throws(()=>decodeMiningProgress({...active,session:'s:other'},{expectedSession:'s:mining-progress'}),/session mismatch/);
-assert.throws(()=>decodeMiningProgress({...active,tick:-1}),/network sequence/i);
+assert.throws(()=>decodeMiningProgress({...active,tick:-1}),/mining progress tick must be uint32/);
 assert.throws(()=>decodeMiningProgress({...active,target:[1,2,3,0]}),/non-air/);
 console.log('strict mining-progress v1 wire encode/decode: PASS');
