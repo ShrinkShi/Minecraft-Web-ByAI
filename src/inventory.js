@@ -1,24 +1,25 @@
 import {CREATIVE_START,maxStack} from './items.js';
+import {HOTBAR_START,INVENTORY_SLOT_COUNT,creativeSeedSlot} from './inventory-layout.js';
 
 const cloneStack=stack=>stack?{id:stack.id,count:stack.count}:null;
 
 export class Inventory{
   constructor(mode='survival',snapshot=null){
-    this.slots=Array(36).fill(null);
+    this.slots=Array(INVENTORY_SLOT_COUNT).fill(null);
     this.cursor=null;
     if(snapshot)this.restore(snapshot);
     else if(mode==='creative')this.seedCreative();
   }
 
   seedCreative(){
-    CREATIVE_START.forEach((id,i)=>{this.slots[27+i]={id,count:maxStack(id)};});
+    CREATIVE_START.forEach((id,i)=>{this.slots[creativeSeedSlot(i)]={id,count:maxStack(id)};});
   }
 
   snapshot(){return{slots:this.slots.map(cloneStack)};}
 
   restore(snapshot){
     if(!Array.isArray(snapshot?.slots))return false;
-    for(let i=0;i<36;i++){
+    for(let i=0;i<INVENTORY_SLOT_COUNT;i++){
       const s=snapshot.slots[i];
       if(s?.id&&Number.isFinite(s.count)&&s.count>0)this.slots[i]={id:s.id,count:Math.min(maxStack(s.id),Math.floor(s.count))};
     }
@@ -37,7 +38,7 @@ export class Inventory{
     return stacks;
   }
 
-  hotbar(index){return this.slots[27+index]||null;}
+  hotbar(index){return this.slots[HOTBAR_START+index]||null;}
 
   capacityFor(itemId){
     const limit=maxStack(itemId);let capacity=0;
@@ -67,7 +68,7 @@ export class Inventory{
 
   moveBetween(index){
     const slot=this.slots[index];if(!slot)return false;
-    const targets=index<27?[27,36]:[0,27];
+    const targets=index<HOTBAR_START?[HOTBAR_START,INVENTORY_SLOT_COUNT]:[0,HOTBAR_START];
     let remaining=slot.count,changed=false,limit=maxStack(slot.id);
     for(let i=targets[0];i<targets[1];i++){
       const t=this.slots[i];if(!t||t.id!==slot.id||t.count>=limit)continue;
