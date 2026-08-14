@@ -2,29 +2,23 @@ import assert from 'node:assert/strict';
 import {MultiplayerMovementSession} from '../src/multiplayer-movement-session.js';
 
 let bootstrapHooks=null,bootstrap=null,bridgeCalls=[];
-const bootstrapFactory=options=>{
-  bootstrapHooks=options;
-  bootstrap={state:'idle',client:{name:'transport'},connect(url){this.state='ready';options.onStateChange({state:'ready'});return url;},close(){this.state='closed';}};
-  return bootstrap;
-};
-const bridgeFactory=()=>({
-  prime(control,view){bridgeCalls.push(['prime',control,view]);},
-  flush(){bridgeCalls.push(['flush']);return{view:{frame:{seq:0}},control:{seq:0}};},
-  setControl(value){bridgeCalls.push(['control',value]);},setView(value){bridgeCalls.push(['view',value]);},
-  sendHotbarSelect(slot){return{kind:'hotbar-select',slot};},sendUse(){return{kind:'use'};},sendDrop(){return{kind:'drop'};}
-});
+const bootstrapFactory=options=>{bootstrapHooks=options;bootstrap={state:'idle',client:{name:'transport'},connect(url){this.state='ready';options.onStateChange({state:'ready'});return url;},close(){this.state='closed';}};return bootstrap;};
+const bridgeFactory=()=>({prime(control,view){bridgeCalls.push(['prime',control,view]);},flush(){bridgeCalls.push(['flush']);return{view:{frame:{seq:0}},control:{seq:0}};},setControl(value){bridgeCalls.push(['control',value]);},setView(value){bridgeCalls.push(['view',value]);},sendHotbarSelect(slot){return{kind:'hotbar-select',slot};},sendUse(){return{kind:'use'};},sendDrop(){return{kind:'drop'};}});
 const clone=value=>value?{...value,position:{...value.position},velocity:{...value.velocity}}:null;
 const interpolatorFactory=()=>{let state=null;return{accept(value){state=clone(value);return{accepted:true};},step(){return clone(state);},current(){return clone(state);}};};
-const ready=[],snapshots=[];
-const movement=new MultiplayerMovementSession({bootstrapFactory,bridgeFactory,interpolatorFactory,onReady:value=>ready.push(value),onSnapshot:value=>snapshots.push(value)});
+const ready=[],snapshots=[],inventoryEvents=[];
+const movement=new MultiplayerMovementSession({bootstrapFactory,bridgeFactory,interpolatorFactory,onReady:value=>ready.push(value),onSnapshot:value=>snapshots.push(value),onInventorySnapshot:value=>inventoryEvents.push(value)});
 assert.equal(movement.connect('wss://example.test/ws'),'wss://example.test/ws');
 const initial={session:'s:move',tick:0,position:{x:.5,y:25.001,z:.5},velocity:{x:0,y:0,z:0},yaw:0,pitch:0,mode:'survival',grounded:true,swimCoverage:0,voided:false};
 const inventory={version:1,kind:'inventory-snapshot',session:'s:move',revision:7,mode:'survival',slots:Array(36).fill(null)};inventory.slots[27]={id:'stick',count:3};
-bootstrapHooks.onReady({client:bootstrap.client,worldInfo:{session:'s:move',worldId:'movement-world',tickRate:20},worldEdits:{session:'s:move',worldId:'movement-world',revision:5,edits:{'17,20,-1':3}},inventorySnapshot:inventory,initialSnapshot:initial});
-assert.equal(movement.ready,true);assert.equal(ready.length,1);assert.equal(ready[0].worldEdits.revision,5);assert.equal(ready[0].worldEdits.edits['17,20,-1'],3);assert.equal(ready[0].inventorySnapshot.revision,7);assert.deepEqual(ready[0].inventorySnapshot.slots[27],{id:'stick',count:3});assert.equal(movement.inventoryRevision,7);assert.equal(ready[0].initialSnapshot.tick,0);assert.deepEqual(movement.current().position,{x:.5,y:25.001,z:.5});assert.equal(bridgeCalls[0][0],'prime');assert.equal(bridgeCalls[1][0],'flush');
+bootstrapHooks.onInventorySnapshot(inventory);bootstrapHooks.onReady({client:bootstrap.client,worldInfo:{session:'s:move',worldId:'movement-world',tickRate:20},worldEdits:{session:'s:move',worldId:'movement-world',revision:5,edits:{'17,20,-1':3}},inventorySnapshot:inventory,initialSnapshot:initial});
+assert.equal(movement.ready,true);assert.equal(ready.length,1);assert.equal(ready[0].worldEdits.revision,5);assert.equal(ready[0].worldEdits.edits['17,20,-1'],3);assert.equal(ready[0].inventorySnapshot.revision,7);assert.deepEqual(ready[0].inventorySnapshot.slots[27],{id:'stick',count:3});assert.equal(movement.inventoryRevision,7);assert.equal(inventoryEvents.length,1);assert.equal(ready[0].initialSnapshot.tick,0);assert.deepEqual(movement.current().position,{x:.5,y:25.001,z:.5});assert.equal(bridgeCalls[0][0],'prime');assert.equal(bridgeCalls[1][0],'flush');
 inventory.slots[27].count=99;assert.equal(ready[0].inventorySnapshot.slots[27].count,3,'movement ready data must clone the authoritative inventory snapshot');
+const applied=[];movement.attachInventoryApplier(value=>applied.push(value));assert.equal(applied.length,1);assert.equal(applied[0].revision,7,'attaching after ready must replay the latest authoritative inventory');
+const live={...ready[0].inventorySnapshot,revision:8,slots:ready[0].inventorySnapshot.slots.map(slot=>slot?{...slot}:null)};live.slots[27]={id:'stick',count:5};bootstrapHooks.onInventorySnapshot(live);assert.equal(movement.inventoryRevision,8);assert.deepEqual(movement.inventoryState().slots[27],{id:'stick',count:5});assert.equal(applied.length,2);assert.equal(applied[1].revision,8);assert.equal(inventoryEvents.length,2);live.slots[27].count=99;assert.equal(movement.inventoryState().slots[27].count,5,'live inventory state must be cloned before retention');
+assert.equal(typeof movement.detachInventoryApplier(),'function');
 const next={...initial,tick:1,position:{x:.285,y:25.001,z:.5},velocity:{x:-4.3,y:0,z:0},yaw:Math.PI/2};bootstrapHooks.onPlayerSnapshot(next);assert.equal(snapshots.length,1);assert.equal(movement.step(.025).tick,1);
 movement.setControl({side:0,forward:1,jump:false,sneak:false,sprint:false,primary:false});movement.setView({yaw:Math.PI/2,pitch:0});assert.equal(bridgeCalls.at(-2)[0],'control');assert.equal(bridgeCalls.at(-1)[0],'view');assert.equal(movement.sendHotbarSelect(4).slot,4);
-movement.close();assert.equal(movement.state,'closed');assert.equal(bootstrap.state,'closed');assert.equal(movement.current(),null);assert.equal(movement.inventoryRevision,null);
-assert.throws(()=>new MultiplayerMovementSession({bootstrapFactory:null}),/bootstrapFactory/);assert.throws(()=>new MultiplayerMovementSession({bootstrapOptions:{clientFactory:null}}).connect('wss://example.test/ws'),/clientFactory/);assert.throws(()=>new MultiplayerMovementSession().setView({yaw:0,pitch:99}),/pitch/);
-console.log('movement session composes world edits + inventory + input bridge + authoritative display state: PASS');
+movement.close();assert.equal(movement.state,'closed');assert.equal(bootstrap.state,'closed');assert.equal(movement.current(),null);assert.equal(movement.inventoryRevision,null);assert.equal(movement.inventoryState(),null);
+assert.throws(()=>new MultiplayerMovementSession({bootstrapFactory:null}),/bootstrapFactory/);assert.throws(()=>new MultiplayerMovementSession({onInventorySnapshot:null}),/onInventorySnapshot/);assert.throws(()=>new MultiplayerMovementSession({bootstrapOptions:{clientFactory:null}}).connect('wss://example.test/ws'),/clientFactory/);assert.throws(()=>new MultiplayerMovementSession().setView({yaw:0,pitch:99}),/pitch/);
+console.log('movement session propagates initial + live authoritative inventory revisions: PASS');
