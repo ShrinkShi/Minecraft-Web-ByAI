@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import WebSocket from 'ws';
-import {MULTIPLAYER_SUBPROTOCOL,encodeClientHello,encodeServerWelcome} from '../src/multiplayer-handshake.js';
+import {MULTIPLAYER_HANDSHAKE_VERSION,MULTIPLAYER_SUBPROTOCOL,encodeClientHello,encodeServerWelcome} from '../src/multiplayer-handshake.js';
 import {encodeServerWorldInfo,decodeServerWorldInfo} from '../src/server-world-info.js';
 import {MultiplayerWebSocketClient} from '../src/websocket-client.js';
 import {createMultiplayerServer} from '../server/multiplayer-server.mjs';
@@ -33,7 +33,7 @@ function queue(socket){const values=[],waiters=[];socket.on('message',(data,isBi
 
 let server;server=createMultiplayerServer({port:0,allowedOrigins:[ORIGIN],sessionFactory:()=> 'real-world-info-session',onSessionReady:({session})=>{const sent=server.sendWorldInfo(session,infoState(session,{worldId:'real-world',seed:'golden-seed',prompt:'mountain forest'}));assert.equal(sent.kind,'world-info');}});
 try{
-  const address=await server.listen(),ws=await openClient(`ws://127.0.0.1:${address.port}${server.path}`),messages=queue(ws);ws.send(JSON.stringify(encodeClientHello()));const welcome=await messages.next('real welcome'),realInfoWire=await messages.next('real world info');assert.deepEqual(welcome,{v:1,kind:'welcome',session:'real-world-info-session'});assert.deepEqual(decodeServerWorldInfo(realInfoWire,{expectedSession:welcome.session}),{version:1,kind:'world-info',session:welcome.session,worldId:'real-world',terrainVersion:1,seed:'golden-seed',prompt:'mountain forest',tickRate:20});assert.throws(()=>server.sendWorldInfo(welcome.session,infoState('other')),/must match target session/);assert.equal(server.sendWorldInfo('missing',infoState('missing')),null);ws.close(1000,'done');
+  const address=await server.listen(),ws=await openClient(`ws://127.0.0.1:${address.port}${server.path}`),messages=queue(ws);ws.send(JSON.stringify(encodeClientHello()));const welcome=await messages.next('real welcome'),realInfoWire=await messages.next('real world info');assert.deepEqual(welcome,{v:MULTIPLAYER_HANDSHAKE_VERSION,kind:'welcome',session:'real-world-info-session'});assert.deepEqual(decodeServerWorldInfo(realInfoWire,{expectedSession:welcome.session}),{version:1,kind:'world-info',session:welcome.session,worldId:'real-world',terrainVersion:1,seed:'golden-seed',prompt:'mountain forest',tickRate:20});assert.throws(()=>server.sendWorldInfo(welcome.session,infoState('other')),/must match target session/);assert.equal(server.sendWorldInfo('missing',infoState('missing')),null);ws.close(1000,'done');
 }finally{await server.close();}
 
-console.log('websocket single-world metadata delivery + real server downlink: PASS');
+console.log('websocket single-world metadata delivery + real server v2 welcome downlink: PASS');
