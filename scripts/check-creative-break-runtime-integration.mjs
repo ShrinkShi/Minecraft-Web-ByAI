@@ -6,6 +6,7 @@ import {encodeClientInputEnvelope} from '../src/client-input-envelope.js';
 import {encodePlayerControlFrame} from '../src/player-control-frame.js';
 import {encodePlayerViewFrame} from '../src/player-view-frame.js';
 import {MULTIPLAYER_SUBPROTOCOL,encodeClientHello} from '../src/multiplayer-handshake.js';
+import {decodeServerInventorySnapshot} from '../src/server-inventory-snapshot.js';
 import {decodeServerPlayerSnapshot} from '../src/server-player-snapshot.js';
 import {decodeWorldEditReplication,WORLD_BLOCK_CHANGE_KIND,WORLD_EDIT_SYNC_END_KIND} from '../src/world-edit-replication.js';
 import {createAuthoritativeServerRuntime} from '../server/runtime.mjs';
@@ -23,6 +24,7 @@ try{
   const welcome=await messages.next('creative welcome');assert.equal(welcome.kind,'welcome');await messages.next('creative world info');
   for(;;){const message=await messages.next('creative initial edit sync');if(message.kind===WORLD_EDIT_SYNC_END_KIND)break;}
   const initial=decodeServerPlayerSnapshot(await messages.next('creative initial snapshot'),{expectedSession:welcome.session});assert.equal(initial.mode,'creative');
+  const inventory=decodeServerInventorySnapshot(await messages.next('creative initial inventory'),{expectedSession:welcome.session});assert.equal(inventory.mode,'creative');assert.equal(inventory.revision,0);
 
   const x=Math.floor(initial.position.x),y=Math.floor(initial.position.y+PLAYER_EYE_HEIGHT),frontZ=Math.floor(initial.position.z)-1,targetZ=Math.floor(initial.position.z)-2;
   for(const change of [runtime.setBlock(x,y,frontZ,BLOCK.AIR),runtime.setBlock(x,y,targetZ,BLOCK.STONE)]){
@@ -40,4 +42,4 @@ try{
   const broken=decodeWorldEditReplication(await messages.next('creative authoritative block change'),{expectedSession:welcome.session,expectedWorldId:'creative-break-runtime'});assert.equal(broken.kind,WORLD_BLOCK_CHANGE_KIND);assert.deepEqual({x:broken.x,y:broken.y,z:broken.z,previous:broken.previous,id:broken.id},{x,y,z:targetZ,previous:BLOCK.STONE,id:BLOCK.AIR});assert.equal(broken.revision,(revisionBeforeBreak+1)>>>0);assert.equal(runtime.world.getBlock(x,y,targetZ),BLOCK.AIR,'latched short click must mutate the authoritative world on the next tick');
 }finally{if(runtime.state!=='stopped')await runtime.stop();if(socket&&socket.readyState===WebSocket.OPEN)socket.terminate();}
 
-console.log('websocket primary edge -> authoritative creative block break runtime: PASS');
+console.log('websocket inventory bootstrap + primary edge -> authoritative creative block break runtime: PASS');
