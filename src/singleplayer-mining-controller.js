@@ -8,6 +8,7 @@ function callback(value,label){if(typeof value!=='function')throw new TypeError(
 function finite(value,label){if(typeof value!=='number'||!Number.isFinite(value))throw new TypeError(`${label} must be a finite number`);return value;}
 function targetKey(target){return `${target.x},${target.y},${target.z}:${target.id}`;}
 function cloneTarget(target){return target?{x:target.x,y:target.y,z:target.z,id:target.id,previous:target.previous?{...target.previous}:null}:null;}
+function isDamageableKnownItem(itemId){if(!itemId)return false;try{return itemDurability(itemId)!==null;}catch{return false;}}
 
 export class SingleplayerMiningController{
   constructor({aim,getMode,getSelectedStack,breakTarget,spawnDrop,damageSelected,onProgress=()=>{},onBreak=()=>{}}={}){
@@ -29,7 +30,7 @@ export class SingleplayerMiningController{
     const block=BLOCKS[aimed.id],broken=cloneTarget(aimed),removed=!!this.breakTarget(broken);let harvested=false,wear=null;
     if(removed){
       if(mode!=='creative'&&canHarvestBlock(broken.id,selectedId)&&block?.drops){this.spawnDrop({id:block.drops,count:1},broken);harvested=true;}
-      if(mode!=='creative'&&selectedId&&itemDurability(selectedId)!==null)wear=this.damageSelected(selectedId,1);
+      if(mode!=='creative'&&isDamageableKnownItem(selectedId))wear=this.damageSelected(selectedId,1);
       this.onBreak({target:broken,block,selected:selected?{...selected}:null,harvested,wear});
     }
     this.target=null;this.key=null;this.startedAt=now;this.progress=0;this.onProgress(0);return Object.freeze({...this.snapshot(),completed:removed,harvested,wear});
