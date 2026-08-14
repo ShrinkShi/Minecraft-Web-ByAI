@@ -1,22 +1,24 @@
 import {BLOCKS} from './blocks.js';
 import {ITEMS} from './items.js';
 import {HOSTILE_MOBS,PASSIVE_MOBS} from './mobs.js';
+import {minimumToolTier,toolMeetsBlockRequirement,toolTierLabel} from './tool-tier-rules.js';
 
 const TOOL_NAMES=Object.freeze({pickaxe:'镐',axe:'斧',shovel:'锹',hoe:'锄',sword:'剑'});
 
-function selectedTool(itemId){return itemId?ITEMS[itemId]?.tool?.kind||null:null;}
+function selectedTool(itemId){return itemId?ITEMS[itemId]?.tool||null:null;}
 function dropName(dropId){return dropId?(ITEMS[dropId]?.name||dropId):null;}
 function finiteHp(value){return Number.isFinite(value)?Math.max(0,value):0;}
 
 export function inspectBlockTarget(blockId,{selectedItemId=null}={}){
   const block=BLOCKS[blockId];if(!block||blockId===0)return null;
-  const requiredTool=block.requires||null,tool=selectedTool(selectedItemId),hasRequiredTool=!requiredTool||tool===requiredTool;
+  const requiredTool=block.requires||null,requiredToolTier=minimumToolTier(block),tool=selectedTool(selectedItemId),heldToolTier=tool?.tier||null,hasRequiredTool=toolMeetsBlockRequirement(tool,block);
   const canDrop=!!block.drops&&hasRequiredTool;
   return Object.freeze({
     kind:'block',id:blockId,name:block.name,source:'Minecraft Web By AI',tile:Number.isFinite(block.tiles?.[0])?block.tiles[0]:null,
     hardness:Number.isFinite(block.hardness)?block.hardness:null,
     requiredTool,requiredToolName:requiredTool?(TOOL_NAMES[requiredTool]||requiredTool):'任意',
-    heldTool:tool,toolCorrect:hasRequiredTool,
+    requiredToolTier,requiredToolTierName:toolTierLabel(requiredToolTier),
+    heldTool:tool?.kind||null,heldToolTier,heldToolTierName:toolTierLabel(heldToolTier),toolCorrect:hasRequiredTool,
     hasDrop:!!block.drops,canDrop,dropId:block.drops||null,dropName:dropName(block.drops),
     liquid:!!block.liquid
   });
