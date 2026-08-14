@@ -7,6 +7,7 @@ import {encodeServerInventorySnapshot} from '../src/server-inventory-snapshot.js
 import {encodeServerPlayerSnapshot} from '../src/server-player-snapshot.js';
 import {encodeServerWorldInfo} from '../src/server-world-info.js';
 import {encodeRemotePlayerSpawn,encodeRemotePlayerSnapshot,encodeRemotePlayerDespawn} from '../src/remote-player-replication.js';
+import {encodeItemEntitySpawn,encodeItemEntitySnapshot,encodeItemEntityDespawn} from '../src/item-entity-replication.js';
 import {encodeWorldEditSync,encodeWorldBlockChange} from '../src/world-edit-replication.js';
 import {ServerPlayerInputState} from './player-input-state.mjs';
 
@@ -51,6 +52,7 @@ export function createMultiplayerServer({host=DEFAULT_MULTIPLAYER_HOST,port=DEFA
     sendInventorySnapshot(session,snapshot){session=assertClientSessionId(session);if(!snapshot||snapshot.session!==session)throw new RangeError('inventory snapshot session must match target session');return sendEncoded(session,encodeServerInventorySnapshot(snapshot));},
     sendPlayerSnapshot(session,snapshot){session=assertClientSessionId(session);if(!snapshot||snapshot.session!==session)throw new RangeError('player snapshot session must match target session');return sendEncoded(session,encodeServerPlayerSnapshot(snapshot));},
     sendRemotePlayerSpawn(session,state){return sendEncoded(session,encodeRemotePlayerSpawn(state));},sendRemotePlayerSnapshot(session,state){return sendEncoded(session,encodeRemotePlayerSnapshot(state));},sendRemotePlayerDespawn(session,playerId){return sendEncoded(session,encodeRemotePlayerDespawn(playerId));},
+    sendItemEntitySpawn(session,state){return sendEncoded(session,encodeItemEntitySpawn(state));},sendItemEntitySnapshot(session,state){return sendEncoded(session,encodeItemEntitySnapshot(state));},sendItemEntityDespawn(session,entityId,revision,reason){return sendEncoded(session,encodeItemEntityDespawn(entityId,revision,reason));},
     async close(){for(const websocket of wss.clients)websocket.terminate();await new Promise(resolve=>wss.close(()=>resolve()));sessions.clear();if(httpServer.listening)await new Promise((resolve,reject)=>httpServer.close(error=>error?reject(error):resolve()));}
   };
 }
