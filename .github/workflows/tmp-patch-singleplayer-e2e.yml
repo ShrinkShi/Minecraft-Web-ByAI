@@ -1,0 +1,49 @@
+name: Temporary singleplayer E2E patch
+
+on:
+  push:
+    branches:
+      - game/v0.4-singleplayer-mining-durability
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: game/v0.4-singleplayer-mining-durability
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Patch exact E2E bridge
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs=require('node:fs');
+          const path='src/main.js';
+          let source=fs.readFileSync(path,'utf8');
+          const old="if(e2eEnabled)Object.defineProperty(globalThis,'__minecraftE2E',{value:{setLook:setPlayerLook,multiplayer:()=>({sessionKind,state:multiplayerMovement?.state||null,ready:multiplayerMovement?.ready||false,worldId:worldInfo?.id||null,tick:multiplayerMovement?.current()?.tick??null})},configurable:true});";
+          const next="function prepareSingleplayerMiningTarget(blockId=3){if(!e2eEnabled||sessionKind!=='singleplayer'||!world||!player||!BLOCKS[blockId])return null;player.setLook(0,0);const origin=player.eyePosition(new THREE.Vector3()),x=Math.floor(origin.x),y=Math.floor(origin.y),baseZ=Math.floor(origin.z);for(let offset=1;offset<=6;offset++)world.setBlock(x,y,baseZ-offset,0);const z=baseZ-2;if(!world.setBlock(x,y,z,blockId))return null;selectedTarget=null;singleplayerMining.cancel();return{x,y,z,id:blockId};}\nif(e2eEnabled)Object.defineProperty(globalThis,'__minecraftE2E',{value:{setLook:setPlayerLook,prepareSingleplayerMiningTarget,multiplayer:()=>({sessionKind,state:multiplayerMovement?.state||null,ready:multiplayerMovement?.ready||false,worldId:worldInfo?.id||null,tick:multiplayerMovement?.current()?.tick??null})},configurable:true});";
+          const count=source.split(old).length-1;
+          if(count!==1)throw new Error(`expected exact E2E bridge once, found ${count}`);
+          source=source.replace(old,next);
+          fs.writeFileSync(path,source);
+          NODE
+          node --check src/main.js
+      - name: Commit exact patch
+        shell: bash
+        run: |
+          if git diff --quiet -- src/main.js; then
+            echo 'No patch produced' >&2
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/main.js
+          git commit -m 'test: expose isolated singleplayer mining fixture'
+          git push origin HEAD:game/v0.4-singleplayer-mining-durability
