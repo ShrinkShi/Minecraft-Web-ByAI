@@ -12,6 +12,7 @@ import {createAuthoritativeServerRuntime} from '../server/runtime.mjs';
 const creative=new Inventory('creative');
 assert.equal(creative.slots.length,INVENTORY_SLOT_COUNT,'creative client inventory must stay exactly 36 slots');
 assert.equal(creative.hotbar(0).id,CREATIVE_START[0]);assert.equal(creative.hotbar(8).id,CREATIVE_START[8]);assert.equal(creative.slots[0].id,CREATIVE_START[9],'starter overflow belongs in main inventory instead of creating slot 36');assert.equal(creative.slots[36],undefined);
+const legacySlots=Array(37).fill(null);legacySlots[36]={id:'bed',count:1};const migrated=new Inventory('survival',{slots:legacySlots});assert.equal(migrated.slots.length,INVENTORY_SLOT_COUNT);assert.deepEqual(migrated.slots[0],{id:'bed',count:1},'legacy slot 36 must migrate into the real 36-slot inventory instead of disappearing');
 
 const state=new ServerPlayerInventoryState('s:inventory',{mode:'creative'});const snapshot=state.snapshot();assert.equal(snapshot.slots.length,INVENTORY_SLOT_COUNT);assert.equal(snapshot.slots[HOTBAR_START].id,CREATIVE_START[0]);assert.equal(snapshot.slots[0].id,CREATIVE_START[9]);assert.equal(state.selectedStack(8).id,'wooden_pickaxe');assert.equal(state.add('stick',65),0);assert.equal(state.remove(1,1).id,'stick');assert.throws(()=>state.add('missing-item',1),/known item/);assert.throws(()=>state.selectedStack(9),/0 to 8/);
 const survival=new ServerPlayerInventoryState('s:survival',{mode:'survival'});assert.equal(survival.snapshot().slots.every(value=>value===null),true);
@@ -30,4 +31,4 @@ try{
   const closed=new Promise(resolve=>socket.once('close',resolve));socket.close(1000,'inventory test complete');await Promise.race([closed,timeout(2500,'inventory websocket close')]);await waitUntil(()=>runtime.inventories.sessionCount===0,'runtime inventory leave');
 }finally{if(runtime.state!=='stopped')await runtime.stop();if(socket&&socket.readyState===WebSocket.OPEN)socket.terminate();}
 
-console.log('36-slot inventory layout + authoritative inventory/hotbar runtime foundation: PASS');
+console.log('36-slot inventory layout + legacy migration + authoritative inventory/hotbar runtime foundation: PASS');
