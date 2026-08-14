@@ -9,7 +9,7 @@ function rng(seed){let value=seed>>>0;return()=>{value=(Math.imul(value,1664525)
 function createCrackTexture(stage,size){
   const canvas=document.createElement('canvas');canvas.width=size;canvas.height=size;const ctx=canvas.getContext('2d',{alpha:true});if(!ctx)throw new Error('2D canvas is unavailable for mining crack texture');
   ctx.clearRect(0,0,size,size);ctx.strokeStyle='rgba(18,18,18,.92)';ctx.lineCap='square';ctx.lineJoin='miter';ctx.lineWidth=Math.max(1,Math.round(size/32));
-  const random=rng(0x51f15e+stage*0);const center=size*.5,branches=4+stage,steps=3+stage;
+  const random=rng(0x51f15e);const center=size*.5,branches=4+stage,steps=3+stage;
   for(let branch=0;branch<branches;branch++){
     let x=center+(random()-.5)*size*.12,y=center+(random()-.5)*size*.12,angle=random()*Math.PI*2;ctx.beginPath();ctx.moveTo(Math.round(x)+.5,Math.round(y)+.5);
     for(let step=0;step<steps;step++){
@@ -31,7 +31,7 @@ export class MiningCrackOverlay{
 
   apply(state){
     if(this.disposed)return null;if(!state?.active)return this.hide();const stage=miningCrackStage(state.progress);if(stage===null)return this.hide();const target=miningCrackTarget(state.target);
-    this.material.map=this.textures[stage];this.material.needsUpdate=true;this.mesh.position.set(target.x+.5,target.y+.5,target.z+.5);this.mesh.visible=true;
+    if(this.current?.stage!==stage)this.material.map=this.textures[stage];this.mesh.position.set(target.x+.5,target.y+.5,target.z+.5);this.mesh.visible=true;
     this.current=Object.freeze({visible:true,stage,progress:state.progress,tick:state.tick??null,target});return this.snapshot();
   }
 
