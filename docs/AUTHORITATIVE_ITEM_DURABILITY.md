@@ -4,7 +4,7 @@
 
 工具耐久不能只作为一个 UI 数字存在。只要磨损状态没有贯穿 Inventory、网络和地面 item entity，玩家就可以通过丢弃/拾取、重连或其它状态转换把磨损工具错误恢复成新品。
 
-本阶段先把多人服务器权威链完整打通。单机仍使用同一个共享 `item-stack` 数据模型，但单机挖掘入口的耐久扣除将在下一阶段先从巨大 `main.js` 中抽离后接入，避免为了一个副作用整文件手工重写入口。
+当前多人服务器权威链已经完整贯穿挖掘、Inventory、Q 丢弃、地面实体、拾取和客户端槽位显示。单机仍使用同一个共享 `item-stack` 数据模型，但单机挖掘入口的耐久扣除将在后续先从巨大 `main.js` 中抽离后接入，避免为了一个副作用整文件手工重写入口。
 
 ## Item stack 实例状态
 
@@ -22,6 +22,8 @@
 
 - `add(id,count)` / `addPickup(id,count)`：批量生成未磨损同类物品，可跨多个槽分配；
 - `addStack(stack)` / `addPickupStack(stack)`：移动一个已有实例状态，必须保留 damage。
+
+本地客户端另有 `returnExistingStack()`，只用于把已经存在于本地 UI/旧存档中的 stack 放回背包。它不是网络或新物品创建入口，因此能在不放宽网络严格校验的前提下继续保留历史未知 itemId。
 
 ## 多人协议 v2
 
@@ -61,15 +63,38 @@ Q 丢弃时不能重新构造 `{id,count:1}`。survival runtime 使用 Inventory
 
 客户端 DropSystem 也保存 damage，使网络权威地面工具的 debug/state/最终单机复用都不会丢失实例信息。
 
+## 槽位耐久显示
+
+`src/item-durability-display.js` 只根据 stack 中已经存在的权威 `damage` 计算显示数据，不自行推测使用次数。
+
+- 满耐久工具不显示耐久条；
+- 首次磨损后显示 Minecraft 风格的底部细条；
+- 长度表示剩余耐久比例；
+- 颜色根据剩余比例由绿色逐步过渡到红色；
+- title / aria-label 同时提供 `耐久 remaining / maximum`；
+- 服务器 Inventory revision 到达浏览器后，快捷栏、背包、工作台背包区和 cursor stack 都由同一 `UI.makeSlot()` 重绘，因此没有独立的“多人耐久 UI 状态”。
+
+最终一次使用使服务器删除工具后，新 Inventory snapshot 会直接移除槽位物品和耐久条。
+
+## 合成界面的实例安全
+
+耐久状态不能被 UI 操作洗掉。合成格现在遵守完整 stack identity：
+
+- 左键/右键拿取会复制完整 stack metadata；
+- 向空合成格右键放 1 个时保留 damage；
+- 只有 itemId 与 damage 都相同的实例才允许合并；
+- Shift 从合成格移回背包使用 `returnExistingStack()`；
+- `CraftingGrid.drain()` 和 `clearTo()` 保留完整 stack，而不是降级成 `{id,count}`；
+- 关闭面板时既不会修复磨损工具，也不会吞掉历史未知本地物品。
+
 ## 当前明确未完成
 
-本阶段不把以下内容伪装成已经完成：
+当前仍不把以下内容伪装成已经完成：
 
 - 单机挖掘成功后的耐久扣除；
-- HUD 槽位耐久条；
 - 铁镐、石镐、钻石镐等更多工具与 harvest tier；
 - 工具耐久随机减免、附魔等；
 - 武器/工具攻击时的耐久消费；
 - 装备耐久。
 
-下一阶段优先抽离单机 mining interaction，再接同一个共享 item-stack durability 规则；之后再决定 UI 耐久条与工具 tier 数据扩展。
+下一阶段优先抽离单机 mining interaction，再接同一个共享 item-stack durability 规则；之后再扩展更多工具 tier，而不是先堆一套没有实际工具差异可验证的抽象层。
