@@ -5,6 +5,8 @@ import {nextNetworkSequence} from '../src/network-sequence.js';
 
 const PLAYER_MODES=new Set(['survival','creative','adventure','spectator']);
 const cloneStack=value=>value?Object.freeze({id:value.id,count:value.count}):null;
+const MAIN_RANGE=Object.freeze([0,HOTBAR_START]);
+const HOTBAR_RANGE=Object.freeze([HOTBAR_START,HOTBAR_START+HOTBAR_SIZE]);
 
 function playerMode(value){if(typeof value!=='string'||!PLAYER_MODES.has(value))throw new RangeError('inventory mode must be survival, creative, adventure, or spectator');return value;}
 function itemId(value){if(typeof value!=='string'||!ITEMS[value])throw new RangeError('inventory item id must reference a known item');return value;}
@@ -33,6 +35,15 @@ export class ServerPlayerInventoryState{
     if(remaining!==requested)this.advanceRevision();return remaining;
   }
 
+  addPickup(id,count=1){
+    id=itemId(id);const requested=itemCount(count);let remaining=requested,limit=maxStack(id);
+    for(const [start,end] of [HOTBAR_RANGE,MAIN_RANGE]){
+      for(let i=start;i<end&&remaining;i++){const slot=this.slots[i];if(!slot||slot.id!==id||slot.count>=limit)continue;const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;}
+      for(let i=start;i<end&&remaining;i++){if(this.slots[i])continue;const moved=Math.min(remaining,limit);this.slots[i]={id,count:moved};remaining-=moved;}
+    }
+    if(remaining!==requested)this.advanceRevision();return remaining;
+  }
+
   remove(slot,count=1){
     slot=inventorySlot(slot);count=itemCount(count);const current=this.slots[slot];if(!current)return null;const taken=Math.min(count,current.count),result={id:current.id,count:taken};current.count-=taken;if(current.count===0)this.slots[slot]=null;this.advanceRevision();return cloneStack(result);
   }
@@ -50,6 +61,7 @@ export class ServerPlayerInventoryHub{
   snapshot(session){return this.state(session).snapshot();}
   selectedStack(session,selectedSlot){return this.state(session).selectedStack(selectedSlot);}
   add(session,id,count=1){return this.state(session).add(id,count);}
+  addPickup(session,id,count=1){return this.state(session).addPickup(id,count);}
   remove(session,slot,count=1){return this.state(session).remove(slot,count);}
   close(){this.states.clear();}
 }
