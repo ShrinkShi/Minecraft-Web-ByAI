@@ -58,7 +58,7 @@ export class VoxelWorld{
     const result=new Map();
     for(const [chunkKey,entries] of Object.entries(saved||{})){
       if(!Array.isArray(entries)||entries.length===0)continue;
-      result.set(chunkKey,new Map(entries.map(([i,id])=>[Number(i),Number(id)]));
+      result.set(chunkKey,new Map(entries.map(([i,id])=>[Number(i),Number(id)])));
     }
     return result;
   }
@@ -163,7 +163,7 @@ export class VoxelWorld{
     if(saved)for(const [i,id] of saved)if(i>=0&&i<data.length)data[i]=id;
     this.chunks.set(chunkKey,data);
     this.requestMesh(m.cx,m.cz);
-    this.requestMesh(m.cx-1,m.cz);this.requestMesh(m.cx+1,m.cz);this.requestMesh(m.cx,cz-1);this.requestMesh(m.cx,m.cz+1);
+    this.requestMesh(m.cx-1,m.cz);this.requestMesh(m.cx+1,m.cz);this.requestMesh(m.cx,m.cz-1);this.requestMesh(m.cx,m.cz+1);
     if(this.initialPending.delete(chunkKey))this.reportInitialProgress();
   }
 
