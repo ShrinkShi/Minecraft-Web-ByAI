@@ -17,7 +17,7 @@ function cloneControl(value){
 function cloneView(value){return value?{yaw:value.yaw,pitch:value.pitch,sequence:value.sequence}:null;}
 function cloneAction(value){
   if(value.kind==='hotbar-select')return{kind:value.kind,sequence:value.sequence,slot:value.slot};
-  return{kind:value.kind,sequence:value.sequence,viewSequence:value.viewSequence,view:cloneView(value.view)};
+  return{kind:value.kind,sequence:value.sequence,viewSequence:value.viewSequence,view:cloneView(value.view),selectedSlot:value.selectedSlot};
 }
 
 export class ServerPlayerInputState{
@@ -62,7 +62,7 @@ export class ServerPlayerInputState{
     const view=this.viewHistory.get(payload.viewSequence);
     if(!view)return{accepted:false,reason:'unknown-action-view'};
     if(this.actions.length>=this.actionQueueLimit)return{accepted:false,reason:'action-queue-full'};
-    const action={kind:payload.kind,sequence:payload.sequence,viewSequence:payload.viewSequence,view:cloneView(view)};this.actions.push(action);
+    const action={kind:payload.kind,sequence:payload.sequence,viewSequence:payload.viewSequence,view:cloneView(view),selectedSlot:this.selectedSlot};this.actions.push(action);
     return{accepted:true,reason:'action-queued',sequence:payload.sequence,viewSequence:payload.viewSequence};
   }
 
