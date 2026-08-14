@@ -7,10 +7,11 @@
 `ServerPlayerInventoryState` 仍然是唯一物品真相。production runtime 新增明确的 mutation wrapper：
 
 - `addInventoryItem(session,id,count)`；
-- `removeInventoryItem(session,slot,count)`；
-- `syncInventory(session)`。
+- `removeInventoryItem(session,slot,count)`。
 
 成功 mutation 推进 Inventory revision 后，runtime 立即向该 session 发送完整 36 格 `inventory-snapshot`。no-op 不产生新 revision，也不发送伪更新。若 mutation 已提交但网络发送失败，服务器状态不会回滚；失败通过 runtime observer 报告。
+
+不提供“无 revision 变化时强制重发当前 snapshot”的公共接口，因为客户端会把同 revision 正确视为重复/陈旧消息。由于 snapshot 是完整状态，某次传输失败后，只要后续 mutation 成功产生更高 revision，客户端即可直接用新完整状态恢复；重新连接则重新建立 revision 基线。
 
 ## 客户端顺序规则
 
