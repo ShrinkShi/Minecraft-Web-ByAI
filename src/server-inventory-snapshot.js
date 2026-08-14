@@ -16,7 +16,7 @@ function count(value,id,label){if(!Number.isInteger(value)||value<1||value>maxSt
 function slots(value,label){if(!Array.isArray(value)||value.length!==INVENTORY_SLOT_COUNT)throw new RangeError(`${label} must contain exactly ${INVENTORY_SLOT_COUNT} slots`);return value;}
 function assertExactKeys(value){const keys=Object.keys(value).sort();if(keys.length!==SNAPSHOT_KEYS.length||keys.some((key,index)=>key!==SNAPSHOT_KEYS[index]))throw new RangeError('server inventory snapshot contains unexpected fields');}
 function encodeSlot(value,index){if(value===null||value===undefined)return null;value=object(value,`inventory slot ${index}`);const id=itemId(value.id,`inventory slot ${index} id`);return[id,count(value.count,id,`inventory slot ${index} count`)];}
-function decodeSlot(value,index){if(value===null)return null;if(!Array.isArray(value)||value.length!==2)throw new TypeError(`inventory slot ${index} must be null or [itemId,count]`);const id=itemId(value[0],`inventory slot ${index} id`);return{id,count(value[1],id,`inventory slot ${index} count`)};}
+function decodeSlot(value,index){if(value===null)return null;if(!Array.isArray(value)||value.length!==2)throw new TypeError(`inventory slot ${index} must be null or [itemId,count]`);const id=itemId(value[0],`inventory slot ${index} id`);return{id,count:count(value[1],id,`inventory slot ${index} count`)};}
 
 export function encodeServerInventorySnapshot(snapshot){
   snapshot=object(snapshot,'server inventory snapshot state');
