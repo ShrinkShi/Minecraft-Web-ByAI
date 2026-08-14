@@ -1,8 +1,12 @@
 import {ATLAS_COLS,ATLAS_ROWS} from './blocks.js';
 import {ITEMS,maxStack} from './items.js';
+import {itemStacksCanMerge} from './item-stack.js';
+import {itemDurabilityDisplay} from './item-durability-display.js';
 import {CraftingGrid} from './recipes.js';
 import {EQUIPMENT_SLOTS} from './equipment.js';
 import {subscribeMultiplayerMiningProgress} from './multiplayer-mining-progress-channel.js';
+
+function craftStacksCanMerge(a,b){if(!a||!b||a.id!==b.id)return false;if(ITEMS[a.id]&&ITEMS[b.id])return itemStacksCanMerge(a,b);return(a.damage??0)===(b.damage??0);}
 
 export class UI{
   constructor(){
@@ -44,7 +48,7 @@ export class UI{
         const grid=slot.dataset.craftSize==='3'?this.craft3:this.craft2;
         if(e.shiftKey){
           const index=Number(slot.dataset.craftIndex),item=grid.slots[index];
-          if(item){const before=item.count,left=this.inventoryModel.add(item.id,before),moved=before-left;if(moved>0){if(left>0)item.count=left;else grid.slots[index]=null;grid.refresh();this.changed();}}
+          if(item){const before=item.count,left=typeof this.inventoryModel.returnExistingStack==='function'?this.inventoryModel.returnExistingStack({...item}):((item.damage??0)>0&&typeof this.inventoryModel.addStack==='function'?this.inventoryModel.addStack({...item}):this.inventoryModel.add(item.id,before)),moved=before-left;if(moved>0){if(left>0)item.count=left;else grid.slots[index]=null;grid.refresh();this.changed();}}
         }else if(this.clickCraftInput(grid,Number(slot.dataset.craftIndex),e.button))this.changed();
       }else if(slot.dataset.craftResult!==undefined){
         const grid=slot.dataset.craftResult==='3'?this.craft3:this.craft2;
@@ -60,13 +64,13 @@ export class UI{
     if(button===0){
       if(!cursor&&slot){this.inventoryModel.cursor=slot;grid.slots[index]=null;grid.refresh();return true;}
       if(cursor&&!slot){grid.slots[index]=cursor;this.inventoryModel.cursor=null;grid.refresh();return true;}
-      if(cursor&&slot&&cursor.id===slot.id){const moved=Math.min(cursor.count,maxStack(slot.id)-slot.count);if(!moved)return false;slot.count+=moved;cursor.count-=moved;if(cursor.count<=0)this.inventoryModel.cursor=null;grid.refresh();return true;}
+      if(cursor&&slot&&craftStacksCanMerge(cursor,slot)){const moved=Math.min(cursor.count,maxStack(slot.id)-slot.count);if(!moved)return false;slot.count+=moved;cursor.count-=moved;if(cursor.count<=0)this.inventoryModel.cursor=null;grid.refresh();return true;}
       if(cursor&&slot){grid.slots[index]=cursor;this.inventoryModel.cursor=slot;grid.refresh();return true;}
     }
     if(button===2){
-      if(!cursor&&slot){const take=Math.ceil(slot.count/2);this.inventoryModel.cursor={id:slot.id,count:take};slot.count-=take;if(slot.count<=0)grid.slots[index]=null;grid.refresh();return true;}
-      if(cursor&&!slot){grid.slots[index]={id:cursor.id,count:1};cursor.count--;if(cursor.count<=0)this.inventoryModel.cursor=null;grid.refresh();return true;}
-      if(cursor&&slot&&cursor.id===slot.id&&slot.count<maxStack(slot.id)){slot.count++;cursor.count--;if(cursor.count<=0)this.inventoryModel.cursor=null;grid.refresh();return true;}
+      if(!cursor&&slot){const take=Math.ceil(slot.count/2);this.inventoryModel.cursor={...slot,count:take};slot.count-=take;if(slot.count<=0)grid.slots[index]=null;grid.refresh();return true;}
+      if(cursor&&!slot){grid.slots[index]={...cursor,count:1};cursor.count--;if(cursor.count<=0)this.inventoryModel.cursor=null;grid.refresh();return true;}
+      if(cursor&&slot&&craftStacksCanMerge(cursor,slot)&&slot.count<maxStack(slot.id)){slot.count++;cursor.count--;if(cursor.count<=0)this.inventoryModel.cursor=null;grid.refresh();return true;}
     }
     return false;
   }
@@ -106,7 +110,10 @@ export class UI{
     if(equipmentSlot!==null)s.dataset.equipmentSlot=equipmentSlot;
     if(craftIndex!==null){s.dataset.craftIndex=craftIndex;s.dataset.craftSize=craftSize;}
     if(result!==null)s.dataset.craftResult=result;
-    if(stack){s.append(this.makeIcon(stack.id));const c=document.createElement('span');c.className='slot-count';if(stack.count>1)c.textContent=stack.count;s.append(c);s.title=ITEMS[stack.id]?.name||stack.id;}
+    if(stack){
+      s.append(this.makeIcon(stack.id));const c=document.createElement('span');c.className='slot-count';if(stack.count>1)c.textContent=stack.count;s.append(c);const name=ITEMS[stack.id]?.name||stack.id,durability=itemDurabilityDisplay(stack);
+      if(durability){const bar=document.createElement('span'),fill=document.createElement('span');bar.className='slot-durability';fill.style.width=`${Math.max(0,Math.min(100,durability.ratio*100))}%`;fill.style.backgroundColor=`hsl(${durability.hue} 100% 50%)`;bar.append(fill);s.append(bar);s.dataset.durabilityDamage=String(durability.damage);s.dataset.durabilityRemaining=String(durability.remaining);s.dataset.durabilityMaximum=String(durability.maximum);s.title=`${name}\n${durability.label}`;s.setAttribute('aria-label',`${name}，${durability.label}`);}else{s.title=name;s.setAttribute('aria-label',name);}
+    }
     if(key){const k=document.createElement('span');k.className='slot-key';k.textContent=key;s.append(k);}
     return s;
   }
