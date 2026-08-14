@@ -46,7 +46,15 @@ export class Inventory{
 
   capacityFor(itemId){const incoming={id:itemId,count:1},limit=maxStack(itemId);let capacity=0;for(const slot of this.slots){if(!slot)capacity+=limit;else if(itemStacksCanMerge(slot,incoming))capacity+=Math.max(0,limit-slot.count);}return capacity;}
 
-  add(itemId,count=1){const amount=requestedCount(count);return amount?this.addStack({id:itemId,count:amount}):0;}
+  insertBulk(itemId,count,ranges){
+    const requested=requestedCount(count);if(!requested)return 0;const prototype=normalizeItemStack({id:itemId,count:1}),limit=maxStack(prototype.id);let remaining=requested;
+    for(const [start,end] of ranges){
+      for(let i=start;i<end&&remaining;i++){const slot=this.slots[i];if(!itemStacksCanMerge(slot,prototype)||slot.count>=limit)continue;const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;}
+      for(let i=start;i<end&&remaining;i++){if(this.slots[i])continue;const moved=Math.min(remaining,limit);this.slots[i]={id:prototype.id,count:moved};remaining-=moved;}
+    }
+    return remaining;
+  }
+  add(itemId,count=1){return this.insertBulk(itemId,count,[[0,INVENTORY_SLOT_COUNT]]);}
   addStack(value){
     const incoming=normalizeItemStack(value),limit=maxStack(incoming.id);let remaining=incoming.count;
     for(const slot of this.slots){if(!itemStacksCanMerge(slot,incoming)||slot.count>=limit)continue;const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;if(!remaining)return 0;}
@@ -54,7 +62,7 @@ export class Inventory{
     return remaining;
   }
 
-  addPickup(itemId,count=1){const amount=requestedCount(count);return amount?this.addPickupStack({id:itemId,count:amount}):0;}
+  addPickup(itemId,count=1){return this.insertBulk(itemId,count,[HOTBAR_RANGE,MAIN_RANGE]);}
   addPickupStack(value){
     const incoming=normalizeItemStack(value),limit=maxStack(incoming.id);let remaining=incoming.count;
     for(const [start,end] of [HOTBAR_RANGE,MAIN_RANGE]){
