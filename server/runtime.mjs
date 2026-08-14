@@ -7,9 +7,10 @@ import {RemotePlayerReplicationHub} from './remote-player-replication-hub.mjs';
 import {normalizeRuntimeConfig} from './runtime-config.mjs';
 
 function callback(value,label){if(typeof value!=='function')throw new TypeError(`${label} must be a function`);return value;}
+function observer(value,label){const fn=callback(value,label);return event=>{try{fn(event);}catch{}};}
 
 export function createAuthoritativeServerRuntime({config={},setIntervalFn=setInterval,clearIntervalFn=clearInterval,playerIdFactory=undefined,onLog=()=>{},onError=()=>{}}={}){
-  const normalized=normalizeRuntimeConfig(config),log=callback(onLog,'onLog'),report=callback(onError,'onError');
+  const normalized=normalizeRuntimeConfig(config),log=observer(onLog,'onLog'),report=observer(onError,'onError');
   const world=new ServerTerrainWorld({seed:normalized.seed,prompt:normalized.prompt,maxCacheChunks:normalized.terrainCacheChunks});
   let server=null;
   const replication=new RemotePlayerReplicationHub({sendSpawn:(session,state)=>server?.sendRemotePlayerSpawn(session,state)??null,sendSnapshot:(session,state)=>server?.sendRemotePlayerSnapshot(session,state)??null,sendDespawn:(session,playerId)=>server?.sendRemotePlayerDespawn(session,playerId)??null,...(playerIdFactory===undefined?{}:{playerIdFactory:callback(playerIdFactory,'playerIdFactory')}),onSendError:event=>report({source:'remote-replication',...event})});
