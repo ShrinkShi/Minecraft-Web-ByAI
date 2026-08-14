@@ -1,7 +1,9 @@
 import {CREATIVE_START,maxStack} from './items.js';
-import {HOTBAR_START,INVENTORY_SLOT_COUNT,creativeSeedSlot} from './inventory-layout.js';
+import {HOTBAR_START,HOTBAR_SIZE,INVENTORY_SLOT_COUNT,creativeSeedSlot} from './inventory-layout.js';
 
 const cloneStack=stack=>stack?{id:stack.id,count:stack.count}:null;
+const MAIN_RANGE=Object.freeze([0,HOTBAR_START]);
+const HOTBAR_RANGE=Object.freeze([HOTBAR_START,HOTBAR_START+HOTBAR_SIZE]);
 
 export class Inventory{
   constructor(mode='survival',snapshot=null){
@@ -48,19 +50,22 @@ export class Inventory{
     return capacity;
   }
 
-  add(itemId,count=1){
-    let remaining=Math.max(0,Math.floor(count));
-    const limit=maxStack(itemId);
-    for(const slot of this.slots){
-      if(!slot||slot.id!==itemId||slot.count>=limit)continue;
-      const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;if(!remaining)return 0;
-    }
-    for(let i=0;i<this.slots.length;i++){
-      if(this.slots[i])continue;
-      const moved=Math.min(remaining,limit);this.slots[i]={id:itemId,count:moved};remaining-=moved;if(!remaining)return 0;
+  addAcrossRanges(itemId,count,ranges){
+    let remaining=Math.max(0,Math.floor(count));const limit=maxStack(itemId);
+    for(const [start,end] of ranges){
+      for(let i=start;i<end&&remaining;i++){
+        const slot=this.slots[i];if(!slot||slot.id!==itemId||slot.count>=limit)continue;
+        const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;
+      }
+      for(let i=start;i<end&&remaining;i++){
+        if(this.slots[i])continue;const moved=Math.min(remaining,limit);this.slots[i]={id:itemId,count:moved};remaining-=moved;
+      }
     }
     return remaining;
   }
+
+  add(itemId,count=1){return this.addAcrossRanges(itemId,count,[MAIN_RANGE,HOTBAR_RANGE]);}
+  addPickup(itemId,count=1){return this.addAcrossRanges(itemId,count,[HOTBAR_RANGE,MAIN_RANGE]);}
 
   removeAt(index,count=1){
     const slot=this.slots[index];if(!slot)return null;
