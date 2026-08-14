@@ -1,5 +1,6 @@
 import {BLOCKS} from './blocks.js';
 import {ITEMS} from './items.js';
+import {toolMeetsBlockRequirement} from './tool-tier-rules.js';
 
 export const CREATIVE_BREAK_DURATION_MS=70;
 export const MIN_BREAK_DURATION_MS=120;
@@ -12,7 +13,7 @@ export function miningToolMultiplier(blockId,itemId=null){
   const block=blockDef(blockId),tool=toolFor(itemId);if(!tool)return 1;if(block.requires===tool.kind)return 2.5*tool.speed;return 1.2;
 }
 
-export function canHarvestBlock(blockId,itemId=null){const block=blockDef(blockId);if(!block.requires)return true;return toolFor(itemId)?.kind===block.requires;}
+export function canHarvestBlock(blockId,itemId=null){return toolMeetsBlockRequirement(toolFor(itemId),blockDef(blockId));}
 
 export function miningDurationMs(blockId,itemId=null,mode='survival'){
   const block=blockDef(blockId);if(mode==='creative')return CREATIVE_BREAK_DURATION_MS;if(mode==='adventure'||mode==='spectator')return Infinity;const hardness=Number.isFinite(block.hardness)&&block.hardness>0?block.hardness:1;return Math.max(MIN_BREAK_DURATION_MS,hardness*BASE_HARDNESS_DURATION_MS/miningToolMultiplier(blockId,itemId));
