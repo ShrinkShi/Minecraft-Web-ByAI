@@ -1,4 +1,4 @@
-import {CREATIVE_START,ITEMS,maxStack} from './items.js';
+import {CREATIVE_START,maxStack} from './items.js';
 import {HOTBAR_START,HOTBAR_SIZE,INVENTORY_SLOT_COUNT,creativeSeedSlot} from './inventory-layout.js';
 
 const cloneStack=stack=>stack?{id:stack.id,count:stack.count}:null;
@@ -9,9 +9,8 @@ function snapshotSlots(snapshot){
   if(!Array.isArray(snapshot?.slots))return null;
   const slots=Array(INVENTORY_SLOT_COUNT).fill(null);
   for(let i=0;i<INVENTORY_SLOT_COUNT;i++){
-    const stack=snapshot.slots[i];
-    if(!stack)continue;
-    if(typeof stack.id!=='string'||!ITEMS[stack.id]||!Number.isFinite(stack.count)||stack.count<=0)continue;
+    const stack=snapshot.slots[i];if(!stack)continue;
+    if(typeof stack.id!=='string'||!stack.id||!Number.isFinite(stack.count)||stack.count<=0)continue;
     slots[i]={id:stack.id,count:Math.min(maxStack(stack.id),Math.floor(stack.count))};
   }
   return slots;
@@ -30,31 +29,22 @@ export class Inventory{
   snapshot(){return{slots:this.slots.map(cloneStack)};}
 
   restore(snapshot){
-    const restored=snapshotSlots(snapshot);if(!restored)return false;
-    this.slots=restored;
+    const restored=snapshotSlots(snapshot);if(!restored)return false;this.slots=restored;
     const legacyOverflow=snapshot.slots[INVENTORY_SLOT_COUNT];
-    if(legacyOverflow?.id&&ITEMS[legacyOverflow.id]&&Number.isFinite(legacyOverflow.count)&&legacyOverflow.count>0)this.add(legacyOverflow.id,Math.min(maxStack(legacyOverflow.id),Math.floor(legacyOverflow.count)));
+    if(legacyOverflow?.id&&Number.isFinite(legacyOverflow.count)&&legacyOverflow.count>0)this.add(legacyOverflow.id,Math.min(maxStack(legacyOverflow.id),Math.floor(legacyOverflow.count)));
     return true;
   }
 
-  replaceSnapshot(snapshot){
-    const restored=snapshotSlots(snapshot);if(!restored)return false;
-    this.slots=restored;this.cursor=null;this.notify('authoritative-snapshot');return true;
-  }
+  replaceSnapshot(snapshot){const restored=snapshotSlots(snapshot);if(!restored)return false;this.slots=restored;this.cursor=null;this.notify('authoritative-snapshot');return true;}
 
   drain(){
-    const stacks=[];
-    for(let i=0;i<this.slots.length;i++){const stack=this.slots[i];if(stack)stacks.push(cloneStack(stack));this.slots[i]=null;}
+    const stacks=[];for(let i=0;i<this.slots.length;i++){const stack=this.slots[i];if(stack)stacks.push(cloneStack(stack));this.slots[i]=null;}
     if(this.cursor)stacks.push(cloneStack(this.cursor));this.cursor=null;return stacks;
   }
 
   hotbar(index){return this.slots[HOTBAR_START+index]||null;}
 
-  capacityFor(itemId){
-    const limit=maxStack(itemId);let capacity=0;
-    for(const slot of this.slots){if(!slot)capacity+=limit;else if(slot.id===itemId)capacity+=Math.max(0,limit-slot.count);}
-    return capacity;
-  }
+  capacityFor(itemId){const limit=maxStack(itemId);let capacity=0;for(const slot of this.slots){if(!slot)capacity+=limit;else if(slot.id===itemId)capacity+=Math.max(0,limit-slot.count);}return capacity;}
 
   add(itemId,count=1){
     let remaining=Math.max(0,Math.floor(count));const limit=maxStack(itemId);
