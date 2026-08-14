@@ -74,9 +74,7 @@ export class CraftingGrid{
     const overflow=[];
     for(let i=0;i<this.slots.length;i++){
       const slot=this.slots[i];if(!slot)continue;
-      let left;
-      if((slot.damage??0)>0&&typeof inventory.addStack==='function')left=inventory.addStack({...slot});
-      else left=inventory.add(slot.id,slot.count);
+      const left=typeof inventory.returnExistingStack==='function'?inventory.returnExistingStack({...slot}):((slot.damage??0)>0&&typeof inventory.addStack==='function'?inventory.addStack({...slot}):inventory.add(slot.id,slot.count));
       if(left)overflow.push({...slot,count:left});this.slots[i]=null;
     }
     this.refresh();return overflow;
