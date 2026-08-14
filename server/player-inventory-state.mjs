@@ -27,6 +27,7 @@ export class ServerPlayerInventoryState{
   }
 
   advanceRevision(){this.revision=nextNetworkSequence(this.revision);return this.revision;}
+  setMode(nextMode){nextMode=playerMode(nextMode);if(nextMode===this.mode)return this.snapshot();this.mode=nextMode;this.advanceRevision();return this.snapshot();}
   stack(slot){return cloneStack(this.slots[inventorySlot(slot)]);}
   hotbar(slot){return cloneStack(this.slots[HOTBAR_START+assertHotbarSlot(slot)]);}
   selectedStack(selectedSlot){return this.hotbar(selectedSlot);}
@@ -90,6 +91,7 @@ export class ServerPlayerInventoryHub{
   leave(session){session=assertClientSessionId(session);return this.states.delete(session);}
   state(session){session=assertClientSessionId(session);const state=this.states.get(session);if(!state)throw new Error(`unknown inventory session: ${session}`);return state;}
   snapshot(session){return this.state(session).snapshot();}
+  setMode(session,nextMode){return this.state(session).setMode(nextMode);}
   selectedStack(session,selectedSlot){return this.state(session).selectedStack(selectedSlot);}
   add(session,id,count=1){return this.state(session).add(id,count);}
   addStack(session,stack){return this.state(session).addStack(stack);}
