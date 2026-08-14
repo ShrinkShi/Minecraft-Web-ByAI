@@ -1,3 +1,5 @@
+import {BLOCK} from '../src/blocks.js';
+import {isBedBlock} from '../src/bed-rules.js';
 import {assertClientSessionId} from '../src/client-input-envelope.js';
 import {ITEMS} from '../src/items.js';
 import {assertHotbarSlot} from '../src/inventory-layout.js';
@@ -18,6 +20,7 @@ function actionLike(value){
   return{kind:'use',selectedSlot:assertHotbarSlot(value.selectedSlot,'use action selectedSlot'),view:{yaw:view.yaw,pitch:view.pitch}};
 }
 const frozen=value=>Object.freeze(value);
+const unsupportedInteractiveTarget=id=>id===BLOCK.CRAFTING_TABLE||isBedBlock(id);
 
 export class CreativeBlockUseController{
   constructor({world,setBlock,inventories,maxDistance=DEFAULT_BLOCK_REACH}={}){
@@ -37,6 +40,7 @@ export class CreativeBlockUseController{
       if(!item?.blockId){results.push(frozen({kind:'use',attempted:false,reason:'item-not-placeable',selectedSlot:action.selectedSlot,itemId:stack.id}));continue;}
       const target=raycastAuthoritativeBlock(this.world,{position:player.position,yaw:action.view.yaw,pitch:action.view.pitch},{maxDistance:this.maxDistance});
       if(!target){results.push(frozen({kind:'use',attempted:true,reason:'no-target',selectedSlot:action.selectedSlot,itemId:stack.id,target:null,placement:null}));continue;}
+      if(unsupportedInteractiveTarget(target.id)){results.push(frozen({kind:'use',attempted:false,reason:'interactive-target-unsupported',selectedSlot:action.selectedSlot,itemId:stack.id,target,placement:null}));continue;}
       const placement=applyAuthoritativeBlockPlacement(this.world,target,{blockId:item.blockId,player,setBlock:this.setBlock});
       results.push(frozen({kind:'use',attempted:true,reason:placement.reason,selectedSlot:action.selectedSlot,itemId:stack.id,target,placement}));
     }
