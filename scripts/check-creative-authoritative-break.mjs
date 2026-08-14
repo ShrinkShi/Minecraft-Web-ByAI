@@ -12,31 +12,36 @@ const setBlock=(x,y,z,id)=>{
 const controller=new CreativeBlockBreakController({world,setBlock});
 const session='s:creative-break';
 const player={position:{x:.5,y:1,z:.5},yaw:0,pitch:0,mode:'creative'};
-const input=primary=>({session,control:{primary}});
 
-let result=controller.step(session,player,input(false));
-assert.equal(result.attempted,false);assert.equal(result.reason,'primary-idle');assert.equal(mutations.length,0);
+let result=controller.step(session,player);
+assert.equal(result.attempted,false);assert.equal(result.reason,'no-pending-primary');assert.equal(mutations.length,0);
 
-result=controller.step(session,player,input(true));
-assert.equal(result.attempted,true);assert.equal(result.reason,'broken');assert.deepEqual({x:result.target.x,y:result.target.y,z:result.target.z,id:result.target.id},{x:0,y:2,z:-2,id:BLOCK.STONE});assert.equal(result.breakResult.changed,true);assert.equal(world.getBlock(0,2,-2),BLOCK.AIR);assert.equal(mutations.length,1);
+let observed=controller.observePrimary(session,true);
+assert.equal(observed.queued,true);assert.equal(observed.reason,'primary-queued');assert.equal(controller.pendingCount(session),1);
+result=controller.step(session,player);
+assert.equal(result.attempted,true);assert.equal(result.reason,'broken');assert.deepEqual({x:result.target.x,y:result.target.y,z:result.target.z,id:result.target.id},{x:0,y:2,z:-2,id:BLOCK.STONE});assert.equal(result.breakResult.changed,true);assert.equal(world.getBlock(0,2,-2),BLOCK.AIR);assert.equal(mutations.length,1);assert.equal(controller.pendingCount(session),0);
 
-result=controller.step(session,player,input(true));
-assert.equal(result.attempted,false);assert.equal(result.reason,'primary-held');assert.equal(mutations.length,1,'holding primary must not delete one block per 20 Hz server tick');
+observed=controller.observePrimary(session,true);assert.equal(observed.queued,false);assert.equal(observed.reason,'primary-held');
+result=controller.step(session,player);assert.equal(result.reason,'no-pending-primary');assert.equal(mutations.length,1,'holding primary must not delete one block per 20 Hz server tick');
 
 cells.set(key(0,2,-3),BLOCK.STONE);
-result=controller.step(session,player,input(false));assert.equal(result.reason,'primary-released');
-result=controller.step(session,player,input(true));assert.equal(result.reason,'broken');assert.equal(result.target.z,-3);assert.equal(mutations.length,2);
+controller.observePrimary(session,false);controller.observePrimary(session,true);controller.observePrimary(session,false);
+assert.equal(controller.pendingCount(session),1,'a press+release entirely between server ticks must remain latched');
+result=controller.step(session,player);assert.equal(result.reason,'broken');assert.equal(result.target.z,-3);assert.equal(mutations.length,2);
 
-controller.step(session,player,input(false));cells.set(key(0,2,-4),BLOCK.STONE);player.mode='survival';
-result=controller.step(session,player,input(true));assert.equal(result.attempted,false);assert.equal(result.reason,'mode-not-creative');assert.equal(mutations.length,2);
-player.mode='creative';result=controller.step(session,player,input(true));assert.equal(result.reason,'primary-held');assert.equal(mutations.length,2,'mode changes while held must not synthesize a fresh click');
-controller.step(session,player,input(false));result=controller.step(session,player,input(true));assert.equal(result.reason,'broken');assert.equal(result.target.z,-4);assert.equal(mutations.length,3);
+cells.set(key(0,2,-4),BLOCK.STONE);player.mode='survival';controller.observePrimary(session,true);
+result=controller.step(session,player);assert.equal(result.attempted,false);assert.equal(result.reason,'mode-not-creative');assert.equal(mutations.length,2);
+player.mode='creative';observed=controller.observePrimary(session,true);assert.equal(observed.reason,'primary-held');result=controller.step(session,player);assert.equal(result.reason,'no-pending-primary');assert.equal(mutations.length,2,'mode changes while held must not synthesize a fresh click');
+controller.observePrimary(session,false);controller.observePrimary(session,true);result=controller.step(session,player);assert.equal(result.reason,'broken');assert.equal(result.target.z,-4);assert.equal(mutations.length,3);
 
-controller.remove(session);cells.set(key(0,2,-5),BLOCK.STONE);result=controller.step(session,player,input(true));assert.equal(result.reason,'broken');assert.equal(result.target.z,-5);assert.equal(mutations.length,4,'removing a session must clear its primary latch');
+controller.observePrimary(session,false);controller.observePrimary(session,true);assert.equal(controller.pendingCount(session),1);assert.equal(controller.remove(session),true);assert.equal(controller.pendingCount(session),0);cells.set(key(0,2,-5),BLOCK.STONE);result=controller.step(session,player);assert.equal(result.reason,'no-pending-primary');controller.observePrimary(session,true);result=controller.step(session,player);assert.equal(result.reason,'broken');assert.equal(result.target.z,-5);assert.equal(mutations.length,4,'removing a session must clear its latch and queued press');
 controller.clear();
 
-assert.throws(()=>controller.step(session,player,{session:'s:other',control:{primary:true}}),/does not match/);
-assert.throws(()=>controller.step(session,player,{session,control:{primary:1}}),/must be a boolean/);
-assert.throws(()=>new CreativeBlockBreakController({world,setBlock,maxDistance:0}),/maxDistance/);
+const bounded=new CreativeBlockBreakController({world,setBlock,pendingPrimaryPressLimit:2});
+for(let i=0;i<2;i++){bounded.observePrimary('s:bounded',true);bounded.observePrimary('s:bounded',false);}assert.equal(bounded.pendingCount('s:bounded'),2);bounded.observePrimary('s:bounded',true);assert.equal(bounded.pendingCount('s:bounded'),2,'pending edge queue must stay bounded');
 
-console.log('creative authoritative primary break: PASS');
+assert.throws(()=>controller.observePrimary(session,1),/must be a boolean/);
+assert.throws(()=>new CreativeBlockBreakController({world,setBlock,maxDistance:0}),/maxDistance/);
+assert.throws(()=>new CreativeBlockBreakController({world,setBlock,pendingPrimaryPressLimit:0}),/pendingPrimaryPressLimit/);
+
+console.log('creative authoritative primary break edge latch: PASS');
