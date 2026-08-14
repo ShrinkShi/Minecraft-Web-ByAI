@@ -1,5 +1,5 @@
 import {createClientGameplayRuntime} from './client-gameplay-runtime.js';
-import {registerControlActionInterceptor} from './control-intents.js';
+import {installMultiplayerSecondaryRouting} from './multiplayer-secondary-routing.js';
 import {RemotePlayerSystem} from './remote-player-system.js';
 import {authoritativeEditsToVoxelEdits} from './world-edit-replication.js';
 import {applyVoxelOverlay} from './voxel-overlay.js';
@@ -11,15 +11,6 @@ export function applyAuthoritativePlayerState(player,state,{applyLook=false}={})
   object(player,'player');state=object(state,'authoritative player state');const position=object(state.position,'authoritative player position'),velocity=object(state.velocity,'authoritative player velocity');
   player.setMode(state.mode);player.position.set(finite(position.x,'position.x'),finite(position.y,'position.y'),finite(position.z,'position.z'));player.velocity.set(finite(velocity.x,'velocity.x'),finite(velocity.y,'velocity.y'),finite(velocity.z,'velocity.z'));player.grounded=!!state.grounded;player.swimCoverage=Number.isFinite(state.swimCoverage)?Math.max(0,Math.min(1,state.swimCoverage)):0;
   if(applyLook)player.setLook(state.yaw,state.pitch);else player.syncCamera();return player;
-}
-
-export function installMultiplayerSecondaryRouting({runtime,movement}={}){
-  runtime=object(runtime,'multiplayer runtime');movement=object(movement,'multiplayer movement session');const player=object(runtime.player,'multiplayer runtime player');if(typeof movement.sendUse!=='function')throw new TypeError('multiplayer movement session must expose sendUse');
-  return registerControlActionInterceptor(intent=>{
-    if(!intent||intent.name!=='secondary'||player.mode!=='creative')return undefined;
-    if(movement.ready===false)return false;
-    const sent=movement.sendUse({yaw:finite(player.yaw,'player.yaw'),pitch:finite(player.pitch,'player.pitch')});return sent!==null;
-  });
 }
 
 export async function createAuthoritativeMultiplayerGameplay({readyData,movement,scene,camera,canvas,controlState,onProgress=()=>{}}={}){
