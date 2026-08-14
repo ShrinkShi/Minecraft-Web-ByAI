@@ -12,6 +12,8 @@ function playerMode(value){if(typeof value!=='string'||!PLAYER_MODES.has(value))
 function itemId(value){if(typeof value!=='string'||!ITEMS[value])throw new RangeError('inventory item id must reference a known item');return value;}
 function itemCount(value,label='inventory item count'){if(!Number.isInteger(value)||value<1)throw new RangeError(`${label} must be a positive integer`);return value;}
 function inventorySlot(value){if(!Number.isInteger(value)||value<0||value>=INVENTORY_SLOT_COUNT)throw new RangeError(`inventory slot must be an integer from 0 to ${INVENTORY_SLOT_COUNT-1}`);return value;}
+function transactionCallback(value){if(typeof value!=='function')throw new TypeError('inventory transaction callback must be a function');return value;}
+function transactionResult(value){if(!value||typeof value!=='object'||Array.isArray(value)||typeof value.changed!=='boolean')throw new TypeError('inventory transaction callback must return an object with changed boolean');return value;}
 
 export class ServerPlayerInventoryState{
   constructor(session,{mode='survival'}={}){
@@ -48,6 +50,15 @@ export class ServerPlayerInventoryState{
     slot=inventorySlot(slot);count=itemCount(count);const current=this.slots[slot];if(!current)return null;const taken=Math.min(count,current.count),result={id:current.id,count:taken};current.count-=taken;if(current.count===0)this.slots[slot]=null;this.advanceRevision();return cloneStack(result);
   }
 
+  commitSelected(selectedSlot,expectedId,count,commit){
+    selectedSlot=assertHotbarSlot(selectedSlot);expectedId=itemId(expectedId);count=itemCount(count,'inventory transaction count');commit=transactionCallback(commit);const index=HOTBAR_START+selectedSlot,current=this.slots[index];
+    if(!current)return Object.freeze({committed:false,reason:'empty-selected-slot',consumed:null,result:null,snapshot:this.snapshot()});
+    if(current.id!==expectedId)return Object.freeze({committed:false,reason:'selected-item-changed',consumed:null,result:null,snapshot:this.snapshot()});
+    if(current.count<count)return Object.freeze({committed:false,reason:'insufficient-selected-count',consumed:null,result:null,snapshot:this.snapshot()});
+    const result=transactionResult(commit(cloneStack(current)));if(!result.changed)return Object.freeze({committed:false,reason:result.reason||'transaction-declined',consumed:null,result,snapshot:this.snapshot()});
+    current.count-=count;if(current.count===0)this.slots[index]=null;this.advanceRevision();return Object.freeze({committed:true,reason:'committed',consumed:Object.freeze({id:expectedId,count}),result,snapshot:this.snapshot()});
+  }
+
   snapshot(){return Object.freeze({session:this.session,mode:this.mode,revision:this.revision,slots:Object.freeze(this.slots.map(cloneStack))});}
 }
 
@@ -63,6 +74,7 @@ export class ServerPlayerInventoryHub{
   add(session,id,count=1){return this.state(session).add(id,count);}
   addPickup(session,id,count=1){return this.state(session).addPickup(id,count);}
   remove(session,slot,count=1){return this.state(session).remove(slot,count);}
+  commitSelected(session,selectedSlot,expectedId,count,commit){return this.state(session).commitSelected(selectedSlot,expectedId,count,commit);}
   close(){this.states.clear();}
 }
 
