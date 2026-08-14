@@ -122,6 +122,8 @@ Q 丢弃不能重新构造 `{id,count:1}`。多人 survival runtime 使用 Inven
 
 单机耐久 E2E 会先把 damage=57 持久化进真实 IndexedDB 世界存档，再重新进入世界。按住左键连续挖掘本身是正确的游戏行为，因此测试不能依赖 Playwright 在第一块破坏完成后“足够快”地发送 mouseup。`?e2e=1` bridge 提供 `prepareSingleplayerMiningTarget()`：它只在 E2E 模式和单机 session 中可用，会把当前视线前 6 格同高度空间清空，只在第 2 格构造一块指定石头，并重置当前本地 mining 状态。正常游戏不会暴露该 helper。测试仍然使用真实鼠标 primary、真实 controller、真实 world mutation 和真实 Inventory/HUD，只移除了随机地形以及连续第二目标造成的调度竞态。
 
+该 fixture 只构造测试几何，不直接调用 `Inventory.damageAt()`、不推进 mining progress、也不替代真实 `world.setBlock(...,AIR)` 破坏事务，所以 E2E 仍能捕获 controller、输入、世界修改和 UI 同步之间的真实集成错误。
+
 ## 当前明确未完成
 
 当前仍不把以下内容伪装成已经完成：
