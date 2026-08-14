@@ -1,6 +1,6 @@
 import {CREATIVE_START,ITEMS,maxStack} from './items.js';
 import {HOTBAR_START,HOTBAR_SIZE,INVENTORY_SLOT_COUNT,creativeSeedSlot} from './inventory-layout.js';
-import {cloneItemStack,itemStacksCanMerge,normalizeItemStack} from './item-stack.js';
+import {cloneItemStack,damageItemStack,itemStacksCanMerge,normalizeItemStack} from './item-stack.js';
 
 const MAIN_RANGE=Object.freeze([0,HOTBAR_START]);
 const HOTBAR_RANGE=Object.freeze([HOTBAR_START,HOTBAR_START+HOTBAR_SIZE]);
@@ -24,6 +24,7 @@ function snapshotSlots(snapshot,{strict=false}={}){
   return slots;
 }
 function requestedCount(value){if(!Number.isFinite(value))return 0;return Math.max(0,Math.floor(value));}
+function slotIndex(value){if(!Number.isInteger(value)||value<0||value>=INVENTORY_SLOT_COUNT)throw new RangeError(`inventory slot must be an integer from 0 to ${INVENTORY_SLOT_COUNT-1}`);return value;}
 
 export class Inventory{
   constructor(mode='survival',snapshot=null){
@@ -75,6 +76,15 @@ export class Inventory{
   addPickup(itemId,count=1){return this.insertBulk(itemId,count,[HOTBAR_RANGE,MAIN_RANGE]);}
   addPickupStack(value){const incoming=normalizeItemStack(value);return this.insertExistingStack(incoming,[HOTBAR_RANGE,MAIN_RANGE]);}
   returnExistingStack(value){return this.insertExistingStack(value,[[0,INVENTORY_SLOT_COUNT]]);}
+
+  damageAt(index,expectedId,amount=1){
+    index=slotIndex(index);const current=this.slots[index];
+    if(!current)return Object.freeze({changed:false,broken:false,reason:'empty-slot',result:null,stack:null});
+    if(current.id!==expectedId)return Object.freeze({changed:false,broken:false,reason:'item-changed',result:null,stack:cloneStack(current)});
+    const result=damageItemStack(current,amount,{label:`inventory slot ${index}`});
+    if(!result.changed)return Object.freeze({changed:false,broken:false,reason:result.reason,result,stack:cloneStack(current)});
+    this.slots[index]=result.stack?cloneStack(result.stack):null;this.notify('durability');return Object.freeze({changed:true,broken:result.broken,reason:result.reason,result,stack:cloneStack(this.slots[index])});
+  }
 
   removeAt(index,count=1){const slot=this.slots[index];if(!slot)return null;const taken=Math.min(slot.count,Math.max(1,Math.floor(count))),result={...slot,count:taken};slot.count-=taken;if(slot.count<=0)this.slots[index]=null;return cloneStack(result);}
 
