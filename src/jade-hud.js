@@ -21,8 +21,8 @@ export class JadeHud{
     if(Number.isFinite(info.tile)){
       const tileSize=58;this.icon.className='jade-icon jade-block-icon';const tx=info.tile%ATLAS_COLS,ty=Math.floor(info.tile/ATLAS_COLS);this.icon.style.backgroundSize=`${ATLAS_COLS*tileSize}px ${ATLAS_ROWS*tileSize}px`;this.icon.style.backgroundPosition=`-${tx*tileSize}px -${ty*tileSize}px`;
     }else this.icon.className='jade-icon';
-    const rows=[],toolState=info.toolCorrect?'✓':'✕';
-    rows.push(`工具：${info.requiredToolName} ${toolState}`);
+    const rows=[],toolState=info.toolCorrect?'✓':'✕',tier=info.requiredToolTierName?` · 最低${info.requiredToolTierName}`:'';
+    rows.push(`工具：${info.requiredToolName}${tier} ${toolState}`);
     if(info.liquid)rows.push('挖掘掉落：不可直接采集');
     else if(!info.hasDrop)rows.push('挖掘掉落：无');
     else rows.push(`挖掘掉落：${info.canDrop?'是':'否'}${info.dropName?` · ${info.dropName}`:''}`);
