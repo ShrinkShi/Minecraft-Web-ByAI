@@ -65,7 +65,7 @@ export class VoxelWorld{
     if(this.meshWorkerBusy)return;
     while(this.meshQueue.size){
       const chunkKey=this.meshQueue.values().next().value;this.meshQueue.delete(chunkKey);const data=this.chunks.get(chunkKey);if(!data)continue;const [cx,cz]=chunkKey.split(',').map(Number),version=(this.meshVersions.get(chunkKey)||0)+1;this.meshVersions.set(chunkKey,version);const copy=chunk=>chunk?chunk.slice().buffer:null;
-      const payload={type:'mesh',key:chunkKey,cx,cz,version,data:data.slice().buffer,px:copy(this.chunks.get(key(cx+1,cz))),nx:copy(this.chunks.get(key(cx-1,cz))),pz:copy(this.chunks.get(key(cx,cz+1))),nz:copy(this.chunks.get(key(cx,cz-1))};
+      const payload={type:'mesh',key:chunkKey,cx,cz,version,data:data.slice().buffer,px:copy(this.chunks.get(key(cx+1,cz))),nx:copy(this.chunks.get(key(cx-1,cz))),pz:copy(this.chunks.get(key(cx,cz+1))),nz:copy(this.chunks.get(key(cx,cz-1)))};
       const transfers=[payload.data,payload.px,payload.nx,payload.pz,payload.nz].filter(Boolean);this.meshWorkerBusy=true;this.meshWorker.postMessage(payload,transfers);return;
     }
   }
