@@ -45,6 +45,5 @@ export function minecraftTextureAssetPath(value,options){
 
 export function minecraftBlockstateAssetPath(value,options){
   const {namespace,path}=parseMinecraftResourceId(value,options);
-  if(path.includes('/'))throw new TypeError('blockstate resource identifier must name a block, not a model path');
   return `./assets/${namespace}/blockstates/${path}.json`;
 }
