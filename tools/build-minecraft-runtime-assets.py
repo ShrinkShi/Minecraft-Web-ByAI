@@ -23,8 +23,6 @@ TILE_SIZE = 16
 ATLAS_COLS = 4
 ATLAS_ROWS = 4
 
-# Vanilla rendering applies biome/item tint at render time. The current world
-# has no biome color field yet, so use stable Plains/default values when baking.
 PLAINS_GRASS = (145, 189, 89)
 PLAINS_FOLIAGE = (119, 171, 47)
 PLAINS_WATER = (63, 118, 228)
@@ -80,6 +78,15 @@ PASS_THROUGH = [
     "blockstates/grass_block.json",
     "blockstates/crafting_table.json",
     "textures/entity/bed/red.png",
+    "textures/entity/cow/cow.png",
+    "textures/entity/sheep/sheep.png",
+    "textures/entity/sheep/sheep_fur.png",
+    "textures/entity/pig/pig.png",
+    "textures/entity/chicken.png",
+    "textures/entity/zombie/zombie.png",
+    "textures/entity/skeleton/skeleton.png",
+    "textures/entity/creeper/creeper.png",
+    "textures/entity/spider/spider.png",
     "textures/block/water_still.png.mcmeta",
     "textures/block/water_flow.png.mcmeta",
 ]
