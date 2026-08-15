@@ -27,8 +27,6 @@ function pushFace(positions,uvs,indices,vertices,rect,textureSize){
   const base=positions.length/3;
   for(const vertex of vertices)positions.push(vertex[0]*PIXEL,vertex[1]*PIXEL,vertex[2]*PIXEL);
   const [u0,v0,u1,v1]=rect,[tw,th]=textureSize;
-  // TextureLoader flips image Y; convert Minecraft's top-left pixel rectangles
-  // into WebGL's bottom-left UV convention.
   const left=u0/tw,right=u1/tw,top=1-v0/th,bottom=1-v1/th;
   uvs.push(left,bottom,left,top,right,top,right,bottom);
   indices.push(base,base+1,base+2,base,base+2,base+3);
@@ -56,8 +54,8 @@ function cuboidGeometry(box,textureSize){
 
 export function createMobModelTemplate(type,def,rawResources){
   const spec=mobModelSpec(type);if(!spec)throw new Error(`missing mob model spec: ${type}`);
-  const resources=ensureResources(rawResources),root=new THREE.Group();root.userData.mobModelType=type;
-  const scale=Number(def?.height)>0?def.height/(spec.heightPixels*PIXEL):1;root.scale.setScalar(scale);
+  const resources=ensureResources(rawResources),root=new THREE.Group(),modelRoot=new THREE.Group();root.userData.mobModelType=type;modelRoot.name=`mob-model:${type}`;
+  const scale=Number(def?.height)>0?def.height/(spec.heightPixels*PIXEL):1;modelRoot.scale.setScalar(scale);root.add(modelRoot);
   const materials=Object.fromEntries(Object.entries(spec.materials).map(([slot,assetKey])=>[slot,entityMaterial(resources,assetKey)]));
   for(const partSpec of spec.parts){
     const part=new THREE.Group();part.name=`mob:${type}:${partSpec.name}`;part.position.set(...partSpec.pivot.map(value=>value*PIXEL));part.rotation.set(...partSpec.rotation);part.userData.mobWalk=partSpec.walk;part.userData.mobBaseRotation=[...partSpec.rotation];
@@ -65,7 +63,7 @@ export function createMobModelTemplate(type,def,rawResources){
       const geometry=cuboidGeometry(boxSpec,spec.textureSize);resources.geometries.add(geometry);
       const mesh=new THREE.Mesh(geometry,materials[boxSpec.material]);mesh.name=`mob-box:${boxSpec.name}`;part.add(mesh);
     }
-    root.add(part);
+    modelRoot.add(part);
   }
   return root;
 }
