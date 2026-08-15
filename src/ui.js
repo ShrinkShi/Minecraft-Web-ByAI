@@ -8,6 +8,7 @@ import {subscribeMultiplayerMiningProgress} from './multiplayer-mining-progress-
 import {hasMultiplayerInventoryTransactionSender,sendMultiplayerInventoryTransaction,subscribeMultiplayerInventoryTransactionResults} from './multiplayer-inventory-transaction-channel.js';
 import {hasMultiplayerEquipmentTransactionSender,sendMultiplayerEquipmentTransaction,subscribeMultiplayerEquipmentTransactionResults} from './multiplayer-equipment-transaction-channel.js';
 import {currentMultiplayerPlayerCraftingSnapshot,hasMultiplayerPlayerCraftingSender,sendMultiplayerPlayerCraftingTransaction,subscribeMultiplayerPlayerCraftingResults,subscribeMultiplayerPlayerCraftingSnapshots} from './multiplayer-player-crafting-channel.js';
+import {currentMultiplayerWorkbenchSnapshot,hasMultiplayerWorkbenchSender,sendMultiplayerWorkbenchTransaction,subscribeMultiplayerWorkbenchSnapshots,subscribeMultiplayerWorkbenchResults,subscribeMultiplayerWorkbenchCloses} from './multiplayer-workbench-channel.js';
 
 function craftStacksCanMerge(a,b){if(!a||!b||a.id!==b.id)return false;if(ITEMS[a.id]&&ITEMS[b.id])return itemStacksCanMerge(a,b);return(a.damage??0)===(b.damage??0);}
 
@@ -28,6 +29,9 @@ export class UI{
     this.releaseEquipmentTransactionResults=subscribeMultiplayerEquipmentTransactionResults(result=>{if(result.ok)return;if(result.code==='stale-revision')this.showToast('装备状态已由服务器更新，请重试');else this.showToast(`装备操作被服务器拒绝：${result.code}`);});
     this.releasePlayerCraftingSnapshots=subscribeMultiplayerPlayerCraftingSnapshots(snapshot=>{if(this.craft2.replaceSnapshot(snapshot))this.renderCrafting();});
     this.releasePlayerCraftingResults=subscribeMultiplayerPlayerCraftingResults(result=>{if(result.ok){if(result.code==='closed-partial')this.showToast('背包已满，部分物品仍保留在合成栏');return;}if(result.code==='stale-revision')this.showToast('合成状态已由服务器更新，请重试');else this.showToast(`合成操作被服务器拒绝：${result.code}`);});
+    this.releaseWorkbenchSnapshots=subscribeMultiplayerWorkbenchSnapshots(snapshot=>{if(snapshot){if(this.craft3.replaceSnapshot(snapshot))this.openWorkbench();return;}this.craft3.replaceSnapshot(null);this.workbench.classList.add('hidden');this.renderCrafting();this.renderCursor();});
+    this.releaseWorkbenchResults=subscribeMultiplayerWorkbenchResults(result=>{if(result.ok)return;if(result.code==='stale-revision')this.showToast('工作台状态已由服务器更新，请重试');else if(result.code==='out-of-range')this.showToast('距离工作台过远，容器已关闭');else if(result.code==='block-removed')this.showToast('工作台已失效，容器已关闭');else this.showToast(`工作台操作被服务器拒绝：${result.code}`);});
+    this.releaseWorkbenchCloses=subscribeMultiplayerWorkbenchCloses(message=>{if(message.reason==='out-of-range')this.showToast('距离工作台过远，容器已关闭');else if(message.reason==='block-removed')this.showToast('工作台已被移除，容器已关闭');else if(message.reason==='mode-invalid')this.showToast('当前游戏模式无法继续使用工作台');});
     this.renderStatus(20,20,0,0,0);this.renderOxygen(15,15,false);this.bindSlotEvents();this.renderHotbar();
   }
 
@@ -37,7 +41,7 @@ export class UI{
 
   bindInventory(model,{equipment=null,onChanged=()=>{},onOverflow=()=>{}}={}){
     this.inventorySubscription?.();this.inventorySubscription=null;this.equipmentSubscription?.();this.equipmentSubscription=null;this.inventoryModel=model;this.equipmentModel=equipment;this.onChanged=onChanged;this.onOverflow=onOverflow;
-    if(hasMultiplayerInventoryTransactionSender()){this.craft2=new CraftingGrid(2);this.craft3=new CraftingGrid(3);const snapshot=currentMultiplayerPlayerCraftingSnapshot();if(snapshot)this.craft2.replaceSnapshot(snapshot);}
+    if(hasMultiplayerInventoryTransactionSender()){this.craft2=new CraftingGrid(2);this.craft3=new CraftingGrid(3);const snapshot=currentMultiplayerPlayerCraftingSnapshot();if(snapshot)this.craft2.replaceSnapshot(snapshot);const workbench=currentMultiplayerWorkbenchSnapshot();if(workbench)this.craft3.replaceSnapshot(workbench);}
     if(model&&typeof model.subscribe==='function')this.inventorySubscription=model.subscribe(()=>this.refreshInventory());
     if(equipment&&typeof equipment.subscribe==='function')this.equipmentSubscription=equipment.subscribe(()=>{this.refreshInventory();this.renderArmor(this.equipmentModel?.armorPoints()||0);this.onChanged();});
     this.refreshInventory();this.renderArmor(this.equipmentModel?.armorPoints()||0);
@@ -49,7 +53,7 @@ export class UI{
       if(!slot)return;
       if(slot.dataset.hotbarIndex!==undefined){if(e.button!==0)return;e.preventDefault();this.select(Number(slot.dataset.hotbarIndex));return;}
       if(!this.inventoryModel)return;if(e.button!==0&&e.button!==2)return;e.preventDefault();
-      const authoritativeInventory=hasMultiplayerInventoryTransactionSender(),authoritativeEquipment=hasMultiplayerEquipmentTransactionSender(),authoritativeCrafting=hasMultiplayerPlayerCraftingSender();
+      const authoritativeInventory=hasMultiplayerInventoryTransactionSender(),authoritativeEquipment=hasMultiplayerEquipmentTransactionSender(),authoritativeCrafting=hasMultiplayerPlayerCraftingSender(),authoritativeWorkbench=hasMultiplayerWorkbenchSender();
       if(slot.dataset.invIndex!==undefined){
         if(authoritativeInventory){try{sendMultiplayerInventoryTransaction({type:'slot-click',slot:Number(slot.dataset.invIndex),button:e.button,shift:!!e.shiftKey});}catch(error){this.showToast(`背包操作发送失败：${error?.message||error}`);}return;}
         const changed=this.inventoryModel.click(Number(slot.dataset.invIndex),e.button,e.shiftKey);if(changed)this.changed();
@@ -60,6 +64,7 @@ export class UI{
       }else if(slot.dataset.craftIndex!==undefined){
         const size=slot.dataset.craftSize;
         if(size==='2'&&authoritativeCrafting){try{sendMultiplayerPlayerCraftingTransaction({type:'input-click',slot:Number(slot.dataset.craftIndex),button:e.button,shift:!!e.shiftKey});}catch(error){this.showToast(`合成操作发送失败：${error?.message||error}`);}return;}
+        if(size==='3'&&authoritativeWorkbench){if(!currentMultiplayerWorkbenchSnapshot()){this.showToast('当前没有打开的权威工作台容器');return;}try{sendMultiplayerWorkbenchTransaction({type:'input-click',slot:Number(slot.dataset.craftIndex),button:e.button,shift:!!e.shiftKey});}catch(error){this.showToast(`工作台操作发送失败：${error?.message||error}`);}return;}
         if(authoritativeInventory){this.showToast(size==='3'?'联机工作台容器尚未服务端化':'联机合成事务尚未服务端化');return;}
         const grid=size==='3'?this.craft3:this.craft2;
         if(e.shiftKey){
@@ -69,6 +74,7 @@ export class UI{
       }else if(slot.dataset.craftResult!==undefined){
         const size=slot.dataset.craftResult;
         if(size==='2'&&authoritativeCrafting){try{sendMultiplayerPlayerCraftingTransaction({type:'take-result',shift:!!e.shiftKey});}catch(error){this.showToast(`合成操作发送失败：${error?.message||error}`);}return;}
+        if(size==='3'&&authoritativeWorkbench){if(!currentMultiplayerWorkbenchSnapshot()){this.showToast('当前没有打开的权威工作台容器');return;}try{sendMultiplayerWorkbenchTransaction({type:'take-result',shift:!!e.shiftKey});}catch(error){this.showToast(`工作台操作发送失败：${error?.message||error}`);}return;}
         if(authoritativeInventory){this.showToast(size==='3'?'联机工作台容器尚未服务端化':'联机合成事务尚未服务端化');return;}
         const grid=size==='3'?this.craft3:this.craft2;if(this.takeCraftResult(grid,e.shiftKey))this.changed();
       }
@@ -155,7 +161,9 @@ export class UI{
   closePanels(){
     if(!this.inventoryModel)return[];
     if(hasMultiplayerInventoryTransactionSender()){
-      if(hasMultiplayerPlayerCraftingSender())try{sendMultiplayerPlayerCraftingTransaction({type:'close'});}catch(error){this.showToast(`合成栏收尾操作发送失败：${error?.message||error}`);}
+      const workbenchOpen=!this.workbench.classList.contains('hidden'),inventoryOpen=!this.inventory.classList.contains('hidden');
+      if(workbenchOpen&&hasMultiplayerWorkbenchSender()&&currentMultiplayerWorkbenchSnapshot())try{sendMultiplayerWorkbenchTransaction({type:'close'});}catch(error){this.showToast(`工作台收尾操作发送失败：${error?.message||error}`);}
+      else if(inventoryOpen&&hasMultiplayerPlayerCraftingSender())try{sendMultiplayerPlayerCraftingTransaction({type:'close'});}catch(error){this.showToast(`合成栏收尾操作发送失败：${error?.message||error}`);}
       else if(this.inventoryModel.cursor)try{sendMultiplayerInventoryTransaction({type:'return-cursor'});}catch(error){this.showToast(`背包收尾操作发送失败：${error?.message||error}`);}
       this.inventory.classList.add('hidden');this.workbench.classList.add('hidden');this.renderCursor();return[];
     }
@@ -165,7 +173,7 @@ export class UI{
   openChat(prefix=''){this.chatWrap.classList.remove('hidden');this.chatInput.value=prefix;this.chatInput.focus();requestAnimationFrame(()=>this.chatInput.setSelectionRange(this.chatInput.value.length,this.chatInput.value.length));}
   closeChat(){this.chatWrap.classList.add('hidden');this.chatInput.blur();}
   isChatOpen(){return !this.chatWrap.classList.contains('hidden');}
-  chatMessage(text,type='system'){const inventoryNotice='多人服务器已接管移动、普通方块交互、掉落物与背包状态；装备、合成、战斗和本地存档仍未接入。',equipmentNotice='多人服务器已接管移动、普通方块交互、掉落物、背包与装备状态；合成、战斗和本地存档仍未接入。';if(hasMultiplayerPlayerCraftingSender()&&(text===inventoryNotice||text===equipmentNotice))text='多人服务器已接管移动、普通方块交互、掉落物、背包、装备与玩家 2×2 合成状态；工作台、战斗和本地存档仍未接入。';else if(hasMultiplayerEquipmentTransactionSender()&&text===inventoryNotice)text=equipmentNotice;const line=document.createElement('div');line.className=`chat-line ${type}`;line.textContent=text;this.chatLog.append(line);while(this.chatLog.children.length>8)this.chatLog.firstChild.remove();clearTimeout(line._timer);line._timer=setTimeout(()=>line.classList.add('faded'),9000);}
+  chatMessage(text,type='system'){const inventoryNotice='多人服务器已接管移动、普通方块交互、掉落物与背包状态；装备、合成、战斗和本地存档仍未接入。',equipmentNotice='多人服务器已接管移动、普通方块交互、掉落物、背包与装备状态；合成、战斗和本地存档仍未接入。',craftingNotice='多人服务器已接管移动、普通方块交互、掉落物、背包、装备与玩家 2×2 合成状态；工作台、战斗和本地存档仍未接入。';if(hasMultiplayerWorkbenchSender()&&(text===inventoryNotice||text===equipmentNotice||text===craftingNotice))text='多人服务器已接管移动、普通方块交互、掉落物、背包、装备、玩家 2×2 合成与工作台 3×3 容器；战斗和本地存档仍未接入。';else if(hasMultiplayerPlayerCraftingSender()&&(text===inventoryNotice||text===equipmentNotice))text=craftingNotice;else if(hasMultiplayerEquipmentTransactionSender()&&text===inventoryNotice)text=equipmentNotice;const line=document.createElement('div');line.className=`chat-line ${type}`;line.textContent=text;this.chatLog.append(line);while(this.chatLog.children.length>8)this.chatLog.firstChild.remove();clearTimeout(line._timer);line._timer=setTimeout(()=>line.classList.add('faded'),9000);}
 
   renderStatus(hp,hunger,xp,level,armorPoints=0){
     this.hearts.textContent='';this.hunger.textContent='';for(let i=0;i<10;i++){const h=document.createElement('i');h.className='heart'+(hp>=i*2+1?'':' empty');this.hearts.append(h);const f=document.createElement('i');f.className='food'+(hunger>=i*2+1?'':' empty');this.hunger.append(f);}this.renderArmor(armorPoints);this.xp.style.width=`${Math.max(0,Math.min(100,xp))}%`;this.level.textContent=level;
