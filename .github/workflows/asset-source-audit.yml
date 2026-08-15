@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'MC原版素材assets.zip'
+      - 'assets/**'
       - 'tools/audit-minecraft-assets.py'
       - 'tools/import-minecraft-assets.py'
       - 'tools/build-minecraft-runtime-assets.py'
@@ -12,15 +13,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
@@ -32,6 +31,13 @@ jobs:
         run: python tools/import-minecraft-assets.py
       - name: Build browser-ready runtime assets
         run: python tools/build-minecraft-runtime-assets.py
+      - name: Verify tracked runtime assets match generated output
+        run: |
+          cmp build/minecraft-runtime-assets/textures/atlas.png assets/textures/atlas.png
+          for file in build/minecraft-runtime-assets/items/*.png; do
+            cmp "$file" "assets/items/$(basename "$file")"
+          done
+          diff -qr build/minecraft-runtime-assets/minecraft assets/minecraft
       - name: Upload deterministic audit report
         uses: actions/upload-artifact@v4
         with:
@@ -50,22 +56,3 @@ jobs:
           name: minecraft-runtime-assets
           path: build/minecraft-runtime-assets
           if-no-files-found: error
-      - name: Stage generated runtime resources on this asset branch
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'assets/v0.4-minecraft-1.20.1-import'
-        env:
-          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
-        run: |
-          mkdir -p assets/textures assets/items
-          cp build/minecraft-runtime-assets/textures/atlas.png assets/textures/atlas.png
-          cp build/minecraft-runtime-assets/items/*.png assets/items/
-          rm -rf assets/minecraft
-          cp -R build/minecraft-runtime-assets/minecraft assets/minecraft
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add assets
-          if git diff --cached --quiet; then
-            echo 'Generated assets already match the branch.'
-          else
-            git commit -m 'assets: sync generated Minecraft 1.20.1 runtime resources'
-            git push origin "HEAD:${HEAD_BRANCH}"
-          fi
