@@ -19,10 +19,10 @@ assert.deepEqual(bedSleepCheckPointFromRespawn(respawnAnchor),sleepPoint,'monste
 assert.equal(bedPlacement(null,{x:0,z:-1}),null);assert.equal(bedPartner({x:0,y:0,z:0},3),null);assert.equal(bedRespawnAnchor({x:0,y:0,z:0},3),null);assert.equal(bedSleepCheckPoint({x:0,y:0,z:0},3),null);assert.equal(bedSleepCheckPointFromRespawn(null),null);
 
 for(const id of BED_BLOCK_IDS){
-  assert.equal(isBedBlock(id),true);const meta=bedBlockMeta(id);assert.ok(meta);assert.equal(BLOCKS[id].bed,true);assert.equal(BLOCKS[id].bedPart,meta.part);assert.equal(BLOCKS[id].bedFacing,meta.facing);assert.equal(BLOCKS[id].drops,'bed');assert.deepEqual(BLOCKS[id].tint,[255,118,118]);assert.equal(itemForBlock(id),'bed');
+  assert.equal(isBedBlock(id),true);const meta=bedBlockMeta(id),block=BLOCKS[id];assert.ok(meta);assert.equal(block.bed,true);assert.equal(block.bedPart,meta.part);assert.equal(block.bedFacing,meta.facing);assert.equal(block.drops,'bed');assert.equal(block.solid,true,'render migration must not silently change gameplay collision');assert.equal(block.fullCube,false,'bed must not occlude neighbor faces as a full cube');assert.equal(block.renderKind,'bed');assert.equal(block.tint,undefined,'bed no longer renders through the tinted terrain atlas');assert.equal(itemForBlock(id),'bed');
 }
 assert.equal(isBedBlock(10),false);assert.equal(bedBlockMeta(10),null);
-assert.equal(ITEMS.bed.name,'床');assert.equal(ITEMS.bed.stack,1);assert.equal(ITEMS.bed.placeKind,'bed');assert.ok(ITEMS.bed.texture.startsWith('data:image/svg+xml'));
+assert.equal(ITEMS.bed.name,'床');assert.equal(ITEMS.bed.stack,1);assert.equal(ITEMS.bed.placeKind,'bed');assert.ok(ITEMS.bed.texture.startsWith('data:image/svg+xml'));assert.equal(ITEMS.bed.entityAssetKey,'entity.bed.red');
 
 const grid=new CraftingGrid(3);grid.slots=[
   {id:'white_wool',count:1},{id:'white_wool',count:1},{id:'white_wool',count:1},
@@ -33,4 +33,4 @@ assert.deepEqual(grid.refresh(),{id:'bed',count:1});assert.deepEqual(grid.consum
 const grid2=new CraftingGrid(2);grid2.slots=[{id:'white_wool',count:1},{id:'white_wool',count:1},{id:'block:5',count:1},{id:'block:5',count:1}];assert.equal(grid2.refresh(),null);
 assert.deepEqual(rollMobLoot('sheep',()=>0),[{id:'white_wool',count:1},{id:'raw_mutton',count:1}]);
 
-console.log('bed placement and recipe rules: PASS');
+console.log('bed placement + recipe + special-render contract: PASS');
