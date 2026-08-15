@@ -1,160 +1,196 @@
 # 开发进度
 
-## 当前版本口径
+## 权威口径
 
-- 稳定发布基线：`v0.3.0`。
-- 当前 `main` 开发线：`v0.4.0-dev`。
-- 版本完成度只按 GitHub `main` 已落库代码和通过的质量门认定；未形成远端 commit 的临时实现不计入完成。
+- 当前开发线：`v0.4.0-dev`。
+- 本轮 Progress Baseline 基于 `main` commit `dbdd6a2b632b6a14b9232806bcbf6a9ccea74113`。
+- 严格 Minecraft Java 1.20.1 完整复刻规划完成度：约 **35%**。
+- Web Minecraft 引擎/基础玩法底座完成度：约 **75–80%**。
+- 当前实现事实以 [`PROJECT_BASELINE.md`](PROJECT_BASELINE.md) 为准。
+- 全量目标与状态以 [`MINECRAFT_1_20_1_FEATURE_MATRIX.md`](MINECRAFT_1_20_1_FEATURE_MATRIX.md) 为准。
+- 只有已经合并到 `main` 且交付 head 质量门通过的功能才允许记为完成。
 
-## 工程质量基础
+## 当前阶段
 
-- [x] Node 22 `src/*.js` 与 `scripts/*.mjs` 语法检查。
-- [x] `npm run test:logic`：基础世界/实体/Worker + Equipment/Armor + Water Mesh + Oxygen/Drowning + Swimming/Buoyancy + Weather/Precipitation + Death Integration + Custom Respawn + Bed Rules + Mobile Device/Input + Unified Control Intent + Absolute View Frame + Gameplay Action Frame + Sleep Rules + Sleep Safety，共 15 套逻辑/契约回归；View/Action Frame 由 `check-controls.mjs` 串联执行。
-- [x] PC/手机输入统一：`ControlIntentBus` 为唯一 gameplay input contract；Desktop/Touch 只是适配器，Player 不再拥有 DOM 键盘监听或 mobile virtualInput。
-- [x] 联机前置平台约束：同一 World/Player/Inventory/存档/玩法语义，未来 `network-peer` 与本地输入复用相同控制状态，不创建独立 mobile client protocol。
-- [x] `PlayerControlFrame v1`：平台无关连续控制 wire schema；desktop/touch/network-peer 同状态编码一致且不携带设备身份。
-- [x] `PlayerViewFrame v1`：平台无关绝对 yaw/pitch wire schema；yaw 规范化到 `[-π,π)`，pitch 严格限制为 Player 运行时范围，拒绝 device/source 与畸形字段。
-- [x] `PlayerActionFrame v1`：离散 `use/drop/hotbar-select` wire schema；use/drop 关联 `viewSeq`，hotbar 发送绝对 slot，拒绝 client target/source/device 与未知 action。
-- [x] GitHub Pages 使用 GitHub Actions，并持续验证真实 Pages Deployment。
-- [x] Playwright Chromium browser smoke：主海洋世界覆盖氧气/游泳/WeatherFX/护甲 v6/虚空死亡；第二世界覆盖普通死亡物品+XP 回收；第三世界覆盖 `/spawnpoint` 持久化与精确自定义重生；第四世界覆盖真实床放置/激活、夜间跳夜、附近敌对生物阻止睡眠与床锚点重生；第五条 Android 横屏用例覆盖移动端自动识别、旋转提示、触控 UI 和摇杆移动。
-- [x] 浏览器失败保留 Playwright trace / screenshot / report。
-- [ ] 将 Three.js 从运行时 jsDelivr 迁移为版本锁定的本地 vendor / 构建依赖。
-- [ ] 扩展 E2E 到普通死亡掉落/拾回、真实战斗减伤、完整溺水死亡、横向游泳速度、天气像素/遮雨、存档重载。
+项目已从“v0.4 技术底座建设”为主，切换到“Minecraft 1.20.1 大规模内容接入”为主。
 
-## v0.4.0 — 实体、战斗与生存扩展（开发中）
+当前不再按“想到一个方块/功能就手工实现一个”的方式扩张。下一阶段的核心原则是先建立可以批量解释原版资源、批量注册内容、批量验证的基础设施。
 
-状态：开发中。实体基础、四种敌对生物、奖励闭环、生存死亡损失、显式死亡界面/重生、持久化自定义重生点、两格床重生锚点/基础跳夜/附近怪物阻止睡眠、第一版护甲、透明水 pass、氧气/溺水、基础游泳/浮力、可见降雨 FX 和手机浏览器横屏触控底座已落库；死亡统计、完整床睡眠表现/占用/模型、完整流体/冲刺游泳、自动天气/闪电/雪、水下视觉和正式 Java 伤害/护甲公式仍未完成。
+## 已确认完成的关键底座
 
-### 联机协议前置
-- [x] 连续移动/按键：`PlayerControlFrame v1`
-- [x] 绝对朝向：`PlayerViewFrame v1`
-- [x] 离散实时动作：`PlayerActionFrame v1`，仅 `use/drop/hotbar-select`
-- [x] action v1 不接受客户端 block/entity target；未来服务端用 authoritative position + referenced view 自己 raycast
-- [x] 本地 UI 动作与世界动作分离：pause/view/focus/escape 不进入 gameplay wire；chat 预留独立消息协议；hotbar-step 必须归一化为绝对 slot
-- [ ] 最小 transport envelope / ordering / session schema
-- [ ] WebSocket/WebTransport transport、房间/认证、玩家复制与 authoritative server loop
-- [ ] Inventory/Crafting/Equipment transaction schema 与 Chat message schema
+### Client / Runtime
 
-### 实体 / 战斗 / 奖励
-- [x] `EntityStore` + `SpatialHash` 数据/空间索引基础及 Node 回归
-- [x] 牛、羊、猪、鸡：地表生成、10 Hz 漫游、受击逃跑、距离回收
-- [x] 僵尸：夜间生成、追击和近战
-- [x] 骷髅：距离控制、侧移和箭矢远程攻击
-- [x] 苦力怕：引信/取消/爆炸；玩家伤害/击退与附近地形破坏
-- [x] 蜘蛛：16 HP、宽体视觉、近战追击、有限局部攀爬
-- [x] `combat.js`：攻击冷却、受击无敌、伤害和击退纯规则
-- [x] `ProjectileSystem` + projectile rules：箭矢重力、方块阻挡、segment/AABB 玩家命中
-- [x] 第一批 loot、`ExperienceOrbSystem`、Java 风格 XP 等级/总经验公式与存档
-- [ ] 完整寻路、亮度生成、日照燃烧、玩家弓、暴击/扫击/完整攻击强度曲线
+- [x] 单一 desktop/mobile Web runtime；`ControlIntentBus` 统一输入语义。
+- [x] 桌面 Pointer Lock + 键鼠；移动端 landscape touch controls。
+- [x] 第一/第三人称视角。
+- [x] 16×16×64 chunk streaming。
+- [x] terrain Worker + mesh Worker。
+- [x] chunk-level merged opaque/water mesh。
+- [x] 显式 chunk/GPU resource disposal。
+- [x] pinned/self-hosted Three.js runtime。
+- [x] IndexedDB 单人增量存档。
 
-### 死亡 / 重生 / 床
-- [x] `death-rules.js`：模式损失策略、`min(100, level × 7)` 死亡 XP、虚空边界
-- [x] survival/adventure 死亡统一 drain Inventory/cursor/Crafting/Equipment
-- [x] 普通死亡在原地生成物品/经验；`y < -10` 虚空死亡直接损失
-- [x] creative/spectator 不执行上述死亡损失
-- [x] `DeathScreen`：死亡原因/损失摘要、显式“重生”和“返回标题画面”；死亡状态下普通输入和本地世界帧被阻断
-- [x] 死亡结算与重生分离：`beginPlayerDeath()` 先在原位置清算并保存，`completeRespawn()` 仅由显式重生动作调用
-- [x] Chromium 虚空死亡 E2E：死亡界面必须持续存在，Escape 不得打开暂停菜单，点击“重生”后才恢复 hp=20；背包/装备/XP 仍保持清空
-- [x] 标准 `/kill` self 指令通过正式 `beginPlayerDeath()` 进入死亡流程；额外参数拒绝
-- [x] Chromium 普通可恢复死亡物品闭环：给予 3 原木→`/kill`→死亡界面确认 3 物品掉落→显式重生→返回死亡坐标→DropSystem 真实拾回→IndexedDB 再次持有 3 原木
-- [x] self `/xp add <points>` / `/experience` points 指令，通过现有 `addExperience()` 接入，不支持 levels/目标选择器
-- [x] Chromium 普通死亡 XP 闭环：16 total XP（Lv.2）→`/kill`→摘要确认 14 XP→显式重生→返回死亡点→ExperienceOrbSystem 真实吸收→IndexedDB `totalXp=14`（恢复后派生 Lv.1）
-- [x] `respawn-rules.js` + `Player.respawnAt()`：精确点/周边候选、安全位置解析和世界出生点 fallback
-- [x] self `/spawnpoint [x y z]`：当前点或 `~` 相对坐标；v6 world record 持久化 `respawnPoint`
-- [x] Chromium 自定义重生 E2E：非原点设置并保存 `/spawnpoint`→移动到异地 `/kill`→显式重生必须回到持久化精确安全点
-- [x] `bed-rules.js`：四方向 foot/head 配对、任一端 partner 解析、统一床锚点与 canonical sleep-check point；睡眠判定点和 `y+1.01` respawn anchor 明确分离
-- [x] 生存床物品/配方：3 白色羊毛 + 3 橡木木板→1 床；羊既有 loot 提供 `white_wool`
-- [x] 两格床 runtime：真实朝向原子放置、任一端使用设置共享 respawnPoint、破坏任一端联动清理并只掉 1 床
-- [x] `sleep-rules.js`：晴天可睡窗口 12542..23459；雨天独立窗口 12010..23991；雷暴全天可睡；`playersSleepingPercentage` 风格 quorum 支持 0..2^31-1，0 仍至少需 1 人，>100 会产生不可达 quorum 而不是报错
-- [x] 当前单人睡眠：夜间/雨天窗口/雷暴使用床时 1/1 quorum 立即把共享世界时间推进到 1000 tick 清晨；有降水时清为 `clear`，并标记世界存档 dirty
-- [x] `sleep-safety-rules.js` + HostileMobSystem SpatialHash 查询：当前实现的僵尸/骷髅/苦力怕/蜘蛛在床 X/Z ±8、Y ±5 范围内阻止睡眠；边界从真实 bed plane 计算，不受 respawn Y offset 影响
-- [x] `/summon <entity> [x y z]`：支持当前四类敌对生物和 `~` 相对坐标，用于正常调试/确定性集成，不提供 E2E 私有世界修改接口
-- [x] Chromium 床 E2E：真实放置/设重生点→夜间正常跳到约 1000 tick→再次设夜 `/summon zombie ~2 ~ ~`→同一床提示附近怪物且时间保持夜晚→传送触发怪物正常回收→v6 保存两端 edits/respawnPoint→异地死亡回床锚点
-- [ ] 装备掉落的普通死亡单独拾回断言、死亡统计、床 101-tick 入睡延迟/动画、占用、半高模型/碰撞、维度爆炸、`keepInventory`
-- [ ] 完整 Minecraft hostile/neutral 睡眠阻止例外表；当前只覆盖项目已实现的四类敌对生物
-- [ ] 死亡掉落/经验球跨页面重载持久化
+### Gameplay / Survival
 
-### Mobile browser / Landscape touch
-- [x] `device-profile.js`：Mobile UA / UA-CH + touch/coarse/no-hover 回退；iPadOS 桌面 UA 与 touchscreen laptop false-positive 边界回归
-- [x] portrait 手机全屏旋转提示；landscape 自动启用 safe-area-aware 触控 HUD
-- [x] 左模拟摇杆 + 右侧拖动视角；`DesktopControls` / `MobileControls` 只翻译设备事件并统一写入 `ControlIntentBus`，Player 仅消费 canonical control state/look intent
-- [x] 攻击/持续挖掘、使用/放置、跳跃、疾跑、潜行、丢弃、背包、暂停、聊天、视角切换与触控热栏
-- [x] 手机控制不依赖 Pointer Lock；桌面 Pointer Lock/键鼠路径保持原语义
-- [x] Android Chromium 844×390 + touch + Mobile UA：横竖屏、背包、暂停、视角、摇杆位移、热栏选择 E2E
-- [ ] 真实 iOS Safari / Android 设备矩阵、可选全屏/方向锁定、震动反馈、控件尺寸/位置自定义、PWA 安装与离线缓存
+- [x] 36-slot Inventory + hotbar + cursor/Shift/right-click stack semantics。
+- [x] 2×2 player crafting + 3×3 workbench。
+- [x] 木镐挖掘速度/harvest/durability。
+- [x] HP / damage / hurt cooldown / knockback。
+- [x] death settlement / DeathScreen / explicit respawn。
+- [x] recoverable item + XP death drops。
+- [x] persistent custom respawnPoint。
+- [x] two-block red bed placement / respawn / sleep / hostile safety。
+- [x] bed partial red entity-texture visual through chunk special rendering。
+- [x] leather Equipment + basic mitigation。
+- [x] water render pass / oxygen / drowning / basic swimming/buoyancy。
+- [x] rain/thunder visible FX。
+- [x] XP orbs and level formulas。
 
-### Equipment / Armor
-- [x] `Equipment`：head/chest/legs/feet 四槽，不占 36 格 Inventory
-- [x] 皮革四件：1/3/2/1 护甲点，cursor 手动装备，错误部位拒绝
-- [x] `armor-rules.js`：过渡公式每点 4%，最高 80%；完整皮革套 7 点=28%
-- [x] 敌对近战、箭矢、爆炸经过基础护甲减伤；虚空/溺水绕过护甲
-- [x] v6 world record 保存/恢复 Equipment；非法快照过滤
-- [x] `scripts/check-armor.mjs` + Chromium 真实装备/存档/死亡清空
-- [ ] 正式 armor+toughness、耐久、更多材质、附魔、Armor Trim、装备配方/快捷装备
+### Entities
 
-### Water render
-- [x] `mesh-worker.js` 单次 chunk 扫描分别构建 opaque / water 两套 TypedArray + Transferable
-- [x] 同水内部面与跨 chunk 同水边界剔除；水/实体边界方向规则
-- [x] `VoxelWorld` 每 chunk 最多一个 opaque mesh + 一个透明 water mesh
-- [x] 两 pass 共享 atlas；water 当前 `transparent=true / opacity=.68 / depthWrite=false`
-- [x] rebuild/unload/dispose 显式释放两套 geometry、material 与共享 texture
-- [x] `scripts/check-water.mjs` 回归；opaque 旧顶层 buffers 暂留迁移兼容层
-- [ ] 流体 level/传播、水流、动态水面、透明排序像素测试、水下 fog/折射
+- [x] EntityStore + SpatialHash foundation。
+- [x] cow / sheep / pig / chicken gameplay slices。
+- [x] zombie / skeleton / creeper / spider gameplay slices。
+- [x] arrow projectile and creeper explosion foundations。
+- [x] first loot/XP tables。
+- [x] all eight current mobs use imported Minecraft Java 1.20.1 texture-backed cuboid models。
 
-### Oxygen / Drowning
-- [x] eye voxel `liquid` 头部浸水检测
-- [x] survival/adventure 15 秒空气；离水 4× 恢复；creative/spectator 满空气
-- [x] 0 空气后每秒产生一次 2 HP 溺水伤害，溺水绕过护甲
-- [x] 10 气泡 Oxygen HUD；重生/退出/非氧气模式复位
-- [x] oxygen 是瞬时状态，不写入 v6 world record
-- [x] `scripts/check-oxygen.mjs` 精确时序回归
-- [x] Chromium：固定 seed + `海` prompt 真实浸水→air 下降→离水恢复；并确认存档无 oxygen
-- [ ] Respiration、Water Breathing、Conduit、气泡柱等扩展
+### Multiplayer authority
 
-### Swimming / Buoyancy
-- [x] `swim-rules.js`：水体覆盖率、水平速度倍率、降低重力、浮力、上下游和垂直限速纯规则
-- [x] Player 脚/躯干/眼睛三点采样；覆盖率由 0→1 时水平速度平滑趋近陆地的 50%
-- [x] 水中不套用陆地 sprint/sneak 速度语义；Space 上游、Shift 下潜
-- [x] 完整浸水有轻微正浮力；水中垂直阻尼并限制约 +3.4/-3.0
-- [x] 水中仍复用 Player 原有 AABB 碰撞与单一轴向积分；离水自动恢复原陆地重力/跳跃
-- [x] `scripts/check-swim.mjs` + Chromium 真实海洋 Space 上升 / Shift 下降
-- [ ] 冲刺游泳姿态/爬行过渡、视线方向三维推进、实体游泳 AI、水流作用、Depth Strider/Dolphin's Grace
+- [x] strict WebSocket handshake/session/input protocol。
+- [x] server-authoritative movement/collision at 20 Hz。
+- [x] remote player replication + interpolation/rendering。
+- [x] shared deterministic terrain on browser/server。
+- [x] initial + live authoritative world edits。
+- [x] authoritative creative/survival mining and placement。
+- [x] authoritative mining progress + crack presentation。
+- [x] authoritative ground item entities + pickup。
+- [x] item-instance durability wire/state path。
+- [x] authoritative Inventory + carried cursor transactions。
+- [x] authoritative Equipment transactions。
+- [x] authoritative 2×2 crafting。
+- [x] authoritative 3×3 Workbench container。
+- [x] authoritative chat + command channel。
+- [x] authoritative PvP melee, HP, mitigation, knockback, death drops and respawn。
+- [x] real two-browser E2E coverage for important multiplayer paths。
 
-### Weather / Precipitation
-- [x] 原有 `/weather clear|rain|thunder` 与 world record weather 状态保留
-- [x] `weather-rules.js`：clear/rain/thunder 固定 profile，包含预算、下落速度、雨线长度、风偏和透明度
-- [x] 固定天气池上限 720：clear=0、rain=`floor(720×.62)=446`、thunder=720
-- [x] `WeatherSystem` 使用单一 `THREE.LineSegments` + 动态 Float32Array，不按雨滴创建 Mesh/Geometry
-- [x] 降水在玩家约 16 格范围内循环 respawn/recycle；玩家移动/传送后重新围绕玩家分布
-- [x] `/weather` 同时更新环境光和 WeatherSystem profile；恢复存档世界时恢复 weather FX
-- [x] world teardown 显式 dispose weather geometry/material
-- [x] `scripts/check-weather.mjs`：天气类型、精确预算、rain/thunder 参数强度和非法输入回归
-- [x] Chromium：真实执行 `/weather rain → thunder → clear`，debug 必须出现 `WeatherFX rain:446 → thunder:720 → clear:0`
-- [ ] 自动天气周期、群系降水、雪、屋顶遮雨/世界碰撞、飞溅/湿润、闪电实体/伤害/音效、像素级降雨视觉断言
+### Assets / Quality
 
-## v0.3.0 — 生存闭环基础
+- [x] logical runtime asset manifest。
+- [x] tracked Minecraft 1.20.1 source archive audit。
+- [x] deterministic selective import/build/checksum pipeline。
+- [x] original block/item subset integrated into runtime atlas/assets。
+- [x] original texture sheets for eight implemented mobs。
+- [x] original red-bed texture in world rendering。
+- [x] Repository quality gate + sharded Chromium browser smoke。
+- [x] PR #94 delivery gate: 131 logic/worker regressions + both browser shards green。
 
-状态：实现完成。
+## 当前内容量瓶颈
 
-- [x] 36 格背包 + 9 格快捷栏映射
-- [x] 左/右键、Shift、cursor stack
-- [x] 2×2 基础配方与 3×3 木镐、工作台 GUI
-- [x] 方块掉落/拾取/Q 丢弃/300 秒销毁
-- [x] F5 三视角
-- [x] `/gamemode` `/give` `/tp` `/time set` `/weather` `/help`
-- [x] 昼夜环境光、IndexedDB 基础存档、GitHub Actions 质量门
+### Blocks
 
-## v0.2.0 — 流式世界与持久化
+正式 gameplay block families 仍然只有约 11 类：grass/dirt/stone/sand/oak planks/oak log/oak leaves/water/crafting table/cobblestone/red bed。
 
-- [x] 动态 chunk streaming 与卸载滞回
-- [x] mesh Worker、精确 TypedArray + Transferable、请求去重队列
-- [x] chunk 卸载 GPU geometry 释放
-- [x] IndexedDB voxel edits + 玩家状态恢复
+导入资源已经远多于 runtime registry，但尚无通用 blockstate/model interpreter，因此大量 block models/blockstates 不能直接变成可玩的方块。
 
-## v0.1.0 — 可玩体素核心
+### Items / Recipes
 
-- [x] 主菜单 / 世界创建 / 暂停菜单
-- [x] Pointer Lock、WASD、Jump、Sprint、Sneak
-- [x] 生存 / 创造基础模式
-- [x] terrain Worker、chunk 合并 mesh、方块破坏/放置
-- [x] AABB 碰撞、重力、跳跃、HUD、GitHub Pages workflow
+- runtime item IDs：28。
+- recipes：5。
+- tool progression 只有 wooden pickaxe 真正进入完整挖掘/耐久闭环。
+
+### Worldgen
+
+当前仍是 deterministic fBm heightmap + basic surface + sea + oak tree。没有真正的 biome / cave / ore / feature / structure pipeline。
+
+### PvE Authority
+
+当前 mobs、hostile AI、projectiles、explosions 仍主要是 client gameplay 系统。多人已经有 authoritative PvP，但 server-authoritative PvE 尚未完成。
+
+### Audio
+
+当前 supplied asset ZIP 中没有 sound files 或 `sounds.json`。音效/音乐需要额外资源源，因此 AudioEngine 暂时是 blocked domain。
+
+## 当前任务：Progress Baseline 重建
+
+目标：消除旧 README/PROGRESS 与真实 `main` 的状态漂移，并把未来 roadmap 固定为可维护矩阵。
+
+- [x] 从当前 `main` 恢复权威 SHA。
+- [x] 新建 `docs/PROJECT_BASELINE.md`。
+- [x] 新建 `docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md`。
+- [x] README 重写为当前真实功能口径。
+- [x] PROGRESS 改为短期 active dashboard，不再重复维护整套历史。
+- [ ] ARCHITECTURE 对齐当前 authoritative multiplayer / asset interpretation 下一阶段边界。
+- [ ] CHANGELOG 增加本轮 baseline/documentation reset 记录。
+- [ ] FILE_MANIFEST / TESTING 检查是否仍含明显失真条目。
+- [ ] exact-head quality gate。
+- [ ] PR review surface clear 后 squash merge。
+
+## 下一任务：Minecraft JSON blockstate/model interpreter
+
+Baseline PR 合并后立即开始，不与其它内容扩张并行手工堆叠。
+
+### 第一阶段：格式/解析边界
+
+- [ ] 定义 resource identifier/path resolver。
+- [ ] 解析 block model `parent` inheritance。
+- [ ] 合并/覆盖 `textures` variables。
+- [ ] 解析 `elements` cuboids。
+- [ ] 解析 per-face texture/uv/cullface/tintindex/rotation。
+- [ ] 解析 element rotation origin/axis/angle/rescale。
+- [ ] 检测 parent cycle / missing model / missing texture。
+- [ ] Node-pure fixtures 和 golden tests。
+
+### 第二阶段：blockstate
+
+- [ ] `variants` property matching。
+- [ ] weighted model alternatives。
+- [ ] x/y model rotation + uvlock。
+- [ ] `multipart` conditions / OR / AND。
+- [ ] deterministic model selection inputs。
+
+### 第三阶段：render/mesh integration
+
+- [ ] 将普通 model cuboids 编译为 mesh-worker 可消费的纯数据 spec。
+- [ ] 支持 atlas/resource texture binding。
+- [ ] 保留 full-cube fast path，非 cube 才走 model interpreter，避免性能退化。
+- [ ] 建立 transparent/cutout/render-layer 分类边界。
+- [ ] 建立 model/collision independence，避免把视觉几何错误当碰撞盒。
+- [ ] Chromium 解码/构建 representative models。
+
+### 第一批 acceptance blocks
+
+优先选择能覆盖模型解释器能力、同时对后续内容扩张有价值的一组 representative blocks，而不是一次盲目导入全部 1.20.1：
+
+- [ ] iron_ore：普通 full cube registry/import 验证；
+- [ ] glass：透明 full cube；
+- [ ] oak_slab：非满高 cuboid；
+- [ ] oak_stairs：多 cuboid + state；
+- [ ] oak_door：上下两格 + facing/open/hinge；
+- [ ] oak_fence：multipart/neighbor state；
+- [ ] torch：非 full cube / texture model；
+- [ ] grass/foliage representative tint index contract。
+
+这批通过后再启动 broad block/item registry batch import。
+
+## 后续批准路线
+
+1. Minecraft JSON blockstate/model interpreter；
+2. broad block/item registry + batch original resource integration；
+3. survival progression：stone/iron/gold/diamond/netherite tools、ores、furnace、food、farming、breeding；
+4. worldgen：biome → caves → ores → vegetation/features → structures → vertical expansion；
+5. server-authoritative mobs/PvE/projectiles/explosions；
+6. persistent shared containers：chest/furnace first；
+7. neighbor updates + scheduled ticks + redstone；
+8. Nether → portal → brewing/enchanting → End → bosses；
+9. AudioEngine + audio source；
+10. lighting/particles/animated textures/biome tint/skins/nameplates；
+11. rooms/auth/operators/reconnect/Realms-like product shell and remaining settings/accessibility/mobile polish。
+
+## 维护规则
+
+- 不再把旧 PR body 中的 “follow-up/out of scope” 自动当成当前 TODO；必须先检查 matrix 和 `main`。
+- 每个改变 Minecraft parity 的 PR 必须同步更新 feature matrix。
+- 普通架构 groundwork 默认只能标 `FOUNDATION`/`PARTIAL`，不能因为有文件/协议就标 `DONE`。
+- 不为扩大内容量牺牲已有 server-authoritative 边界、determinism、Worker isolation 或 resource lifecycle。
+- 不把 Java Edition 的旧技术实现问题（渲染 API、单线程热点、无界资源生命周期等）作为兼容目标。
