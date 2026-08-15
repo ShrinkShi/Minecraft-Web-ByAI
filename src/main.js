@@ -195,7 +195,7 @@ function resume(){if(deathState)return;paused=false;modeScreen(null);pointer();}
 function toggleInventory(){if(!running||paused||deathState||ui.isChatOpen())return;if(ui.hasOpenPanel()){ui.closePanels();pointer();}else{clearPlayerInput();document.exitPointerLock?.();ui.openInventory();}}
 function openWorkbench(){if(sessionKind==='multiplayer'){ui.showToast('联机工作台权威尚未接入');return;}if(!running||paused||deathState)return;clearPlayerInput();document.exitPointerLock?.();ui.openWorkbench();}
 function cycleViewMode(){if(!running||!player)return;const view=player.cycleView();ui.showToast(['第一人称','第三人称背面','第三人称正面'][view]);markSaveDirty();}
-function openChatInput(prefix=''){if(sessionKind==='multiplayer'){ui.showToast('联机聊天/命令协议尚未接入');return;}if(!running||paused||deathState||ui.hasOpenPanel())return;clearPlayerInput();document.exitPointerLock?.();ui.openChat(prefix);}
+function openChatInput(prefix=''){if(!running||paused||deathState||ui.hasOpenPanel())return;clearPlayerInput();document.exitPointerLock?.();ui.openChat(prefix);}
 
 async function handleAction(action){
   if(action==='singleplayer')modeScreen('world');
@@ -223,7 +223,7 @@ function handleControlIntent({name,payload}={}){
   if(name==='pause'){if(running&&!paused){pauseGame();return true;}return false;}
   if(name==='inventory'){const allowed=running&&!paused&&!deathState&&!ui.isChatOpen();if(allowed)toggleInventory();return allowed;}
   if(name==='view'){if(!running)return false;cycleViewMode();return true;}
-  if(name==='chat'){if(sessionKind==='multiplayer')return multiplayerUnsupported('联机聊天/命令协议尚未接入');const allowed=running&&!paused&&!ui.hasOpenPanel();if(allowed)openChatInput(payload?.prefix||'');return allowed;}
+  if(name==='chat'){const allowed=running&&!paused&&!ui.hasOpenPanel();if(allowed)openChatInput(payload?.prefix||'');return allowed;}
   if(name==='drop'){if(sessionKind==='multiplayer')return multiplayerUnsupported('联机丢弃/物品权威尚未接入');if(!canControl())return false;dropSelected();return true;}
   if(name==='hotbar-select'){if(!running||!Number.isInteger(payload?.index)||payload.index<0||payload.index>8)return false;ui.select(payload.index);sendMultiplayerHotbar();return true;}
   if(name==='hotbar-step'){if(!running||ui.hasOpenPanel()||!Number.isFinite(payload?.step))return false;ui.select(ui.selected+(payload.step>0?1:-1));sendMultiplayerHotbar();return true;}
@@ -281,7 +281,7 @@ function runCommand(text){if(sessionKind==='multiplayer'){ui.chatMessage('联机
 function applySky(){const angle=(gameTime-6000)/24000*Math.PI*2,sunHeight=Math.cos(angle),daylight=Math.max(.08,Math.min(1,(sunHeight+.25)/1.25)),storm=weather==='clear'?1:weather==='rain' ? .72 : .55,night=new THREE.Color(0x061126),day=new THREE.Color(0x86bff2),color=night.clone().lerp(day,daylight*storm);scene.background=color;scene.fog.color.copy(color);hemi.intensity=.35+2.05*daylight*storm;sun.intensity=Math.max(0,2.2*daylight*storm);sun.position.set(Math.cos(angle)*100,Math.sin(Math.PI/2-angle)*110,45);}
 function updateMultiplayer(dt){
   const movement=multiplayerMovement;if(!movement?.ready||!world||!player)return;movement.flush();const authoritative=movement.step(dt);if(authoritative){applyAuthoritativePlayerState(player,authoritative);if(worldInfo)worldInfo.mode=authoritative.mode;}world.ensureAround(player.position.x,player.position.z);selectedTarget=null;ui.setBreak(0);ui.renderOxygen(MAX_AIR_SECONDS,MAX_AIR_SECONDS,false);
-  const current=movement.current(),p=player.position;ui.debug.textContent=`Minecraft Web By AI v0.4-dev\nFPS ${fps} · WebGL ${renderer.capabilities.isWebGL2?'2':'1'}\nXYZ ${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}\nChunks ${world.chunks.size} · Meshes ${world.meshQueue.size} · MeshQ ${world.meshQueue.size}\nNetwork server-authoritative · ${worldInfo?.tickRate||20} Hz · Tick ${current?.tick??'-'}\nWorld ${worldInfo?.id||'-'} · Session ${worldInfo?.session||'-'}\n模式 ${player.mode} · Seed ${worldInfo?.seed}`;
+  const current=movement.current(),p=player.position;ui.debug.textContent=`Minecraft Web By AI v0.4-dev\nFPS ${fps} · WebGL ${renderer.capabilities.isWebGL2?'2':'1'}\nXYZ ${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}\nChunks ${world.chunks.size} · Meshes ${world.meshes.size} · MeshQ ${world.meshQueue.size}\nNetwork server-authoritative · ${worldInfo?.tickRate||20} Hz · Tick ${current?.tick??'-'}\nWorld ${worldInfo?.id||'-'} · Session ${worldInfo?.session||'-'}\n模式 ${player.mode} · Seed ${worldInfo?.seed}`;
 }
 
 function animate(now){
