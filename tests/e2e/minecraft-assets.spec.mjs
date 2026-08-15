@@ -23,8 +23,7 @@ test('imported Minecraft runtime assets resolve and decode through the real HTTP
   const atlasResponse=await request.get('/assets/textures/atlas.png');
   expect(atlasResponse.ok()).toBeTruthy();
   expect(atlasResponse.headers()['content-type']).toContain('image/png');
-  const atlas=await decodedImage(page,'/assets/textures/atlas.png');
-  expect(atlas).toEqual({width:64,height:64,complete:true});
+  expect(await decodedImage(page,'/assets/textures/atlas.png')).toEqual({width:64,height:64,complete:true});
 
   for(const path of[
     '/assets/items/wooden_pickaxe.png',
@@ -39,5 +38,23 @@ test('imported Minecraft runtime assets resolve and decode through the real HTTP
     expect(decoded.complete).toBeTruthy();
     expect(decoded.width).toBeGreaterThan(0);
     expect(decoded.height).toBeGreaterThan(0);
+  }
+
+  const entitySheets={
+    '/assets/minecraft/textures/entity/cow/cow.png':[64,32],
+    '/assets/minecraft/textures/entity/sheep/sheep.png':[64,32],
+    '/assets/minecraft/textures/entity/sheep/sheep_fur.png':[64,32],
+    '/assets/minecraft/textures/entity/pig/pig.png':[64,32],
+    '/assets/minecraft/textures/entity/chicken.png':[64,32],
+    '/assets/minecraft/textures/entity/zombie/zombie.png':[64,64],
+    '/assets/minecraft/textures/entity/skeleton/skeleton.png':[64,32],
+    '/assets/minecraft/textures/entity/creeper/creeper.png':[64,32],
+    '/assets/minecraft/textures/entity/spider/spider.png':[64,32]
+  };
+  for(const [path,[width,height]] of Object.entries(entitySheets)){
+    const response=await request.get(path);
+    expect(response.ok(),`${path} must be served`).toBeTruthy();
+    expect(response.headers()['content-type'],`${path} must be served as PNG`).toContain('image/png');
+    expect(await decodedImage(page,path),`${path} must decode at the model sheet dimensions`).toEqual({width,height,complete:true});
   }
 });
