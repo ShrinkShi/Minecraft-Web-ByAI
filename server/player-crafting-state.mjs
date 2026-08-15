@@ -1,0 +1,68 @@
+import {assertClientSessionId} from '../src/client-input-envelope.js';
+import {freezeItemStack,itemStacksCanMerge,normalizeItemStack} from '../src/item-stack.js';
+import {INVENTORY_SLOT_COUNT} from '../src/inventory-layout.js';
+import {maxStack} from '../src/items.js';
+import {matchRecipe} from '../src/recipes.js';
+import {nextNetworkSequence} from '../src/network-sequence.js';
+import {PLAYER_CRAFTING_SIZE,PLAYER_CRAFTING_SLOT_COUNT} from '../src/server-player-crafting-snapshot.js';
+
+const cloneStack=value=>freezeItemStack(value),INVENTORY_RANGE=Object.freeze([0,INVENTORY_SLOT_COUNT]);
+function inputSlot(value){if(!Number.isInteger(value)||value<0||value>=PLAYER_CRAFTING_SLOT_COUNT)throw new RangeError(`player crafting slot must be an integer from 0 to ${PLAYER_CRAFTING_SLOT_COUNT-1}`);return value;}
+function mouseButton(value){if(value!==0&&value!==2)throw new RangeError('player crafting click button must be 0 or 2');return value;}
+function inventoryState(value){if(!value||typeof value!=='object'||Array.isArray(value)||typeof value.advanceRevision!=='function'||typeof value.insertIntoRanges!=='function'||!Array.isArray(value.slots))throw new TypeError('player crafting transaction requires authoritative inventory state');return value;}
+function capacityForInventory(inventory,value){const stack=normalizeItemStack(value,{label:'player crafting output'}),limit=maxStack(stack.id);let capacity=0;for(const slot of inventory.slots){if(!slot)capacity+=limit;else if(itemStacksCanMerge(slot,stack))capacity+=Math.max(0,limit-slot.count);}return capacity;}
+
+export class ServerPlayerCraftingState{
+  constructor(session){this.session=assertClientSessionId(session);this.revision=0;this.size=PLAYER_CRAFTING_SIZE;this.slots=Array(PLAYER_CRAFTING_SLOT_COUNT).fill(null);}
+  advanceRevision(){this.revision=nextNetworkSequence(this.revision);return this.revision;}
+  match(){return matchRecipe(this.slots,this.size);}
+  result(){const result=this.match()?.recipe?.result;return result?cloneStack(result):null;}
+  consumeMatch(match){for(const index of match.used){const stack=this.slots[index];if(!stack)throw new Error('player crafting recipe input disappeared during transaction');stack.count--;if(stack.count<=0)this.slots[index]=null;}}
+
+  clickInput(inventory,slot,button=0,shift=false){
+    inventory=inventoryState(inventory);slot=inputSlot(slot);button=mouseButton(button);if(typeof shift!=='boolean')throw new TypeError('player crafting input shift must be a boolean');if(inventory.mode==='spectator')return Object.freeze({changed:false,reason:'spectator-read-only',inventory:inventory.snapshot(),crafting:this.snapshot()});
+    const current=this.slots[slot];
+    if(shift){if(!current)return Object.freeze({changed:false,reason:'no-change',inventory:inventory.snapshot(),crafting:this.snapshot()});const incoming=cloneStack(current),remaining=inventory.insertIntoRanges(incoming,[INVENTORY_RANGE]),moved=incoming.count-remaining;if(moved<=0)return Object.freeze({changed:false,reason:'inventory-full',inventory:inventory.snapshot(),crafting:this.snapshot()});this.slots[slot]=remaining?{...incoming,count:remaining}:null;inventory.advanceRevision();this.advanceRevision();return Object.freeze({changed:true,reason:remaining?'shift-moved-partial':'shift-moved',inventory:inventory.snapshot(),crafting:this.snapshot()});}
+    const cursor=inventory.cursor;let changed=false,reason='no-change';
+    if(button===0){
+      if(!cursor&&current){inventory.cursor=current;this.slots[slot]=null;changed=true;reason='picked-up';}
+      else if(cursor&&!current){this.slots[slot]=cursor;inventory.cursor=null;changed=true;reason='placed';}
+      else if(cursor&&current&&itemStacksCanMerge(cursor,current)){const moved=Math.min(cursor.count,maxStack(current.id)-current.count);if(moved>0){current.count+=moved;cursor.count-=moved;if(cursor.count<=0)inventory.cursor=null;changed=true;reason='merged';}}
+      else if(cursor&&current){this.slots[slot]=cursor;inventory.cursor=current;changed=true;reason='swapped';}
+    }else{
+      if(!cursor&&current){const take=Math.ceil(current.count/2);inventory.cursor={...current,count:take};current.count-=take;if(current.count<=0)this.slots[slot]=null;changed=true;reason='split-picked-up';}
+      else if(cursor&&!current){this.slots[slot]={...cursor,count:1};cursor.count--;if(cursor.count<=0)inventory.cursor=null;changed=true;reason='placed-one';}
+      else if(cursor&&current&&itemStacksCanMerge(cursor,current)&&current.count<maxStack(current.id)){current.count++;cursor.count--;if(cursor.count<=0)inventory.cursor=null;changed=true;reason='merged-one';}
+    }
+    if(changed){inventory.advanceRevision();this.advanceRevision();}return Object.freeze({changed,reason,inventory:inventory.snapshot(),crafting:this.snapshot()});
+  }
+
+  takeResult(inventory,{shift=false}={}){
+    inventory=inventoryState(inventory);if(typeof shift!=='boolean')throw new TypeError('player crafting take-result shift must be a boolean');if(inventory.mode==='spectator')return Object.freeze({changed:false,reason:'spectator-read-only',crafted:0,inventory:inventory.snapshot(),crafting:this.snapshot()});
+    if(shift){let crafts=0,items=0,safety=64;while(safety--){const match=this.match(),result=match?.recipe?.result;if(!result)break;if(capacityForInventory(inventory,result)<result.count)break;const remaining=inventory.insertIntoRanges(result,[INVENTORY_RANGE]);if(remaining!==0)throw new Error('player crafting capacity check diverged from inventory insertion');this.consumeMatch(match);crafts++;items+=result.count;}if(!crafts)return Object.freeze({changed:false,reason:this.result()?'inventory-full':'no-result',crafted:0,inventory:inventory.snapshot(),crafting:this.snapshot()});inventory.advanceRevision();this.advanceRevision();return Object.freeze({changed:true,reason:'shift-crafted',crafted:items,inventory:inventory.snapshot(),crafting:this.snapshot()});}
+    const match=this.match(),result=match?.recipe?.result;if(!result)return Object.freeze({changed:false,reason:'no-result',crafted:0,inventory:inventory.snapshot(),crafting:this.snapshot()});const output=normalizeItemStack(result,{label:'player crafting output'}),cursor=inventory.cursor;if(cursor){if(!itemStacksCanMerge(cursor,output)||cursor.count+output.count>maxStack(output.id))return Object.freeze({changed:false,reason:'result-blocked',crafted:0,inventory:inventory.snapshot(),crafting:this.snapshot()});cursor.count+=output.count;}else inventory.cursor={...output};this.consumeMatch(match);inventory.advanceRevision();this.advanceRevision();return Object.freeze({changed:true,reason:'crafted',crafted:output.count,inventory:inventory.snapshot(),crafting:this.snapshot()});
+  }
+
+  close(inventory){
+    inventory=inventoryState(inventory);let inventoryChanged=false,craftingChanged=false;
+    for(let i=0;i<this.slots.length;i++){const stack=this.slots[i];if(!stack)continue;const incoming=cloneStack(stack),remaining=inventory.insertIntoRanges(incoming,[INVENTORY_RANGE]),moved=incoming.count-remaining;if(moved<=0)continue;inventoryChanged=true;craftingChanged=true;this.slots[i]=remaining?{...incoming,count:remaining}:null;}
+    if(inventory.cursor){const incoming=cloneStack(inventory.cursor),remaining=inventory.insertIntoRanges(incoming,[INVENTORY_RANGE]),moved=incoming.count-remaining;if(moved>0){inventoryChanged=true;inventory.cursor=remaining?{...incoming,count:remaining}:null;}}
+    if(inventoryChanged)inventory.advanceRevision();if(craftingChanged)this.advanceRevision();const remainingState=!!inventory.cursor||this.slots.some(Boolean);return Object.freeze({changed:inventoryChanged||craftingChanged,reason:(inventoryChanged||craftingChanged)?(remainingState?'closed-partial':'closed-returned'):'no-change',inventory:inventory.snapshot(),crafting:this.snapshot()});
+  }
+
+  snapshot(){return Object.freeze({session:this.session,revision:this.revision,size:this.size,slots:Object.freeze(this.slots.map(cloneStack)),result:this.result()});}
+}
+
+export class ServerPlayerCraftingHub{
+  constructor(){this.states=new Map();}
+  get sessionCount(){return this.states.size;}
+  has(session){return this.states.has(assertClientSessionId(session));}
+  join(session){session=assertClientSessionId(session);if(this.states.has(session))throw new Error(`player crafting session already exists: ${session}`);const state=new ServerPlayerCraftingState(session);this.states.set(session,state);return state.snapshot();}
+  leave(session){session=assertClientSessionId(session);return this.states.delete(session);}
+  state(session){session=assertClientSessionId(session);const state=this.states.get(session);if(!state)throw new Error(`unknown player crafting session: ${session}`);return state;}
+  snapshot(session){return this.state(session).snapshot();}
+  clickInput(session,inventory,slot,button=0,shift=false){return this.state(session).clickInput(inventory,slot,button,shift);}
+  takeResult(session,inventory,options={}){return this.state(session).takeResult(inventory,options);}
+  closePanel(session,inventory){return this.state(session).close(inventory);}
+  close(){this.states.clear();}
+}
