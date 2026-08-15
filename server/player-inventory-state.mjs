@@ -42,13 +42,22 @@ export class ServerPlayerInventoryState{
     return remaining;
   }
 
+  insertBulk(id,count,ranges){
+    id=itemId(id);const requested=itemCount(count),limit=maxStack(id),prototype={id,count:1};let remaining=requested;
+    for(const [start,end] of ranges){
+      for(let i=start;i<end&&remaining;i++){const slot=this.slots[i];if(!itemStacksCanMerge(slot,prototype)||slot.count>=limit)continue;const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;}
+      for(let i=start;i<end&&remaining;i++){if(this.slots[i])continue;const moved=Math.min(remaining,limit);this.slots[i]={id,count:moved};remaining-=moved;}
+    }
+    if(remaining!==requested)this.advanceRevision();return remaining;
+  }
+
   insertStack(stack,{pickup=false}={}){
     const incoming=normalizeItemStack(stack),remaining=this.insertIntoRanges(incoming,pickup?[HOTBAR_RANGE,MAIN_RANGE]:[[0,INVENTORY_SLOT_COUNT]]);if(remaining!==incoming.count)this.advanceRevision();return remaining;
   }
 
-  add(id,count=1){return this.insertStack({id:itemId(id),count:itemCount(count)});}
+  add(id,count=1){return this.insertBulk(id,count,[[0,INVENTORY_SLOT_COUNT]]);}
   addStack(stack){return this.insertStack(stack,{pickup:false});}
-  addPickup(id,count=1){return this.insertStack({id:itemId(id),count:itemCount(count)},{pickup:true});}
+  addPickup(id,count=1){return this.insertBulk(id,count,[HOTBAR_RANGE,MAIN_RANGE]);}
   addPickupStack(stack){return this.insertStack(stack,{pickup:true});}
 
   remove(slot,count=1){
