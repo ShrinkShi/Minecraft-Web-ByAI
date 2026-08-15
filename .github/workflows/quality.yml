@@ -31,6 +31,10 @@ jobs:
     needs: static-checks
     timeout-minutes: 15
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ['1/2', '2/2']
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -40,13 +44,13 @@ jobs:
         run: npm install --no-audit --no-fund --no-package-lock
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Browser smoke
-        run: npm run test:e2e
+      - name: Browser smoke (${{ matrix.shard }})
+        run: npm run test:e2e -- --shard=${{ matrix.shard }}
       - name: Upload browser failure artifacts
         if: failure()
         uses: actions/upload-artifact@v5
         with:
-          name: browser-smoke-artifacts
+          name: browser-smoke-artifacts-${{ strategy.job-index }}
           path: |
             test-results/
             playwright-report/
