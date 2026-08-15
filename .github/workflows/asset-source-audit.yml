@@ -11,6 +11,9 @@ on:
       - 'tools/minecraft_model_closure.py'
       - 'tools/check_minecraft_model_closure.py'
       - 'tools/check_minecraft_model_direct_face.py'
+      - 'tools/minecraft_model_atlas.py'
+      - 'tools/build-minecraft-model-atlas.py'
+      - 'tools/check_minecraft_model_atlas.py'
       - 'tools/requirements-assets.txt'
       - '.github/workflows/asset-source-audit.yml'
   workflow_dispatch:
@@ -34,6 +37,10 @@ jobs:
         run: |
           python tools/check_minecraft_model_closure.py
           python tools/check_minecraft_model_direct_face.py
+      - name: Validate deterministic model texture atlas
+        run: python tools/check_minecraft_model_atlas.py
+      - name: Build deterministic model texture atlas
+        run: python tools/build-minecraft-model-atlas.py
       - name: Extract deterministic runtime source subset
         run: python tools/import-minecraft-assets.py
       - name: Build browser-ready runtime assets
@@ -62,4 +69,10 @@ jobs:
         with:
           name: minecraft-runtime-assets
           path: build/minecraft-runtime-assets
+          if-no-files-found: error
+      - name: Upload deterministic model texture atlas
+        uses: actions/upload-artifact@v4
+        with:
+          name: minecraft-model-texture-atlas
+          path: build/minecraft-model-atlas
           if-no-files-found: error
