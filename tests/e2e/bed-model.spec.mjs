@@ -3,8 +3,8 @@ import {test,expect} from '@playwright/test';
 test('bed blocks leave cube mesh, preserve neighbor faces, and build texture-backed halves',async({page})=>{
   await page.goto('/');
   const result=await page.evaluate(async()=>{
-    const [{BED_IDS},{BedModelRenderer},{bedVisualDescriptor}]=await Promise.all([
-      import('/src/bed-rules.js'),import('/src/bed-model-renderer.js'),import('/src/bed-model-specs.js')
+    const [{BED_IDS},{BedModelRenderer},{bedVisualDescriptor},{VoxelWorld}]=await Promise.all([
+      import('/src/bed-rules.js'),import('/src/bed-model-renderer.js'),import('/src/bed-model-specs.js'),import('/src/world.js')
     ]);
     const runWorker=data=>new Promise((resolve,reject)=>{
       const worker=new Worker('/src/mesh-worker.js',{type:'module'}),timer=setTimeout(()=>{worker.terminate();reject(new Error('mesh worker timeout'));},4000);
@@ -25,7 +25,21 @@ test('bed blocks leave cube mesh, preserve neighbor faces, and build texture-bac
       }
     }
     renderer.dispose();
-    return{specials:workerResult.specials,opaqueEmpty:workerResult.opaque.empty,opaqueIndexBytes:workerResult.opaque.empty?0:workerResult.opaque.indices.byteLength,models,disposed:{geometries:renderer.geometries.size,templates:renderer.templates.size}};
+
+    const scene={children:[],add(object){this.children.push(object);},remove(object){this.children=this.children.filter(entry=>entry!==object);}};
+    const world=new VoxelWorld(scene,{seed:'bed-lifecycle',prompt:'bed lifecycle test',renderDistance:0});
+    const chunkKey='2,-1',descriptor=bedVisualDescriptor(1,2,3,BED_IDS.south.foot),empty={empty:true};
+    world.chunks.set(chunkKey,new Uint8Array(16*16*64));world.meshVersions.set(chunkKey,7);
+    world.onMeshWorker({type:'mesh',key:chunkKey,cx:2,cz:-1,version:7,opaque:empty,water:empty,specials:[descriptor]});
+    const attached=scene.children[0],attachedState={sceneChildren:scene.children.length,name:attached?.name,groupPosition:attached?[attached.position.x,attached.position.y,attached.position.z]:null,visualPosition:attached?.children[0]?[attached.children[0].position.x,attached.children[0].position.y,attached.children[0].position.z]:null};
+    world.disposeChunkMeshes(chunkKey);
+    const afterChunkDispose=scene.children.length;
+    world.onMeshWorker({type:'mesh',key:chunkKey,cx:2,cz:-1,version:7,opaque:empty,water:empty,specials:[descriptor]});
+    const beforeWorldDispose=scene.children.length;
+    world.dispose();
+    const worldDisposed={sceneChildren:scene.children.length,geometries:world.bedRenderer.geometries.size,templates:world.bedRenderer.templates.size};
+
+    return{specials:workerResult.specials,opaqueEmpty:workerResult.opaque.empty,opaqueIndexBytes:workerResult.opaque.empty?0:workerResult.opaque.indices.byteLength,models,disposed:{geometries:renderer.geometries.size,templates:renderer.templates.size},chunkLifecycle:{attachedState,afterChunkDispose,beforeWorldDispose,worldDisposed}};
   });
 
   expect(result.opaqueEmpty).toBeFalsy();
@@ -47,4 +61,9 @@ test('bed blocks leave cube mesh, preserve neighbor faces, and build texture-bac
   expect(result.models['east:foot'].rotationY).toBeCloseTo(Math.PI/2,8);
   expect(result.models['west:foot'].rotationY).toBeCloseTo(-Math.PI/2,8);
   expect(result.disposed).toEqual({geometries:0,templates:0});
+
+  expect(result.chunkLifecycle.attachedState).toEqual({sceneChildren:1,name:'chunk-specials:2,-1',groupPosition:[32,0,-16],visualPosition:[1,2,3]});
+  expect(result.chunkLifecycle.afterChunkDispose).toBe(0);
+  expect(result.chunkLifecycle.beforeWorldDispose).toBe(1);
+  expect(result.chunkLifecycle.worldDisposed).toEqual({sceneChildren:0,geometries:0,templates:0});
 });
