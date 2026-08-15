@@ -10,6 +10,7 @@ on:
       - 'tools/build-minecraft-runtime-assets.py'
       - 'tools/minecraft_model_closure.py'
       - 'tools/check_minecraft_model_closure.py'
+      - 'tools/check_minecraft_model_direct_face.py'
       - 'tools/requirements-assets.txt'
       - '.github/workflows/asset-source-audit.yml'
   workflow_dispatch:
@@ -30,7 +31,9 @@ jobs:
       - name: Inspect source archive
         run: python tools/audit-minecraft-assets.py --json-out minecraft-assets-audit.json
       - name: Validate model dependency closure
-        run: python tools/check_minecraft_model_closure.py
+        run: |
+          python tools/check_minecraft_model_closure.py
+          python tools/check_minecraft_model_direct_face.py
       - name: Extract deterministic runtime source subset
         run: python tools/import-minecraft-assets.py
       - name: Build browser-ready runtime assets
