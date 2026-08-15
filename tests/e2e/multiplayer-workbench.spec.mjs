@@ -27,6 +27,7 @@ test('multiplayer workbench opens from server use and keeps 3x3 crafting authori
     await page.evaluate(()=>globalThis.__minecraftE2E?.sendUse?.({yaw:0,pitch:0}));
     await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E?.workbench?.()),{timeout:5_000}).toMatchObject({target:table,revision:0});
     await expect(page.locator('#workbench')).not.toHaveClass(/hidden/);
+    await expect.poll(()=>page.evaluate(()=>document.pointerLockElement===null),{timeout:5_000}).toBe(true);
     expect(runtime.workbenches.hub.sessionCount).toBe(1);
 
     const added=runtime.addInventoryItem(session,'block:6',1);expect(added.changed).toBe(true);
