@@ -47,7 +47,7 @@ export class ServerPlayerCraftingState{
     inventory=inventoryState(inventory);let inventoryChanged=false,craftingChanged=false;
     for(let i=0;i<this.slots.length;i++){const stack=this.slots[i];if(!stack)continue;const incoming=cloneStack(stack),remaining=inventory.insertIntoRanges(incoming,[INVENTORY_RANGE]),moved=incoming.count-remaining;if(moved<=0)continue;inventoryChanged=true;craftingChanged=true;this.slots[i]=remaining?{...incoming,count:remaining}:null;}
     if(inventory.cursor){const incoming=cloneStack(inventory.cursor),remaining=inventory.insertIntoRanges(incoming,[INVENTORY_RANGE]),moved=incoming.count-remaining;if(moved>0){inventoryChanged=true;inventory.cursor=remaining?{...incoming,count:remaining}:null;}}
-    if(inventoryChanged)inventory.advanceRevision();if(craftingChanged)this.advanceRevision();const remainingState=!!inventory.cursor||this.slots.some(Boolean);return Object.freeze({changed:inventoryChanged||craftingChanged,reason:(inventoryChanged||craftingChanged)?(remainingState?'closed-partial':'closed-returned'):'no-change',inventory:inventory.snapshot(),crafting:this.snapshot()});
+    if(inventoryChanged)inventory.advanceRevision();if(craftingChanged)this.advanceRevision();const remainingState=!!inventory.cursor||this.slots.some(Boolean),changed=inventoryChanged||craftingChanged;return Object.freeze({changed,reason:remainingState?'closed-partial':changed?'closed-returned':'no-change',inventory:inventory.snapshot(),crafting:this.snapshot()});
   }
 
   snapshot(){return Object.freeze({session:this.session,revision:this.revision,size:this.size,slots:Object.freeze(this.slots.map(cloneStack)),result:this.result()});}
