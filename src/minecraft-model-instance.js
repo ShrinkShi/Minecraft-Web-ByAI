@@ -11,20 +11,12 @@ const DIRECTION_VECTORS=Object.freeze({
   east:Object.freeze([1,0,0])
 });
 
-const CANONICAL_FACE_VERTICES=Object.freeze({
-  east:Object.freeze([[1,0,0],[1,1,0],[1,1,1],[1,0,1]].map(Object.freeze)),
-  west:Object.freeze([[0,0,1],[0,1,1],[0,1,0],[0,0,0]].map(Object.freeze)),
-  up:Object.freeze([[0,1,1],[1,1,1],[1,1,0],[0,1,0]].map(Object.freeze)),
-  down:Object.freeze([[0,0,0],[1,0,0],[1,0,1],[0,0,1]].map(Object.freeze)),
-  south:Object.freeze([[1,0,1],[1,1,1],[0,1,1],[0,0,1]].map(Object.freeze)),
-  north:Object.freeze([[0,0,0],[0,1,0],[1,1,0],[1,0,0]].map(Object.freeze))
-});
-
 function freezeVec(value){return Object.freeze(value.map(number=>Math.abs(number)<EPSILON?0:number));}
 function freezeVertices(value){return Object.freeze(value.map(vertex=>freezeVec(vertex)));}
 function finite(value,label){if(typeof value!=='number'||!Number.isFinite(value))throw new TypeError(`${label} must be a finite number`);return value;}
 function modelRotation(value,label){if(value===undefined)return 0;if(!Number.isInteger(value)||!MODEL_ROTATIONS.has(value))throw new RangeError(`${label} must be 0, 90, 180, or 270`);return value;}
 function boolean(value,label){if(typeof value!=='boolean')throw new TypeError(`${label} must be a boolean`);return value;}
+function vec3(value,label){if(!Array.isArray(value)||value.length!==3)throw new TypeError(`${label} must contain exactly three numbers`);return value.map((entry,index)=>finite(entry,`${label}[${index}]`));}
 
 function rotateX(vector,radians){
   const [x,y,z]=vector,c=Math.cos(radians),s=Math.sin(radians);
@@ -36,8 +28,10 @@ function rotateY(vector,radians){
 }
 
 function rotateVectorForModel(vector,x,y){
-  // Minecraft blockstate x/y values rotate the baked model in the opposite
-  // mathematical sign around positive axes. Apply X first, then Y.
+  // Blockstate model rotations use clockwise-positive quarter turns in the
+  // Minecraft model coordinate convention. With the right-handed vector
+  // helpers used here that is the negative mathematical angle. Apply X,
+  // then Y, matching the model-state transform composition.
   let result=rotateX(vector,-x*Math.PI/180);
   result=rotateY(result,-y*Math.PI/180);
   return result;
@@ -73,36 +67,72 @@ export function transformMinecraftModelDirection(direction,{x=0,y=0}={}){
   return directionFromVector(rotateVectorForModel(vector,x,y),`rotated ${direction}`);
 }
 
-function samePoint(a,b){return a.every((value,index)=>Math.abs(value-b[index])<=EPSILON);}
-
-function uvRoleMap(direction,x,y){
-  const targetDirection=transformMinecraftModelDirection(direction,{x,y});
-  const target=CANONICAL_FACE_VERTICES[targetDirection];
-  return CANONICAL_FACE_VERTICES[direction].map(source=>{
-    const transformed=rotatePointForModel(source,x,y).map(value=>Math.round(value));
-    const index=target.findIndex(candidate=>samePoint(transformed,candidate));
-    if(index===-1)throw new Error(`cannot map UV role for ${direction} after x=${x}, y=${y}`);
-    return index;
-  });
+function faceVertices(from,to,direction){
+  const [x0,y0,z0]=from,[x1,y1,z1]=to;
+  switch(direction){
+    case'east':return[[x1,y0,z0],[x1,y1,z0],[x1,y1,z1],[x1,y0,z1]];
+    case'west':return[[x0,y0,z1],[x0,y1,z1],[x0,y1,z0],[x0,y0,z0]];
+    case'up':return[[x0,y1,z1],[x1,y1,z1],[x1,y1,z0],[x0,y1,z0]];
+    case'down':return[[x0,y0,z0],[x1,y0,z0],[x1,y0,z1],[x0,y0,z1]];
+    case'south':return[[x1,y0,z1],[x1,y1,z1],[x0,y1,z1],[x0,y0,z1]];
+    case'north':return[[x0,y0,z0],[x0,y1,z0],[x1,y1,z0],[x1,y0,z0]];
+    default:throw new TypeError(`unknown Minecraft model direction: ${direction}`);
+  }
 }
 
-function baseUvCorners(uv){
+function projectFacePoint(vertex,direction){
+  const [x,y,z]=vertex;
+  switch(direction){
+    case'down':return[x,1-z];
+    case'up':return[x,z];
+    case'north':return[1-x,1-y];
+    case'south':return[x,1-y];
+    case'west':return[z,1-y];
+    case'east':return[1-z,1-y];
+    default:throw new TypeError(`unknown Minecraft model direction: ${direction}`);
+  }
+}
+
+function faceProjectionRoles(vertices,direction){
+  const projected=vertices.map(vertex=>projectFacePoint(vertex,direction));
+  const us=projected.map(value=>value[0]),vs=projected.map(value=>value[1]);
+  const minU=Math.min(...us),maxU=Math.max(...us),minV=Math.min(...vs),maxV=Math.max(...vs);
+  const width=maxU-minU,height=maxV-minV;
+  if(width<EPSILON||height<EPSILON)throw new RangeError(`cannot derive UV roles for degenerate ${direction} face`);
+  return projected.map(([u,v])=>[(u-minU)/width,(v-minV)/height]);
+}
+
+function rotateUvRoleClockwise(role,rotation){
+  const [u,v]=role;
+  switch(rotation){
+    case 0:return[u,v];
+    case 90:return[v,1-u];
+    case 180:return[1-u,1-v];
+    case 270:return[1-v,u];
+    default:throw new RangeError('face uv rotation must be 0, 90, 180, or 270');
+  }
+}
+
+function uvFromRole(uv,role,rotation){
   if(!Array.isArray(uv)||uv.length!==4)throw new TypeError('face uv must contain exactly four numbers');
   const [u0,v0,u1,v1]=uv.map((value,index)=>finite(value,`face uv[${index}]`));
-  return[[u0,v1],[u0,v0],[u1,v0],[u1,v1]];
+  const [ru,rv]=rotateUvRoleClockwise(role,rotation);
+  return freezeVec([u0+(u1-u0)*ru,v0+(v1-v0)*rv]);
 }
 
-export function minecraftFaceUvCorners(uv,rotation=0){
+export function minecraftFaceUvCorners(uv,rotation=0,{vertices,direction}={}){
   rotation=modelRotation(rotation,'face uv rotation');
-  const base=baseUvCorners(uv),quarter=rotation/90;
-  return Object.freeze(base.map((_,index)=>freezeVec(base[(index-quarter+4)%4])));
+  if(!Array.isArray(vertices)||vertices.length!==4||!DIRECTION_VECTORS[direction])throw new TypeError('face UV corner projection requires four vertices and a Minecraft direction');
+  const roles=faceProjectionRoles(vertices,direction);
+  return Object.freeze(roles.map(role=>uvFromRole(uv,role,rotation)));
 }
 
-function transformedUvCorners(face,x,y,uvlock){
-  const authored=minecraftFaceUvCorners(face.uv,face.rotation??0);
-  if(!uvlock)return authored;
-  const roles=uvRoleMap(face.direction,x,y);
-  return Object.freeze(roles.map(role=>authored[role]));
+function transformedUvCorners(face,sourceVertices,x,y,uvlock){
+  const rotation=modelRotation(face.rotation??0,'face uv rotation');
+  if(!uvlock)return minecraftFaceUvCorners(face.uv,rotation,{vertices:sourceVertices,direction:face.direction});
+  const targetDirection=transformMinecraftModelDirection(face.direction,{x,y});
+  const targetVertices=sourceVertices.map(vertex=>rotatePointForModel(vertex,x,y));
+  return minecraftFaceUvCorners(face.uv,rotation,{vertices:targetVertices,direction:targetDirection});
 }
 
 function boundsForFaces(faces){
@@ -114,13 +144,16 @@ function boundsForFaces(faces){
   return Object.freeze({min:freezeVec(min),max:freezeVec(max)});
 }
 
-function transformFace(face,x,y,uvlock){
+function transformFace(face,element,x,y,uvlock){
   if(!face||typeof face!=='object'||!DIRECTION_VECTORS[face.direction])throw new TypeError('compiled face must have a Minecraft direction');
   if(!Array.isArray(face.vertices)||face.vertices.length!==4)throw new TypeError(`compiled ${face.direction} face must contain four vertices`);
+  const sourceFrom=vec3(element.from,'compiled element from'),sourceTo=vec3(element.to,'compiled element to');
+  const sourceVertices=faceVertices(sourceFrom,sourceTo,face.direction);
   const vertices=freezeVertices(face.vertices.map((vertex,index)=>{
     if(!Array.isArray(vertex)||vertex.length!==3)throw new TypeError(`compiled ${face.direction} vertex ${index} must contain three numbers`);
     return rotatePointForModel(vertex.map((value,axis)=>finite(value,`compiled ${face.direction} vertex ${index}[${axis}]`)),x,y);
   }));
+  if(!Array.isArray(face.normal)||face.normal.length!==3)throw new TypeError(`compiled ${face.direction} face must contain a normal`);
   const normal=freezeVec(normalized(rotateVectorForModel(face.normal,x,y),`compiled ${face.direction} normal`));
   const direction=transformMinecraftModelDirection(face.direction,{x,y});
   const cullface=face.cullface===null||face.cullface===undefined?null:transformMinecraftModelDirection(face.cullface,{x,y});
@@ -132,7 +165,7 @@ function transformFace(face,x,y,uvlock){
     normal,
     sourceCullface:face.cullface??null,
     cullface,
-    uvCorners:transformedUvCorners(face,x,y,uvlock),
+    uvCorners:transformedUvCorners(face,sourceVertices,x,y,uvlock),
     uvlock
   });
 }
@@ -146,7 +179,7 @@ export function applyMinecraftModelInstanceTransform(geometry,modelEntry={}){
   for(const element of geometry.elements){
     if(!element||!Array.isArray(element.faces))throw new TypeError('compiled geometry element must contain faces');
     const transformedFaces=Object.freeze(element.faces.map(face=>{
-      const transformed=transformFace(face,x,y,uvlock);faces.push(transformed);return transformed;
+      const transformed=transformFace(face,element,x,y,uvlock);faces.push(transformed);return transformed;
     }));
     elements.push(Object.freeze({...element,faces:transformedFaces,bounds:boundsForFaces(transformedFaces)}));
   }
