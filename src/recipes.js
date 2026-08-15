@@ -57,7 +57,7 @@ export function matchRecipe(slots,size){
 export class CraftingGrid{
   constructor(size=2){this.size=size;this.slots=Array(size*size).fill(null);this.match=null;this.authoritative=false;this.authoritativeResult=null;this.refresh();}
   refresh(){if(this.authoritative){this.match=null;return this.authoritativeResult?{...this.authoritativeResult}:null;}this.match=matchRecipe(this.slots,this.size);return this.match?.recipe.result||null;}
-  replaceSnapshot(snapshot){if(!snapshot||snapshot.size!==this.size||!Array.isArray(snapshot.slots)||snapshot.slots.length!==this.size*this.size)return false;this.slots=snapshot.slots.map(stack=>stack?{...stack}:null);this.authoritativeResult=snapshot.result?{...snapshot.result}:null;this.authoritative=true;this.match=null;return true;}
+  replaceSnapshot(snapshot){if(snapshot===null){this.slots=Array(this.size*this.size).fill(null);this.authoritativeResult=null;this.authoritative=false;this.match=null;this.refresh();return true;}if(!snapshot||snapshot.size!==this.size||!Array.isArray(snapshot.slots)||snapshot.slots.length!==this.size*this.size)return false;this.slots=snapshot.slots.map(stack=>stack?{...stack}:null);this.authoritativeResult=snapshot.result?{...snapshot.result}:null;this.authoritative=true;this.match=null;return true;}
   consume(){
     if(this.authoritative)return null;if(!this.match)return null;
     const output={...this.match.recipe.result};
