@@ -18,10 +18,13 @@ function snapshotSlots(snapshot,{strict=false}={}){
   const slots=Array(INVENTORY_SLOT_COUNT).fill(null);
   for(let i=0;i<INVENTORY_SLOT_COUNT;i++){
     const stack=snapshot.slots[i];if(!stack)continue;
-    if(strict){try{slots[i]=normalizeItemStack(stack,{label:`inventory slot ${i}`});}catch{};continue;}
+    if(strict){try{slots[i]=normalizeItemStack(stack,{label:`inventory slot ${i}`});}catch{return null;}continue;}
     slots[i]=legacyStack(stack,`inventory slot ${i}`);
   }
   return slots;
+}
+function snapshotCursor(snapshot,{strict=false}={}){
+  const value=snapshot?.cursor;if(value===undefined||value===null)return null;if(strict){try{return normalizeItemStack(value,{label:'inventory cursor'});}catch{return undefined;}}return legacyStack(value,'inventory cursor');
 }
 function requestedCount(value){if(!Number.isFinite(value))return 0;return Math.max(0,Math.floor(value));}
 function slotIndex(value){if(!Number.isInteger(value)||value<0||value>=INVENTORY_SLOT_COUNT)throw new RangeError(`inventory slot must be an integer from 0 to ${INVENTORY_SLOT_COUNT-1}`);return value;}
@@ -44,7 +47,7 @@ export class Inventory{
     return true;
   }
 
-  replaceSnapshot(snapshot){const restored=snapshotSlots(snapshot,{strict:true});if(!restored)return false;this.slots=restored;this.cursor=null;this.notify('authoritative-snapshot');return true;}
+  replaceSnapshot(snapshot){const restored=snapshotSlots(snapshot,{strict:true}),cursor=snapshotCursor(snapshot,{strict:true});if(!restored||cursor===undefined)return false;this.slots=restored;this.cursor=cursor;this.notify('authoritative-snapshot');return true;}
 
   drain(){
     const stacks=[];for(let i=0;i<this.slots.length;i++){const stack=this.slots[i];if(stack)stacks.push(cloneStack(stack));this.slots[i]=null;}

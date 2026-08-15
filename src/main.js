@@ -182,7 +182,7 @@ async function startMultiplayerWorld(readyData,movement){
   try{created=await createAuthoritativeMultiplayerGameplay({readyData,movement,scene,camera,canvas,controlState:controlBus.snapshot(),onProgress:(done,total)=>ui.showLoading(true,`生成服务器区块 ${done}/${total}`,total?Math.round(done/total*100):100)});}catch(error){console.error('创建多人世界失败',error);if(movement===multiplayerMovement){multiplayerMovement=null;multiplayerStarting=false;try{movement.close(1011,'client world setup failed');}catch{}ui.showLoading(false);ui.setMultiplayerStatus(`无法创建服务器世界：${error.message||error}`,{error:true});modeScreen('multiplayer');}return;}
   if(movement!==multiplayerMovement||movement.state!=='ready'){created.runtime.dispose();return;}
   gameplayRuntime=created.runtime;({world,player,inventory,equipment,drops,experienceOrbs,projectiles,explosions,passiveMobs,hostileMobs,weatherSystem}=gameplayRuntime);worldInfo=created.worldInfo;sessionKind='multiplayer';gameTime=6000;weather='clear';totalXp=0;respawnPoint=null;saveDirty=false;lastSavedPosition=null;lastAttackAt=-Infinity;resetOxygen();
-  ui.bindInventory(inventory,{equipment,onChanged:()=>{},onOverflow:()=>{}});multiplayerMovement.setControl(controlBus.snapshot());multiplayerMovement.setView({yaw:player.yaw,pitch:player.pitch});multiplayerMovement.flush();running=true;paused=false;multiplayerStarting=false;ui.setReturnMainLabel(true);ui.hud.classList.remove('hidden');ui.showLoading(false);ui.setMultiplayerStatus(`已连接世界 ${worldInfo.id} · ${worldInfo.tickRate} Hz`);renderPlayerStatus();applySky();ui.chatMessage('多人移动已由服务器权威接管。方块、背包、战斗、命令和本地存档暂时禁用，直到对应服务端执行器完成。');ui.showToast('已进入服务器权威移动模式');pointer();
+  ui.bindInventory(inventory,{equipment,onChanged:()=>{},onOverflow:()=>{}});multiplayerMovement.setControl(controlBus.snapshot());multiplayerMovement.setView({yaw:player.yaw,pitch:player.pitch});multiplayerMovement.flush();running=true;paused=false;multiplayerStarting=false;ui.setReturnMainLabel(true);ui.hud.classList.remove('hidden');ui.showLoading(false);ui.setMultiplayerStatus(`已连接世界 ${worldInfo.id} · ${worldInfo.tickRate} Hz`);renderPlayerStatus();applySky();ui.chatMessage('多人服务器已接管移动、普通方块交互、掉落物与背包状态；装备、合成、战斗和本地存档仍未接入。');ui.showToast('已进入服务器权威移动模式');pointer();
 }
 function connectMultiplayer(){
   if(multiplayerStarting)return;disposeWorld();ui.hud.classList.add('hidden');ui.setReturnMainLabel(false);modeScreen('multiplayer');const url=ui.multiplayerUrl?.value?.trim()||'';if(!url){ui.setMultiplayerStatus('请输入 WebSocket 服务器地址',{error:true});return;}
@@ -192,10 +192,10 @@ function connectMultiplayer(){
 
 function pauseGame(){if(!running||deathState)return;paused=true;clearPlayerInput();document.exitPointerLock?.();modeScreen('pause');persistWorld();}
 function resume(){if(deathState)return;paused=false;modeScreen(null);pointer();}
-function toggleInventory(){if(sessionKind==='multiplayer'){ui.showToast('联机背包权威尚未接入');return;}if(!running||paused||deathState||ui.isChatOpen())return;if(ui.hasOpenPanel()){ui.closePanels();pointer();}else{clearPlayerInput();document.exitPointerLock?.();ui.openInventory();}}
+function toggleInventory(){if(!running||paused||deathState||ui.isChatOpen())return;if(ui.hasOpenPanel()){ui.closePanels();pointer();}else{clearPlayerInput();document.exitPointerLock?.();ui.openInventory();}}
 function openWorkbench(){if(sessionKind==='multiplayer'){ui.showToast('联机工作台权威尚未接入');return;}if(!running||paused||deathState)return;clearPlayerInput();document.exitPointerLock?.();ui.openWorkbench();}
 function cycleViewMode(){if(!running||!player)return;const view=player.cycleView();ui.showToast(['第一人称','第三人称背面','第三人称正面'][view]);markSaveDirty();}
-function openChatInput(prefix=''){if(sessionKind==='multiplayer'){ui.showToast('联机聊天/命令协议尚未接入');return;}if(!running||paused||deathState||ui.hasOpenPanel())return;clearPlayerInput();document.exitPointerLock?.();ui.openChat(prefix);}
+function openChatInput(prefix=''){if(!running||paused||deathState||ui.hasOpenPanel())return;clearPlayerInput();document.exitPointerLock?.();ui.openChat(prefix);}
 
 async function handleAction(action){
   if(action==='singleplayer')modeScreen('world');
@@ -221,9 +221,9 @@ function handleControlIntent({name,payload}={}){
   if(name==='focus'){pointer();return true;}if(deathState)return false;
   if(name==='escape'){if(ui.isChatOpen()){ui.closeChat();pointer();return true;}if(ui.hasOpenPanel()){ui.closePanels();pointer();return true;}if(running&&!paused){pauseGame();return true;}return false;}
   if(name==='pause'){if(running&&!paused){pauseGame();return true;}return false;}
-  if(name==='inventory'){if(sessionKind==='multiplayer')return multiplayerUnsupported('联机背包权威尚未接入');const allowed=running&&!paused&&!deathState&&!ui.isChatOpen();if(allowed)toggleInventory();return allowed;}
+  if(name==='inventory'){const allowed=running&&!paused&&!deathState&&!ui.isChatOpen();if(allowed)toggleInventory();return allowed;}
   if(name==='view'){if(!running)return false;cycleViewMode();return true;}
-  if(name==='chat'){if(sessionKind==='multiplayer')return multiplayerUnsupported('联机聊天/命令协议尚未接入');const allowed=running&&!paused&&!ui.hasOpenPanel();if(allowed)openChatInput(payload?.prefix||'');return allowed;}
+  if(name==='chat'){const allowed=running&&!paused&&!ui.hasOpenPanel();if(allowed)openChatInput(payload?.prefix||'');return allowed;}
   if(name==='drop'){if(sessionKind==='multiplayer')return multiplayerUnsupported('联机丢弃/物品权威尚未接入');if(!canControl())return false;dropSelected();return true;}
   if(name==='hotbar-select'){if(!running||!Number.isInteger(payload?.index)||payload.index<0||payload.index>8)return false;ui.select(payload.index);sendMultiplayerHotbar();return true;}
   if(name==='hotbar-step'){if(!running||ui.hasOpenPanel()||!Number.isFinite(payload?.step))return false;ui.select(ui.selected+(payload.step>0?1:-1));sendMultiplayerHotbar();return true;}

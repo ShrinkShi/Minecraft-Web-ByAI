@@ -5,6 +5,7 @@ import {itemDurabilityDisplay} from './item-durability-display.js';
 import {CraftingGrid} from './recipes.js';
 import {EQUIPMENT_SLOTS} from './equipment.js';
 import {subscribeMultiplayerMiningProgress} from './multiplayer-mining-progress-channel.js';
+import {hasMultiplayerInventoryTransactionSender,sendMultiplayerInventoryTransaction,subscribeMultiplayerInventoryTransactionResults} from './multiplayer-inventory-transaction-channel.js';
 
 function craftStacksCanMerge(a,b){if(!a||!b||a.id!==b.id)return false;if(ITEMS[a.id]&&ITEMS[b.id])return itemStacksCanMerge(a,b);return(a.damage??0)===(b.damage??0);}
 
@@ -21,6 +22,7 @@ export class UI{
     this.chatLog=document.querySelector('#chat-log');this.chatWrap=document.querySelector('#chat-input-wrap');this.chatInput=document.querySelector('#chat-input');
     this.selected=0;this.inventoryModel=null;this.inventorySubscription=null;this.equipmentModel=null;this.craft2=new CraftingGrid(2);this.craft3=new CraftingGrid(3);this.onChanged=()=>{};this.onOverflow=()=>{};this.localBreakProgress=0;this.authoritativeBreakProgress=null;
     this.releaseMiningProgress=subscribeMultiplayerMiningProgress(state=>{this.authoritativeBreakProgress=state?.active?state.progress:null;this.renderBreak();});
+    this.releaseInventoryTransactionResults=subscribeMultiplayerInventoryTransactionResults(result=>{if(result.ok)return;if(result.code==='stale-revision')this.showToast('背包状态已由服务器更新，请重试');else this.showToast(`背包操作被服务器拒绝：${result.code}`);});
     this.renderStatus(20,20,0,0,0);this.renderOxygen(15,15,false);this.bindSlotEvents();this.renderHotbar();
   }
 
@@ -30,6 +32,7 @@ export class UI{
 
   bindInventory(model,{equipment=null,onChanged=()=>{},onOverflow=()=>{}}={}){
     this.inventorySubscription?.();this.inventorySubscription=null;this.inventoryModel=model;this.equipmentModel=equipment;this.onChanged=onChanged;this.onOverflow=onOverflow;
+    if(hasMultiplayerInventoryTransactionSender()){this.craft2=new CraftingGrid(2);this.craft3=new CraftingGrid(3);}
     if(model&&typeof model.subscribe==='function')this.inventorySubscription=model.subscribe(()=>this.refreshInventory());
     this.refreshInventory();
   }
@@ -40,21 +43,23 @@ export class UI{
       if(!slot)return;
       if(slot.dataset.hotbarIndex!==undefined){if(e.button!==0)return;e.preventDefault();this.select(Number(slot.dataset.hotbarIndex));return;}
       if(!this.inventoryModel)return;if(e.button!==0&&e.button!==2)return;e.preventDefault();
+      const authoritative=hasMultiplayerInventoryTransactionSender();
       if(slot.dataset.invIndex!==undefined){
-        const changed=this.inventoryModel.click(Number(slot.dataset.invIndex),e.button,e.shiftKey);
-        if(changed)this.changed();
+        if(authoritative){try{sendMultiplayerInventoryTransaction({type:'slot-click',slot:Number(slot.dataset.invIndex),button:e.button,shift:!!e.shiftKey});}catch(error){this.showToast(`背包操作发送失败：${error?.message||error}`);}return;}
+        const changed=this.inventoryModel.click(Number(slot.dataset.invIndex),e.button,e.shiftKey);if(changed)this.changed();
       }else if(slot.dataset.equipmentSlot!==undefined){
-        const changed=this.equipmentModel?.click(slot.dataset.equipmentSlot,this.inventoryModel,e.button)||false;
-        if(changed)this.changed();
+        if(authoritative){this.showToast('联机装备事务尚未服务端化');return;}
+        const changed=this.equipmentModel?.click(slot.dataset.equipmentSlot,this.inventoryModel,e.button)||false;if(changed)this.changed();
       }else if(slot.dataset.craftIndex!==undefined){
+        if(authoritative){this.showToast('联机合成事务尚未服务端化');return;}
         const grid=slot.dataset.craftSize==='3'?this.craft3:this.craft2;
         if(e.shiftKey){
           const index=Number(slot.dataset.craftIndex),item=grid.slots[index];
           if(item){const before=item.count,left=typeof this.inventoryModel.returnExistingStack==='function'?this.inventoryModel.returnExistingStack({...item}):((item.damage??0)>0&&typeof this.inventoryModel.addStack==='function'?this.inventoryModel.addStack({...item}):this.inventoryModel.add(item.id,before)),moved=before-left;if(moved>0){if(left>0)item.count=left;else grid.slots[index]=null;grid.refresh();this.changed();}}
         }else if(this.clickCraftInput(grid,Number(slot.dataset.craftIndex),e.button))this.changed();
       }else if(slot.dataset.craftResult!==undefined){
-        const grid=slot.dataset.craftResult==='3'?this.craft3:this.craft2;
-        if(this.takeCraftResult(grid,e.shiftKey))this.changed();
+        if(authoritative){this.showToast('联机合成事务尚未服务端化');return;}
+        const grid=slot.dataset.craftResult==='3'?this.craft3:this.craft2;if(this.takeCraftResult(grid,e.shiftKey))this.changed();
       }
     });
     document.addEventListener('contextmenu',e=>{if(e.target.closest('.inventory-panel'))e.preventDefault();});
@@ -89,10 +94,7 @@ export class UI{
     }
     const cursor=this.inventoryModel.cursor,limit=maxStack(result.id);
     if(cursor&&(cursor.id!==result.id||cursor.count+result.count>limit))return false;
-    const out=grid.consume();
-    if(!out)return false;
-    if(cursor)cursor.count+=out.count;else this.inventoryModel.cursor={...out};
-    return true;
+    const out=grid.consume();if(!out)return false;if(cursor)cursor.count+=out.count;else this.inventoryModel.cursor={...out};return true;
   }
 
   changed(){this.onChanged();this.refreshInventory();}
@@ -108,53 +110,29 @@ export class UI{
 
   makeSlot(stack,{key=null,index=null,equipmentSlot=null,craftIndex=null,craftSize=null,result=null,hud=false}={}){
     const s=document.createElement(hud?'div':'button');s.className=hud?'inv-slot hotbar-slot':'inv-slot';if(equipmentSlot!==null)s.classList.add('equipment-slot');if(s.tagName==='BUTTON')s.type='button';
-    if(index!==null)s.dataset.invIndex=index;
-    if(equipmentSlot!==null)s.dataset.equipmentSlot=equipmentSlot;
-    if(craftIndex!==null){s.dataset.craftIndex=craftIndex;s.dataset.craftSize=craftSize;}
-    if(result!==null)s.dataset.craftResult=result;
+    if(index!==null)s.dataset.invIndex=index;if(equipmentSlot!==null)s.dataset.equipmentSlot=equipmentSlot;if(craftIndex!==null){s.dataset.craftIndex=craftIndex;s.dataset.craftSize=craftSize;}if(result!==null)s.dataset.craftResult=result;
     if(stack){
       s.append(this.makeIcon(stack.id));const c=document.createElement('span');c.className='slot-count';if(stack.count>1)c.textContent=stack.count;s.append(c);const name=ITEMS[stack.id]?.name||stack.id,durability=itemDurabilityDisplay(stack);
       if(durability){const bar=document.createElement('span'),fill=document.createElement('span');bar.className='slot-durability';fill.style.width=`${Math.max(0,Math.min(100,durability.ratio*100))}%`;fill.style.backgroundColor=`hsl(${durability.hue} 100% 50%)`;bar.append(fill);s.append(bar);s.dataset.durabilityDamage=String(durability.damage);s.dataset.durabilityRemaining=String(durability.remaining);s.dataset.durabilityMaximum=String(durability.maximum);s.title=`${name}\n${durability.label}`;s.setAttribute('aria-label',`${name}，${durability.label}`);}else{s.title=name;s.setAttribute('aria-label',name);}
     }
-    if(key){const k=document.createElement('span');k.className='slot-key';k.textContent=key;s.append(k);}
-    return s;
+    if(key){const k=document.createElement('span');k.className='slot-key';k.textContent=key;s.append(k);}return s;
   }
 
   refreshInventory(){this.renderHotbar();this.renderInventoryPanels();this.renderEquipment();this.renderCrafting();this.renderCursor();}
 
-  renderHotbar(){
-    this.hotbar.textContent='';
-    for(let i=0;i<9;i++){
-      const stack=this.inventoryModel?.hotbar(i)||null,s=this.makeSlot(stack,{key:String(i+1),hud:true});s.dataset.hotbarIndex=i;if(i===this.selected)s.classList.add('selected');this.hotbar.append(s);
-    }
-  }
+  renderHotbar(){this.hotbar.textContent='';for(let i=0;i<9;i++){const stack=this.inventoryModel?.hotbar(i)||null,s=this.makeSlot(stack,{key:String(i+1),hud:true});s.dataset.hotbarIndex=i;if(i===this.selected)s.classList.add('selected');this.hotbar.append(s);}}
 
   renderInventoryPanels(){
-    const build=(main,hot)=>{
-      main.textContent='';hot.textContent='';
-      for(let i=0;i<27;i++)main.append(this.makeSlot(this.inventoryModel?.slots[i],{index:i}));
-      for(let i=27;i<36;i++)hot.append(this.makeSlot(this.inventoryModel?.slots[i],{index:i}));
-    };
-    build(this.invGrid,this.invHotbar);build(this.workbenchGrid,this.workbenchHotbar);
+    const build=(main,hot)=>{main.textContent='';hot.textContent='';for(let i=0;i<27;i++)main.append(this.makeSlot(this.inventoryModel?.slots[i],{index:i}));for(let i=27;i<36;i++)hot.append(this.makeSlot(this.inventoryModel?.slots[i],{index:i}));};build(this.invGrid,this.invHotbar);build(this.workbenchGrid,this.workbenchHotbar);
   }
 
-  renderEquipment(){
-    if(!this.equipmentSlots)return;this.equipmentSlots.textContent='';
-    for(const slot of EQUIPMENT_SLOTS)this.equipmentSlots.append(this.makeSlot(this.equipmentModel?.get(slot)||null,{equipmentSlot:slot}));
-  }
+  renderEquipment(){if(!this.equipmentSlots)return;this.equipmentSlots.textContent='';for(const slot of EQUIPMENT_SLOTS)this.equipmentSlots.append(this.makeSlot(this.equipmentModel?.get(slot)||null,{equipmentSlot:slot}));}
 
   renderCrafting(){
-    const build=(grid,container,resultEl,size)=>{
-      container.textContent='';grid.slots.forEach((stack,i)=>container.append(this.makeSlot(stack,{craftIndex:i,craftSize:String(size)})));
-      resultEl.textContent='';const r=grid.refresh();resultEl.append(this.makeSlot(r,{result:String(size)}));
-    };
-    build(this.craft2,this.craftGrid2,this.craftResult2,2);build(this.craft3,this.craftGrid3,this.craftResult3,3);
+    const build=(grid,container,resultEl,size)=>{container.textContent='';grid.slots.forEach((stack,i)=>container.append(this.makeSlot(stack,{craftIndex:i,craftSize:String(size)})));resultEl.textContent='';const r=grid.refresh();resultEl.append(this.makeSlot(r,{result:String(size)}));};build(this.craft2,this.craftGrid2,this.craftResult2,2);build(this.craft3,this.craftGrid3,this.craftResult3,3);
   }
 
-  renderCursor(){
-    this.cursorStack.textContent='';const cursor=this.inventoryModel?.cursor;
-    this.cursorStack.classList.toggle('hidden',!cursor);if(cursor)this.cursorStack.append(this.makeSlot(cursor,{hud:true}));
-  }
+  renderCursor(){this.cursorStack.textContent='';const cursor=this.inventoryModel?.cursor,visible=!!cursor&&this.hasOpenPanel();this.cursorStack.classList.toggle('hidden',!visible);if(visible)this.cursorStack.append(this.makeSlot(cursor,{hud:true}));}
 
   select(i){this.selected=(i+9)%9;this.renderHotbar();const stack=this.selectedItem();if(stack)this.showToast(ITEMS[stack.id]?.name||stack.id);}
   selectedItem(){return this.inventoryModel?.hotbar(this.selected)||null;}
@@ -165,36 +143,23 @@ export class UI{
   openWorkbench(){this.inventory.classList.add('hidden');this.workbench.classList.remove('hidden');this.refreshInventory();}
   closePanels(){
     if(!this.inventoryModel)return[];
-    const overflow=[...this.craft2.clearTo(this.inventoryModel),...this.craft3.clearTo(this.inventoryModel)];
-    const cursorOverflow=this.inventoryModel.returnCursor();if(cursorOverflow)overflow.push(cursorOverflow);
-    this.inventory.classList.add('hidden');this.workbench.classList.add('hidden');this.changed();if(overflow.length)this.onOverflow(overflow);return overflow;
+    if(hasMultiplayerInventoryTransactionSender()){
+      if(this.inventoryModel.cursor)try{sendMultiplayerInventoryTransaction({type:'return-cursor'});}catch(error){this.showToast(`背包收尾操作发送失败：${error?.message||error}`);}
+      this.inventory.classList.add('hidden');this.workbench.classList.add('hidden');this.renderCursor();return[];
+    }
+    const overflow=[...this.craft2.clearTo(this.inventoryModel),...this.craft3.clearTo(this.inventoryModel)];const cursorOverflow=this.inventoryModel.returnCursor();if(cursorOverflow)overflow.push(cursorOverflow);this.inventory.classList.add('hidden');this.workbench.classList.add('hidden');this.changed();if(overflow.length)this.onOverflow(overflow);return overflow;
   }
 
-  openChat(prefix=''){
-    this.chatWrap.classList.remove('hidden');this.chatInput.value=prefix;this.chatInput.focus();requestAnimationFrame(()=>this.chatInput.setSelectionRange(this.chatInput.value.length,this.chatInput.value.length));
-  }
+  openChat(prefix=''){this.chatWrap.classList.remove('hidden');this.chatInput.value=prefix;this.chatInput.focus();requestAnimationFrame(()=>this.chatInput.setSelectionRange(this.chatInput.value.length,this.chatInput.value.length));}
   closeChat(){this.chatWrap.classList.add('hidden');this.chatInput.blur();}
   isChatOpen(){return !this.chatWrap.classList.contains('hidden');}
-  chatMessage(text,type='system'){
-    const line=document.createElement('div');line.className=`chat-line ${type}`;line.textContent=text;this.chatLog.append(line);while(this.chatLog.children.length>8)this.chatLog.firstChild.remove();
-    clearTimeout(line._timer);line._timer=setTimeout(()=>line.classList.add('faded'),9000);
-  }
+  chatMessage(text,type='system'){const line=document.createElement('div');line.className=`chat-line ${type}`;line.textContent=text;this.chatLog.append(line);while(this.chatLog.children.length>8)this.chatLog.firstChild.remove();clearTimeout(line._timer);line._timer=setTimeout(()=>line.classList.add('faded'),9000);}
 
   renderStatus(hp,hunger,xp,level,armorPoints=0){
-    this.hearts.textContent='';this.hunger.textContent='';this.armorRow.textContent='';
-    for(let i=0;i<10;i++){
-      const h=document.createElement('i');h.className='heart'+(hp>=i*2+1?'':' empty');this.hearts.append(h);
-      const f=document.createElement('i');f.className='food'+(hunger>=i*2+1?'':' empty');this.hunger.append(f);
-      const a=document.createElement('i'),remaining=armorPoints-i*2;a.className='armor-icon'+(remaining>=2?' full':remaining>=1?' half':'');this.armorRow.append(a);
-    }
-    this.xp.style.width=`${Math.max(0,Math.min(100,xp))}%`;this.level.textContent=level;
+    this.hearts.textContent='';this.hunger.textContent='';this.armorRow.textContent='';for(let i=0;i<10;i++){const h=document.createElement('i');h.className='heart'+(hp>=i*2+1?'':' empty');this.hearts.append(h);const f=document.createElement('i');f.className='food'+(hunger>=i*2+1?'':' empty');this.hunger.append(f);const a=document.createElement('i'),remaining=armorPoints-i*2;a.className='armor-icon'+(remaining>=2?' full':remaining>=1?' half':'');this.armorRow.append(a);}this.xp.style.width=`${Math.max(0,Math.min(100,xp))}%`;this.level.textContent=level;
   }
 
-  renderOxygen(air,maxAir,visible){
-    if(!this.oxygen)return;const safeMax=Math.max(.001,Number(maxAir)||1),safeAir=Math.max(0,Math.min(safeMax,Number(air)||0)),filled=Math.ceil(safeAir/safeMax*10);
-    this.oxygen.textContent='';this.oxygen.classList.toggle('hidden',!visible);this.oxygen.dataset.air=safeAir.toFixed(2);this.oxygen.setAttribute('aria-label',`氧气 ${safeAir.toFixed(1)} / ${safeMax.toFixed(0)} 秒`);
-    for(let i=0;i<10;i++){const bubble=document.createElement('i');bubble.className='oxygen-bubble'+(i<filled?'':' empty');this.oxygen.append(bubble);}
-  }
+  renderOxygen(air,maxAir,visible){if(!this.oxygen)return;const safeMax=Math.max(.001,Number(maxAir)||1),safeAir=Math.max(0,Math.min(safeMax,Number(air)||0)),filled=Math.ceil(safeAir/safeMax*10);this.oxygen.textContent='';this.oxygen.classList.toggle('hidden',!visible);this.oxygen.dataset.air=safeAir.toFixed(2);this.oxygen.setAttribute('aria-label',`氧气 ${safeAir.toFixed(1)} / ${safeMax.toFixed(0)} 秒`);for(let i=0;i<10;i++){const bubble=document.createElement('i');bubble.className='oxygen-bubble'+(i<filled?'':' empty');this.oxygen.append(bubble);}}
 
   showLoading(show,detail='准备区块',p=0){this.loading.classList.toggle('hidden',!show);this.loadingDetail.textContent=detail;this.loadingBar.style.width=`${p}%`;}
   showToast(text){this.toast.textContent=text;this.toast.classList.remove('hidden');clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>this.toast.classList.add('hidden'),900);}

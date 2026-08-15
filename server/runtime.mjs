@@ -60,12 +60,21 @@ export function createAuthoritativeServerRuntime({config={},setIntervalFn=setInt
   const handleChat=({session,chat})=>{
     const result=server?.broadcastChatMessage(session,chat.text);if(!result)throw new Error('chat broadcast transport unavailable');if(result.failed)report({source:'chat-broadcast',session,chat,result,error:new Error(`chat broadcast failed for ${result.failed} session(s)`)});return result;
   };
+  const handleInventoryTransaction=({session,transaction})=>{
+    const before=inventories.snapshot(session);let ok=true,code='no-change';
+    if(transaction.expectedRevision!==before.revision){ok=false;code='stale-revision';}
+    else{
+      const action=transaction.action;let outcome;if(action.type==='slot-click')outcome=inventories.click(session,action.slot,action.button,action.shift);else if(action.type==='return-cursor')outcome=inventories.returnCursor(session);else throw new RangeError(`unsupported inventory transaction action: ${action.type}`);
+      code=outcome.reason||'no-change';if(outcome.changed){const replicationResult=replicateInventory(session);if(!replicationResult.replicated)throw new Error('authoritative inventory transaction snapshot replication failed');}
+    }
+    const revision=inventories.snapshot(session).revision,wire=server?.sendInventoryTransactionResult(session,{session,requestId:transaction.requestId,ok,code,revision})??null;if(wire===null)throw new Error('inventory transaction result transport unavailable');return wire;
+  };
 
   server=createMultiplayerServer({host:normalized.host,port:normalized.port,allowedOrigins:normalized.allowedOrigins,allowMissingOrigin:normalized.allowMissingOrigin,onSessionReady:({session})=>{
     const info=server.sendWorldInfo(session,{session,worldId:normalized.worldId,terrainVersion:TERRAIN_GENERATOR_VERSION,seed:normalized.seed,prompt:normalized.prompt,tickRate:DEFAULT_SERVER_TICK_RATE});if(info===null)throw new Error('world info transport is unavailable');
     const worldEdits=server.sendWorldEditSync(session,{worldId:normalized.worldId,revision:world.revision,edits:world.editEntries()});if(worldEdits===null)throw new Error('world edit sync transport is unavailable');
     const joined=authoritative.join(session,{mode:normalized.mode});try{inventories.join(session,{mode:joined.snapshot.mode});const inventory=server.sendInventorySnapshot(session,inventories.snapshot(session));if(inventory===null)throw new Error('inventory snapshot transport is unavailable');for(const state of itemEntities.states()){if(server.sendItemEntitySpawn(session,state)===null)throw new Error('item entity bootstrap transport is unavailable');}replication.join(session,joined.snapshot);}catch(error){if(inventories.has(session))inventories.leave(session);authoritative.leave(session);creativeBreak.remove(session);survivalBreak.remove(session);miningProgress.remove(session);throw error;}
-  },onInput:({session,message})=>{if(message?.kind==='control'){creativeBreak.observePrimary(session,message.payload.primary);survivalBreak.observePrimary(session,message.payload.primary);}},onCommand:handleCommand,onChat:handleChat,onSessionClose:({session})=>{if(session){creativeBreak.remove(session);survivalBreak.remove(session);miningProgress.remove(session);if(inventories.has(session))inventories.leave(session);replication.leave(session);authoritative.leave(session);}},onSocketError:event=>report({source:'socket',...event})});
+  },onInput:({session,message})=>{if(message?.kind==='control'){creativeBreak.observePrimary(session,message.payload.primary);survivalBreak.observePrimary(session,message.payload.primary);}},onCommand:handleCommand,onChat:handleChat,onInventoryTransaction:handleInventoryTransaction,onSessionClose:({session})=>{if(session){creativeBreak.remove(session);survivalBreak.remove(session);miningProgress.remove(session);if(inventories.has(session))inventories.leave(session);replication.leave(session);authoritative.leave(session);}},onSocketError:event=>report({source:'socket',...event})});
 
   let state='idle',address=null,stopPromise=null;
   const runtime={config:normalized,world,server,authoritative,inventories,itemEntities,replication,miningProgress,creativeBreak,survivalBreak,creativeUse,survivalUse,get state(){return state;},get running(){return state==='running';},get address(){return address;},
