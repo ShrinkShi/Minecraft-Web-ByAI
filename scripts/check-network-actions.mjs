@@ -9,9 +9,11 @@ import {
 } from '../src/player-action-frame.js';
 
 assert.equal(PLAYER_ACTION_FRAME_VERSION,1);
-assert.deepEqual(PLAYER_GAMEPLAY_ACTIONS,['use','drop','hotbar-select']);
+assert.deepEqual(PLAYER_GAMEPLAY_ACTIONS,['use','drop','attack','respawn','hotbar-select']);
 assert.equal(actionRequiresView('use'),true);
 assert.equal(actionRequiresView('drop'),true);
+assert.equal(actionRequiresView('attack'),true);
+assert.equal(actionRequiresView('respawn'),false);
 assert.equal(actionRequiresView('hotbar-select'),false);
 
 const desktopUse=encodePlayerActionFrame({kind:'use',viewSeq:72},73);
@@ -27,9 +29,19 @@ const drop=encodePlayerActionFrame({kind:'drop',viewSeq:80},81);
 assert.deepEqual(decodePlayerActionFrame(drop),{kind:'drop',sequence:81,viewSequence:80});
 assert.equal('target' in drop,false,'drop direction is resolved from authoritative player view, not a client target');
 
-const select=encodePlayerActionFrame({kind:'hotbar-select',slot:8},82);
+const attack=encodePlayerActionFrame({kind:'attack',viewSeq:82},83);
+assert.deepEqual(Object.keys(attack).sort(),['kind','seq','v','viewSeq']);
+assert.deepEqual(decodePlayerActionFrame(attack),{kind:'attack',sequence:83,viewSequence:82});
+assert.equal('target' in attack,false,'attack target is resolved from the authoritative referenced view, not a client target');
+
+const respawn=encodePlayerActionFrame({kind:'respawn'},84);
+assert.deepEqual(Object.keys(respawn).sort(),['kind','seq','v']);
+assert.deepEqual(decodePlayerActionFrame(respawn),{kind:'respawn',sequence:84});
+assert.equal(actionRequiresView(respawn.kind),false,'respawn is a server state transition and must not fabricate a view dependency');
+
+const select=encodePlayerActionFrame({kind:'hotbar-select',slot:8},85);
 assert.deepEqual(Object.keys(select).sort(),['kind','seq','slot','v']);
-assert.deepEqual(decodePlayerActionFrame(select),{kind:'hotbar-select',sequence:82,slot:8});
+assert.deepEqual(decodePlayerActionFrame(select),{kind:'hotbar-select',sequence:85,slot:8});
 assert.equal(isCompatibleActionFrame(select),true);
 
 assert.throws(()=>encodePlayerActionFrame({kind:'use',viewSeq:1},-1),/uint32/);
@@ -39,6 +51,8 @@ assert.throws(()=>encodePlayerActionFrame({kind:'hotbar-select',slot:9},1),/inte
 assert.throws(()=>encodePlayerActionFrame({kind:'inventory'},1),/unsupported player gameplay action/);
 assert.throws(()=>encodePlayerActionFrame({kind:'chat'},1),/unsupported player gameplay action/);
 assert.throws(()=>encodePlayerActionFrame({kind:'use',viewSeq:1,target:{x:1,y:2,z:3}},2),/unexpected fields/,'client target hints are not authoritative in v1');
+assert.throws(()=>encodePlayerActionFrame({kind:'attack',viewSeq:1,target:'s:other'},2),/unexpected fields/,'client player target hints are not authoritative in v1');
+assert.throws(()=>encodePlayerActionFrame({kind:'respawn',viewSeq:1},2),/unexpected fields/,'respawn must not carry a stale referenced view');
 assert.throws(()=>decodePlayerActionFrame({...desktopUse,v:2}),/unsupported player action frame version/);
 assert.throws(()=>decodePlayerActionFrame({...desktopUse,viewSeq:'72'}),/view sequence/);
 assert.throws(()=>decodePlayerActionFrame({...desktopUse,source:'desktop'}),/unexpected fields/);
