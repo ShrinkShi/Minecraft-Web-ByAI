@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""Resolve a deterministic Minecraft blockstate/model/texture dependency closure.
+"""Resolve deterministic Minecraft blockstate/model/texture dependency closures.
 
-The tracked source ZIP may have an arbitrary outer directory. This module indexes
-canonical ``assets/<namespace>/...`` paths from every safe ZIP entry, then walks
-blockstate -> model -> parent/texture references without hard-coding vanilla
-parent geometry.
+The tracked source ZIP may have an arbitrary outer directory (the historical
+archive uses an outer folder ending in ``assets``).  Resources are therefore
+identified by their canonical ``assets/<namespace>/...`` suffix, then walked as
+blockstate -> model -> parent/direct-texture dependencies.
 
-It is intentionally independent from the runtime atlas builder. The output is a
-provenance manifest / optional extracted closure that later asset stages can use
-as their exact source set.
+This module is deliberately independent from runtime atlas packing.  It produces
+an exact, source-provenance closure that later build stages can consume.
 """
 
 from __future__ import annotations
@@ -17,6 +16,7 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
@@ -30,7 +30,7 @@ BUILTIN_MODEL_PATHS = frozenset({"builtin/entity", "builtin/generated"})
 
 
 class ClosureError(RuntimeError):
-    """Raised when the declared source closure is malformed or incomplete."""
+    """Raised when a declared model-source closure is unsafe or incomplete."""
 
 
 def sha256_bytes(payload: bytes) -> str:
@@ -57,45 +57,40 @@ def safe_zip_name(name: str) -> bool:
 def canonical_asset_path(name: str) -> str | None:
     """Return the canonical ``assets/...`` suffix from an arbitrary ZIP entry.
 
-    The supplied archive's historical outer folder is named
-    ``MC原版素材assets`` rather than containing a literal top-level ``assets``
-    directory.  The original selective importer therefore resolves resources by
-    canonical suffix.  Mirror that proven contract here by taking the *last*
-    ``assets/`` occurrence, whether it starts a path segment or is the suffix of
-    an arbitrary outer-folder name.
+    Use the last ``assets/`` occurrence.  This mirrors the proven legacy
+    importer and supports the supplied ``MC原版素材assets/...`` outer folder
+    without making that display name part of runtime identity.
     """
     normalized = normalize_zip_name(name)
-    lowered = normalized.lower()
-    index = lowered.rfind("assets/")
+    index = normalized.lower().rfind("assets/")
     if index == -1:
         return None
     candidate = normalized[index:]
-    if not CANONICAL_RE.fullmatch(candidate):
-        return None
-    return candidate
+    return candidate if CANONICAL_RE.fullmatch(candidate) else None
 
 
 def normalize_resource_id(value: str, *, default_namespace: str = DEFAULT_NAMESPACE) -> str:
-    if not isinstance(value, str) or not value or value.strip() != value:
+    if not isinstance(value, str) or not value or value.strip() != value or value.count(":") > 1:
         raise ClosureError(f"invalid Minecraft resource identifier: {value!r}")
-    if value.count(":") > 1:
-        raise ClosureError(f"invalid Minecraft resource identifier: {value!r}")
-    if ":" in value:
-        namespace, path = value.split(":", 1)
-    else:
-        namespace, path = default_namespace, value
+    namespace, path = value.split(":", 1) if ":" in value else (default_namespace, value)
     result = f"{namespace}:{path}"
     if not RESOURCE_RE.fullmatch(result):
         raise ClosureError(f"invalid Minecraft resource identifier: {value!r}")
     parts = PurePosixPath(path).parts
-    if not path or path.startswith("/") or path.endswith("/") or "//" in path or any(part in {".", ".."} for part in parts):
+    if (
+        not path
+        or path.startswith("/")
+        or path.endswith("/")
+        or "//" in path
+        or any(part in {".", ".."} for part in parts)
+    ):
         raise ClosureError(f"unsafe Minecraft resource identifier: {value!r}")
     return result
 
 
 def split_resource_id(value: str) -> tuple[str, str]:
-    normalized = normalize_resource_id(value)
-    return tuple(normalized.split(":", 1))  # type: ignore[return-value]
+    namespace, path = normalize_resource_id(value).split(":", 1)
+    return namespace, path
 
 
 def blockstate_path(block_id: str) -> str:
@@ -122,6 +117,8 @@ class SourceRecord:
 
 
 class MinecraftArchiveIndex:
+    """Canonical read-only view over an arbitrary-layout source ZIP."""
+
     def __init__(self, archive: ZipFile):
         self.archive = archive
         self._source_by_canonical: dict[str, str] = {}
@@ -160,7 +157,7 @@ class MinecraftArchiveIndex:
         if source is None:
             raise ClosureError(f"missing source resource: {canonical}")
         payload = self.archive.read(source)
-        return SourceRecord(canonical=canonical, source=source, sha256=sha256_bytes(payload), size=len(payload))
+        return SourceRecord(canonical, source, sha256_bytes(payload), len(payload))
 
 
 @dataclass(frozen=True)
@@ -194,11 +191,12 @@ def iter_model_entries(value: Any, *, label: str) -> Iterable[dict[str, Any]]:
 def blockstate_model_ids(value: Any, *, canonical: str) -> tuple[str, ...]:
     if not isinstance(value, dict):
         raise ClosureError(f"blockstate must be an object: {canonical}")
-    output: set[str] = set()
     variants = value.get("variants")
     multipart = value.get("multipart")
     if variants is None and multipart is None:
         raise ClosureError(f"blockstate has neither variants nor multipart: {canonical}")
+
+    output: set[str] = set()
     if variants is not None:
         if not isinstance(variants, dict) or not variants:
             raise ClosureError(f"blockstate variants must be a non-empty object: {canonical}")
@@ -207,6 +205,7 @@ def blockstate_model_ids(value: Any, *, canonical: str) -> tuple[str, ...]:
                 raise ClosureError(f"blockstate variant key must be a string: {canonical}")
             for entry in iter_model_entries(model_value, label=f"{canonical} variant {key!r}"):
                 output.add(normalize_resource_id(entry["model"]))
+
     if multipart is not None:
         if not isinstance(multipart, list) or not multipart:
             raise ClosureError(f"blockstate multipart must be a non-empty array: {canonical}")
@@ -218,25 +217,66 @@ def blockstate_model_ids(value: Any, *, canonical: str) -> tuple[str, ...]:
     return tuple(sorted(output))
 
 
+def _direct_texture_reference(reference: Any, *, label: str) -> str | None:
+    if not isinstance(reference, str) or not reference:
+        raise ClosureError(f"{label} must be a non-empty string")
+    if reference.startswith("#"):
+        if len(reference) == 1:
+            raise ClosureError(f"{label} contains an empty texture variable")
+        return None
+    return normalize_resource_id(reference)
+
+
 def model_dependencies(value: Any, *, canonical: str) -> tuple[str | None, tuple[str, ...]]:
+    """Return parent + every direct texture file referenced by this model.
+
+    Most vanilla faces use ``#variables`` backed by the top-level ``textures``
+    map, but direct face resource IDs are legal and are also understood by the
+    browser model resolver.  Scan both locations so source closure semantics
+    cannot diverge from runtime model semantics.
+    """
     if not isinstance(value, dict):
         raise ClosureError(f"model must be an object: {canonical}")
+
     parent_raw = value.get("parent")
     parent = None
     if parent_raw is not None:
         if not isinstance(parent_raw, str) or not parent_raw:
             raise ClosureError(f"model parent must be a non-empty string: {canonical}")
         parent = normalize_resource_id(parent_raw)
+
     textures_raw = value.get("textures", {})
     if not isinstance(textures_raw, dict):
         raise ClosureError(f"model textures must be an object: {canonical}")
     textures: set[str] = set()
     for name, reference in textures_raw.items():
-        if not isinstance(name, str) or not isinstance(reference, str) or not reference:
-            raise ClosureError(f"invalid model texture reference in {canonical}: {name!r}={reference!r}")
-        if reference.startswith("#"):
-            continue
-        textures.add(normalize_resource_id(reference))
+        if not isinstance(name, str) or not name:
+            raise ClosureError(f"invalid model texture variable name in {canonical}: {name!r}")
+        direct = _direct_texture_reference(reference, label=f"texture variable {name!r} in {canonical}")
+        if direct is not None:
+            textures.add(direct)
+
+    elements = value.get("elements", [])
+    if not isinstance(elements, list):
+        raise ClosureError(f"model elements must be an array: {canonical}")
+    for element_index, element in enumerate(elements):
+        if not isinstance(element, dict):
+            raise ClosureError(f"model element {element_index} must be an object: {canonical}")
+        faces = element.get("faces", {})
+        if not isinstance(faces, dict):
+            raise ClosureError(f"model element {element_index}.faces must be an object: {canonical}")
+        for direction, face in faces.items():
+            if not isinstance(face, dict):
+                raise ClosureError(f"model face {direction!r} must be an object: {canonical}")
+            if "texture" not in face:
+                raise ClosureError(f"model face {direction!r} is missing texture: {canonical}")
+            direct = _direct_texture_reference(
+                face["texture"],
+                label=f"model face {direction!r}.texture in {canonical}",
+            )
+            if direct is not None:
+                textures.add(direct)
+
     return parent, tuple(sorted(textures))
 
 
@@ -251,13 +291,13 @@ def resolve_block_model_closure(index: MinecraftArchiveIndex, block_ids: Iterabl
     metadata: set[str] = set()
     builtin_models: set[str] = set()
     edges: set[tuple[str, str, str]] = set()
-    pending_models: list[str] = []
+    pending_models: set[str] = set()
 
     for block_id in roots:
         canonical = blockstate_path(block_id)
         blockstates.add(canonical)
         for model_id in blockstate_model_ids(index.json(canonical), canonical=canonical):
-            pending_models.append(model_id)
+            pending_models.add(model_id)
             edges.add((canonical, "model", model_path(model_id)))
 
     visited_models: set[str] = set()
@@ -265,22 +305,25 @@ def resolve_block_model_closure(index: MinecraftArchiveIndex, block_ids: Iterabl
 
     def visit_model(model_id: str) -> None:
         normalized = normalize_resource_id(model_id)
-        _namespace, path = split_resource_id(normalized)
+        _, path = split_resource_id(normalized)
         if path in BUILTIN_MODEL_PATHS:
             builtin_models.add(normalized)
             return
+
         canonical = model_path(normalized)
         if canonical in visited_models:
             return
         if canonical in visiting:
             cycle = visiting[visiting.index(canonical) :] + [canonical]
             raise ClosureError(f"model parent cycle: {' -> '.join(cycle)}")
+
         visiting.append(canonical)
         value = index.json(canonical)
         parent, texture_ids = model_dependencies(value, canonical=canonical)
         models.add(canonical)
+
         if parent is not None:
-            _parent_namespace, parent_path = split_resource_id(parent)
+            _, parent_path = split_resource_id(parent)
             if parent_path in BUILTIN_MODEL_PATHS:
                 builtin_models.add(parent)
                 edges.add((canonical, "builtin-parent", parent))
@@ -288,19 +331,21 @@ def resolve_block_model_closure(index: MinecraftArchiveIndex, block_ids: Iterabl
                 parent_canonical = model_path(parent)
                 edges.add((canonical, "parent", parent_canonical))
                 visit_model(parent)
+
         for texture_id in texture_ids:
             tex_canonical = texture_path(texture_id)
-            index.read(tex_canonical)  # fail closed before adding to the closure
+            index.read(tex_canonical)  # fail closed before admitting the file
             textures.add(tex_canonical)
             edges.add((canonical, "texture", tex_canonical))
             mcmeta = f"{tex_canonical}.mcmeta"
             if index.has(mcmeta):
                 metadata.add(mcmeta)
                 edges.add((tex_canonical, "metadata", mcmeta))
+
         visiting.pop()
         visited_models.add(canonical)
 
-    for model_id in sorted(set(pending_models)):
+    for model_id in sorted(pending_models):
         visit_model(model_id)
 
     return ClosureResult(
@@ -314,8 +359,13 @@ def resolve_block_model_closure(index: MinecraftArchiveIndex, block_ids: Iterabl
     )
 
 
-def manifest_for(index: MinecraftArchiveIndex, result: ClosureResult, *, archive_path: str | Path | None = None) -> dict[str, Any]:
-    records = {}
+def manifest_for(
+    index: MinecraftArchiveIndex,
+    result: ClosureResult,
+    *,
+    archive_path: str | Path | None = None,
+) -> dict[str, Any]:
+    records: dict[str, dict[str, Any]] = {}
     for canonical in result.files:
         record = index.record(canonical)
         records[canonical] = {
@@ -323,6 +373,7 @@ def manifest_for(index: MinecraftArchiveIndex, result: ClosureResult, *, archive
             "sha256": record.sha256,
             "bytes": record.size,
         }
+
     manifest: dict[str, Any] = {
         "format": 1,
         "minecraftVersion": "1.20.1",
@@ -360,7 +411,13 @@ def extract_closure(index: MinecraftArchiveIndex, result: ClosureResult, output:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("archive", nargs="?", default=DEFAULT_ARCHIVE)
-    parser.add_argument("--block", action="append", dest="blocks", required=True, help="Block resource ID; repeat for multiple roots")
+    parser.add_argument(
+        "--block",
+        action="append",
+        dest="blocks",
+        required=True,
+        help="Block resource ID; repeat for multiple roots",
+    )
     parser.add_argument("--json-out")
     parser.add_argument("--extract")
     args = parser.parse_args()
@@ -384,8 +441,9 @@ def main() -> int:
         print(payload, end="")
     print(
         f"resolved {len(result.roots)} block roots -> {len(result.blockstates)} blockstates, "
-        f"{len(result.models)} models, {len(result.textures)} textures, {len(result.metadata)} metadata files",
-        file=__import__("sys").stderr,
+        f"{len(result.models)} models, {len(result.textures)} textures, "
+        f"{len(result.metadata)} metadata files",
+        file=sys.stderr,
     )
     return 0
 
