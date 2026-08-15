@@ -14,6 +14,7 @@ import {encodeServerInventorySnapshot} from '../src/server-inventory-snapshot.js
 import {encodeServerEquipmentSnapshot} from '../src/server-equipment-snapshot.js';
 import {encodeServerPlayerCraftingSnapshot} from '../src/server-player-crafting-snapshot.js';
 import {encodeServerWorkbenchContainerSnapshot,encodeServerWorkbenchContainerClose} from '../src/server-workbench-container-snapshot.js';
+import {encodeServerPlayerCombatSnapshot} from '../src/server-player-combat-snapshot.js';
 import {encodeServerPlayerSnapshot} from '../src/server-player-snapshot.js';
 import {encodeServerWorldInfo} from '../src/server-world-info.js';
 import {encodeRemotePlayerSpawn,encodeRemotePlayerSnapshot,encodeRemotePlayerDespawn} from '../src/remote-player-replication.js';
@@ -80,6 +81,7 @@ export function createMultiplayerServer({host=DEFAULT_MULTIPLAYER_HOST,port=DEFA
     sendPlayerCraftingSnapshot(session,snapshot){session=assertClientSessionId(session);if(!snapshot||snapshot.session!==session)throw new RangeError('player crafting snapshot session must match target session');return sendEncoded(session,encodeServerPlayerCraftingSnapshot(snapshot));},
     sendWorkbenchContainerSnapshot(session,snapshot){session=assertClientSessionId(session);if(!snapshot||snapshot.session!==session)throw new RangeError('workbench snapshot session must match target session');return sendEncoded(session,encodeServerWorkbenchContainerSnapshot(snapshot));},
     sendWorkbenchContainerClose(session,message){session=assertClientSessionId(session);if(!message||message.session!==session)throw new RangeError('workbench close session must match target session');return sendEncoded(session,encodeServerWorkbenchContainerClose(message));},
+    sendPlayerCombatSnapshot(session,snapshot){session=assertClientSessionId(session);if(!snapshot||snapshot.session!==session)throw new RangeError('player combat snapshot session must match target session');return sendEncoded(session,encodeServerPlayerCombatSnapshot(snapshot));},
     sendPlayerSnapshot(session,snapshot){session=assertClientSessionId(session);if(!snapshot||snapshot.session!==session)throw new RangeError('player snapshot session must match target session');return sendEncoded(session,encodeServerPlayerSnapshot(snapshot));},
     sendRemotePlayerSpawn(session,state){return sendEncoded(session,encodeRemotePlayerSpawn(state));},sendRemotePlayerSnapshot(session,state){return sendEncoded(session,encodeRemotePlayerSnapshot(state));},sendRemotePlayerDespawn(session,playerId){return sendEncoded(session,encodeRemotePlayerDespawn(playerId));},
     sendItemEntitySpawn(session,state){return sendEncoded(session,encodeItemEntitySpawn(state));},sendItemEntitySnapshot(session,state){return sendEncoded(session,encodeItemEntitySnapshot(state));},sendItemEntityDespawn(session,entityId,revision,reason){return sendEncoded(session,encodeItemEntityDespawn(entityId,revision,reason));},
