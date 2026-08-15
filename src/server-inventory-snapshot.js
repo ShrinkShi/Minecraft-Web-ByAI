@@ -3,11 +3,11 @@ import {decodeItemStackTuple,encodeItemStackTuple} from './item-stack.js';
 import {INVENTORY_SLOT_COUNT} from './inventory-layout.js';
 import {assertNetworkSequence} from './network-sequence.js';
 
-export const SERVER_INVENTORY_SNAPSHOT_VERSION=2;
+export const SERVER_INVENTORY_SNAPSHOT_VERSION=3;
 export const SERVER_INVENTORY_SNAPSHOT_KIND='inventory-snapshot';
 export const SERVER_INVENTORY_MODES=Object.freeze(['survival','creative','adventure','spectator']);
 const MODE_SET=new Set(SERVER_INVENTORY_MODES);
-const SNAPSHOT_KEYS=Object.freeze(['kind','mode','revision','session','slots','v']);
+const SNAPSHOT_KEYS=Object.freeze(['cursor','kind','mode','revision','session','slots','v']);
 
 function object(value,label){if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError(`${label} must be an object`);return value;}
 function mode(value){if(!MODE_SET.has(value))throw new RangeError(`unsupported inventory snapshot mode: ${value}`);return value;}
@@ -15,10 +15,12 @@ function slots(value,label){if(!Array.isArray(value)||value.length!==INVENTORY_S
 function assertExactKeys(value){const keys=Object.keys(value).sort();if(keys.length!==SNAPSHOT_KEYS.length||keys.some((key,index)=>key!==SNAPSHOT_KEYS[index]))throw new RangeError('server inventory snapshot contains unexpected fields');}
 function encodeSlot(value,index){if(value===null||value===undefined)return null;return encodeItemStackTuple(value,{label:`inventory slot ${index}`});}
 function decodeSlot(value,index){if(value===null)return null;return decodeItemStackTuple(value,{label:`inventory slot ${index}`});}
+function encodeCursor(value){if(value===null||value===undefined)return null;return encodeItemStackTuple(value,{label:'inventory cursor'});}
+function decodeCursor(value){if(value===null)return null;return decodeItemStackTuple(value,{label:'inventory cursor'});}
 
 export function encodeServerInventorySnapshot(snapshot){
   snapshot=object(snapshot,'server inventory snapshot state');
-  return{v:SERVER_INVENTORY_SNAPSHOT_VERSION,kind:SERVER_INVENTORY_SNAPSHOT_KIND,session:assertClientSessionId(snapshot.session),revision:assertNetworkSequence(snapshot.revision,'inventory revision'),mode:mode(snapshot.mode),slots:slots(snapshot.slots,'inventory snapshot slots').map(encodeSlot)};
+  return{v:SERVER_INVENTORY_SNAPSHOT_VERSION,kind:SERVER_INVENTORY_SNAPSHOT_KIND,session:assertClientSessionId(snapshot.session),revision:assertNetworkSequence(snapshot.revision,'inventory revision'),mode:mode(snapshot.mode),slots:slots(snapshot.slots,'inventory snapshot slots').map(encodeSlot),cursor:encodeCursor(snapshot.cursor)};
 }
 
 export function decodeServerInventorySnapshot(snapshot,{expectedSession=null}={}){
@@ -26,7 +28,7 @@ export function decodeServerInventorySnapshot(snapshot,{expectedSession=null}={}
   if(snapshot.v!==SERVER_INVENTORY_SNAPSHOT_VERSION)throw new RangeError(`unsupported server inventory snapshot version: ${snapshot.v}`);
   if(snapshot.kind!==SERVER_INVENTORY_SNAPSHOT_KIND)throw new RangeError(`unsupported server realtime message kind: ${snapshot.kind}`);
   const session=assertClientSessionId(snapshot.session);if(expectedSession!==null&&session!==assertClientSessionId(expectedSession))throw new RangeError('server inventory snapshot session mismatch');
-  return{version:SERVER_INVENTORY_SNAPSHOT_VERSION,kind:SERVER_INVENTORY_SNAPSHOT_KIND,session,revision:assertNetworkSequence(snapshot.revision,'inventory revision'),mode:mode(snapshot.mode),slots:slots(snapshot.slots,'inventory snapshot slots').map(decodeSlot)};
+  return{version:SERVER_INVENTORY_SNAPSHOT_VERSION,kind:SERVER_INVENTORY_SNAPSHOT_KIND,session,revision:assertNetworkSequence(snapshot.revision,'inventory revision'),mode:mode(snapshot.mode),slots:slots(snapshot.slots,'inventory snapshot slots').map(decodeSlot),cursor:decodeCursor(snapshot.cursor)};
 }
 
 export function isCompatibleServerInventorySnapshot(snapshot,options){try{decodeServerInventorySnapshot(snapshot,options);return true;}catch{return false;}}
