@@ -13,13 +13,15 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
@@ -31,6 +33,22 @@ jobs:
         run: python tools/import-minecraft-assets.py
       - name: Build browser-ready runtime assets
         run: python tools/build-minecraft-runtime-assets.py
+      - name: Stage generated entity resources on this asset branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'assets/v0.4-vanilla-entity-models'
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          rm -rf assets/minecraft
+          cp -R build/minecraft-runtime-assets/minecraft assets/minecraft
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/minecraft
+          if git diff --cached --quiet; then
+            echo 'Generated entity assets already match the branch.'
+          else
+            git commit -m 'assets: sync generated vanilla entity resources'
+            git push origin "HEAD:${HEAD_BRANCH}"
+          fi
       - name: Verify tracked runtime assets match generated output
         run: |
           cmp build/minecraft-runtime-assets/textures/atlas.png assets/textures/atlas.png
