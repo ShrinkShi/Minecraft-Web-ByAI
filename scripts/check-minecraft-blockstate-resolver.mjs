@@ -11,6 +11,7 @@ assert.deepEqual(normalizeMinecraftBlockStateProperties({facing:'north',powered:
   facing:'north',powered:'false',level:'7'
 });
 assert.throws(()=>normalizeMinecraftBlockStateProperties({Facing:'north'}),/property/);
+assert.throws(()=>normalizeMinecraftBlockStateProperties(JSON.parse('{"__proto__":"north"}')),/safe name/);
 assert.throws(()=>normalizeMinecraftBlockStateProperties({level:1.5}),/string, boolean, or integer/);
 assert.throws(()=>normalizeMinecraftBlockStateProperties({axis:null}),/string, boolean, or integer/);
 
@@ -54,7 +55,7 @@ assert.throws(()=>resolveMinecraftBlockstate(ambiguous,{powered:true}),/ambiguou
 
 assert.throws(()=>normalizeMinecraftBlockstate({}),/must define variants or multipart/);
 assert.throws(()=>normalizeMinecraftBlockstate({variants:{},extra:true}),/unsupported field: extra/);
-assert.throws(()=>normalizeMinecraftBlockstate({variants:{'facing =north':{model:'block/x'}}}),/invalid Minecraft variant term/);
+assert.throws(()=>normalizeMinecraftBlockstate({variants:{'facing =north':{model:'block/x'}}}),/variant property/);
 assert.throws(()=>normalizeMinecraftBlockstate({variants:{'facing=north,facing=south':{model:'block/x'}}}),/duplicate Minecraft variant property/);
 assert.throws(()=>normalizeMinecraftBlockstate({variants:{'':{model:'block/x',x:45}}}),/must be 0, 90, 180, or 270/);
 assert.throws(()=>normalizeMinecraftBlockstate({variants:{'':{model:'block/x',weight:0}}}),/positive safe integer/);
