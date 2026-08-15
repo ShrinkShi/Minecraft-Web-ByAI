@@ -69,8 +69,9 @@ assert.deepEqual([...batches.opaque.positions.slice(0,12)],[11,20,-3,11,21,-3,11
 assert.deepEqual([...batches.opaque.normals.slice(0,12)],[1,0,0,1,0,0,1,0,0,1,0,0]);
 
 // Stone atlas region is u=.00..25 / v=.50..75. Minecraft model V grows down,
-// so the batching contract flips V into WebGL UV orientation.
-assert.deepEqual([...batches.opaque.uvs.slice(0,8)],[0,.5,0,.75,.25,.75,.25,.5]);
+// so the batching contract flips V into WebGL UV orientation. UV-lock has
+// already projected source north into its final east-facing orientation.
+assert.deepEqual([...batches.opaque.uvs.slice(0,8)],[.25,.5,.25,.75,0,.75,0,.5]);
 // Source south uses an explicit 4..12 crop inside the same atlas region.
 assert.deepEqual([...batches.opaque.uvs.slice(8,16)],[.1875,.5625,.1875,.6875,.0625,.6875,.0625,.5625]);
 assert.deepEqual([...batches.opaque.colors.slice(0,12)],Array(12).fill(1));
