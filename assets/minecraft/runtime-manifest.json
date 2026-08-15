@@ -1,0 +1,206 @@
+{
+  "atlas": {
+    "path": "textures/atlas.png",
+    "sha256": "02f5d5a4926b5da7f217b60028d5fbb5ae864c6b5d0483d021ec074639c921f2",
+    "tiles": {
+      "0": {
+        "source": "textures/block/grass_block_top.png",
+        "treatment": "grass"
+      },
+      "1": {
+        "source": "textures/block/grass_block_side.png",
+        "treatment": "grass-side"
+      },
+      "10": {
+        "source": "textures/block/crafting_table_top.png",
+        "treatment": null
+      },
+      "11": {
+        "source": "textures/block/crafting_table_side.png",
+        "treatment": null
+      },
+      "12": {
+        "source": "textures/block/crafting_table_front.png",
+        "treatment": null
+      },
+      "13": {
+        "source": "textures/block/cobblestone.png",
+        "treatment": null
+      },
+      "14": {
+        "source": "textures/block/iron_ore.png",
+        "treatment": null
+      },
+      "15": {
+        "source": "textures/block/white_wool.png",
+        "treatment": null
+      },
+      "2": {
+        "source": "textures/block/dirt.png",
+        "treatment": null
+      },
+      "3": {
+        "source": "textures/block/stone.png",
+        "treatment": null
+      },
+      "4": {
+        "source": "textures/block/sand.png",
+        "treatment": null
+      },
+      "5": {
+        "source": "textures/block/oak_planks.png",
+        "treatment": null
+      },
+      "6": {
+        "source": "textures/block/oak_log.png",
+        "treatment": null
+      },
+      "7": {
+        "source": "textures/block/oak_log_top.png",
+        "treatment": null
+      },
+      "8": {
+        "source": "textures/block/oak_leaves.png",
+        "treatment": "foliage"
+      },
+      "9": {
+        "source": "textures/block/water_still.png",
+        "treatment": "water"
+      }
+    }
+  },
+  "format": 1,
+  "items": {
+    "arrow.png": {
+      "sha256": "9dfc345c4ae71a7bab003d3d15f420376910162a000a99832e9ca63a51bc85dd",
+      "source": "textures/item/arrow.png",
+      "treatment": null
+    },
+    "bone.png": {
+      "sha256": "5a975e7bb108733cfd3d8ba0173bf5a58f51f5898cd429a7dab519524259fbca",
+      "source": "textures/item/bone.png",
+      "treatment": null
+    },
+    "feather.png": {
+      "sha256": "56513599c70b5da268ebf37e3245ef1f0fc9645a8b654aedd69069ec2f757513",
+      "source": "textures/item/feather.png",
+      "treatment": null
+    },
+    "gunpowder.png": {
+      "sha256": "2e92e94da1d88d700f946aefd67e8fae76dbf7517931063c88c7ff547a2a7bf2",
+      "source": "textures/item/gunpowder.png",
+      "treatment": null
+    },
+    "leather.png": {
+      "sha256": "d3ee371b5dfc67d2ef11c2e2acc4a1f7f069af2fb4fd9b2d73b815e911fcdbe7",
+      "source": "textures/item/leather.png",
+      "treatment": null
+    },
+    "leather_boots.png": {
+      "sha256": "ccd552159fb0f6c8ed30a37e3b2a5e0aedd7a1a61be40cf8f635e45d74aef20f",
+      "source": "textures/item/leather_boots.png",
+      "treatment": "leather"
+    },
+    "leather_chestplate.png": {
+      "sha256": "8ecd2bd8563cd9dc8f3ac93c8693a32a63ccc2bb922735fa36388c006fc8b6b9",
+      "source": "textures/item/leather_chestplate.png",
+      "treatment": "leather"
+    },
+    "leather_helmet.png": {
+      "sha256": "765e14d555959bac634c72d9d31f45c251d59fa80ab04cfc9312af3fa5117688",
+      "source": "textures/item/leather_helmet.png",
+      "treatment": "leather"
+    },
+    "leather_leggings.png": {
+      "sha256": "ceeddaaff08cec05b286bc71c0d5a207be91a6a6f482c8e4d70de2a447d4b803",
+      "source": "textures/item/leather_leggings.png",
+      "treatment": "leather"
+    },
+    "raw_beef.png": {
+      "sha256": "d3cfa567cf2253ec805c9fb1fb96b7b2de9fc9029ce1672e381a631c76f5e355",
+      "source": "textures/item/beef.png",
+      "treatment": null
+    },
+    "raw_chicken.png": {
+      "sha256": "d881ffda3bf13c96173a88516bc5e72028080d33e2df99c6370f44389c5eefae",
+      "source": "textures/item/chicken.png",
+      "treatment": null
+    },
+    "raw_iron.png": {
+      "sha256": "c87c56318de676c29150b2f7db1071b0cbc5df1e3418a0729f169b0f05587324",
+      "source": "textures/item/raw_iron.png",
+      "treatment": null
+    },
+    "raw_mutton.png": {
+      "sha256": "c879e9c708e9b748bdb2a740c294bbfb0c08b47f076e1d3b73517ea316dceeea",
+      "source": "textures/item/mutton.png",
+      "treatment": null
+    },
+    "raw_porkchop.png": {
+      "sha256": "90f2eb4c0837ab94fa16c3a5f1a9de58e740d4be030c70ebaee7ec9a944c3b9c",
+      "source": "textures/item/porkchop.png",
+      "treatment": null
+    },
+    "rotten_flesh.png": {
+      "sha256": "d83d0bf7bba8d47a6385673e50a18126c1ffe682f2308358b0231be1aee970a2",
+      "source": "textures/item/rotten_flesh.png",
+      "treatment": null
+    },
+    "stick.png": {
+      "sha256": "2b5a6b7202fcd3a45663ccf249fe87de076e8c735e0b6ab8a3bf2a812332b4ff",
+      "source": "textures/item/stick.png",
+      "treatment": null
+    },
+    "stone_pickaxe.png": {
+      "sha256": "763604e8e9cfec00ff0bbb3d9ebc622ac384f241803a012f0b83079cea637d10",
+      "source": "textures/item/stone_pickaxe.png",
+      "treatment": null
+    },
+    "string.png": {
+      "sha256": "e38d2e59056f8af400412309204c154b8e41e521f0df65dd5448f8279539cf63",
+      "source": "textures/item/string.png",
+      "treatment": null
+    },
+    "wooden_pickaxe.png": {
+      "sha256": "9448d9e28e6e21ca3514caeab4b40648468dbb5850cf701bf2c7e6b0968cc30d",
+      "source": "textures/item/wooden_pickaxe.png",
+      "treatment": null
+    }
+  },
+  "minecraftVersion": "1.20.1",
+  "referenceFiles": {
+    "minecraft/blockstates/crafting_table.json": "bd75337fe8f663e3c88e5f2490a7217d60925ff7f0001f98656b037441ecdb98",
+    "minecraft/blockstates/grass_block.json": "f428a88833a320ceae681bd4ce88dee75307b2517864c4b1a72e5f995071d1cb",
+    "minecraft/models/block/crafting_table.json": "98e1ff48fd72ed2a820ae4237e6d5193e0cd5ab6abd2338493c7bbbff130dea1",
+    "minecraft/models/block/grass_block.json": "fdea6afda5fa7d47241f181b56879e6807efc2b18a119133e3a871c411bf661a",
+    "minecraft/models/item/stick.json": "04048187b6c11f1152546cbb7b29db9877a73b6d2f152e1941d575c9460be8cc",
+    "minecraft/models/item/wooden_pickaxe.json": "483480c2c21a395196ca8255e933a5db3fd6f995be3dacc3c423e971ef964553",
+    "minecraft/source-manifest.json": "222492a1f1f5a0255b43d85b0b308df6b926306d870de643b95a9eadf9d51f14",
+    "minecraft/textures/block/water_flow.png.mcmeta": "802acdb8f55f30146d5ed18414b21ba35650d4e550f81825ea104131c12dc4fc",
+    "minecraft/textures/block/water_still.png.mcmeta": "e9b8025fde1b09b0a4d2a38427b04f98f28a593045be6d177eb2b29164c872b0",
+    "minecraft/textures/entity/bed/red.png": "73022232cafa0c0c5260e48cb5305a8bcc7f6e09d22f8d1bb51e87a1a84146b2"
+  },
+  "sourceArchiveSha256": "b65a2211175af90664de9f41ea422f4869eee855f0da4bf6fe0715434ebe9c69",
+  "tintProfile": {
+    "foliage": [
+      119,
+      171,
+      47
+    ],
+    "grass": [
+      145,
+      189,
+      89
+    ],
+    "leather": [
+      160,
+      101,
+      64
+    ],
+    "water": [
+      63,
+      118,
+      228
+    ]
+  }
+}
