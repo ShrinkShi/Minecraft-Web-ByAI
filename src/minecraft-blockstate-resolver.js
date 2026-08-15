@@ -2,6 +2,7 @@ import {normalizeMinecraftResourceId} from './minecraft-resource-id.js';
 
 const PROPERTY_NAME_RE=/^[a-z0-9_.-]+$/;
 const PROPERTY_VALUE_RE=/^[a-z0-9_.-]+$/;
+const RESERVED_PROPERTY_NAMES=new Set(['__proto__','prototype','constructor']);
 const MODEL_ENTRY_KEYS=new Set(['model','x','y','uvlock','weight']);
 const BLOCKSTATE_ROTATIONS=new Set([0,90,180,270]);
 const UINT32_MAX=0xffffffff;
@@ -16,7 +17,7 @@ function exactKeys(value,allowed,label){
 }
 
 function propertyName(value,label='blockstate property'){
-  if(typeof value!=='string'||!PROPERTY_NAME_RE.test(value))throw new TypeError(`${label} must match [a-z0-9_.-]+`);
+  if(typeof value!=='string'||!PROPERTY_NAME_RE.test(value)||RESERVED_PROPERTY_NAMES.has(value))throw new TypeError(`${label} must be a safe name matching [a-z0-9_.-]+`);
   return value;
 }
 
@@ -140,8 +141,7 @@ function normalizeMultipart(raw){
   if(!Array.isArray(raw)||!raw.length)throw new TypeError('blockstate multipart must be a non-empty array');
   return Object.freeze(raw.map((entry,index)=>{
     object(entry,`blockstate multipart[${index}]`);
-    const keys=new Set(Object.keys(entry));
-    for(const key of keys)if(key!=='when'&&key!=='apply')throw new TypeError(`blockstate multipart[${index}] contains unsupported field: ${key}`);
+    for(const key of Object.keys(entry))if(key!=='when'&&key!=='apply')throw new TypeError(`blockstate multipart[${index}] contains unsupported field: ${key}`);
     if(!Object.hasOwn(entry,'apply'))throw new TypeError(`blockstate multipart[${index}].apply is required`);
     return Object.freeze({
       when:entry.when===undefined?null:normalizeMultipartCondition(entry.when,`blockstate multipart[${index}].when`),
@@ -161,6 +161,10 @@ export function normalizeMinecraftBlockstate(value){
   });
 }
 
+function isNormalizedBlockstate(value){
+  return !!value&&Object.isFrozen(value)&&Array.isArray(value.variants)&&Object.isFrozen(value.variants)&&Array.isArray(value.multipart)&&Object.isFrozen(value.multipart);
+}
+
 function variantMatches(variant,state){
   return variant.conditions.every(condition=>state[condition.name]===condition.value);
 }
@@ -173,7 +177,7 @@ function conditionMatches(condition,state){
 }
 
 export function resolveMinecraftBlockstate(value,stateProperties={}){
-  const blockstate=value?.variants&&value?.multipart&&Object.isFrozen(value)?value:normalizeMinecraftBlockstate(value);
+  const blockstate=isNormalizedBlockstate(value)?value:normalizeMinecraftBlockstate(value);
   const state=normalizeMinecraftBlockStateProperties(stateProperties);
   const matchingVariants=blockstate.variants.filter(variant=>variantMatches(variant,state));
   if(matchingVariants.length>1)throw new Error(`ambiguous Minecraft blockstate variants: ${matchingVariants.map(variant=>JSON.stringify(variant.key)).join(', ')}`);
