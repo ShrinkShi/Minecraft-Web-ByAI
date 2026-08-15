@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {decodeInventoryTransactionRequest,decodeInventoryTransactionResult,encodeInventoryTransactionRequest,encodeInventoryTransactionResult,INVENTORY_TRANSACTION_REQUEST_KIND,INVENTORY_TRANSACTION_RESULT_KIND} from '../src/inventory-transaction-wire.js';
+
+const session='s:inventory-transaction-wire';
+const request=encodeInventoryTransactionRequest({session,requestId:4,expectedRevision:9,action:{type:'slot-click',slot:27,button:2,shift:false}});
+assert.deepEqual(request,{v:1,kind:INVENTORY_TRANSACTION_REQUEST_KIND,session,requestId:4,expectedRevision:9,action:{type:'slot-click',slot:27,button:2,shift:false}});assert.deepEqual(decodeInventoryTransactionRequest(structuredClone(request),{expectedSession:session}),request);
+const closeRequest=encodeInventoryTransactionRequest({session,requestId:5,expectedRevision:10,action:{type:'return-cursor'}});assert.deepEqual(closeRequest.action,{type:'return-cursor'});
+assert.throws(()=>decodeInventoryTransactionRequest({...request,session:'s:other'},{expectedSession:session}),/session mismatch/);assert.throws(()=>decodeInventoryTransactionRequest({...request,slots:[]}),/fields are invalid/,'clients must not submit replacement inventory state');assert.throws(()=>encodeInventoryTransactionRequest({session,requestId:0,expectedRevision:0,action:{type:'slot-click',slot:36,button:0,shift:false}}),/0 to 35/);assert.throws(()=>encodeInventoryTransactionRequest({session,requestId:0,expectedRevision:0,action:{type:'slot-click',slot:0,button:1,shift:false}}),/0 or 2/);assert.throws(()=>encodeInventoryTransactionRequest({session,requestId:0,expectedRevision:0,action:{type:'slot-click',slot:0,button:0,shift:1}}),/boolean/);assert.throws(()=>encodeInventoryTransactionRequest({session,requestId:0,expectedRevision:0,action:{type:'return-cursor',slot:0}}),/fields are invalid/);
+
+const result=encodeInventoryTransactionResult({session,requestId:4,ok:true,code:'picked-up',revision:10});assert.deepEqual(result,{v:1,kind:INVENTORY_TRANSACTION_RESULT_KIND,session,requestId:4,ok:true,code:'picked-up',revision:10});assert.deepEqual(decodeInventoryTransactionResult({...result},{expectedSession:session}),result);assert.throws(()=>decodeInventoryTransactionResult({...result,revision:-1}),/uint32/);assert.throws(()=>encodeInventoryTransactionResult({session,requestId:4,ok:false,code:'BAD CODE',revision:10}),/lowercase ASCII/);
+
+console.log('strict revision-guarded inventory transaction wire contract: PASS');
