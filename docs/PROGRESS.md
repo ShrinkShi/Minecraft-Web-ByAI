@@ -102,6 +102,7 @@
 - [x] original red-bed texture in world rendering。
 - [x] Repository quality gate + sharded Chromium browser smoke。
 - [x] PR #94 delivery gate baseline: 131 logic/worker regressions + both browser shards green。
+- [x] PR #96 model resolver foundation: strict resource IDs + parent/texture/element semantics；exact-head 132 regression scripts + both browser shards green。
 
 ## 当前主要内容量瓶颈
 
@@ -116,30 +117,33 @@
 
 这是下一阶段最高优先级，不与手工大规模加方块并行。
 
-### A. Resource/model resolver
+### A. Resource/model resolver — merged in PR #96
 
-- [ ] 定义 Minecraft resource identifier/path resolver。
-- [ ] 解析 model `parent` inheritance。
-- [ ] 合并/覆盖 `textures` variables。
-- [ ] 解析 `elements` cuboids。
-- [ ] 解析 per-face texture / uv / cullface / tintindex / rotation。
-- [ ] 解析 element rotation origin / axis / angle / rescale。
-- [ ] parent cycle / missing model / missing texture fail-closed。
-- [ ] Node-pure fixtures + golden tests。
+- [x] 定义 Minecraft resource identifier/path resolver。
+- [x] 解析 model `parent` inheritance。
+- [x] 合并/覆盖 `textures` variables，并在完整 inheritance reduction 后解析 face texture。
+- [x] 解析 `elements` cuboids。
+- [x] 解析 per-face texture / uv / cullface / tintindex / rotation。
+- [x] 解析 element rotation origin / axis / angle / rescale。
+- [x] parent cycle / missing model / missing texture / texture-variable cycle fail-closed。
+- [x] Node-pure fixtures + tracked original `grass_block.json` regression。
 
-### B. Blockstate resolver
+### B. Blockstate resolver — PR #97
 
-- [ ] `variants` property matching。
-- [ ] weighted model alternatives。
-- [ ] x/y model rotation + uvlock。
-- [ ] `multipart` conditions / OR / AND。
-- [ ] deterministic model selection inputs。
+- [x] `variants` property matching；empty variant 和 subset predicate 均有明确语义。
+- [x] weighted model alternatives；默认 weight=1，拒绝 0/非法权重。
+- [x] model x/y 0/90/180/270 rotation + `uvlock` normalization。
+- [x] `multipart` unconditional / property AND / `OR` / explicit `AND` / `a|b` alternatives。
+- [x] deterministic weighted selection：解释器不调用 `Math.random()`，只消费 caller-provided uint32 selection。
+- [x] tracked original `grass_block.json` blockstate：`snowy=false` 四方向 Y variants + `snowy=true` model。
+- [x] tracked original `crafting_table.json` empty variant。
 
-### C. Mesh/runtime integration
+### C. Mesh/runtime integration — next
 
 - [ ] normal model cuboids 编译为 mesh-worker 可消费的纯数据 spec。
 - [ ] full-cube 保留现有 fast path，避免性能退化。
 - [ ] logical resource texture binding。
+- [ ] omitted face UV derivation + element/model rotations + uvlock geometry semantics。
 - [ ] opaque / cutout / transparent layer contract。
 - [ ] visual geometry 与 collision shape 独立。
 - [ ] chunk remesh/unload 生命周期完整。
