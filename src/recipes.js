@@ -55,10 +55,11 @@ export function matchRecipe(slots,size){
 }
 
 export class CraftingGrid{
-  constructor(size=2){this.size=size;this.slots=Array(size*size).fill(null);this.match=null;this.refresh();}
-  refresh(){this.match=matchRecipe(this.slots,this.size);return this.match?.recipe.result||null;}
+  constructor(size=2){this.size=size;this.slots=Array(size*size).fill(null);this.match=null;this.authoritative=false;this.authoritativeResult=null;this.refresh();}
+  refresh(){if(this.authoritative){this.match=null;return this.authoritativeResult?{...this.authoritativeResult}:null;}this.match=matchRecipe(this.slots,this.size);return this.match?.recipe.result||null;}
+  replaceSnapshot(snapshot){if(!snapshot||snapshot.size!==this.size||!Array.isArray(snapshot.slots)||snapshot.slots.length!==this.size*this.size)return false;this.slots=snapshot.slots.map(stack=>stack?{...stack}:null);this.authoritativeResult=snapshot.result?{...snapshot.result}:null;this.authoritative=true;this.match=null;return true;}
   consume(){
-    if(!this.match)return null;
+    if(this.authoritative)return null;if(!this.match)return null;
     const output={...this.match.recipe.result};
     for(const index of this.match.used){const slot=this.slots[index];if(slot){slot.count--;if(slot.count<=0)this.slots[index]=null;}}
     this.refresh();return output;
@@ -68,7 +69,7 @@ export class CraftingGrid{
     for(let i=0;i<this.slots.length;i++){
       const slot=this.slots[i];if(slot)stacks.push({...slot});this.slots[i]=null;
     }
-    this.refresh();return stacks;
+    this.authoritativeResult=null;this.authoritative=false;this.refresh();return stacks;
   }
   clearTo(inventory){
     const overflow=[];
@@ -77,6 +78,6 @@ export class CraftingGrid{
       const left=typeof inventory.returnExistingStack==='function'?inventory.returnExistingStack({...slot}):((slot.damage??0)>0&&typeof inventory.addStack==='function'?inventory.addStack({...slot}):inventory.add(slot.id,slot.count));
       if(left)overflow.push({...slot,count:left});this.slots[i]=null;
     }
-    this.refresh();return overflow;
+    this.authoritativeResult=null;this.authoritative=false;this.refresh();return overflow;
   }
 }
