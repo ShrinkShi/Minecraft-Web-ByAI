@@ -23,7 +23,8 @@ test('imported Minecraft runtime assets resolve and decode through the real HTTP
   const atlasResponse=await request.get('/assets/textures/atlas.png');
   expect(atlasResponse.ok()).toBeTruthy();
   expect(atlasResponse.headers()['content-type']).toContain('image/png');
-  await expect(decodedImage(page,'/assets/textures/atlas.png')).resolves.toEqual({width:64,height:64,complete:true});
+  const atlas=await decodedImage(page,'/assets/textures/atlas.png');
+  expect(atlas).toEqual({width:64,height:64,complete:true});
 
   for(const path of[
     '/assets/items/wooden_pickaxe.png',
