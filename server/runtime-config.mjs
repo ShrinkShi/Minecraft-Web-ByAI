@@ -10,6 +10,7 @@ export const DEFAULT_RUNTIME_WORLD_ID='main';
 export const DEFAULT_RUNTIME_WORLD_SEED='1';
 export const DEFAULT_RUNTIME_TERRAIN_PROMPT='';
 export const DEFAULT_RUNTIME_MODE='survival';
+export const DEFAULT_RUNTIME_ALLOW_COMMANDS=false;
 const MODE_SET=new Set(SERVER_PLAYER_MODES);
 
 function integer(value,label,{min,max}={}){const parsed=typeof value==='number'?value:Number(value);if(!Number.isInteger(parsed)||parsed<min||parsed>max)throw new RangeError(`${label} must be an integer from ${min} to ${max}`);return parsed;}
@@ -31,6 +32,7 @@ export function normalizeRuntimeConfig(input={}){
     port:integer(input.port??DEFAULT_RUNTIME_PORT,'port',{min:0,max:65535}),
     allowedOrigins:origins(input.allowedOrigins),
     allowMissingOrigin:boolean(input.allowMissingOrigin,'allowMissingOrigin'),
+    allowCommands:boolean(input.allowCommands,'allowCommands'),
     worldId:string(input.worldId,DEFAULT_RUNTIME_WORLD_ID),
     seed:string(input.seed,DEFAULT_RUNTIME_WORLD_SEED),
     prompt:string(input.prompt,DEFAULT_RUNTIME_TERRAIN_PROMPT),
@@ -52,6 +54,7 @@ export function runtimeConfigFromEnv(env=process.env){
     port:env.MCWEB_WS_PORT??env.PORT,
     allowedOrigins:env.MCWEB_ALLOWED_ORIGINS,
     allowMissingOrigin:env.MCWEB_ALLOW_MISSING_ORIGIN,
+    allowCommands:env.MCWEB_ALLOW_COMMANDS,
     worldId:env.MCWEB_WORLD_ID,
     seed:env.MCWEB_WORLD_SEED,
     prompt:env.MCWEB_TERRAIN_PROMPT,
