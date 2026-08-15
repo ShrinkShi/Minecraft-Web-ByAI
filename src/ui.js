@@ -6,6 +6,7 @@ import {CraftingGrid} from './recipes.js';
 import {EQUIPMENT_SLOTS} from './equipment.js';
 import {subscribeMultiplayerMiningProgress} from './multiplayer-mining-progress-channel.js';
 import {hasMultiplayerInventoryTransactionSender,sendMultiplayerInventoryTransaction,subscribeMultiplayerInventoryTransactionResults} from './multiplayer-inventory-transaction-channel.js';
+import {hasMultiplayerEquipmentTransactionSender,sendMultiplayerEquipmentTransaction,subscribeMultiplayerEquipmentTransactionResults} from './multiplayer-equipment-transaction-channel.js';
 
 function craftStacksCanMerge(a,b){if(!a||!b||a.id!==b.id)return false;if(ITEMS[a.id]&&ITEMS[b.id])return itemStacksCanMerge(a,b);return(a.damage??0)===(b.damage??0);}
 
@@ -20,9 +21,10 @@ export class UI{
     this.cursorStack=document.querySelector('#cursor-stack');this.hearts=document.querySelector('#hearts');this.hunger=document.querySelector('#hunger');this.armorRow=document.querySelector('#armor-row');this.oxygen=document.querySelector('#oxygen');this.xp=document.querySelector('#xp-bar');this.level=document.querySelector('#xp-level');
     this.debug=document.querySelector('#debug');this.toast=document.querySelector('#toast');this.breakMeter=document.querySelector('#break-meter');this.loadingBar=document.querySelector('#loading-bar');this.loadingDetail=document.querySelector('#loading-detail');
     this.chatLog=document.querySelector('#chat-log');this.chatWrap=document.querySelector('#chat-input-wrap');this.chatInput=document.querySelector('#chat-input');
-    this.selected=0;this.inventoryModel=null;this.inventorySubscription=null;this.equipmentModel=null;this.craft2=new CraftingGrid(2);this.craft3=new CraftingGrid(3);this.onChanged=()=>{};this.onOverflow=()=>{};this.localBreakProgress=0;this.authoritativeBreakProgress=null;
+    this.selected=0;this.inventoryModel=null;this.inventorySubscription=null;this.equipmentModel=null;this.equipmentSubscription=null;this.craft2=new CraftingGrid(2);this.craft3=new CraftingGrid(3);this.onChanged=()=>{};this.onOverflow=()=>{};this.localBreakProgress=0;this.authoritativeBreakProgress=null;
     this.releaseMiningProgress=subscribeMultiplayerMiningProgress(state=>{this.authoritativeBreakProgress=state?.active?state.progress:null;this.renderBreak();});
     this.releaseInventoryTransactionResults=subscribeMultiplayerInventoryTransactionResults(result=>{if(result.ok)return;if(result.code==='stale-revision')this.showToast('背包状态已由服务器更新，请重试');else this.showToast(`背包操作被服务器拒绝：${result.code}`);});
+    this.releaseEquipmentTransactionResults=subscribeMultiplayerEquipmentTransactionResults(result=>{if(result.ok)return;if(result.code==='stale-revision')this.showToast('装备状态已由服务器更新，请重试');else this.showToast(`装备操作被服务器拒绝：${result.code}`);});
     this.renderStatus(20,20,0,0,0);this.renderOxygen(15,15,false);this.bindSlotEvents();this.renderHotbar();
   }
 
@@ -31,9 +33,10 @@ export class UI{
   setReturnMainLabel(multiplayer=false){if(this.returnMainButton)this.returnMainButton.textContent=multiplayer?'断开连接并返回标题画面':'保存并返回标题画面';}
 
   bindInventory(model,{equipment=null,onChanged=()=>{},onOverflow=()=>{}}={}){
-    this.inventorySubscription?.();this.inventorySubscription=null;this.inventoryModel=model;this.equipmentModel=equipment;this.onChanged=onChanged;this.onOverflow=onOverflow;
+    this.inventorySubscription?.();this.inventorySubscription=null;this.equipmentSubscription?.();this.equipmentSubscription=null;this.inventoryModel=model;this.equipmentModel=equipment;this.onChanged=onChanged;this.onOverflow=onOverflow;
     if(hasMultiplayerInventoryTransactionSender()){this.craft2=new CraftingGrid(2);this.craft3=new CraftingGrid(3);}
     if(model&&typeof model.subscribe==='function')this.inventorySubscription=model.subscribe(()=>this.refreshInventory());
+    if(equipment&&typeof equipment.subscribe==='function')this.equipmentSubscription=equipment.subscribe(()=>{this.refreshInventory();this.onChanged();});
     this.refreshInventory();
   }
 
@@ -43,22 +46,23 @@ export class UI{
       if(!slot)return;
       if(slot.dataset.hotbarIndex!==undefined){if(e.button!==0)return;e.preventDefault();this.select(Number(slot.dataset.hotbarIndex));return;}
       if(!this.inventoryModel)return;if(e.button!==0&&e.button!==2)return;e.preventDefault();
-      const authoritative=hasMultiplayerInventoryTransactionSender();
+      const authoritativeInventory=hasMultiplayerInventoryTransactionSender(),authoritativeEquipment=hasMultiplayerEquipmentTransactionSender();
       if(slot.dataset.invIndex!==undefined){
-        if(authoritative){try{sendMultiplayerInventoryTransaction({type:'slot-click',slot:Number(slot.dataset.invIndex),button:e.button,shift:!!e.shiftKey});}catch(error){this.showToast(`背包操作发送失败：${error?.message||error}`);}return;}
+        if(authoritativeInventory){try{sendMultiplayerInventoryTransaction({type:'slot-click',slot:Number(slot.dataset.invIndex),button:e.button,shift:!!e.shiftKey});}catch(error){this.showToast(`背包操作发送失败：${error?.message||error}`);}return;}
         const changed=this.inventoryModel.click(Number(slot.dataset.invIndex),e.button,e.shiftKey);if(changed)this.changed();
       }else if(slot.dataset.equipmentSlot!==undefined){
-        if(authoritative){this.showToast('联机装备事务尚未服务端化');return;}
+        if(authoritativeEquipment){try{sendMultiplayerEquipmentTransaction({slot:slot.dataset.equipmentSlot,button:e.button});}catch(error){this.showToast(`装备操作发送失败：${error?.message||error}`);}return;}
+        if(authoritativeInventory){this.showToast('联机装备事务尚未服务端化');return;}
         const changed=this.equipmentModel?.click(slot.dataset.equipmentSlot,this.inventoryModel,e.button)||false;if(changed)this.changed();
       }else if(slot.dataset.craftIndex!==undefined){
-        if(authoritative){this.showToast('联机合成事务尚未服务端化');return;}
+        if(authoritativeInventory){this.showToast('联机合成事务尚未服务端化');return;}
         const grid=slot.dataset.craftSize==='3'?this.craft3:this.craft2;
         if(e.shiftKey){
           const index=Number(slot.dataset.craftIndex),item=grid.slots[index];
           if(item){const before=item.count,left=typeof this.inventoryModel.returnExistingStack==='function'?this.inventoryModel.returnExistingStack({...item}):((item.damage??0)>0&&typeof this.inventoryModel.addStack==='function'?this.inventoryModel.addStack({...item}):this.inventoryModel.add(item.id,before)),moved=before-left;if(moved>0){if(left>0)item.count=left;else grid.slots[index]=null;grid.refresh();this.changed();}}
         }else if(this.clickCraftInput(grid,Number(slot.dataset.craftIndex),e.button))this.changed();
       }else if(slot.dataset.craftResult!==undefined){
-        if(authoritative){this.showToast('联机合成事务尚未服务端化');return;}
+        if(authoritativeInventory){this.showToast('联机合成事务尚未服务端化');return;}
         const grid=slot.dataset.craftResult==='3'?this.craft3:this.craft2;if(this.takeCraftResult(grid,e.shiftKey))this.changed();
       }
     });
