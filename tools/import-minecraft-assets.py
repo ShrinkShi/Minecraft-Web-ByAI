@@ -49,7 +49,6 @@ RUNTIME_FILES = {
     "textures/item/wooden_pickaxe.png": "assets/minecraft/textures/item/wooden_pickaxe.png",
     "textures/item/stone_pickaxe.png": "assets/minecraft/textures/item/stone_pickaxe.png",
     "textures/item/raw_iron.png": "assets/minecraft/textures/item/raw_iron.png",
-    "textures/item/red_bed.png": "assets/minecraft/textures/item/red_bed.png",
     "textures/item/leather_helmet.png": "assets/minecraft/textures/item/leather_helmet.png",
     "textures/item/leather_chestplate.png": "assets/minecraft/textures/item/leather_chestplate.png",
     "textures/item/leather_leggings.png": "assets/minecraft/textures/item/leather_leggings.png",
@@ -65,6 +64,10 @@ RUNTIME_FILES = {
     "textures/item/arrow.png": "assets/minecraft/textures/item/arrow.png",
     "textures/item/gunpowder.png": "assets/minecraft/textures/item/gunpowder.png",
     "textures/item/string.png": "assets/minecraft/textures/item/string.png",
+
+    # Beds render from an entity sheet in vanilla; this archive does not expose
+    # a standalone textures/item/red_bed.png resource.
+    "textures/entity/bed/red.png": "assets/minecraft/textures/entity/bed/red.png",
 
     # JSON resources needed for later model/blockstate interpretation.
     "models/block/grass_block.json": "assets/minecraft/models/block/grass_block.json",
