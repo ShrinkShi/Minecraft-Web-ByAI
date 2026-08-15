@@ -36,8 +36,8 @@ export class UI{
     this.inventorySubscription?.();this.inventorySubscription=null;this.equipmentSubscription?.();this.equipmentSubscription=null;this.inventoryModel=model;this.equipmentModel=equipment;this.onChanged=onChanged;this.onOverflow=onOverflow;
     if(hasMultiplayerInventoryTransactionSender()){this.craft2=new CraftingGrid(2);this.craft3=new CraftingGrid(3);}
     if(model&&typeof model.subscribe==='function')this.inventorySubscription=model.subscribe(()=>this.refreshInventory());
-    if(equipment&&typeof equipment.subscribe==='function')this.equipmentSubscription=equipment.subscribe(()=>{this.refreshInventory();this.onChanged();});
-    this.refreshInventory();
+    if(equipment&&typeof equipment.subscribe==='function')this.equipmentSubscription=equipment.subscribe(()=>{this.refreshInventory();this.renderArmor(this.equipmentModel?.armorPoints()||0);this.onChanged();});
+    this.refreshInventory();this.renderArmor(this.equipmentModel?.armorPoints()||0);
   }
 
   bindSlotEvents(){
@@ -157,11 +157,13 @@ export class UI{
   openChat(prefix=''){this.chatWrap.classList.remove('hidden');this.chatInput.value=prefix;this.chatInput.focus();requestAnimationFrame(()=>this.chatInput.setSelectionRange(this.chatInput.value.length,this.chatInput.value.length));}
   closeChat(){this.chatWrap.classList.add('hidden');this.chatInput.blur();}
   isChatOpen(){return !this.chatWrap.classList.contains('hidden');}
-  chatMessage(text,type='system'){const line=document.createElement('div');line.className=`chat-line ${type}`;line.textContent=text;this.chatLog.append(line);while(this.chatLog.children.length>8)this.chatLog.firstChild.remove();clearTimeout(line._timer);line._timer=setTimeout(()=>line.classList.add('faded'),9000);}
+  chatMessage(text,type='system'){if(hasMultiplayerEquipmentTransactionSender()&&text==='多人服务器已接管移动、普通方块交互、掉落物与背包状态；装备、合成、战斗和本地存档仍未接入。')text='多人服务器已接管移动、普通方块交互、掉落物、背包与装备状态；合成、战斗和本地存档仍未接入。';const line=document.createElement('div');line.className=`chat-line ${type}`;line.textContent=text;this.chatLog.append(line);while(this.chatLog.children.length>8)this.chatLog.firstChild.remove();clearTimeout(line._timer);line._timer=setTimeout(()=>line.classList.add('faded'),9000);}
 
   renderStatus(hp,hunger,xp,level,armorPoints=0){
-    this.hearts.textContent='';this.hunger.textContent='';this.armorRow.textContent='';for(let i=0;i<10;i++){const h=document.createElement('i');h.className='heart'+(hp>=i*2+1?'':' empty');this.hearts.append(h);const f=document.createElement('i');f.className='food'+(hunger>=i*2+1?'':' empty');this.hunger.append(f);const a=document.createElement('i'),remaining=armorPoints-i*2;a.className='armor-icon'+(remaining>=2?' full':remaining>=1?' half':'');this.armorRow.append(a);}this.xp.style.width=`${Math.max(0,Math.min(100,xp))}%`;this.level.textContent=level;
+    this.hearts.textContent='';this.hunger.textContent='';for(let i=0;i<10;i++){const h=document.createElement('i');h.className='heart'+(hp>=i*2+1?'':' empty');this.hearts.append(h);const f=document.createElement('i');f.className='food'+(hunger>=i*2+1?'':' empty');this.hunger.append(f);}this.renderArmor(armorPoints);this.xp.style.width=`${Math.max(0,Math.min(100,xp))}%`;this.level.textContent=level;
   }
+
+  renderArmor(armorPoints=0){this.armorRow.textContent='';for(let i=0;i<10;i++){const a=document.createElement('i'),remaining=armorPoints-i*2;a.className='armor-icon'+(remaining>=2?' full':remaining>=1?' half':'');this.armorRow.append(a);}}
 
   renderOxygen(air,maxAir,visible){if(!this.oxygen)return;const safeMax=Math.max(.001,Number(maxAir)||1),safeAir=Math.max(0,Math.min(safeMax,Number(air)||0)),filled=Math.ceil(safeAir/safeMax*10);this.oxygen.textContent='';this.oxygen.classList.toggle('hidden',!visible);this.oxygen.dataset.air=safeAir.toFixed(2);this.oxygen.setAttribute('aria-label',`氧气 ${safeAir.toFixed(1)} / ${safeMax.toFixed(0)} 秒`);for(let i=0;i<10;i++){const bubble=document.createElement('i');bubble.className='oxygen-bubble'+(i<filled?'':' empty');this.oxygen.append(bubble);}}
 
