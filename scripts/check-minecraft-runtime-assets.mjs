@@ -1,0 +1,56 @@
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {readFileSync} from 'node:fs';
+import {resolve} from 'node:path';
+
+const root=process.cwd();
+const runtimePath=resolve(root,'assets/minecraft/runtime-manifest.json');
+const runtime=JSON.parse(readFileSync(runtimePath,'utf8'));
+const source=JSON.parse(readFileSync(resolve(root,'assets/minecraft/source-manifest.json'),'utf8'));
+const sha256=path=>createHash('sha256').update(readFileSync(path)).digest('hex');
+
+assert.equal(runtime.format,1);
+assert.equal(runtime.minecraftVersion,'1.20.1');
+assert.equal(source.format,1);
+assert.equal(source.minecraftVersion,'1.20.1');
+assert.equal(runtime.sourceArchiveSha256,'b65a2211175af90664de9f41ea422f4869eee855f0da4bf6fe0715434ebe9c69');
+assert.equal(source.sourceArchiveSha256,runtime.sourceArchiveSha256);
+
+const atlasPath=resolve(root,'assets',runtime.atlas.path);
+assert.equal(sha256(atlasPath),runtime.atlas.sha256,'tracked atlas must match generated runtime manifest checksum');
+const atlas=readFileSync(atlasPath);
+assert.equal(atlas.subarray(1,4).toString('ascii'),'PNG');
+assert.equal(atlas.readUInt32BE(16),64,'atlas width must remain 4 * 16px');
+assert.equal(atlas.readUInt32BE(20),64,'atlas height must remain 4 * 16px');
+assert.deepEqual(Object.keys(runtime.atlas.tiles).map(Number).sort((a,b)=>a-b),Array.from({length:16},(_,index)=>index));
+assert.equal(runtime.atlas.tiles['12'].source,'textures/block/crafting_table_front.png');
+assert.equal(runtime.atlas.tiles['14'].source,'textures/block/iron_ore.png');
+assert.equal(runtime.atlas.tiles['15'].source,'textures/block/white_wool.png');
+assert.equal(runtime.atlas.tiles['0'].treatment,'grass');
+assert.equal(runtime.atlas.tiles['8'].treatment,'foliage');
+assert.equal(runtime.atlas.tiles['9'].treatment,'water');
+
+for(const [name,record] of Object.entries(runtime.items)){
+  const path=resolve(root,'assets/items',name);
+  assert.equal(sha256(path),record.sha256,`${name} must match the generated runtime checksum`);
+  const sourceKey=record.source;
+  assert.ok(source.files[sourceKey],`${name} must retain an exact source-manifest record`);
+}
+
+for(const [relative,checksum] of Object.entries(runtime.referenceFiles)){
+  assert.equal(sha256(resolve(root,'assets',relative)),checksum,`${relative} must match runtime manifest checksum`);
+}
+
+for(const required of [
+  'textures/block/grass_block_top.png','textures/block/grass_block_side.png','textures/block/grass_block_side_overlay.png',
+  'textures/block/crafting_table_front.png','textures/block/iron_ore.png','textures/block/white_wool.png',
+  'textures/item/stick.png','textures/item/wooden_pickaxe.png','textures/item/stone_pickaxe.png','textures/item/raw_iron.png',
+  'textures/entity/bed/red.png','models/block/grass_block.json','models/block/crafting_table.json'
+])assert.ok(source.files[required],`${required} must be traceable to the source ZIP`);
+
+assert.deepEqual(runtime.tintProfile.grass,[145,189,89]);
+assert.deepEqual(runtime.tintProfile.foliage,[119,171,47]);
+assert.deepEqual(runtime.tintProfile.water,[63,118,228]);
+assert.deepEqual(runtime.tintProfile.leather,[160,101,64]);
+
+console.log('Minecraft 1.20.1 generated runtime assets + checksum provenance: PASS');
