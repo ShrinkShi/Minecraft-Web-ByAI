@@ -1,0 +1,23 @@
+import {test,expect} from '@playwright/test';
+import {createAuthoritativeServerRuntime} from '../../server/runtime.mjs';
+
+const ORIGIN='http://127.0.0.1:4173';
+
+test('multiplayer player 2x2 crafting is server-authoritative and shift crafts through snapshots',async({page})=>{
+  const errors=[],runtime=createAuthoritativeServerRuntime({config:{host:'127.0.0.1',port:0,allowedOrigins:[ORIGIN],worldId:'e2e-player-crafting',seed:'player-crafting-seed',prompt:'plains',mode:'survival',spawnX:0,spawnZ:0,prefetchRadius:0,terrainCacheChunks:32},onError:event=>errors.push(event)});
+  try{
+    const address=await runtime.start(),url=`ws://127.0.0.1:${address.port}/ws`;
+    await page.goto('/?e2e=1');await page.getByRole('button',{name:'多人游戏'}).click();await page.locator('#multiplayer-url').fill(url);await page.locator('#multiplayer-insecure').check();await page.getByRole('button',{name:'连接服务器'}).click();
+    await expect(page.locator('#loading')).toHaveClass(/hidden/,{timeout:30_000});await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E?.multiplayer?.()),{timeout:30_000}).toMatchObject({sessionKind:'multiplayer',state:'ready',ready:true,worldId:'e2e-player-crafting'});await expect(page.locator('#chat-log')).toContainText('玩家 2×2 合成状态');
+    const [session]=[...runtime.authoritative.sessions];expect(session).toBeTruthy();await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E?.playerCrafting?.()),{timeout:5_000}).toEqual({revision:0,slots:[null,null,null,null],result:null});
+
+    const given=runtime.addInventoryItem(session,'block:6',2);expect(given.changed).toBe(true);await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E?.inventoryRevision?.()),{timeout:5_000}).toBe(1);await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E?.inventorySlot?.(0)),{timeout:5_000}).toEqual({id:'block:6',count:2});
+    await page.keyboard.press('e');const panel=page.locator('#inventory');await expect(panel).not.toHaveClass(/hidden/);const inventorySlot=page.locator('#inventory [data-inv-index="0"]'),craftInput=page.locator('#inventory [data-craft-index="0"][data-craft-size="2"]'),craftResult=page.locator('#inventory [data-craft-result="2"]');
+    await inventorySlot.click({force:true});await expect.poll(()=>runtime.inventories.snapshot(session).revision,{timeout:5_000}).toBe(2);await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E?.inventoryCursor?.()),{timeout:5_000}).toEqual({id:'block:6',count:2});
+    await craftInput.click({force:true});await expect.poll(()=>runtime.craftings.snapshot(session).revision,{timeout:5_000}).toBe(1);expect(runtime.inventories.snapshot(session).revision).toBe(3);expect(runtime.craftings.snapshot(session).slots[0]).toEqual({id:'block:6',count:2});expect(runtime.inventories.snapshot(session).cursor).toBe(null);await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E?.playerCrafting?.()),{timeout:5_000}).toEqual({revision:1,slots:[{id:'block:6',count:2},null,null,null],result:{id:'block:5',count:4}});await expect(craftResult).toHaveAttribute('aria-label',/橡木木板/);
+
+    await craftResult.click({force:true,modifiers:['Shift']});await expect.poll(()=>runtime.craftings.snapshot(session).revision,{timeout:5_000}).toBe(2);expect(runtime.inventories.snapshot(session).revision).toBe(4);expect(runtime.craftings.snapshot(session).slots).toEqual([null,null,null,null]);expect(runtime.craftings.snapshot(session).result).toBe(null);expect(runtime.inventories.snapshot(session).slots.some(stack=>stack?.id==='block:5'&&stack.count===8)).toBe(true);await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E?.playerCrafting?.()),{timeout:5_000}).toEqual({revision:2,slots:[null,null,null,null],result:null});await expect.poll(()=>page.evaluate(()=>Array.from({length:36},(_,i)=>globalThis.__minecraftE2E?.inventorySlot?.(i)).find(stack=>stack?.id==='block:5')||null),{timeout:5_000}).toEqual({id:'block:5',count:8});
+
+    await page.keyboard.press('e');await expect(panel).toHaveClass(/hidden/);expect(errors).toEqual([]);
+  }finally{await runtime.stop();}
+});
