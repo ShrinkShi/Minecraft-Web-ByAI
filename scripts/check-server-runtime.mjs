@@ -6,9 +6,10 @@ import {encodeClientInputEnvelope} from '../src/client-input-envelope.js';
 import {encodePlayerControlFrame} from '../src/player-control-frame.js';
 import {encodePlayerViewFrame} from '../src/player-view-frame.js';
 import {MULTIPLAYER_SUBPROTOCOL,encodeClientHello} from '../src/multiplayer-handshake.js';
-import {decodeServerInventorySnapshot} from '../src/server-inventory-snapshot.js';
+import {decodeServerInventorySnapshot,SERVER_INVENTORY_SNAPSHOT_KIND} from '../src/server-inventory-snapshot.js';
+import {decodeServerEquipmentSnapshot,SERVER_EQUIPMENT_SNAPSHOT_KIND} from '../src/server-equipment-snapshot.js';
 import {decodeServerWorldInfo} from '../src/server-world-info.js';
-import {decodeServerPlayerSnapshot} from '../src/server-player-snapshot.js';
+import {decodeServerPlayerSnapshot,SERVER_PLAYER_SNAPSHOT_KIND} from '../src/server-player-snapshot.js';
 import {WorldEditSyncAssembler,authoritativeEditsToVoxelEdits} from '../src/world-edit-replication.js';
 import {createAuthoritativeServerRuntime} from '../server/runtime.mjs';
 import {normalizeRuntimeConfig,runtimeConfigFromEnv,DEFAULT_RUNTIME_PORT,DEFAULT_RUNTIME_WORLD_ID,DEFAULT_RUNTIME_WORLD_SEED,DEFAULT_RUNTIME_TERRAIN_PROMPT,DEFAULT_RUNTIME_MODE} from '../server/runtime-config.mjs';
@@ -25,6 +26,7 @@ assert.throws(()=>runtimeConfigFromEnv({MCWEB_WS_PORT:'0'}),/1 to 65535/);assert
 
 function openClient(url){return Promise.race([new Promise((resolve,reject)=>{const socket=new WebSocket(url,[MULTIPLAYER_SUBPROTOCOL],{origin:ORIGIN});socket.once('open',()=>resolve(socket));socket.once('error',reject);}),timeout(2500,'runtime websocket open')]);}
 function messageQueue(socket){const queued=[],waiters=[];socket.on('message',(data,isBinary)=>{if(isBinary)return;const value=JSON.parse(data.toString('utf8')),waiter=waiters.shift();if(waiter)waiter(value);else queued.push(value);});return{next(label){if(queued.length)return Promise.resolve(queued.shift());return Promise.race([new Promise(resolve=>waiters.push(resolve)),timeout(2500,label)]);}};}
+async function nextKind(messages,kind,label){for(let i=0;i<64;i++){const message=await messages.next(label);if(message.kind===kind)return message;}throw new Error(`did not receive ${kind}`);}
 async function waitUntil(predicate,label){return Promise.race([new Promise(resolve=>{const poll=()=>predicate()?resolve():setTimeout(poll,10);poll();}),timeout(2500,label)]);}
 
 let tickCallback=null,tickDelay=null,clearedTimer=null;const logs=[],errors=[];
@@ -43,15 +45,16 @@ try{
   assert.equal(editSnapshot.revision,1);assert.deepEqual(editSnapshot.edits,{[`${editX},${editY},${editZ}`]:editId});
   const voxelEdits=authoritativeEditsToVoxelEdits(editSnapshot.edits),localX=editX%CHUNK_SIZE,localZ=editZ%CHUNK_SIZE,localIndex=localX+CHUNK_SIZE*(localZ+CHUNK_SIZE*editY);assert.deepEqual(voxelEdits['6,6'],[[localIndex,editId]]);
   assert.deepEqual(authoritativeEditsToVoxelEdits({'-1,10,-1':BLOCK.WATER})['-1,-1'],[[15+CHUNK_SIZE*(15+CHUNK_SIZE*10),BLOCK.WATER]]);assert.throws(()=>authoritativeEditsToVoxelEdits({'1,2,3':999}),/known block/);
-  const initial=decodeServerPlayerSnapshot(await messages.next('runtime initial snapshot'),{expectedSession:welcome.session});assert.equal(initial.tick,0);assert.deepEqual(initial.position,{x:33.5,y:23.001,z:-16.5});
-  const inventory=decodeServerInventorySnapshot(await messages.next('runtime initial inventory'),{expectedSession:welcome.session});assert.equal(inventory.mode,'survival');assert.equal(inventory.revision,0);assert.equal(inventory.slots.length,36);assert.equal(inventory.slots.every(slot=>slot===null),true);
-  assert.equal(runtime.server.sessionCount,1);assert.equal(runtime.authoritative.sessionCount,1);
+  const initial=decodeServerPlayerSnapshot(await nextKind(messages,SERVER_PLAYER_SNAPSHOT_KIND,'runtime initial snapshot'),{expectedSession:welcome.session});assert.equal(initial.tick,0);assert.deepEqual(initial.position,{x:33.5,y:23.001,z:-16.5});
+  const inventory=decodeServerInventorySnapshot(await nextKind(messages,SERVER_INVENTORY_SNAPSHOT_KIND,'runtime initial inventory'),{expectedSession:welcome.session});assert.equal(inventory.mode,'survival');assert.equal(inventory.revision,0);assert.equal(inventory.slots.length,36);assert.equal(inventory.slots.every(slot=>slot===null),true);
+  const equipment=decodeServerEquipmentSnapshot(await nextKind(messages,SERVER_EQUIPMENT_SNAPSHOT_KIND,'runtime initial equipment'),{expectedSession:welcome.session});assert.equal(equipment.revision,0);assert.deepEqual(equipment.slots,{head:null,chest:null,legs:null,feet:null});
+  assert.equal(runtime.server.sessionCount,1);assert.equal(runtime.authoritative.sessionCount,1);assert.equal(runtime.equipments.sessionCount,1);
 
   const view=encodePlayerViewFrame({yaw:Math.PI/2,pitch:0},7),control=encodePlayerControlFrame({side:0,forward:1,jump:false,sneak:false,sprint:false,primary:false},8);socket.send(JSON.stringify(encodeClientInputEnvelope({session:welcome.session,packetSeq:0,kind:'view',payload:view})));socket.send(JSON.stringify(encodeClientInputEnvelope({session:welcome.session,packetSeq:1,kind:'control',payload:control})));
-  await waitUntil(()=>runtime.server.getSessionInputState(welcome.session)?.control?.sequence===8,'runtime validated input state');const movedPromise=messages.next('runtime tick1 snapshot');tickCallback();const moved=decodeServerPlayerSnapshot(await movedPromise,{expectedSession:welcome.session});assert.equal(moved.tick,1);near(moved.position.x,33.5-4.3*.05,1e-9,'production runtime +90 W x');near(moved.position.z,-16.5,1e-9,'production runtime +90 W z');assert.equal(moved.grounded,true);assert.deepEqual(errors,[]);
+  await waitUntil(()=>runtime.server.getSessionInputState(welcome.session)?.control?.sequence===8,'runtime validated input state');tickCallback();const moved=decodeServerPlayerSnapshot(await nextKind(messages,SERVER_PLAYER_SNAPSHOT_KIND,'runtime tick1 snapshot'),{expectedSession:welcome.session});assert.equal(moved.tick,1);near(moved.position.x,33.5-4.3*.05,1e-9,'production runtime +90 W x');near(moved.position.z,-16.5,1e-9,'production runtime +90 W z');assert.equal(moved.grounded,true);assert.deepEqual(errors,[]);
 
-  const closePromise=new Promise(resolve=>socket.once('close',(code,reason)=>resolve({code,reason:reason.toString('utf8')})));await runtime.stop();const closed=await Promise.race([closePromise,timeout(2500,'runtime client close')]);assert.ok(closed.code===1006||closed.code===1001||closed.code===1000);assert.equal(runtime.state,'stopped');assert.equal(runtime.running,false);assert.equal(runtime.authoritative.running,false);assert.deepEqual(clearedTimer,{timer:'runtime'});assert.equal(runtime.authoritative.sessionCount,0);assert.equal(logs.at(-1).event,'stopped');await runtime.stop();await assert.rejects(runtime.start(),/cannot start authoritative runtime while stopped/);
+  const closePromise=new Promise(resolve=>socket.once('close',(code,reason)=>resolve({code,reason:reason.toString('utf8')})));await runtime.stop();const closed=await Promise.race([closePromise,timeout(2500,'runtime client close')]);assert.ok(closed.code===1006||closed.code===1001||closed.code===1000);assert.equal(runtime.state,'stopped');assert.equal(runtime.running,false);assert.equal(runtime.authoritative.running,false);assert.deepEqual(clearedTimer,{timer:'runtime'});assert.equal(runtime.authoritative.sessionCount,0);assert.equal(runtime.equipments.sessionCount,0);assert.equal(logs.at(-1).event,'stopped');await runtime.stop();await assert.rejects(runtime.start(),/cannot start authoritative runtime while stopped/);
 }finally{if(runtime.state!=='stopped')await runtime.stop();if(socket&&socket.readyState===WebSocket.OPEN)socket.terminate();}
 
 assert.throws(()=>createAuthoritativeServerRuntime({config:null}),/runtime config/);assert.throws(()=>createAuthoritativeServerRuntime({onLog:null}),/onLog/);assert.throws(()=>createAuthoritativeServerRuntime({onError:null}),/onError/);
-console.log('production authoritative runtime + world edits + inventory bootstrap + tick lifecycle: PASS');
+console.log('production authoritative runtime + world edits + inventory + equipment bootstrap + tick lifecycle: PASS');
