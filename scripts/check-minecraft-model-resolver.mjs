@@ -17,11 +17,11 @@ assert.equal(normalizeMinecraftResourceId('block/stone'),'minecraft:block/stone'
 assert.equal(minecraftModelAssetPath('block/stone'),'./assets/minecraft/models/block/stone.json');
 assert.equal(minecraftTextureAssetPath('block/stone'),'./assets/minecraft/textures/block/stone.png');
 assert.equal(minecraftBlockstateAssetPath('grass_block'),'./assets/minecraft/blockstates/grass_block.json');
+assert.equal(minecraftBlockstateAssetPath('example:nested/widget'),'./assets/example/blockstates/nested/widget.json');
 assert.throws(()=>normalizeMinecraftResourceId('Minecraft:block/stone'),/namespace/);
 assert.throws(()=>normalizeMinecraftResourceId('minecraft:../stone'),/traversal/);
 assert.throws(()=>normalizeMinecraftResourceId('minecraft:block//stone'),/empty path segments/);
 assert.throws(()=>normalizeMinecraftResourceId('minecraft:block:stone'),/at most one/);
-assert.throws(()=>minecraftBlockstateAssetPath('block/stone'),/must name a block/);
 
 const inheritedElement={
   from:[0,0,0],to:[16,16,16],
