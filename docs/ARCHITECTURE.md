@@ -1,179 +1,346 @@
 # 架构记录
 
-## 设计原则
+本文只描述当前 `main` 已经建立的架构边界，以及下一阶段允许如何扩张。完整功能完成度见 [`PROJECT_BASELINE.md`](PROJECT_BASELINE.md) 和 [`MINECRAFT_1_20_1_FEATURE_MATRIX.md`](MINECRAFT_1_20_1_FEATURE_MATRIX.md)。
 
-1. **数据优先**：区块用紧凑 TypedArray；Inventory、Equipment、配方、战斗、护甲、氧气、游泳、天气 profile、死亡/重生候选与床配对规则尽量保持纯数据/纯逻辑。
-2. **重活离开主线程**：terrain 与 mesh 分别运行在 Web Worker；主线程负责输入、系统编排和 GPU 对象安装。
-3. **批处理渲染**：chunk 不是一方块一 Mesh；天气也不是一雨滴一 Mesh。可重复大量元素优先固定 Buffer 池。
-4. **玩家位置只有一个积分器**：陆地、飞行、水中移动都收口在 `PlayerController.update()`。
-5. **GPU 生命周期显式**：chunk rebuild/unload 与 world teardown 必须释放 geometry/material/texture；WeatherSystem 同样显式 dispose。
-6. **程序化世界只存差异**：seed/prompt 重建基础区块，IndexedDB 保存必要 world record。
-7. **瞬时状态不滥入存档**：Oxygen 与 swimCoverage 不持久化；weather 本身是长期世界状态，继续使用既有 weather 字段。
-8. **规则可离线测试**：核心纯规则/Worker 协议在 Node 22 回归；真实 Three.js/WebGL 生命周期由 Chromium 覆盖。
-9. **远端证据决定完成度**：只有进入 GitHub `main` 且质量门和 Pages 通过才算完成。
-10. **单客户端、多输入适配器**：桌面/手机不得分叉 World、Player、Inventory、命令、存档或玩法规则。设备差异只允许存在于输入适配和响应式 UI；未来网络层接收/发送的也是平台无关 gameplay intent/state。
-11. **输入适配器无玩法写权限**：键鼠、触摸以及未来手柄/网络 source 只产生统一控制意图，不允许输入适配层直接修改 World、Inventory、Storage 或伤害/碰撞规则。
+## 核心设计原则
 
-## 当前 v0.4 总体数据流
+1. **玩法语义优先，旧实现细节不是兼容目标。** 目标是复刻 Minecraft 玩法/交互，不复制 Java Edition 的历史渲染 API、主线程热点或资源生命周期问题。
+2. **单客户端、多输入适配器。** Desktop/Touch/Future Gamepad 只产生统一 gameplay intent，不得分叉 World/Player/Inventory/规则。
+3. **数据优先。** 区块、网络快照、Inventory、Equipment、配方、规则尽量保持 plain data / TypedArray / pure modules。
+4. **重活离开主线程。** terrain generation 和 chunk meshing 由 Worker 执行；主线程负责输入、系统编排、Three.js 对象安装与表现。
+5. **普通体素批处理。** 不使用“一方块一 Mesh”。完整方块保持 chunk fast path；特殊模型只在必要时走 special/model path。
+6. **GPU 生命周期显式。** Chunk remesh/unload、world teardown、mob model cache、bed renderer、weather、projectiles 等必须释放资源。
+7. **Client 不得伪造 authoritative state。** Multiplayer 中位置、世界 mutation、Inventory、Equipment、Crafting、PvP 等已进入 server authority 的域只能从服务器状态推进。
+8. **不同 authority domain 使用独立 revision/sequence。** 不把 movement tick、Inventory revision、Equipment revision、chat seq、command request id 等混成一个全局序列。
+9. **确定性与可验证性优先。** Browser/server 共用 deterministic terrain rules；资源导入可重建并校验 checksum；核心 pure rules 进入 Node regression。
+10. **文档不得超前声称完成。** Architecture groundwork 只能把 feature matrix 推到 `FOUNDATION`/`PARTIAL`；只有真实玩法和质量门闭环才能记 `DONE`。
 
-```text
-world-worker -> chunk data -> mesh-worker -> opaque/water -> VoxelWorld GPU
-
-Player input + World liquid samples -> swim-rules -> PlayerController -> position
-Player eye liquid -> oxygen-rules -> drowning -> Player.takeDamage
-AI damage/projectile/explosion -> armor-rules -> Player.takeDamage
-
-/weather command -> main weather state -> applySky()
-                               \-> WeatherSystem.setWeather()
-                                      |
-                                      v
-                               fixed LineSegments pool
-                                      |
-                               player-relative recycle
-
-Mob death -> DropSystem + ExperienceOrbSystem -> Inventory / totalXp
-```
-
-## Device profile / Responsive presentation
-
-- `device-profile.js` 是纯环境判定层：优先使用 Mobile UA / `navigator.userAgentData.mobile`，并用 `maxTouchPoints + (pointer:coarse) + (hover:none) + compact viewport` 覆盖 iPadOS 桌面 UA；带触摸屏但仍有 fine pointer/hover 的桌面设备不自动切到手机布局。
-- 判定结果只写入 `body[data-device]` / `body[data-orientation]` 并选择输入适配器/响应式布局；它不进入 Player、World、Inventory、world record 或未来服务端玩法状态。
-- portrait 手机显示旋转提示，landscape 显示触控控件；桌面通过 Pointer Lock 获得鼠标视角。两者只是表现和输入捕获方式不同。
-- `mobile.css` 使用 `env(safe-area-inset-*)` 避开刘海/圆角并压缩横屏 HUD/背包；不设置 `user-scalable=no`，也不依赖浏览器通常受手势权限限制的强制 orientation lock。
-- 实际 gameplay 输入统一规则见下方 `Platform / Control Intent`；本节不得再描述 mobile-only Player 状态。
-
-## Platform / Control Intent
-
-- 浏览器项目只有一个客户端 runtime，没有“电脑版逻辑”和“手机版逻辑”两棵树。
-- `control-intents.js` 定义 `CONTROL_INTENT_VERSION=1`、规范化连续状态和一次性动作；状态来源可以是 `desktop`、`touch`，以后也可以是 `gamepad` 或 `network-peer`。
-- `desktop-controls.js` 只把 Keyboard/Mouse/Pointer Lock 翻译成标准意图；`mobile-controls.js` 只把摇杆/触摸/按钮翻译成同一标准意图。
-- `PlayerController` 不再注册 DOM keyboard/mouse listener，也不保存 `virtualInput`；它只消费规范化 `controlState` 和平台无关 look intent。
-- `main.js` 的 `handleControlIntent()` 不按输入来源分叉玩法：primary/secondary、背包、热栏、暂停、聊天、视角和丢弃都进入同一运行时函数。
-- Pointer Lock、横竖屏提示和 safe-area 属于 presentation/input adapter，不得进入世界快照或未来 server-authoritative gameplay state。
-- 联机实现时客户端平台字段可以用于 UI/遥测，但不得决定碰撞、伤害、移动速度、物品、实体或世界协议。PC 与手机必须能进入同一房间并互相看到/交互。
-
-## World / Water render
-
-- `world-worker.js` 生成 voxel 数据；`mesh-worker.js` 一次 chunk 扫描分别构建 opaque / water buffers。
-- 同水内部面含跨 chunk 邻接会剔除；水对实体接触面剔除，实体面对透明水保留。
-- 每 chunk GPU 记录 `{opaque, water}`；两 pass 共用 atlas，water 当前 `transparent=true / opacity=.68 / depthWrite=false`。
-- opaque 顶层旧 buffers 暂作兼容视图；运行时只消费新 `opaque/water` 协议。
-- 当前仍不是 Fluid System：没有 level/传播、水流、动态液面或水下后处理。
-
-## Player / Swimming / Oxygen
-
-- `PlayerController.update()` 是唯一位移积分路径。
-- dry 保留原陆地重力/跳跃/疾跑/潜行；flying 保留创造/旁观飞行。
-- water coverage 采样 `position.y+0.2 / +0.9 / +1.62` 三点，得到 0 / 1/3 / 2/3 / 1。
-- `swim-rules.js` 在 coverage>0 时提供水平速度插值、低重力、coverage 浮力、Space 上游、Shift 下潜、垂直阻尼和约 +3.4/-3.0 限速；coverage=0 strict no-op。
-- Oxygen 只采样 eye voxel，脚/躯干入水但头未入水不会扣空气。
-- survival/adventure 15 秒空气，离水 4x 恢复；0-air 每秒一个 2 HP drowning event；creative/spectator 满空气。
-- drowning 直接进入 Player.takeDamage，不经过 armor-rules。
-- Oxygen/swimCoverage 都是环境派生瞬时状态，不进入 v6 world record。
-
-## Weather / Precipitation
-
-### 状态边界
-
-- `weather` 仍是世界长期状态，合法值 `clear / rain / thunder`，继续写入 v6 world record。
-- `/weather` 通过 Commands context 调用主编排层；main 同时更新 `weather`、`WeatherSystem.setWeather()`、`applySky()` 并标记存档 dirty。
-- 世界载入时从 saved weather 恢复天空光照和 WeatherSystem profile，不引入新数据库 schema。
-
-### `weather-rules.js`
-
-默认固定池上限：
+## 总体运行图
 
 ```text
-WEATHER_MAX_SEGMENTS = 720
-clear   ratio 0     ->   0 segments
-rain    ratio .62   -> 446 segments
-thunder ratio 1     -> 720 segments
+DesktopControls ----\
+                     > ControlIntentBus ----> singleplayer gameplay adapters
+MobileControls  ----/                \
+                                   MultiplayerMovementSession
+                                             |
+                                             v
+                                      WebSocket protocol
+                                             |
+                                             v
+                                  AuthoritativeServerRuntime
+                                      /      |       \
+                              player sim   world    state hubs
+                                  |          |        |
+                                  +----------+--------+
+                                             |
+                                  authoritative snapshots/results
+                                             |
+                                             v
+                                    browser presentation
+
+seed + prompt
+    |
+    +--> shared terrain-generator.js
+            |                    |
+            v                    v
+      browser Worker       ServerTerrainWorld
+            |
+            v
+      mesh-worker.js
+        /    |     \
+   opaque  water  specials
+      |       |      |
+      v       v      v
+ chunk mesh water  BedModelRenderer / future model interpreter
 ```
 
-profile 还提供 fallSpeed、line length、windX/windZ、opacity。thunder 的下落速度、线长、风偏和 opacity 均高于 rain。该模块纯逻辑，不依赖 Three.js。
+## Client Runtime
 
-### `WeatherSystem`
+`createClientGameplayRuntime()` / `ClientGameplayRuntime` 是浏览器玩法对象图的共享构造边界。Singleplayer 和 Multiplayer 可以复用 World/renderer/UI 侧对象，但 authority 决策由外层 adapter 决定。
 
-- 只创建一个 `THREE.LineSegments`、一个 `BufferGeometry`、一个 `LineBasicMaterial` 和一块固定 `Float32Array(maxSegments*2*3)` position buffer。
-- `geometry.setDrawRange()` 控制 activeCount；clear 为 0，不销毁/重建资源。
-- 每条雨线只维护 x/y/z、speedScale 和 generation 等 TypedArray 状态。
-- update 时直接原地修改 position buffer 并 `needsUpdate=true`，不逐帧创建 Vector3/Mesh/Geometry。
-- 雨线围绕玩家约 16 格半径分布；落到玩家下方或玩家移动/传送导致超出范围时，使用确定性 hash 重新放回玩家上方。
-- rain 当前 446 条，thunder 720 条；雷雨更快、更长、更斜、更明显。
-- `depthWrite=false`，renderOrder 高于主要世界 pass；这是轻量视觉 FX，不参与 world collision。
-- world teardown 时 main 先 `weatherSystem.dispose()`，显式从 scene 移除并释放 geometry/material。
+核心要求：
 
-### 明确未实现
+- 不为 multiplayer 再复制一套 World/renderer/gameplay class；
+- 不在 input adapter 中直接修改 World/Inventory；
+- 不在 UI 中预测已经 server-authoritative 的结果；
+- runtime dispose 必须关闭其拥有的系统和 GPU resources。
 
-- 没有自动天气周期/duration。
-- 没有 biome precipitation/snow。
-- 没有屋顶/方块遮雨与雨线 collision。
-- 没有地面 splash、湿润、积雪。
-- thunder 目前只是更强降雨 + 原有暗光，没有闪电 flash/bolt/damage/sound。
-- 没有像素级降水视觉 E2E；Chromium 当前验证 profile/实例/逐帧更新无运行时错误。
+## Platform / Input
 
-## Inventory / Equipment / Armor
+### Local intent
 
-- Inventory 固定 36 格；Equipment 固定 head/chest/legs/feet 四槽。
-- 皮革护甲 1/3/2/1 点，共 7；当前 armor-rules 为 `min(0.8, armorPoints*0.04)`，整套 28%。
-- melee/arrow/explosion 经过护甲；void/drowning 绕过。
-- v6 world record 保存 Equipment，非法快照过滤。
+`ControlIntentBus` 是设备无关 gameplay input contract。
 
-## Death / Rewards / Explicit Respawn
+- `desktop-controls.js`：Keyboard/Mouse/Pointer Lock → canonical intent；
+- `mobile-controls.js`：touch/joystick/buttons → canonical intent；
+- Player/gameplay 只消费 canonical control/look/action，不根据设备类型改变玩法规则。
 
-- `death-rules.js` 仍只负责策略：survival/adventure 按 death plan drain Crafting/Equipment/Inventory/cursor；creative/spectator 不执行这套损失。
-- `beginPlayerDeath()` 捕获原死亡坐标和旧 totalXp，在**原坐标**完成掉落/经验或虚空直接损失，然后设置 `deathState`、退出 Pointer Lock、写入死亡原因/损失摘要并显示 `DeathScreen`；它不会调用 `Player.respawn()`。
-- 普通死亡在死亡点生成 drops/orbs；`y < -10` 虚空直接损失；死亡 XP 为 `min(100, currentLevel*7)`。
-- deathState 激活时 `pointer()/canControl()/pause/inventory/workbench/key handler` 均有显式 guard，主 animate 的普通世界更新块也停止，避免尸体继续被移动、攻击或自动重生。
-- `completeRespawn()` 只由“重生”按钮调用：先用 `respawn-rules.js` 对持久化 `respawnPoint` 生成 exact/周边候选，并由 main 的 world/AABB 安全检查选择首个可用位置；成功时走 `Player.respawnAt()`，全部候选失效才回退 `Player.respawn(0,0)`。随后 reset oxygen → 清 deathState → 返回游戏 → 标记存档 dirty。
-- 标准 self `/kill` 由 `commands.js` 解析后调用 main context 的 `kill()`；main 将 hp 置 0 并直接复用 `beginPlayerDeath('你被杀死了')`。它既是用户可用 Minecraft 风格指令，也是确定性可恢复死亡集成入口，不存在绕过死亡策略的测试后门。
-- self `/xp add <points>` / `/experience` 只做正整数 points 增量，commands 经 `ctx.addXp()` 调用既有 `addExperience()`；因此等级派生、HUD、saveDirty 和死亡 XP 公式仍只有一套真相源。levels/target selectors 暂不实现。
-- 浏览器普通死亡回归在同一页面内返回死亡坐标，让现有 DropSystem 与 ExperienceOrbSystem 自己完成物品拾取和 XP 吸收；测试只从随后保存的 IndexedDB 观察 Inventory/totalXp，避免直接操纵运行时内部数组。
-- “返回标题画面”会先 force-save 已清算的 hp=0 死亡状态再 dispose world；DeathScreen 本身不持久化。下次载入 hp<=0 的世界时，`startWorld()` 会优先解析已保存的自定义重生点及安全候选，失败才回世界出生点，因此不会把死亡 UI 跨页面保存。
-- `beginPlayerDeath()` 还会 fire-and-forget 启动一次强制 IndexedDB 保存，降低停留在死亡界面后直接关闭页面造成结算丢失的风险。
-- `respawn-rules.js` 是纯逻辑层：只负责 `{x,y,z}` 归一化、固定候选顺序和 first-safe 选择；它不读取 Three.js/World。`/spawnpoint` 只更新 main 的 `respawnPoint` + saveDirty，安全性在真正重生时由 world/player 检查。
-- `Player.respawnAt()` 只接受已经解析的精确位置，重置生命/饱食/受伤状态并复用 Player AABB 碰撞。
-- `bed-rules.js` 把四个水平方向编码成 8 个 foot/head voxel ID，并纯逻辑负责朝向、配对端坐标和两端归一到同一床重生锚点；它不读取 World/Three.js。main 的 `placeBed()` 负责两端占位检查和原子写入，`breakBed()` 只在预期配对 ID 仍存在时联动删除。
-- `sleep-rules.js` 独立负责夜间/雷暴可睡条件、清晨目标和 sleeper percentage/quorum；它不读取 DOM、设备类型或 World。`activateBed()` 先走共享 `setRespawnPoint()`，再调用 `resolveSleep()`；桌面/手机都从同一个 secondary/use 动作进入该函数。当前单人传入 1/1，未来 server-authoritative 联机由服务器提供真实 sleepingPlayers/totalPlayers/percentage，设备平台不得影响 quorum。
-- 当前床渲染仍沿用标准 1m³ voxel mesh/collision，并通过通用 per-block vertex tint 区分视觉；这是明确的过渡实现，不等同于原版半高床模型。后续专用床 geometry/collision 不应改变已持久化的床 ID 或 respawnPoint 协议。
-- DropSystem / ExperienceOrbSystem 当前仍不跨页面持久化。
+当前浏览器安全约束：疾跑保留 double-W，并使用 `R` 作为 hold sprint；不再把 Ctrl 作为 intended gameplay sprint chord。
 
-## Entities / Combat
+### Network input
 
-- EntityStore + SpatialHash 管实体与邻域候选。
-- Passive：牛/羊/猪/鸡；Hostile：僵尸/骷髅/苦力怕/蜘蛛。
-- AI 通过 callback 发伤害/投射物/爆炸/死亡事件。
-- Projectile 使用 segment/AABB + world raycast；Explosion 为基础距离伤害/击退/地形破坏。
+Multiplayer wire 将 input 拆为不同语义帧：
 
-## Storage
+- control：连续移动/跳跃/潜行/疾跑/primary state；
+- view：绝对 yaw/pitch；
+- action：use/drop/hotbar/attack/respawn 等离散动作；
+- command/chat/inventory/equipment/crafting/workbench：独立协议域。
 
-- IndexedDB object-store schema version 1；world record 逻辑快照 v6。
-- 保存 Player、Inventory、Equipment、totalXp、gameTime、weather、`respawnPoint`、voxel edits。
-- weather 是持久状态；Oxygen/swimCoverage 是瞬时状态。
-- 程序化 chunk 由 seed/prompt 重建，不存完整 chunk。
+客户端不发送可信 block/entity target。需要目标的动作由服务器结合 authoritative player position + referenced accepted view 自行 raycast/validate。
 
-## CI / Browser integration
+## World / Terrain
 
-`Repository quality`：
+### Deterministic base world
 
-1. static-checks：语法 + base/armor/water/oxygen/swim/weather/death/respawn/bed/mobile 十套回归。
-2. browser-smoke：第一世界验证 water/oxygen/swimming、WeatherFX、Equipment v6、虚空显式重生；第二世界验证普通死亡 3 原木 + 14 XP 的真实回收；第三世界验证 `/spawnpoint` v6 持久化与异地死亡后精确自定义重生；第四世界验证两格床放置/激活与床锚点重生；第五条 Android 横屏用例验证设备检测、portrait rotate overlay、无 Pointer Lock 触控、移动端 UI、虚拟摇杆和触控热栏。
+`terrain-generator.js` 是 browser/server 共用的纯 deterministic terrain baseline。
 
-Weather browser test 不访问隐藏 WeatherSystem 实例，只读公开 debug HUD，并同时捕获 pageerror/console error，因此覆盖真实命令→main→Three.js 系统链。
+当前仍是简化 heightmap/fBm world：
 
-## 当前技术债
+- 16×16×64 chunk；
+- stone/dirt/grass/sand/water；
+- oak tree；
+- prompt 只调整 amplitude/sea/forest/sand 参数。
 
-- 手机端目前是浏览器横屏适配，不是原生 App/PWA；尚缺真实 iOS Safari/Android 设备矩阵、手柄/震动反馈、控件自定义、PWA 离线/安装、可选全屏/方向锁定和更细的触控合成体验。
+未来 biome/caves/ores/features/structures 必须在这个“共享 deterministic source”原则上升级，不能让 browser 和 server 各自实现一份生成器。
 
-- Three.js 仍从 jsDelivr runtime import。
-- terrain/mesh 各只有一个 Worker，高速探索需要 pool/优先级/取消。
-- water 仍是静态透明 pass；swimming 仍是基础直立移动。
-- WeatherSystem 没有世界遮挡/碰撞、自动周期、雪、闪电、音效和像素级视觉回归。
-- 固定 720 条 LineSegments 适合当前渲染距离；后续若增加视距/高密度天气，应以 GPU profiling 决定是否迁 instancing/shader precipitation，而不是盲目增大池。
-- Oxygen 没有 Respiration/Water Breathing/Conduit/气泡柱。
-- opaque Worker 顶层兼容 buffers 应在消费者迁移后删除。
-- Equipment 无快捷装备、耐久、正式穿戴模型和标准 armor+toughness。
-- 生物无 chunk 持久化、正式寻路/亮度生成/动画。
-- 死亡统计、床睡眠/跳夜/占用/怪物限制/维度爆炸语义、半高床 geometry/collision、keepInventory、死亡世界实体持久化尚未完成；两格床重生锚点基础已经落库。
+### Browser world
 
-这些项目继续按独立可验证单元拆除，不能因为“已经能跑”就固化成长期架构。
+`VoxelWorld` 管理：
+
+- chunk request/load/unload；
+- voxel edits overlay；
+- terrain/mesh Worker lifecycle；
+- opaque/water/special visual chunk records；
+- raycast/query；
+- GPU object disposal。
+
+### Server world
+
+`ServerTerrainWorld` 管理 deterministic base + sparse authoritative edit overlay。
+
+原则：
+
+- generated baseline 不直接被 mutation 改写；
+- edit overlay 独立于 chunk cache；
+- revision 只由真实 mutation 推进；
+- browser bootstrap/live edit replication 只能消费 server truth。
+
+当前 server world edits 仍是运行期 authoritative state，不是 durable world database；多人持久化是后续独立工作。
+
+## Chunk Meshing / Rendering Layers
+
+### Full-cube fast path
+
+`mesh-worker.js` 负责普通体素可见面合并，输出 TypedArray/Transferable buffers。
+
+当前主要 pass：
+
+- opaque；
+- water transparent pass；
+- `specials` descriptors（当前用于 bed，未来可承接通用 model path）。
+
+### Water
+
+水拥有独立 transparent material/pass，同水内部面会剔除。当前没有 vanilla fluid level/flow/propagation/dynamic surface。
+
+### Bed special renderer
+
+Bed gameplay 仍使用四方向 × foot/head block state IDs，但视觉已经从 full cube mesh 移出：
+
+- `blocks.js` 标记 `fullCube:false` / `renderKind:'bed'`；
+- mesh Worker 输出 bed special descriptors；
+- `BedModelRenderer` 使用 `entity.bed.red` texture 构建 partial geometry；
+- special group 跟随 chunk remesh/unload 生命周期；
+- bed gameplay collision 与 visual geometry 明确分离。
+
+这个模式是下一阶段 generic block model renderer 的直接参考，但普通模型不能全部变成主线程一个 block 一个 Mesh。
+
+## Asset Architecture
+
+### Source
+
+仓库跟踪 `MC原版素材assets.zip`，确定性审计已经确认其中包含大量 1.20.1 block/item/entity textures、block models、item models 和 blockstates。
+
+### Runtime manifest
+
+`asset-manifest.js` 使用逻辑 key → runtime resource 映射；已导入的资源带来源/manifest/checksum 证据。
+
+当前原则：
+
+- 不因为资源 ZIP 中存在某文件就声称玩法支持；
+- 不为缺失资源伪造“原版素材”；
+- importer 选择性、可重建、可 checksum 验证；
+- source asset 与 derived runtime asset provenance 分离。
+
+### Missing audio
+
+当前 supplied ZIP 没有 sound files / `sounds.json`，因此 audio 是明确 blocked domain，不能在文档中假装“原版声音已经具备”。
+
+## 下一阶段：Minecraft JSON Model Interpreter
+
+这是从手工内容扩张切换到批量内容扩张的关键架构。
+
+### 解析层（Node/browser-neutral）
+
+目标模块不能依赖 Three.js/DOM/Worker：
+
+```text
+resource id
+   |
+   v
+model resolver
+   |- parent inheritance
+   |- texture variables
+   |- elements/faces/uv
+   |- element rotation
+   |- cycle/missing validation
+   v
+normalized model spec
+```
+
+Blockstate resolver：
+
+```text
+block properties
+   |
+   +--> variants -> model alternatives/weights
+   |
+   +--> multipart -> condition matching
+   v
+resolved model instances
+```
+
+### 编译/渲染层
+
+- full cube 必须保留现有 fast path；
+- non-full/multipart model 编译为 mesh-worker 可消费的纯数据 spec；
+- texture binding 通过 logical resource layer；
+- rendering geometry 不自动等于 collision shape；
+- transparent/cutout/opaque render layer 需要显式分类；
+- weighted variant 的随机输入必须 deterministic，不能刷新页面后任意变化。
+
+### 首批 acceptance blocks
+
+用少量 representative blocks 覆盖解释器能力：
+
+- iron ore：full cube registry/resource；
+- glass：transparent cube；
+- oak slab：partial cuboid；
+- oak stairs：multiple cuboids + state；
+- oak door：paired/stateful block；
+- oak fence：multipart/neighbor state；
+- torch：non-full model；
+- tint-index representative block。
+
+解释器通过后才批量扩展 registry，避免为每个 block 重复手写 renderer。
+
+## Inventory / Equipment / Crafting
+
+Singleplayer 有本地 Inventory/Equipment/CraftingGrid models。
+
+Multiplayer 已拆成独立 authoritative domains：
+
+- Inventory snapshot/transaction + carried cursor；
+- Equipment snapshot/transaction，涉及 cursor 时同时验证 Inventory/Equipment revisions；
+- permanent 2×2 player crafting；
+- transient 3×3 Workbench container。
+
+客户端发送操作意图，不发送可信 replacement slots/result/recipe output。
+
+未来 chest/furnace 不能直接复用 transient Workbench 语义，因为它们需要：
+
+- persistent block entity state；
+- chunk/world storage；
+- multi-viewer concurrency；
+- container-specific processing/update rules。
+
+## Player / Survival
+
+Singleplayer 当前拥有 HP/death/respawn、oxygen/swimming、weather、XP、Equipment、bed 等已实现 slices。
+
+这些系统的 pure rule modules 与 presentation/runtime orchestration 分离。新增 survival progression 应继续遵守：
+
+- item/block definitions 不直接写 UI；
+- recipe/mining/damage/status rules 可 Node 测试；
+- visual state 不应成为 gameplay truth；
+- transient state 不无条件进入 world save。
+
+## Entities / PvE
+
+当前八类 mob 的本地 AI 使用 EntityStore/SpatialHash 和低频 AI tick，visual renderer 与 gameplay hitbox/state 分离。
+
+重要边界：
+
+**现有 mob/PvE/projectile/explosion 还不是 multiplayer server-authoritative domain。**
+
+下一阶段迁移时应：
+
+1. 将 mob identity/state 生命周期放到 server；
+2. server 执行 spawn/AI/navigation/combat；
+3. projectile/explosion 在 server 做命中和 world mutation；
+4. server 生成 loot/item entities/XP；
+5. browser 只插值/表现 authoritative mob snapshots/events；
+6. 复用现有 mob texture/model renderer，不重写视觉。
+
+## Multiplayer Authority Domains
+
+当前服务器已拥有：
+
+- session/handshake/input validation；
+- player movement/collision；
+- self + remote player snapshots；
+- world info/edit state；
+- mining/placement；
+- ground item entities/pickup；
+- item-instance durability state；
+- Inventory/cursor；
+- Equipment；
+- player crafting；
+- Workbench；
+- chat；
+- command execution boundary；
+- PvP HP/melee/armor/knockback/death/respawn。
+
+每个 domain 保持自己的 revision/request/sequence。跨域 transaction（例如 Equipment ↔ Inventory cursor）必须显式验证所有涉及 revisions 并原子提交。
+
+## Persistence
+
+### Singleplayer
+
+IndexedDB 当前保存 deterministic world 的 edit overlay 和已实现的 player/world state。世界生成 baseline 不整块写入数据库。
+
+### Multiplayer
+
+当前 authoritative server state 主要是进程运行期状态。正式 durable server persistence 尚未完成。
+
+后续 server persistence 不得直接复用浏览器 IndexedDB schema；应定义服务器自己的 durable world/player/block-entity storage boundary，并提供 migration/versioning。
+
+## Quality Gates
+
+当前交付原则：
+
+1. JavaScript/Node syntax；
+2. auto-discovered logic/contract/Worker/server integration regressions；
+3. Chromium E2E shards；
+4. asset changes额外执行 source archive / generated bytes / manifest checksum audit；
+5. exact-head CI green；
+6. base drift/review surface 检查；
+7. squash merge。
+
+PR #94 baseline 的 Repository quality：131 logic/worker regressions + 两个 Chromium shards 全绿。
+
+## 明确技术债 / 后续边界
+
+- generic blockstate/model interpreter 尚未实现；
+- world height 仍为 64，worldgen 仍是简化 heightmap；
+- no vanilla biome/cave/ore/structure pipeline；
+- no fluid propagation/lava；
+- no full hunger/food/farming/smelting progression；
+- no redstone neighbor update/scheduled tick/power system；
+- no durable multiplayer persistence/accounts/rooms/operators；
+- no server-authoritative PvE；
+- no Nether/End；
+- no audio source/AudioEngine；
+- long-session memory/load/soak coverage 仍需加强。
+
+这些缺口的优先级和完成度只在 feature matrix 中维护，不再在多份文档里各写一套互相漂移的 TODO。

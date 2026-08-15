@@ -1,123 +1,194 @@
 # Minecraft-Web-ByAI
 
-一个面向现代浏览器的体素沙盒复刻 / 重实现项目。目标不是照搬 Minecraft Java 版的内部实现，而是在保留经典玩法和交互语义的前提下，用浏览器并行能力、流式区块、紧凑数据结构、显式 GPU 生命周期和现代持久化重新实现核心系统。
+面向现代浏览器重实现 Minecraft 核心玩法与交互语义的 Web 体素沙盒项目。
 
-> 稳定发布基线：`v0.3.0`。当前 `main` 开发线为 `v0.4.0-dev`：实体数据层、第一批被动生物、四种敌对生物、基础战斗、箭矢/爆炸、战利品/经验、生存死亡损失、显式死亡界面/重生、持久化自定义重生点、两格床重生锚点与夜间睡眠跳夜、第一版护甲装备系统、水独立透明渲染 pass、水下氧气/溺水、基础游泳/浮力，可见降雨/雷雨粒子，以及手机浏览器自动识别 + 横屏触控底座已经落库；流体传播、完整冲刺游泳、自动天气周期/闪电和完整伤害公式等仍属于后续工作。
+项目目标不是复制 Minecraft Java Edition 的内部技术实现，而是用现代 Web 架构重新实现其玩法：Worker 并行区块生成/网格构建、紧凑体素数据、显式 GPU 生命周期、IndexedDB 持久化，以及真正的 Node server-authoritative 多人运行时。
 
-在线构建：[https://shrinkshi.github.io/Minecraft-Web-ByAI/](https://shrinkshi.github.io/Minecraft-Web-ByAI/)
+> 当前开发线：`v0.4.0-dev`。2026-08-16 的权威项目基线以 `main` commit `dbdd6a2b632b6a14b9232806bcbf6a9ccea74113` 为起点。严格按 Minecraft Java 1.20.1 完整玩法/内容口径，当前规划完成度约 **35%**；Web Minecraft 引擎/基础玩法底座本身约 **75–80%**。
 
-## 当前可玩内容
+在线构建：https://shrinkshi.github.io/Minecraft-Web-ByAI/
 
-### 世界与基础交互
-- Minecraft 风格主菜单、世界创建、暂停界面、HUD、9 格快捷栏与真实 36 格背包。
-- 背包左键整组拿取 / 放置 / 合并、右键拆半 / 单个放置、Shift 点击在主背包和快捷栏之间快速移动。
-- 第一人称 WASD、鼠标视角、空格跳跃、Ctrl 疾跑、Shift 潜行减速。
-- 自动区分桌面浏览器与手机/触控优先浏览器：桌面继续使用 Pointer Lock + 键鼠；手机横屏显示左摇杆、右侧拖动视角，以及攻击/持续挖掘、使用/放置、跳跃、疾跑、潜行、丢弃、背包、暂停、聊天和 F5 等价视角按钮。手机竖屏会覆盖游戏并提示旋转到横屏；不强制调用浏览器方向锁定 API。
-- **PC 与手机不是两个游戏端**：仓库只有一套 Web runtime、Player、World、Inventory、存档和玩法状态机。`DesktopControls` 与 `MobileControls` 只负责把不同设备事件翻译成同一个版本化 `ControlIntentBus`；未来联机也必须复用同一控制/世界协议，使桌面与手机可以进入同一服务器、同一世界。
-- F5 循环第一人称、第三人称背面、第三人称正面视角。
-- 生存 / 创造 / 指令切换模式；创造和旁观支持飞行式移动。
-- 程序化区块世界，玩家跨区块时动态加载，离开较远区域后自动卸载。
-- terrain Worker 异步生成地形；mesh Worker 异步计算暴露面和顶点缓冲。
-- 区块级合并网格：不是“一个方块一个 Three.js Mesh”。
-- 水已从普通不透明 chunk mesh 中拆成独立透明 pass：同水内部面会剔除，opaque/water 分别通过 TypedArray + Transferable 返回主线程；每个 chunk 最多安装一个 opaque mesh 和一个 water mesh。
-- 水使用独立透明材质（当前 opacity 0.68、`depthWrite=false`）并与普通方块共享 atlas texture。
-- 玩家头部/眼睛所在 voxel 为 liquid 时判定为浸水；生存/冒险拥有 15 秒空气，离水后按每秒 4 秒额度恢复；空气耗尽后每秒受到 2 HP 溺水伤害。
-- 氧气 HUD 使用 10 个气泡显示，只在头部浸水或空气尚未恢复满时出现；创造/旁观不会消耗空气或溺水。
-- 玩家脚部、躯干、眼睛三个 voxel 会参与水体覆盖率采样；覆盖越高，水平移动越接近陆地速度的 50%。
-- 水中使用独立垂直物理：重力显著降低，完整浸水有轻微浮力；Space 向上游、Shift 下潜，垂直速度约限制在 +3.4 / -3.0。
-- 游泳仍复用 PlayerController 原有 AABB 碰撞与轴向积分；当前没有水流推动、流体传播、动态液面、冲刺游泳姿态/爬行过渡或水下 fog/折射。
-- `/weather clear|rain|thunder` 现在同时改变环境光与可见天气 FX。雨和雷雨使用一个固定容量 `THREE.LineSegments` 池，不为每根雨线创建 Mesh。
-- 固定池上限为 720 条雨线：rain 激活 446 条，thunder 激活 720 条；雷雨拥有更高下落速度、更长雨线、更强风偏和更高透明度。
-- 雨线围绕玩家约 16 格范围复用/重生，底层位置数据只更新同一块动态 Float32Array；世界退出时显式释放 weather geometry/material。
-- 当前天气仍由指令或存档状态决定，没有自动天气周期、群系降水、屋顶遮雨、雨滴碰撞/飞溅、积雪/湿润、闪电实体/伤害或天气音效。
-- 草方块、泥土、石头、圆石、沙子、木板、原木、树叶、水、工作台，以及四方向两格逻辑床等基础方块。床当前仍用两个 1m³ voxel 占位，半高专用模型/碰撞尚未接入。
-- 左键持续挖掘、工具影响基础挖掘速度、右键放置。
-- 方块掉落物实体：简单重力、漂浮旋转、拾取、5 分钟销毁。
-- Q 丢弃当前选中物品。
-- 2×2 合成：原木→木板、木板→木棍、4 木板→工作台。
-- 3×3 工作台：当前至少可制作木镐，以及 3 白色羊毛 + 3 橡木木板合成 1 张床；羊会通过既有 loot 路径掉落白色羊毛。
-- 玩家 AABB 碰撞、重力、跳跃、掉落保护重生。
-- 基础生命、饱食度、经验、护甲和氧气 HUD。
-- IndexedDB 自动保存玩家状态、背包、四个护甲槽、经验、天气、自定义重生点和方块修改；当前逻辑快照为 v6，再次进入相同“世界名称 + seed”会恢复。氧气和 swimCoverage 是瞬时状态，不进入存档。
-- T 打开聊天，`/` 直接输入指令；当前支持 `/gamemode`、`/give`、`/tp`、`/spawnpoint`、`/kill`、`/xp`、`/time set`、`/weather`、`/help`。
-- 昼夜光照随 24000 tick 周期变化。
-- 文本“AI 地形提示词”会影响程序化地形参数；真正扩散模型高度图生成接口尚未接入。
+完整当前事实见 [`docs/PROJECT_BASELINE.md`](docs/PROJECT_BASELINE.md)，完整 1.20.1 功能矩阵见 [`docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md`](docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md)。这两份文档优先于历史 PR/CHANGELOG 中的阶段性描述。
 
-### v0.4 开发线已经落库的实体 / 战斗 / 死亡 / 护甲能力
-- `EntityStore + SpatialHash`：实体身份、位置、组件和邻域查询分离，避免把所有生物交互做成全表两两扫描。
-- 牛、羊、猪、鸡：基础生成、10 Hz 漫游、受击逃跑和远距离回收。
-- 僵尸：夜间生成、追击和近战攻击。
-- 骷髅：距离控制、侧移和箭矢远程攻击。
-- 苦力怕：接近、引信、取消范围和爆炸事件；爆炸可伤害/击退玩家并破坏附近地形。
-- 蜘蛛：宽体低矮占位模型、夜间敌对生成、近战追击，以及最多约 3 格高度差的局部地形攀爬；这不是完整墙面寻路。
-- 公共战斗规则：攻击冷却、受击无敌窗口、击退和致死判断。
-- 投射物：箭矢重力、方块阻挡、线段/AABB 玩家命中。
-- 生物死亡奖励：第一批战利品、经验球、Java 风格经验等级计算和 `totalXp` 存档。
-- 生存/冒险死亡：36 格背包、cursor、四个护甲槽和 2×2/3×3 合成输入在原死亡位置统一清算；普通死亡把物品掉在死亡点，并掉落 `min(100, 当前等级 × 7)` 点经验后清零总经验。
-- 死亡结算后不会立即传送：游戏进入独立死亡界面并阻断普通输入/本地世界更新；点击“重生”时优先解析持久化自定义重生点及其附近安全候选，全部失效才回退世界出生点。也可在死亡结算已保存后返回标题画面。
-- 新增标准 self `/kill` 指令，直接进入现有死亡结算/死亡界面，不使用测试专用后门；自动浏览器回归已验证普通可恢复死亡后返回死亡点可重新拾回掉落物。
-- 新增 self `/xp add <points>`（`/experience` 别名），只支持正整数 points；普通死亡浏览器回归现已同时验证死亡 XP 球：16 总经验在等级 2 死亡时掉 14 XP，重生回死亡点后可真实吸收并恢复 `totalXp=14`（此时派生等级为 Lv.1）。
-- 新增 self `/spawnpoint [x y z]`：无参数记录玩家当前精确位置，也支持 `~` 相对坐标；world record v6 持久化 `respawnPoint`。显式重生会按 exact→附近候选顺序检查脚下实体支撑、脚/眼空间和 AABB 碰撞，找不到安全候选时回退世界出生点。
-- 新增两格床重生锚点与基础睡眠：床按玩家水平朝向原子放置 foot/head 两端，使用任一端都会通过同一 `respawnPoint` setter 设置持久化重生点；夜晚或雷暴中再次使用会通过共享 `sleep-rules` 把世界时间推进到清晨并清除降水。桌面右键与手机“使用”按钮走同一 `activateBed()`；当前不含睡眠动画、床占用、附近怪物限制、下界/末地床爆炸或半高床模型。
-- 虚空死亡：`y < -10` 时不制造无法回收的掉落/经验实体，携带内容直接损失；创造/旁观不执行这套损失规则。
-- `Equipment` 独立维护 head/chest/legs/feet 四槽，不挤占 36 格背包；world record v6 保存/恢复装备。
-- 第一批皮革护甲：帽子/外套/裤子/靴子分别 1/3/2/1 点，总计 7 点；可通过背包 cursor 拖放到正确部位，错误部位会拒绝。
-- 当前减伤是明确的过渡公式：每点护甲 4%，最高 80%；整套皮革为 28%。它适用于敌对近战、箭矢和爆炸，虚空与溺水不受护甲保护；Java toughness/附魔完整公式后续替换。
+## 当前已经可玩的核心
+
+### 客户端 / 世界
+
+- Minecraft 风格主菜单、世界创建、暂停、HUD、背包、工作台、死亡界面和聊天/指令输入。
+- 桌面：Pointer Lock + WASD，Space 跳跃，Shift 潜行，双击 W 或按住 `R` 疾跑，F5 切换视角。
+- 手机：自动识别触控优先设备，横屏提供摇杆、拖动视角、攻击/挖掘、使用/放置、跳跃、疾跑、潜行、丢弃、背包、暂停、聊天和视角按钮；竖屏显示旋转提示。
+- 桌面和手机共享同一 World/Player/Inventory/玩法 runtime，只在输入适配层分流。
+- 16×16×64 紧凑体素区块，按玩家位置动态加载/卸载。
+- terrain Worker 生成区块，mesh Worker 构建可见面；不是一个方块一个 Three.js Mesh。
+- opaque / transparent water 独立 chunk pass，TypedArray + Transferable 返回主线程。
+- Three.js 版本已锁定并由项目本地静态资源提供，不依赖历史运行时 CDN。
+- IndexedDB 保存单人世界增量编辑和已实现的玩家状态。
+
+### 方块、挖掘与合成
+
+当前正式玩法方块族仍然很少，主要包括：
+
+- 草方块、泥土、石头、沙子、橡木木板、橡木原木、橡树树叶、水；
+- 工作台、圆石；
+- 四方向两格红床。
+
+床已经不是旧版粉色整方块占位视觉。当前 chunk mesh 会输出特殊床描述，`BedModelRenderer` 使用已导入的 Minecraft Java 1.20.1 红床 entity texture 构建半高床视觉；逻辑碰撞仍是后续需要进一步贴近 vanilla 的独立问题。
+
+当前支持：
+
+- 连续挖掘、工具速度、基础 harvest tier、破坏裂纹反馈；
+- 普通方块放置和两格床原子放置；
+- 36 格背包 + 9 格热栏；
+- 左/右键 cursor 操作、拆分、单个放置、合并、Shift 转移；
+- 2×2 player crafting 和 3×3 workbench；
+- 当前五个配方：原木→木板、木板→木棍、工作台、红床、木镐；
+- 木镐 item-instance 耐久及耐久条。
+
+## 生存系统
+
+当前已经形成的生存切片包括：
+
+- HP、伤害、受击无敌、击退；
+- 经验球、总经验/等级；
+- 生存/冒险死亡清算、死亡界面、显式重生；
+- 普通死亡物品/经验可回收，虚空死亡不可回收；
+- 自定义 `/spawnpoint` 与持久化 respawnPoint；
+- 红床重生锚点、夜间跳夜和附近敌对生物阻止睡眠；
+- 皮革四件装备槽和第一版护甲减伤；
+- 水下氧气、溺水、基础游泳/浮力；
+- `/weather clear|rain|thunder` + 可见雨/雷雨 FX；
+- 昼夜时间与 `/time`。
+
+还不能称为完整 Minecraft 生存 progression：完整饥饿/饱和、食物、石→铁→钻石→下界合金工具链、熔炉/熔炼、农业、动物繁殖、盾牌、玩家弓、附魔、药水/状态效果等仍待实现。
+
+## 生物与战斗
+
+当前正式 gameplay mob：
+
+- 被动：牛、羊、猪、鸡；
+- 敌对：僵尸、骷髅、苦力怕、蜘蛛。
+
+八种生物均已改为 Minecraft Java 1.20.1 texture-backed cuboid 模型，不再使用旧的纯色占位身体。
+
+单人当前包括：
+
+- 被动生物漫游/受击逃跑；
+- 僵尸近战；
+- 骷髅箭矢；
+- 苦力怕引信/爆炸；
+- 蜘蛛近战和有限局部攀爬；
+- 第一批 loot 和 XP。
+
+这些 AI/spawn/战斗规则仍是简化实现，离完整 vanilla mob roster、寻路、亮度/群系生成、繁殖/驯服/骑乘等还有明显距离。
+
+## 真正的多人服务器
+
+项目已经拥有 Node WebSocket server-authoritative runtime，而不是“客户端上报位置”的伪联机。
+
+目前已落库：
+
+- 严格 handshake/session/input wire protocol 和序列/replay 防护；
+- server-authoritative 玩家移动、碰撞、20 Hz simulation；
+- 远端玩家 identity、snapshot replication 和插值渲染；
+- 世界初始 edit 同步和 live authoritative block revisions；
+- 创造/生存挖掘与放置；
+- authoritative ground item/drop/pickup；
+- authoritative Inventory + cursor transaction；
+- authoritative Equipment；
+- authoritative 2×2 player crafting；
+- authoritative 3×3 Workbench container；
+- authoritative chat 与受控 command channel；
+- server-owned PvP HP、近战命中、护甲减伤、击退、死亡掉落和重生。
+
+真实双浏览器 E2E 已覆盖多人关键路径。
+
+当前最大的 multiplayer gameplay authority 缺口是 **mob/PvE/projectile/explosion 仍未迁移到服务器权威**；服务器持久化世界、账号/房间/OP/白名单、重连恢复、共享持久容器以及 Realms 类产品层也仍未完成。
+
+## 世界生成现状
+
+当前生成器是可重复的简化基础：
+
+- fBm/heightmap；
+- stone/dirt/grass/sand；
+- sea/water；
+- oak tree；
+- “山/平原/海/森林/沙漠”等提示词调整 amplitude/sea/forest/sand 参数；
+- 浏览器和 Node authoritative world 共用相同 deterministic generator。
+
+它还不是 Minecraft 1.20.1 worldgen：biome pipeline、caves、aquifers、ores、surface rules、features、villages/mineshafts/dungeons/strongholds 等 structures、扩展高度、Nether 和 End 都属于后续阶段。
+
+## Minecraft 1.20.1 资源
+
+仓库跟踪了用户提供的 `MC原版素材assets.zip`。确定性审计发现 7,623 个资源文件，约包含：
+
+- 977 block textures；
+- 582 item textures；
+- 497 entity textures；
+- 2,016 block-model JSON；
+- 1,675 item-model JSON；
+- 1,005 blockstates。
+
+当前 runtime 只选择性接入了已经实现的 terrain/item/entity/bed 资源。因此“资源在仓库里”不等于“玩法已经接入”。
+
+下一阶段最高优先级是实现通用 **Minecraft JSON blockstate/model interpreter**，让现有大量 JSON/texture 能批量进入游戏，而不是继续为普通方块逐个手工写 renderer。
+
+当前资源 ZIP 内没有 sound files，也没有 `sounds.json`，因此完整音效/音乐需要单独补充音频源后再建设 AudioEngine。
 
 ## 运行
 
-这是纯静态 Web 项目。推荐从 HTTP 服务运行，而不是直接打开 `file://`。
-
-```bash
-python -m http.server 8080
-```
-
-安装测试依赖后也可以使用仓库自带跨平台静态服务器：
+推荐通过 HTTP 运行，不要直接打开 `file://`：
 
 ```bash
 npm install
 npm run serve
 ```
 
+多人 authoritative server：
+
+```bash
+npm run server
+```
+
+具体服务器环境变量和安全边界见 [`docs/SERVER.md`](docs/SERVER.md)。
+
 ## 自动检查
 
-纯逻辑 / Worker / 护甲 / 水网格 / 氧气 / 游泳 / 天气 / 死亡集成 / 自定义重生 / 床规则 / 移动端设备与输入回归：
+逻辑/协议/Worker/server integration：
 
 ```bash
 npm run test:logic
 ```
 
-浏览器 smoke：
+Chromium E2E：
 
 ```bash
-npm install
 npx playwright install chromium
 npm run test:e2e
 ```
 
-`Repository quality` 在 PR 和 `main` push 时先执行 Node 规则层，再用 Chromium 创建固定海洋测试世界，验证水体/氧气/游泳，并实际执行 `/weather rain → thunder → clear`，要求 WeatherFX 活跃条数 446 → 720 → 0；随后验证护甲 v6 IndexedDB 快照、虚空死亡显式重生、普通死亡物品+经验真实回收，并在第三个独立世界验证 `/spawnpoint` 持久化后异地死亡会返回该精确安全重生点；第四个独立世界通过真实背包→热栏→右键流程放置两格床、右键床设置重生点，并验证异地死亡后返回床锚点；第五条 Android 移动端用例使用 touch + Mobile UA + 844×390 横屏，验证设备自动识别、横竖屏提示、无 Pointer Lock 触控模式、背包/暂停/视角按钮、虚拟摇杆移动和触控热栏。测试边界见 [`docs/TESTING.md`](docs/TESTING.md)。
+PR #94 基线的 `Repository quality` 为全绿：static gate 包含 131 个 logic/worker regression scripts，Chromium smoke 已拆为两个 shard。Minecraft 资源导入另有确定性 source audit，验证来源 ZIP、生成结果和 runtime manifest 的 checksum/provenance。
 
-## 技术方向
+## 下一阶段路线
 
-- 渲染：Three.js + WebGL2 路线，后续保留 WebGPU renderer 迁移路径。
-- 世界：16×16×64 区块，紧凑 `Uint8Array` 方块存储。
-- 生成：独立 terrain Web Worker。
-- 网格：独立 mesh Web Worker；同一次 chunk 扫描分别生成 opaque / water 可见面，并返回两套 TypedArray / Transferable buffers。opaque 旧顶层字段暂时保留为兼容视图。
-- 水渲染：每 chunk 最多一个透明 water mesh；与 opaque mesh 共享 atlas，独立材质与 render order。
-- 水下生存：主线程采样玩家 eye voxel；`oxygen-rules.js` 维护纯逻辑空气状态和溺水事件。
-- 水中运动：`PlayerController` 采样脚/躯干/眼睛水体覆盖率，`swim-rules.js` 负责速度倍率和垂直速度更新；实际碰撞与位移仍走 Player 的单一积分路径。
-- 天气：`weather-rules.js` 是纯 profile；`WeatherSystem` 使用固定 720 线段动态池，按玩家位置循环复用，不产生按雨滴增长的对象/geometry 数量。
-- 流式：玩家位置驱动加载；渲染距离外增加 1 chunk 滞回后卸载。
-- 存档：IndexedDB 保存程序化世界增量编辑、玩家/背包/Equipment/经验和已有 weather 状态，不保存 oxygen/swimCoverage 瞬时状态。
-- 实体：EntityStore 管身份与组件，SpatialHash 缩小邻域查询候选集；AI 固定低频 tick。
-- 装备：Equipment 独立可序列化；减伤公式与 UI/存档分离。
-- 生命周期：chunk opaque/water geometry、WeatherSystem、掉落物、经验球、投射物、玩家和生物视觉对象都有显式销毁路径。
-- 后续：死亡统计/床重生/`keepInventory`、完整伤害/护甲/耐久/附魔、流体传播/水流/冲刺游泳与水下视觉、自动天气/闪电/雪、状态效果、村民交易、酿造、维度、结构、多人生存网络层、真正 AI 地形管线。
+1. 维护权威 baseline + 1.20.1 功能矩阵；
+2. Minecraft JSON blockstate/model interpreter；
+3. 批量 block/item registry 与原版资源接入；
+4. 工具/矿石/熔炉/食物/农业/繁殖等完整 survival progression；
+5. biome → caves → ores → features → structures worldgen；
+6. server-authoritative mobs/PvE/projectiles/explosions；
+7. chest/furnace 等 persistent shared containers；
+8. neighbor updates + scheduled ticks + redstone；
+9. Nether → portal → brewing/enchanting → End → bosses；
+10. AudioEngine、lighting、particles、animated textures、biome tint、skins/nameplates，以及剩余 server/product shell。
 
 ## 文档
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)：架构决策、数据流和当前技术债。
-- [`docs/PROGRESS.md`](docs/PROGRESS.md)：已完成项与下一阶段任务。
-- [`docs/FILE_MANIFEST.md`](docs/FILE_MANIFEST.md)：文件职责与生命周期约束。
-- [`docs/TESTING.md`](docs/TESTING.md)：自动检查与验证边界。
-- [`CHANGELOG.md`](CHANGELOG.md)：版本变更记录。
+- [`docs/PROJECT_BASELINE.md`](docs/PROJECT_BASELINE.md)：当前 `main` 的权威实现事实。
+- [`docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md`](docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md)：完整复刻目标、完成度与 roadmap authority。
+- [`docs/PROGRESS.md`](docs/PROGRESS.md)：当前正在进行/下一步工作。
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)：架构决策与技术边界。
+- [`docs/NETWORKING.md`](docs/NETWORKING.md)：多人协议与 authority 原则。
+- [`docs/SERVER.md`](docs/SERVER.md)：Node authoritative server 运行边界。
+- [`docs/TESTING.md`](docs/TESTING.md)：验证策略。
+- [`docs/FILE_MANIFEST.md`](docs/FILE_MANIFEST.md)：文件职责。
+- [`CHANGELOG.md`](CHANGELOG.md)：历史变更记录。
