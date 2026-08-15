@@ -33,6 +33,6 @@ test('real browser movement and live blocks are driven by the authoritative Node
     await setViewAndLock(page,Math.PI/2,0);await page.keyboard.down('w');await page.waitForTimeout(800);await page.keyboard.up('w');await page.waitForTimeout(180);
     const moved=await debugXYZ(page);expect(moved.x).toBeLessThan(start.x-1.5);expect(Math.abs(moved.z-start.z)).toBeLessThan(.7);
 
-    await page.keyboard.press('e');await page.waitForTimeout(80);await expect(page.locator('#inventory')).toHaveClass(/hidden/);await expect(page.locator('#toast')).toContainText('联机背包权威尚未接入');
+    const inventory=page.locator('#inventory');await page.keyboard.press('e');await expect(inventory).not.toHaveClass(/hidden/);await page.keyboard.press('e');await expect(inventory).toHaveClass(/hidden/);
   }finally{await runtime.stop();}
 });
