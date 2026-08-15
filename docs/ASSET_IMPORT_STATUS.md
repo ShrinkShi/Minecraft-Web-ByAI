@@ -2,56 +2,79 @@
 
 ## Current repository reality
 
-The current `main` branch does **not** contain the previously supplied full Minecraft asset archives.
+The repository now contains the user-supplied `MC原版素材assets.zip` and a deterministic import pipeline for the subset used by the browser runtime.
 
-Tracked runtime art is still limited to the small placeholder/prototype resources under:
+The exact source archive currently tracked has SHA-256:
 
-- `assets/textures/atlas.png`
-- `assets/items/stick.png`
-- `assets/items/wooden_pickaxe.png`
-- several CSS / data-URI generated UI and item placeholders
+`b65a2211175af90664de9f41ea422f4869eee855f0da4bf6fe0715434ebe9c69`
 
-These assets are useful for engine bring-up and automated tests, but they are not the intended final visual layer.
+GitHub Actions classifies it as a Minecraft Java client resource tree, not a `.minecraft/assets` hash store. The audited archive contains 7,623 files, including:
 
-## Manifest foundation
+- 977 block textures;
+- 582 item textures;
+- 497 entity textures;
+- 89 GUI textures;
+- 195 particle textures;
+- 2,016 block-model JSON files;
+- 1,675 item-model JSON files;
+- 1,005 blockstate JSON files.
 
-`src/asset-manifest.js` is now the authority for file-backed runtime resources. Gameplay/rendering code should use logical asset keys rather than embedding `./assets/...` paths directly.
+The archive contains no `.bbmodel` files. That is expected for vanilla Java resources: block/item geometry is described by Minecraft JSON models/blockstates, while much entity geometry is defined by client code/model layers rather than Blockbench project files.
 
-The first mapped keys are:
+## Runtime resources now imported
 
-- `terrain.block_atlas` -> current prototype atlas;
-- `item.stick` -> current prototype item texture;
-- `item.wooden_pickaxe` -> current prototype item texture.
+`tools/import-minecraft-assets.py` resolves required files by canonical Minecraft resource suffix so the ZIP's arbitrary/top-level encoded folder name does not leak into runtime code. It extracts only the resources used by implemented gameplay and writes an exact per-file source manifest.
 
-The manifest also records known resources that are intentionally unresolved until the user-supplied archive is available:
+`tools/build-minecraft-runtime-assets.py` then produces browser-ready files. The currently tracked outputs include:
 
-- `item.stone_pickaxe`;
-- `item.raw_iron`;
-- `block.iron_ore`.
+- `assets/textures/atlas.png` — generated 4×4 terrain atlas using original Minecraft 1.20.1 source textures;
+- file-backed item textures under `assets/items/` for stick, wooden/stone pickaxes, raw iron, leather armor, mob drops and common materials already represented by gameplay;
+- `assets/minecraft/runtime-manifest.json` — generated runtime checksum/source mapping;
+- selected original model/blockstate JSON files;
+- water animation metadata;
+- the red bed entity texture.
 
-A missing resource is represented as `source: "missing", url: null`. It must not be silently replaced by a newly drawn SVG, an unrelated web download, or a recolored existing texture.
+The terrain atlas checksum is:
 
-This foundation is deliberately compatibility-first: existing UI code still receives resolved `texture` URLs for the currently tracked stick and wooden-pickaxe files, while the logical `assetKey` is retained in the item definition. The terrain renderer resolves its atlas through the manifest directly.
+`02f5d5a4926b5da7f217b60028d5fbb5ae864c6b5d0483d021ec074639c921f2`
 
-## Required migration
+Current atlas slots remain compatible with the chunk mesher while adding original resources for crafting-table front, iron ore and white wool. Cardinal face names are now preserved so the crafting table can distinguish its vanilla front and side textures instead of flattening all horizontal faces into one `side` texture.
 
-When the user-supplied Minecraft asset archives are staged in an active development workspace, the next asset-focused change should do the following instead of creating more placeholder art:
+## Tint handling
 
-1. inventory the archive tree and record source paths;
-2. identify block, item, GUI, entity, font, particle and sound resources that correspond to implemented gameplay;
-3. replace prototype/missing manifest entries with user-supplied resource mappings;
-4. generate the runtime block atlas from the supplied block textures with nearest-neighbor sampling and stable indices;
-5. point item slots at the supplied item textures where available;
-6. replace generated HUD/status/menu imagery with the supplied GUI assets in controlled batches;
-7. introduce entity texture/model bindings separately from entity simulation data;
-8. add sound bindings without coupling simulation outcomes to audio playback;
-9. keep a generated manifest/checksum so CI can detect missing or accidentally remapped resources;
-10. only retain procedural placeholders for content that is genuinely absent from the supplied archive.
+Minecraft applies tint-index colors at render time. The current world generator does not yet expose biome tint data, so the importer deliberately bakes stable Plains/default colors into tint-dependent runtime textures:
 
-## Architecture boundary
+- grass: `[145, 189, 89]`;
+- foliage: `[119, 171, 47]`;
+- water: `[63, 118, 228]`;
+- leather armor item base: `[160, 101, 64]`.
 
-Gameplay definitions should refer to logical asset keys, not filesystem paths or atlas coordinates. The resource manifest resolves those keys to browser URLs and, in the later generated-atlas stage, stable atlas entries. This keeps world/server simulation independent from the visual pack and makes later texture-pack substitution possible without rewriting gameplay logic.
+This is a compatibility stage, not a claim that biome coloring is finished. When biome state becomes authoritative/runtime-visible, those colors should move from build-time baking to render-time tinting.
 
-## Current blocker
+## Manifest authority
 
-The archive bytes must be present in the active workspace before the real asset migration can be executed and verified. Do not silently substitute unrelated web-downloaded copies for the user's supplied files, and do not describe the current prototype atlas as imported original art.
+`src/asset-manifest.js` remains the logical asset authority. Imported runtime resources are marked `source: "user-supplied"`; the terrain atlas and current file-backed item/entity resources must not silently fall back to prototype art.
+
+CI verifies both layers:
+
+1. the archive can be audited, selectively imported and rebuilt from scratch;
+2. tracked runtime binaries exactly match the regenerated output;
+3. runtime manifest checksums match tracked files;
+4. logical asset keys resolve to tracked files;
+5. directional block-face mappings remain stable.
+
+## Known limitations / next batches
+
+The current archive has **no sound resources and no `sounds.json`**. Audio therefore remains a separate asset-source task; it must not be described as imported from this ZIP.
+
+The following work is also intentionally separate from this first real-resource migration:
+
+- biome-aware grass/foliage/water tinting;
+- animated water frame playback (the original `.mcmeta` metadata is already retained);
+- broader Minecraft JSON model/blockstate interpretation for non-cube blocks/items;
+- real bed geometry/item rendering from the available entity texture;
+- entity model geometry reconstructed from the appropriate vanilla model definitions rather than invented `.bbmodel` files;
+- GUI/font/particle migration in controlled batches;
+- sound import once a source archive containing the sound object set/registry is supplied.
+
+The old blocker — absence of the Minecraft resource archive in the active repository — is closed.
