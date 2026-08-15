@@ -1,0 +1,30 @@
+import {assertClientSessionId} from './client-input-envelope.js';
+import {decodeItemStackTuple,encodeItemStackTuple,itemStacksCanMerge} from './item-stack.js';
+import {matchRecipe} from './recipes.js';
+import {assertNetworkSequence} from './network-sequence.js';
+
+export const SERVER_WORKBENCH_CONTAINER_VERSION=1;
+export const SERVER_WORKBENCH_CONTAINER_SNAPSHOT_KIND='workbench-container-snapshot';
+export const SERVER_WORKBENCH_CONTAINER_CLOSE_KIND='workbench-container-close';
+export const WORKBENCH_CONTAINER_SIZE=3;
+export const WORKBENCH_CONTAINER_SLOT_COUNT=9;
+
+const SNAPSHOT_KEYS=Object.freeze(['containerId','kind','result','revision','session','size','slots','target','v']);
+const CLOSE_KEYS=Object.freeze(['containerId','kind','reason','session','v']);
+function object(value,label){if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError(`${label} must be an object`);return value;}
+function exactKeys(value,keys,label){const actual=Object.keys(value).sort(),expected=[...keys].sort();if(actual.length!==expected.length||actual.some((key,index)=>key!==expected[index]))throw new RangeError(`${label} contains unexpected fields`);}
+function coordinate(value,label){if(!Number.isInteger(value)||Math.abs(value)>30_000_000)throw new RangeError(`${label} must be an integer world coordinate`);return value;}
+function reason(value){if(typeof value!=='string'||!/^[a-z0-9-]{1,64}$/u.test(value))throw new RangeError('workbench close reason must be 1 to 64 lowercase ASCII characters, digits, or hyphens');return value;}
+export function assertWorkbenchContainerId(value){if(typeof value!=='string'||!/^[A-Za-z0-9:_-]{1,128}$/u.test(value))throw new RangeError('workbench containerId must be 1 to 128 safe ASCII characters');return value;}
+function target(value){value=object(value,'workbench target');exactKeys(value,['x','y','z'],'workbench target');return Object.freeze({x:coordinate(value.x,'workbench target.x'),y:coordinate(value.y,'workbench target.y'),z:coordinate(value.z,'workbench target.z')});}
+function slots(value,label){if(!Array.isArray(value)||value.length!==WORKBENCH_CONTAINER_SLOT_COUNT)throw new RangeError(`${label} must contain exactly ${WORKBENCH_CONTAINER_SLOT_COUNT} slots`);return value;}
+function encodeSlot(value,index){return value===null||value===undefined?null:encodeItemStackTuple(value,{label:`workbench slot ${index}`});}
+function decodeSlot(value,index){return value===null?null:decodeItemStackTuple(value,{label:`workbench slot ${index}`});}
+function derivedResult(decodedSlots){const match=matchRecipe(decodedSlots,WORKBENCH_CONTAINER_SIZE);return match?.recipe?.result?Object.freeze({...match.recipe.result}):null;}
+function sameStack(a,b){if(a===null||b===null)return a===b;return a.count===b.count&&itemStacksCanMerge(a,b);}
+
+export function encodeServerWorkbenchContainerSnapshot(snapshot){snapshot=object(snapshot,'server workbench container snapshot state');const normalizedSlots=slots(snapshot.slots,'workbench snapshot slots').map((value,index)=>value?decodeItemStackTuple(encodeSlot(value,index),{label:`workbench slot ${index}`}):null),result=derivedResult(normalizedSlots);return Object.freeze({v:SERVER_WORKBENCH_CONTAINER_VERSION,kind:SERVER_WORKBENCH_CONTAINER_SNAPSHOT_KIND,session:assertClientSessionId(snapshot.session),containerId:assertWorkbenchContainerId(snapshot.containerId),target:target(snapshot.target),revision:assertNetworkSequence(snapshot.revision,'workbench container revision'),size:WORKBENCH_CONTAINER_SIZE,slots:Object.freeze(normalizedSlots.map(encodeSlot)),result:result?encodeItemStackTuple(result,{label:'workbench result'}):null});}
+export function decodeServerWorkbenchContainerSnapshot(snapshot,{expectedSession=null}={}){snapshot=object(snapshot,'server workbench container snapshot');exactKeys(snapshot,SNAPSHOT_KEYS,'server workbench container snapshot');if(snapshot.v!==SERVER_WORKBENCH_CONTAINER_VERSION)throw new RangeError(`unsupported workbench container version: ${snapshot.v}`);if(snapshot.kind!==SERVER_WORKBENCH_CONTAINER_SNAPSHOT_KIND)throw new RangeError(`unsupported workbench snapshot kind: ${snapshot.kind}`);const session=assertClientSessionId(snapshot.session);if(expectedSession!==null&&session!==assertClientSessionId(expectedSession))throw new RangeError('server workbench container snapshot session mismatch');const decodedSlots=slots(snapshot.slots,'workbench snapshot slots').map(decodeSlot),expectedResult=derivedResult(decodedSlots),decodedResult=snapshot.result===null?null:decodeItemStackTuple(snapshot.result,{label:'workbench result'});if(!sameStack(expectedResult,decodedResult))throw new RangeError('server workbench snapshot result does not match server recipe state');return Object.freeze({version:SERVER_WORKBENCH_CONTAINER_VERSION,kind:SERVER_WORKBENCH_CONTAINER_SNAPSHOT_KIND,session,containerId:assertWorkbenchContainerId(snapshot.containerId),target:target(snapshot.target),revision:assertNetworkSequence(snapshot.revision,'workbench container revision'),size:WORKBENCH_CONTAINER_SIZE,slots:Object.freeze(decodedSlots),result:decodedResult});}
+
+export function encodeServerWorkbenchContainerClose({session,containerId,reason:closeReason}={}){return Object.freeze({v:SERVER_WORKBENCH_CONTAINER_VERSION,kind:SERVER_WORKBENCH_CONTAINER_CLOSE_KIND,session:assertClientSessionId(session),containerId:assertWorkbenchContainerId(containerId),reason:reason(closeReason)});}
+export function decodeServerWorkbenchContainerClose(raw,{expectedSession=null}={}){raw=object(raw,'server workbench container close');exactKeys(raw,CLOSE_KEYS,'server workbench container close');if(raw.v!==SERVER_WORKBENCH_CONTAINER_VERSION)throw new RangeError(`unsupported workbench container version: ${raw.v}`);if(raw.kind!==SERVER_WORKBENCH_CONTAINER_CLOSE_KIND)throw new RangeError(`unsupported workbench close kind: ${raw.kind}`);const session=assertClientSessionId(raw.session);if(expectedSession!==null&&session!==assertClientSessionId(expectedSession))throw new RangeError('server workbench container close session mismatch');return encodeServerWorkbenchContainerClose({session,containerId:raw.containerId,reason:raw.reason});}

@@ -8,7 +8,7 @@ test('multiplayer player 2x2 crafting is server-authoritative and close is an or
   try{
     const address=await runtime.start(),url=`ws://127.0.0.1:${address.port}/ws`;
     await page.goto('/?e2e=1');await page.getByRole('button',{name:'多人游戏'}).click();await page.locator('#multiplayer-url').fill(url);await page.locator('#multiplayer-insecure').check();await page.getByRole('button',{name:'连接服务器'}).click();
-    await expect(page.locator('#loading')).toHaveClass(/hidden/,{timeout:30_000});await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E?.multiplayer?.()),{timeout:30_000}).toMatchObject({sessionKind:'multiplayer',state:'ready',ready:true,worldId:'e2e-player-crafting'});await expect(page.locator('#chat-log')).toContainText('玩家 2×2 合成状态');
+    await expect(page.locator('#loading')).toHaveClass(/hidden/,{timeout:30_000});await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E?.multiplayer?.()),{timeout:30_000}).toMatchObject({sessionKind:'multiplayer',state:'ready',ready:true,worldId:'e2e-player-crafting'});await expect(page.locator('#chat-log')).toContainText('玩家 2×2 合成与工作台 3×3 容器');
     const [session]=[...runtime.authoritative.sessions];expect(session).toBeTruthy();await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E?.playerCrafting?.()),{timeout:5_000}).toEqual({revision:0,slots:[null,null,null,null],result:null});
 
     const given=runtime.addInventoryItem(session,'block:6',2);expect(given.changed).toBe(true);await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E?.inventoryRevision?.()),{timeout:5_000}).toBe(1);await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E?.inventorySlot?.(0)),{timeout:5_000}).toEqual({id:'block:6',count:2});
