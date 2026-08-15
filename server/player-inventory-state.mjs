@@ -13,12 +13,13 @@ function playerMode(value){if(typeof value!=='string'||!PLAYER_MODES.has(value))
 function itemId(value){if(typeof value!=='string'||!ITEMS[value])throw new RangeError('inventory item id must reference a known item');return value;}
 function itemCount(value,label='inventory item count'){if(!Number.isInteger(value)||value<1)throw new RangeError(`${label} must be a positive integer`);return value;}
 function inventorySlot(value){if(!Number.isInteger(value)||value<0||value>=INVENTORY_SLOT_COUNT)throw new RangeError(`inventory slot must be an integer from 0 to ${INVENTORY_SLOT_COUNT-1}`);return value;}
+function mouseButton(value){if(value!==0&&value!==2)throw new RangeError('inventory click button must be 0 or 2');return value;}
 function transactionCallback(value){if(typeof value!=='function')throw new TypeError('inventory transaction callback must be a function');return value;}
 function transactionResult(value){if(!value||typeof value!=='object'||Array.isArray(value)||typeof value.changed!=='boolean')throw new TypeError('inventory transaction callback must return an object with changed boolean');return value;}
 
 export class ServerPlayerInventoryState{
   constructor(session,{mode='survival'}={}){
-    this.session=assertClientSessionId(session);this.mode=playerMode(mode);this.revision=0;this.slots=Array(INVENTORY_SLOT_COUNT).fill(null);if(this.mode==='creative')this.seedCreative();
+    this.session=assertClientSessionId(session);this.mode=playerMode(mode);this.revision=0;this.slots=Array(INVENTORY_SLOT_COUNT).fill(null);this.cursor=null;if(this.mode==='creative')this.seedCreative();
   }
 
   seedCreative(){
@@ -32,35 +33,56 @@ export class ServerPlayerInventoryState{
   hotbar(slot){return cloneStack(this.slots[HOTBAR_START+assertHotbarSlot(slot)]);}
   selectedStack(selectedSlot){return this.hotbar(selectedSlot);}
 
-  insertStack(stack,{pickup=false}={}){
-    const incoming=normalizeItemStack(stack),requested=incoming.count,limit=maxStack(incoming.id),ranges=pickup?[HOTBAR_RANGE,MAIN_RANGE]:[[0,INVENTORY_SLOT_COUNT]];let remaining=requested;
+  insertIntoRanges(stack,ranges){
+    const incoming=normalizeItemStack(stack),limit=maxStack(incoming.id);let remaining=incoming.count;
     for(const [start,end] of ranges){
       for(let i=start;i<end&&remaining;i++){const slot=this.slots[i];if(!itemStacksCanMerge(slot,incoming)||slot.count>=limit)continue;const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;}
       for(let i=start;i<end&&remaining;i++){if(this.slots[i])continue;const moved=Math.min(remaining,limit);this.slots[i]={...incoming,count:moved};remaining-=moved;}
     }
-    if(remaining!==requested)this.advanceRevision();return remaining;
+    return remaining;
   }
 
-  add(id,count=1){
-    id=itemId(id);const requested=itemCount(count),limit=maxStack(id),prototype={id,count:1};let remaining=requested;
-    for(const slot of this.slots){if(!remaining)break;if(!itemStacksCanMerge(slot,prototype)||slot.count>=limit)continue;const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;}
-    for(let i=0;i<this.slots.length&&remaining;i++){if(this.slots[i])continue;const moved=Math.min(remaining,limit);this.slots[i]={id,count:moved};remaining-=moved;}
-    if(remaining!==requested)this.advanceRevision();return remaining;
+  insertStack(stack,{pickup=false}={}){
+    const incoming=normalizeItemStack(stack),remaining=this.insertIntoRanges(incoming,pickup?[HOTBAR_RANGE,MAIN_RANGE]:[[0,INVENTORY_SLOT_COUNT]]);if(remaining!==incoming.count)this.advanceRevision();return remaining;
   }
+
+  add(id,count=1){return this.insertStack({id:itemId(id),count:itemCount(count)});}
   addStack(stack){return this.insertStack(stack,{pickup:false});}
-
-  addPickup(id,count=1){
-    id=itemId(id);const requested=itemCount(count),limit=maxStack(id),prototype={id,count:1};let remaining=requested;
-    for(const [start,end] of [HOTBAR_RANGE,MAIN_RANGE]){
-      for(let i=start;i<end&&remaining;i++){const slot=this.slots[i];if(!itemStacksCanMerge(slot,prototype)||slot.count>=limit)continue;const moved=Math.min(remaining,limit-slot.count);slot.count+=moved;remaining-=moved;}
-      for(let i=start;i<end&&remaining;i++){if(this.slots[i])continue;const moved=Math.min(remaining,limit);this.slots[i]={id,count:moved};remaining-=moved;}
-    }
-    if(remaining!==requested)this.advanceRevision();return remaining;
-  }
+  addPickup(id,count=1){return this.insertStack({id:itemId(id),count:itemCount(count)},{pickup:true});}
   addPickupStack(stack){return this.insertStack(stack,{pickup:true});}
 
   remove(slot,count=1){
     slot=inventorySlot(slot);count=itemCount(count);const current=this.slots[slot];if(!current)return null;const taken=Math.min(count,current.count),result={...current,count:taken};current.count-=taken;if(current.count===0)this.slots[slot]=null;this.advanceRevision();return cloneStack(result);
+  }
+
+  moveBetween(slot){
+    slot=inventorySlot(slot);const source=this.slots[slot];if(!source)return false;const targets=slot<HOTBAR_START?HOTBAR_RANGE:MAIN_RANGE,limit=maxStack(source.id);let remaining=source.count,changed=false;
+    for(let i=targets[0];i<targets[1]&&remaining;i++){const target=this.slots[i];if(!itemStacksCanMerge(target,source)||target.count>=limit)continue;const moved=Math.min(remaining,limit-target.count);target.count+=moved;remaining-=moved;changed=changed||moved>0;}
+    for(let i=targets[0];i<targets[1]&&remaining;i++){if(this.slots[i])continue;const moved=Math.min(remaining,limit);this.slots[i]={...source,count:moved};remaining-=moved;changed=true;}
+    if(changed){if(remaining)this.slots[slot].count=remaining;else this.slots[slot]=null;}return changed;
+  }
+
+  click(slot,button=0,shift=false){
+    slot=inventorySlot(slot);button=mouseButton(button);if(typeof shift!=='boolean')throw new TypeError('inventory click shift must be a boolean');
+    if(this.mode==='spectator')return Object.freeze({changed:false,reason:'spectator-read-only',snapshot:this.snapshot()});
+    if(shift){const changed=this.moveBetween(slot);if(changed)this.advanceRevision();return Object.freeze({changed,reason:changed?'shift-moved':'no-change',snapshot:this.snapshot()});}
+    const current=this.slots[slot];let changed=false,reason='no-change';
+    if(button===0){
+      if(!this.cursor&&current){this.cursor=current;this.slots[slot]=null;changed=true;reason='picked-up';}
+      else if(this.cursor&&!current){this.slots[slot]=this.cursor;this.cursor=null;changed=true;reason='placed';}
+      else if(this.cursor&&current&&itemStacksCanMerge(this.cursor,current)){
+        const moved=Math.min(this.cursor.count,maxStack(current.id)-current.count);if(moved>0){current.count+=moved;this.cursor.count-=moved;if(this.cursor.count<=0)this.cursor=null;changed=true;reason='merged';}
+      }else if(this.cursor&&current){this.slots[slot]=this.cursor;this.cursor=current;changed=true;reason='swapped';}
+    }else if(button===2){
+      if(!this.cursor&&current){const take=Math.ceil(current.count/2);this.cursor={...current,count:take};current.count-=take;if(current.count<=0)this.slots[slot]=null;changed=true;reason='split-picked-up';}
+      else if(this.cursor&&!current){this.slots[slot]={...this.cursor,count:1};this.cursor.count--;if(this.cursor.count<=0)this.cursor=null;changed=true;reason='placed-one';}
+      else if(this.cursor&&current&&itemStacksCanMerge(this.cursor,current)&&current.count<maxStack(current.id)){current.count++;this.cursor.count--;if(this.cursor.count<=0)this.cursor=null;changed=true;reason='merged-one';}
+    }
+    if(changed)this.advanceRevision();return Object.freeze({changed,reason,snapshot:this.snapshot()});
+  }
+
+  returnCursor(){
+    if(!this.cursor)return Object.freeze({changed:false,reason:'empty-cursor',snapshot:this.snapshot()});const incoming=cloneStack(this.cursor),remaining=this.insertIntoRanges(incoming,[[0,INVENTORY_SLOT_COUNT]]);if(remaining===incoming.count)return Object.freeze({changed:false,reason:'inventory-full',snapshot:this.snapshot()});this.cursor=remaining?{...incoming,count:remaining}:null;this.advanceRevision();return Object.freeze({changed:true,reason:this.cursor?'cursor-partially-returned':'cursor-returned',snapshot:this.snapshot()});
   }
 
   damageSelected(selectedSlot,expectedId,amount=1){
@@ -80,7 +102,7 @@ export class ServerPlayerInventoryState{
     const consumed=cloneStack({...current,count});current.count-=count;if(current.count===0)this.slots[index]=null;this.advanceRevision();return Object.freeze({committed:true,reason:'committed',consumed,result,snapshot:this.snapshot()});
   }
 
-  snapshot(){return Object.freeze({session:this.session,mode:this.mode,revision:this.revision,slots:Object.freeze(this.slots.map(cloneStack))});}
+  snapshot(){return Object.freeze({session:this.session,mode:this.mode,revision:this.revision,slots:Object.freeze(this.slots.map(cloneStack)),cursor:cloneStack(this.cursor)});}
 }
 
 export class ServerPlayerInventoryHub{
@@ -98,6 +120,8 @@ export class ServerPlayerInventoryHub{
   addPickup(session,id,count=1){return this.state(session).addPickup(id,count);}
   addPickupStack(session,stack){return this.state(session).addPickupStack(stack);}
   remove(session,slot,count=1){return this.state(session).remove(slot,count);}
+  click(session,slot,button=0,shift=false){return this.state(session).click(slot,button,shift);}
+  returnCursor(session){return this.state(session).returnCursor();}
   damageSelected(session,selectedSlot,expectedId,amount=1){return this.state(session).damageSelected(selectedSlot,expectedId,amount);}
   commitSelected(session,selectedSlot,expectedId,count,commit){return this.state(session).commitSelected(selectedSlot,expectedId,count,commit);}
   close(){this.states.clear();}
