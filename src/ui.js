@@ -176,7 +176,6 @@ export class UI{
   renderOxygen(air,maxAir,visible){if(!this.oxygen)return;const safeMax=Math.max(.001,Number(maxAir)||1),safeAir=Math.max(0,Math.min(safeMax,Number(air)||0)),filled=Math.ceil(safeAir/safeMax*10);this.oxygen.textContent='';this.oxygen.classList.toggle('hidden',!visible);this.oxygen.dataset.air=safeAir.toFixed(2);this.oxygen.setAttribute('aria-label',`氧气 ${safeAir.toFixed(1)} / ${safeMax.toFixed(0)} 秒`);for(let i=0;i<10;i++){const bubble=document.createElement('i');bubble.className='oxygen-bubble'+(i<filled?'':' empty');this.oxygen.append(bubble);}}
 
   showLoading(show,detail='准备区块',p=0){this.loading.classList.toggle('hidden',!show);this.loadingDetail.textContent=detail;this.loadingBar.style.width=`${p}%`;}
-  debugText(text){this.debug.textContent=text;}
   showToast(text){this.toast.textContent=text;this.toast.classList.remove('hidden');clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>this.toast.classList.add('hidden'),900);}
   renderBreak(){const p=this.authoritativeBreakProgress??this.localBreakProgress;this.breakMeter.classList.toggle('hidden',p<=0||p>=1);this.breakMeter.querySelector('span').style.width=`${p*100}%`;}
   setBreak(p){this.localBreakProgress=Math.max(0,Math.min(1,Number(p)||0));this.renderBreak();}
