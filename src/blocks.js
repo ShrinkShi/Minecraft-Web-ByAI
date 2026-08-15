@@ -29,7 +29,7 @@ export const BLOCKS = {
 
 for(const id of BED_BLOCK_IDS){
   const meta=bedBlockMeta(id);
-  BLOCKS[id]={name:`床（${meta.part==='foot'?'脚端':'头端'}）`,solid:true,hardness:.2,tiles:[5,5,5],drops:'bed',bed:true,bedPart:meta.part,bedFacing:meta.facing,tint:[255,118,118]};
+  BLOCKS[id]={name:`床（${meta.part==='foot'?'脚端':'头端'}）`,solid:true,hardness:.2,tiles:[5,5,5],drops:'bed',bed:true,bedPart:meta.part,bedFacing:meta.facing,fullCube:false,renderKind:'bed'};
 }
 
 export function tileForFace(blockId,faceName){

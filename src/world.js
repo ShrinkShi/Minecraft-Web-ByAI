@@ -1,6 +1,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
 import {BLOCKS,CHUNK_SIZE,WORLD_HEIGHT} from './blocks.js';
 import {requireAssetUrl} from './asset-manifest.js';
+import {BedModelRenderer} from './bed-model-renderer.js';
 
 const key=(cx,cz)=>`${cx},${cz}`;
 const floorDiv=(n,d)=>Math.floor(n/d);
@@ -29,6 +30,7 @@ export class VoxelWorld{
     this.atlasTexture=this.makeAtlasTexture();
     this.material=this.makeOpaqueMaterial();
     this.waterMaterial=this.makeWaterMaterial();
+    this.bedRenderer=new BedModelRenderer();
     this.terrainWorker=new Worker(new URL('./world-worker.js',import.meta.url),{type:'module'});
     this.meshWorker=new Worker(new URL('./mesh-worker.js',import.meta.url),{type:'module'});
     this.terrainWorker.onmessage=e=>this.onTerrainWorker(e.data);
@@ -134,6 +136,7 @@ export class VoxelWorld{
       if(!mesh)continue;
       this.scene.remove(mesh);mesh.geometry.dispose();
     }
+    if(record.specials)this.scene.remove(record.specials);
     this.meshes.delete(chunkKey);
   }
 
@@ -219,6 +222,21 @@ export class VoxelWorld{
     return mesh;
   }
 
+  makeChunkSpecials(specials,cx,cz){
+    if(!Array.isArray(specials)||specials.length===0)return null;
+    const group=new THREE.Group();
+    group.name=`chunk-specials:${cx},${cz}`;
+    group.position.set(cx*CHUNK_SIZE,0,cz*CHUNK_SIZE);
+    for(const descriptor of specials){
+      if(descriptor?.kind!=='bed')continue;
+      const visual=this.bedRenderer.create(descriptor);
+      if(visual)group.add(visual);
+    }
+    if(group.children.length===0)return null;
+    this.scene.add(group);
+    return group;
+  }
+
   onMeshWorker(m){
     if(m.type!=='mesh')return;
     this.meshWorkerBusy=false;
@@ -226,7 +244,8 @@ export class VoxelWorld{
       this.disposeChunkMeshes(m.key);
       const opaque=this.makeChunkMesh(m.opaque,this.material,m.cx,m.cz,0);
       const water=this.makeChunkMesh(m.water,this.waterMaterial,m.cx,m.cz,1);
-      if(opaque||water)this.meshes.set(m.key,{opaque,water});
+      const specials=this.makeChunkSpecials(m.specials,m.cx,m.cz);
+      if(opaque||water||specials)this.meshes.set(m.key,{opaque,water,specials});
     }
     this.pumpMeshQueue();
   }
@@ -276,6 +295,7 @@ export class VoxelWorld{
     this.terrainWorker.terminate();this.meshWorker.terminate();
     for(const chunkKey of [...this.meshes.keys()])this.disposeChunkMeshes(chunkKey);
     this.chunks.clear();this.pending.clear();this.meshQueue.clear();
+    this.bedRenderer.dispose();
     this.material.dispose();this.waterMaterial.dispose();this.atlasTexture.dispose();
   }
 }

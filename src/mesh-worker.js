@@ -1,4 +1,5 @@
 import {BLOCKS,CHUNK_SIZE,WORLD_HEIGHT,ATLAS_COLS,ATLAS_ROWS,tileForFace} from './blocks.js';
+import {bedVisualDescriptor} from './bed-model-specs.js';
 
 const FACES=[
   {n:[1,0,0],name:'east',v:[[1,0,0],[1,1,0],[1,1,1],[1,0,1]]},
@@ -15,6 +16,7 @@ const index=(x,y,z)=>x+CHUNK_SIZE*(z+CHUNK_SIZE*y);
 function faceVisible(id,neighbor){
   if(neighbor===0)return true;
   const a=BLOCKS[id],b=BLOCKS[neighbor]||BLOCKS[0];
+  if(b.fullCube===false)return true;
   if(a.liquid)return neighbor!==id&&!b.solid;
   if(a.transparent)return neighbor!==id&&!b.solid;
   return !!b.transparent;
@@ -58,40 +60,32 @@ function buildMesh(data,blockAt,accept){
     }
   }
 
-  return{
-    empty:false,
-    positions:positions.buffer,normals:normals.buffer,uvs:uvs.buffer,colors:colors.buffer,indices:indices.buffer
-  };
+  return{empty:false,positions:positions.buffer,normals:normals.buffer,uvs:uvs.buffer,colors:colors.buffer,indices:indices.buffer};
+}
+
+function collectSpecials(data){
+  const specials=[];
+  for(let y=0;y<WORLD_HEIGHT;y++)for(let z=0;z<CHUNK_SIZE;z++)for(let x=0;x<CHUNK_SIZE;x++){
+    const id=data[index(x,y,z)],block=BLOCKS[id];if(block?.renderKind!=='bed')continue;
+    const descriptor=bedVisualDescriptor(x,y,z,id);if(descriptor)specials.push(descriptor);
+  }
+  return specials;
 }
 
 function transferables(mesh){return mesh.empty?[]:[mesh.positions,mesh.normals,mesh.uvs,mesh.colors,mesh.indices];}
 
 self.onmessage=e=>{
-  const m=e.data;
-  if(m.type!=='mesh')return;
-  const data=new Uint8Array(m.data);
-  const px=m.px?new Uint8Array(m.px):null;
-  const nx=m.nx?new Uint8Array(m.nx):null;
-  const pz=m.pz?new Uint8Array(m.pz):null;
-  const nz=m.nz?new Uint8Array(m.nz):null;
-
+  const m=e.data;if(m.type!=='mesh')return;
+  const data=new Uint8Array(m.data),px=m.px?new Uint8Array(m.px):null,nx=m.nx?new Uint8Array(m.nx):null,pz=m.pz?new Uint8Array(m.pz):null,nz=m.nz?new Uint8Array(m.nz):null;
   function blockAt(x,y,z){
-    if(y<0)return 3;
-    if(y>=WORLD_HEIGHT)return 0;
-    if(x<0)return nx?nx[index(CHUNK_SIZE-1,y,z)]:0;
-    if(x>=CHUNK_SIZE)return px?px[index(0,y,z)]:0;
-    if(z<0)return nz?nz[index(x,y,CHUNK_SIZE-1)]:0;
-    if(z>=CHUNK_SIZE)return pz?pz[index(x,y,0)]:0;
+    if(y<0)return 3;if(y>=WORLD_HEIGHT)return 0;
+    if(x<0)return nx?nx[index(CHUNK_SIZE-1,y,z)]:0;if(x>=CHUNK_SIZE)return px?px[index(0,y,z)]:0;
+    if(z<0)return nz?nz[index(x,y,CHUNK_SIZE-1)]:0;if(z>=CHUNK_SIZE)return pz?pz[index(x,y,0)]:0;
     return data[index(x,y,z)];
   }
-
-  const opaque=buildMesh(data,blockAt,id=>!BLOCKS[id]?.liquid);
+  const opaque=buildMesh(data,blockAt,id=>!BLOCKS[id]?.liquid&&BLOCKS[id]?.renderKind!=='bed');
   const water=buildMesh(data,blockAt,id=>!!BLOCKS[id]?.liquid);
-  const legacyOpaque=opaque.empty?{empty:true}:{
-    empty:false,positions:opaque.positions,normals:opaque.normals,uvs:opaque.uvs,colors:opaque.colors,indices:opaque.indices
-  };
-  self.postMessage(
-    {type:'mesh',key:m.key,cx:m.cx,cz:m.cz,version:m.version,opaque,water,...legacyOpaque},
-    [...transferables(opaque),...transferables(water)]
-  );
+  const specials=collectSpecials(data);
+  const legacyOpaque=opaque.empty?{empty:true}:{empty:false,positions:opaque.positions,normals:opaque.normals,uvs:opaque.uvs,colors:opaque.colors,indices:opaque.indices};
+  self.postMessage({type:'mesh',key:m.key,cx:m.cx,cz:m.cz,version:m.version,opaque,water,specials,...legacyOpaque},[...transferables(opaque),...transferables(water)]);
 };
