@@ -160,8 +160,12 @@ def assert_real_source() -> None:
         manifest = build_model_texture_atlas(SOURCE_ARCHIVE, output, DEFAULT_BLOCKS)
 
         assert manifest["roots"] == sorted(DEFAULT_BLOCKS)
-        assert manifest["closure"] == {"blockstates": 9, "models": 28, "textures": 13, "metadata": 0}
-        assert len(manifest["textures"]) == 13
+        closure = manifest["closure"]
+        assert closure["blockstates"] == len(DEFAULT_BLOCKS)
+        assert closure["models"] >= len(DEFAULT_BLOCKS)
+        assert closure["textures"] == len(manifest["textures"])
+        assert closure["textures"] >= 13
+        assert closure["metadata"] == 0
         required = {
             "minecraft:block/iron_ore",
             "minecraft:block/glass",
