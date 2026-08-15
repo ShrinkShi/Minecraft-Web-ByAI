@@ -3,18 +3,35 @@
 ## 权威口径
 
 - 当前开发线：`v0.4.0-dev`。
-- 本轮 Progress Baseline 基于 `main` commit `dbdd6a2b632b6a14b9232806bcbf6a9ccea74113`。
+- Progress Baseline 起点：`main` commit `dbdd6a2b632b6a14b9232806bcbf6a9ccea74113`。
 - 严格 Minecraft Java 1.20.1 完整复刻规划完成度：约 **35%**。
 - Web Minecraft 引擎/基础玩法底座完成度：约 **75–80%**。
 - 当前实现事实以 [`PROJECT_BASELINE.md`](PROJECT_BASELINE.md) 为准。
 - 全量目标与状态以 [`MINECRAFT_1_20_1_FEATURE_MATRIX.md`](MINECRAFT_1_20_1_FEATURE_MATRIX.md) 为准。
 - 只有已经合并到 `main` 且交付 head 质量门通过的功能才允许记为完成。
 
-## 当前阶段
+## 阶段切换
 
-项目已从“v0.4 技术底座建设”为主，切换到“Minecraft 1.20.1 大规模内容接入”为主。
+项目已经从“v0.4 技术底座建设”为主，切换到“Minecraft 1.20.1 大规模内容接入”为主。
 
-当前不再按“想到一个方块/功能就手工实现一个”的方式扩张。下一阶段的核心原则是先建立可以批量解释原版资源、批量注册内容、批量验证的基础设施。
+今后不再按“想到一个方块/功能就手工实现一个”的方式扩张。先建立可以批量解释原版资源、批量注册内容、批量验证的基础设施，然后成批扩展 block/item/world content。
+
+## Progress Baseline 重建结果
+
+本轮已经完成文档 authority 收口：
+
+- [x] 从当前 `main` 恢复权威 baseline SHA。
+- [x] 新建 `docs/PROJECT_BASELINE.md`。
+- [x] 新建 `docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md`。
+- [x] README 改为当前真实产品/玩法口径。
+- [x] PROGRESS 改为 active dashboard，不再重复维护全部历史。
+- [x] ARCHITECTURE 对齐当前 authoritative multiplayer / asset pipeline / special-model 边界。
+- [x] TESTING 对齐 auto-discovered logic regressions + 两个 Chromium shards + asset audit。
+- [x] FILE_MANIFEST 更新为当前 architecture responsibility map。
+- [x] CHANGELOG 的 `Unreleased` 从早期 v0.4 快照重整为真实累计状态，同时保留 0.1/0.2/0.3 release history。
+- [x] 文档明确：历史 PR body / changelog 不再作为当前 TODO authority。
+
+交付 PR 的 exact-head CI/run ID 记录在 PR body，不把瞬时 CI run number 写进长期 PROGRESS。
 
 ## 已确认完成的关键底座
 
@@ -26,6 +43,7 @@
 - [x] 16×16×64 chunk streaming。
 - [x] terrain Worker + mesh Worker。
 - [x] chunk-level merged opaque/water mesh。
+- [x] special bed visual 绑定 chunk lifecycle。
 - [x] 显式 chunk/GPU resource disposal。
 - [x] pinned/self-hosted Three.js runtime。
 - [x] IndexedDB 单人增量存档。
@@ -33,14 +51,14 @@
 ### Gameplay / Survival
 
 - [x] 36-slot Inventory + hotbar + cursor/Shift/right-click stack semantics。
-- [x] 2×2 player crafting + 3×3 workbench。
+- [x] 2×2 player crafting + 3×3 Workbench。
 - [x] 木镐挖掘速度/harvest/durability。
 - [x] HP / damage / hurt cooldown / knockback。
 - [x] death settlement / DeathScreen / explicit respawn。
 - [x] recoverable item + XP death drops。
 - [x] persistent custom respawnPoint。
 - [x] two-block red bed placement / respawn / sleep / hostile safety。
-- [x] bed partial red entity-texture visual through chunk special rendering。
+- [x] red-bed texture-backed partial world visual。
 - [x] leather Equipment + basic mitigation。
 - [x] water render pass / oxygen / drowning / basic swimming/buoyancy。
 - [x] rain/thunder visible FX。
@@ -83,65 +101,33 @@
 - [x] original texture sheets for eight implemented mobs。
 - [x] original red-bed texture in world rendering。
 - [x] Repository quality gate + sharded Chromium browser smoke。
-- [x] PR #94 delivery gate: 131 logic/worker regressions + both browser shards green。
+- [x] PR #94 delivery gate baseline: 131 logic/worker regressions + both browser shards green。
 
-## 当前内容量瓶颈
+## 当前主要内容量瓶颈
 
-### Blocks
-
-正式 gameplay block families 仍然只有约 11 类：grass/dirt/stone/sand/oak planks/oak log/oak leaves/water/crafting table/cobblestone/red bed。
-
-导入资源已经远多于 runtime registry，但尚无通用 blockstate/model interpreter，因此大量 block models/blockstates 不能直接变成可玩的方块。
-
-### Items / Recipes
-
-- runtime item IDs：28。
-- recipes：5。
+- gameplay block families 仍只有约 11 类。
+- runtime item IDs 约 28；recipes 5。
 - tool progression 只有 wooden pickaxe 真正进入完整挖掘/耐久闭环。
+- worldgen 仍是 deterministic fBm heightmap + basic surface/sea/oak tree。
+- mobs/PvE/projectiles/explosions 仍主要是 client gameplay domain；multiplayer authoritative PvE 尚未完成。
+- supplied asset ZIP 没有 sound files / `sounds.json`，AudioEngine 是明确 blocked domain。
 
-### Worldgen
+## 当前任务：Minecraft JSON blockstate/model interpreter
 
-当前仍是 deterministic fBm heightmap + basic surface + sea + oak tree。没有真正的 biome / cave / ore / feature / structure pipeline。
+这是下一阶段最高优先级，不与手工大规模加方块并行。
 
-### PvE Authority
+### A. Resource/model resolver
 
-当前 mobs、hostile AI、projectiles、explosions 仍主要是 client gameplay 系统。多人已经有 authoritative PvP，但 server-authoritative PvE 尚未完成。
-
-### Audio
-
-当前 supplied asset ZIP 中没有 sound files 或 `sounds.json`。音效/音乐需要额外资源源，因此 AudioEngine 暂时是 blocked domain。
-
-## 当前任务：Progress Baseline 重建
-
-目标：消除旧 README/PROGRESS 与真实 `main` 的状态漂移，并把未来 roadmap 固定为可维护矩阵。
-
-- [x] 从当前 `main` 恢复权威 SHA。
-- [x] 新建 `docs/PROJECT_BASELINE.md`。
-- [x] 新建 `docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md`。
-- [x] README 重写为当前真实功能口径。
-- [x] PROGRESS 改为短期 active dashboard，不再重复维护整套历史。
-- [ ] ARCHITECTURE 对齐当前 authoritative multiplayer / asset interpretation 下一阶段边界。
-- [ ] CHANGELOG 增加本轮 baseline/documentation reset 记录。
-- [ ] FILE_MANIFEST / TESTING 检查是否仍含明显失真条目。
-- [ ] exact-head quality gate。
-- [ ] PR review surface clear 后 squash merge。
-
-## 下一任务：Minecraft JSON blockstate/model interpreter
-
-Baseline PR 合并后立即开始，不与其它内容扩张并行手工堆叠。
-
-### 第一阶段：格式/解析边界
-
-- [ ] 定义 resource identifier/path resolver。
-- [ ] 解析 block model `parent` inheritance。
+- [ ] 定义 Minecraft resource identifier/path resolver。
+- [ ] 解析 model `parent` inheritance。
 - [ ] 合并/覆盖 `textures` variables。
 - [ ] 解析 `elements` cuboids。
-- [ ] 解析 per-face texture/uv/cullface/tintindex/rotation。
-- [ ] 解析 element rotation origin/axis/angle/rescale。
-- [ ] 检测 parent cycle / missing model / missing texture。
-- [ ] Node-pure fixtures 和 golden tests。
+- [ ] 解析 per-face texture / uv / cullface / tintindex / rotation。
+- [ ] 解析 element rotation origin / axis / angle / rescale。
+- [ ] parent cycle / missing model / missing texture fail-closed。
+- [ ] Node-pure fixtures + golden tests。
 
-### 第二阶段：blockstate
+### B. Blockstate resolver
 
 - [ ] `variants` property matching。
 - [ ] weighted model alternatives。
@@ -149,27 +135,26 @@ Baseline PR 合并后立即开始，不与其它内容扩张并行手工堆叠�
 - [ ] `multipart` conditions / OR / AND。
 - [ ] deterministic model selection inputs。
 
-### 第三阶段：render/mesh integration
+### C. Mesh/runtime integration
 
-- [ ] 将普通 model cuboids 编译为 mesh-worker 可消费的纯数据 spec。
-- [ ] 支持 atlas/resource texture binding。
-- [ ] 保留 full-cube fast path，非 cube 才走 model interpreter，避免性能退化。
-- [ ] 建立 transparent/cutout/render-layer 分类边界。
-- [ ] 建立 model/collision independence，避免把视觉几何错误当碰撞盒。
-- [ ] Chromium 解码/构建 representative models。
+- [ ] normal model cuboids 编译为 mesh-worker 可消费的纯数据 spec。
+- [ ] full-cube 保留现有 fast path，避免性能退化。
+- [ ] logical resource texture binding。
+- [ ] opaque / cutout / transparent layer contract。
+- [ ] visual geometry 与 collision shape 独立。
+- [ ] chunk remesh/unload 生命周期完整。
+- [ ] Chromium HTTP decode/model construction coverage。
 
 ### 第一批 acceptance blocks
 
-优先选择能覆盖模型解释器能力、同时对后续内容扩张有价值的一组 representative blocks，而不是一次盲目导入全部 1.20.1：
-
-- [ ] iron_ore：普通 full cube registry/import 验证；
-- [ ] glass：透明 full cube；
-- [ ] oak_slab：非满高 cuboid；
-- [ ] oak_stairs：多 cuboid + state；
-- [ ] oak_door：上下两格 + facing/open/hinge；
-- [ ] oak_fence：multipart/neighbor state；
-- [ ] torch：非 full cube / texture model；
-- [ ] grass/foliage representative tint index contract。
+- [ ] `iron_ore`：普通 full cube registry/import。
+- [ ] `glass`：透明 full cube。
+- [ ] `oak_slab`：非满高 cuboid。
+- [ ] `oak_stairs`：多 cuboid + state。
+- [ ] `oak_door`：上下两格 + facing/open/hinge。
+- [ ] `oak_fence`：multipart/neighbor state。
+- [ ] `torch`：non-full model。
+- [ ] grass/foliage representative tint-index contract。
 
 这批通过后再启动 broad block/item registry batch import。
 
@@ -193,4 +178,4 @@ Baseline PR 合并后立即开始，不与其它内容扩张并行手工堆叠�
 - 每个改变 Minecraft parity 的 PR 必须同步更新 feature matrix。
 - 普通架构 groundwork 默认只能标 `FOUNDATION`/`PARTIAL`，不能因为有文件/协议就标 `DONE`。
 - 不为扩大内容量牺牲已有 server-authoritative 边界、determinism、Worker isolation 或 resource lifecycle。
-- 不把 Java Edition 的旧技术实现问题（渲染 API、单线程热点、无界资源生命周期等）作为兼容目标。
+- 不把 Java Edition 的旧技术实现问题作为兼容目标。
