@@ -11,7 +11,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from PIL import Image
 
-from build_minecraft_model_atlas import (
+from minecraft_model_atlas import (
     ATLAS_FILE,
     DEFAULT_BLOCKS,
     MANIFEST_FILE,
@@ -123,12 +123,10 @@ def assert_synthetic() -> None:
             image = image.convert("RGBA")
             x = small["x"]
             y = small["y"]
-            # Original 2x2 pixels.
             assert image.getpixel((x, y)) == (255, 0, 0, 255)
             assert image.getpixel((x + 1, y)) == (0, 255, 0, 255)
             assert image.getpixel((x, y + 1)) == (0, 0, 255, 255)
             assert image.getpixel((x + 1, y + 1)) == (255, 255, 0, 255)
-            # One-pixel gutters replicate the corresponding edge/corner.
             assert image.getpixel((x - 1, y)) == image.getpixel((x, y))
             assert image.getpixel((x + 2, y)) == image.getpixel((x + 1, y))
             assert image.getpixel((x, y - 1)) == image.getpixel((x, y))
