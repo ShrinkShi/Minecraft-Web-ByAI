@@ -52,6 +52,15 @@ PROBES = {
     "stone_pickaxe": "assets/minecraft/textures/item/stone_pickaxe.png",
     "raw_iron": "assets/minecraft/textures/item/raw_iron.png",
     "iron_ore": "assets/minecraft/textures/block/iron_ore.png",
+    "entity_cow": "assets/minecraft/textures/entity/cow/cow.png",
+    "entity_sheep": "assets/minecraft/textures/entity/sheep/sheep.png",
+    "entity_sheep_fur": "assets/minecraft/textures/entity/sheep/sheep_fur.png",
+    "entity_pig": "assets/minecraft/textures/entity/pig/pig.png",
+    "entity_chicken": "assets/minecraft/textures/entity/chicken.png",
+    "entity_zombie": "assets/minecraft/textures/entity/zombie/zombie.png",
+    "entity_skeleton": "assets/minecraft/textures/entity/skeleton/skeleton.png",
+    "entity_creeper": "assets/minecraft/textures/entity/creeper/creeper.png",
+    "entity_spider": "assets/minecraft/textures/entity/spider/spider.png",
 }
 
 

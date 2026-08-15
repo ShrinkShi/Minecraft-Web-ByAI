@@ -65,6 +65,17 @@ RUNTIME_FILES = {
     "textures/item/gunpowder.png": "assets/minecraft/textures/item/gunpowder.png",
     "textures/item/string.png": "assets/minecraft/textures/item/string.png",
 
+    # Entity sheets for every mob type already implemented by gameplay.
+    "textures/entity/cow/cow.png": "assets/minecraft/textures/entity/cow/cow.png",
+    "textures/entity/sheep/sheep.png": "assets/minecraft/textures/entity/sheep/sheep.png",
+    "textures/entity/sheep/sheep_fur.png": "assets/minecraft/textures/entity/sheep/sheep_fur.png",
+    "textures/entity/pig/pig.png": "assets/minecraft/textures/entity/pig/pig.png",
+    "textures/entity/chicken.png": "assets/minecraft/textures/entity/chicken.png",
+    "textures/entity/zombie/zombie.png": "assets/minecraft/textures/entity/zombie/zombie.png",
+    "textures/entity/skeleton/skeleton.png": "assets/minecraft/textures/entity/skeleton/skeleton.png",
+    "textures/entity/creeper/creeper.png": "assets/minecraft/textures/entity/creeper/creeper.png",
+    "textures/entity/spider/spider.png": "assets/minecraft/textures/entity/spider/spider.png",
+
     # Beds render from an entity sheet in vanilla; this archive does not expose
     # a standalone textures/item/red_bed.png resource.
     "textures/entity/bed/red.png": "assets/minecraft/textures/entity/bed/red.png",

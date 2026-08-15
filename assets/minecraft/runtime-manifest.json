@@ -175,10 +175,19 @@
     "minecraft/models/block/grass_block.json": "fdea6afda5fa7d47241f181b56879e6807efc2b18a119133e3a871c411bf661a",
     "minecraft/models/item/stick.json": "04048187b6c11f1152546cbb7b29db9877a73b6d2f152e1941d575c9460be8cc",
     "minecraft/models/item/wooden_pickaxe.json": "483480c2c21a395196ca8255e933a5db3fd6f995be3dacc3c423e971ef964553",
-    "minecraft/source-manifest.json": "222492a1f1f5a0255b43d85b0b308df6b926306d870de643b95a9eadf9d51f14",
+    "minecraft/source-manifest.json": "d1c008a8fb9727d726dfadbd9e29f2a0b2392b6a7851c1d8df606b90aef4ad87",
     "minecraft/textures/block/water_flow.png.mcmeta": "802acdb8f55f30146d5ed18414b21ba35650d4e550f81825ea104131c12dc4fc",
     "minecraft/textures/block/water_still.png.mcmeta": "e9b8025fde1b09b0a4d2a38427b04f98f28a593045be6d177eb2b29164c872b0",
-    "minecraft/textures/entity/bed/red.png": "73022232cafa0c0c5260e48cb5305a8bcc7f6e09d22f8d1bb51e87a1a84146b2"
+    "minecraft/textures/entity/bed/red.png": "73022232cafa0c0c5260e48cb5305a8bcc7f6e09d22f8d1bb51e87a1a84146b2",
+    "minecraft/textures/entity/chicken.png": "d2a6c25685cbb2223d3898515e815b09e9448a21552bfb05b384a6fbc5d54f53",
+    "minecraft/textures/entity/cow/cow.png": "3800d29036c33b4da3ae20d07fed0633cee0c249b7f92c92b441a1cae3f18673",
+    "minecraft/textures/entity/creeper/creeper.png": "15c5f8859f0269f94abc97c8eeacd3585fbb5f79cb8faca2308a14a26d7ab7a5",
+    "minecraft/textures/entity/pig/pig.png": "d608804aebbf1a0602f341f03ce7fe768581925fc15a73c1b8901a57892b3b05",
+    "minecraft/textures/entity/sheep/sheep.png": "192dc1036e41f1b43fc504e0a3738570f15b1d15d28ba963bf3fe636956dbff1",
+    "minecraft/textures/entity/sheep/sheep_fur.png": "8b68443a098a6218dac0544ae16a9ca0c141088b78c3e71c34d270c4223981bf",
+    "minecraft/textures/entity/skeleton/skeleton.png": "9d467811493a08c4a9a0bd8810c1b6df097a09b6c8d6f63fc631f93aaec74dc9",
+    "minecraft/textures/entity/spider/spider.png": "9d7655c3c25840f96cde37e7ab840c1b158b0fd9e73fbf949c12a81aa8c02b19",
+    "minecraft/textures/entity/zombie/zombie.png": "08a223eca3451abcb170c12661b4a70acfe967c437dc0b5fd99413d8b74b53b3"
   },
   "sourceArchiveSha256": "b65a2211175af90664de9f41ea422f4869eee855f0da4bf6fe0715434ebe9c69",
   "tintProfile": {

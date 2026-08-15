@@ -135,6 +135,51 @@
       "sha256": "73022232cafa0c0c5260e48cb5305a8bcc7f6e09d22f8d1bb51e87a1a84146b2",
       "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/entity/bed/red.png"
     },
+    "textures/entity/chicken.png": {
+      "bytes": 472,
+      "sha256": "d2a6c25685cbb2223d3898515e815b09e9448a21552bfb05b384a6fbc5d54f53",
+      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/entity/chicken.png"
+    },
+    "textures/entity/cow/cow.png": {
+      "bytes": 1122,
+      "sha256": "3800d29036c33b4da3ae20d07fed0633cee0c249b7f92c92b441a1cae3f18673",
+      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/entity/cow/cow.png"
+    },
+    "textures/entity/creeper/creeper.png": {
+      "bytes": 2869,
+      "sha256": "15c5f8859f0269f94abc97c8eeacd3585fbb5f79cb8faca2308a14a26d7ab7a5",
+      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/entity/creeper/creeper.png"
+    },
+    "textures/entity/pig/pig.png": {
+      "bytes": 788,
+      "sha256": "d608804aebbf1a0602f341f03ce7fe768581925fc15a73c1b8901a57892b3b05",
+      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/entity/pig/pig.png"
+    },
+    "textures/entity/sheep/sheep.png": {
+      "bytes": 922,
+      "sha256": "192dc1036e41f1b43fc504e0a3738570f15b1d15d28ba963bf3fe636956dbff1",
+      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/entity/sheep/sheep.png"
+    },
+    "textures/entity/sheep/sheep_fur.png": {
+      "bytes": 573,
+      "sha256": "8b68443a098a6218dac0544ae16a9ca0c141088b78c3e71c34d270c4223981bf",
+      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/entity/sheep/sheep_fur.png"
+    },
+    "textures/entity/skeleton/skeleton.png": {
+      "bytes": 651,
+      "sha256": "9d467811493a08c4a9a0bd8810c1b6df097a09b6c8d6f63fc631f93aaec74dc9",
+      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/entity/skeleton/skeleton.png"
+    },
+    "textures/entity/spider/spider.png": {
+      "bytes": 927,
+      "sha256": "9d7655c3c25840f96cde37e7ab840c1b158b0fd9e73fbf949c12a81aa8c02b19",
+      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/entity/spider/spider.png"
+    },
+    "textures/entity/zombie/zombie.png": {
+      "bytes": 1007,
+      "sha256": "08a223eca3451abcb170c12661b4a70acfe967c437dc0b5fd99413d8b74b53b3",
+      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/entity/zombie/zombie.png"
+    },
     "textures/item/arrow.png": {
       "bytes": 148,
       "sha256": "9dfc345c4ae71a7bab003d3d15f420376910162a000a99832e9ca63a51bc85dd",

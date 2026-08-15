@@ -9,7 +9,8 @@ for(const key of [
   'terrain.block_atlas','block.iron_ore','block.white_wool','item.stick','item.wooden_pickaxe','item.stone_pickaxe','item.raw_iron',
   'item.leather_helmet','item.leather_chestplate','item.leather_leggings','item.leather_boots','item.raw_beef','item.leather','item.raw_mutton',
   'item.raw_porkchop','item.raw_chicken','item.feather','item.rotten_flesh','item.bone','item.arrow','item.gunpowder','item.string',
-  'entity.bed.red','metadata.minecraft_runtime'
+  'entity.bed.red','entity.cow','entity.sheep','entity.sheep_fur','entity.pig','entity.chicken','entity.zombie','entity.skeleton','entity.creeper','entity.spider',
+  'metadata.minecraft_runtime'
 ])assert.ok(ASSET_KEYS.includes(key),`${key} must be declared`);
 
 for(const key of ASSET_KEYS){
@@ -28,6 +29,15 @@ assert.equal(assetUrl('item.raw_iron'),'./assets/items/raw_iron.png');
 assert.equal(assetRecord('block.iron_ore').tile,14);
 assert.equal(assetRecord('block.white_wool').tile,15);
 assert.equal(assetUrl('entity.bed.red'),'./assets/minecraft/textures/entity/bed/red.png');
+assert.equal(assetUrl('entity.cow'),'./assets/minecraft/textures/entity/cow/cow.png');
+assert.equal(assetUrl('entity.sheep'),'./assets/minecraft/textures/entity/sheep/sheep.png');
+assert.equal(assetUrl('entity.sheep_fur'),'./assets/minecraft/textures/entity/sheep/sheep_fur.png');
+assert.equal(assetUrl('entity.pig'),'./assets/minecraft/textures/entity/pig/pig.png');
+assert.equal(assetUrl('entity.chicken'),'./assets/minecraft/textures/entity/chicken.png');
+assert.equal(assetUrl('entity.zombie'),'./assets/minecraft/textures/entity/zombie/zombie.png');
+assert.equal(assetUrl('entity.skeleton'),'./assets/minecraft/textures/entity/skeleton/skeleton.png');
+assert.equal(assetUrl('entity.creeper'),'./assets/minecraft/textures/entity/creeper/creeper.png');
+assert.equal(assetUrl('entity.spider'),'./assets/minecraft/textures/entity/spider/spider.png');
 assert.throws(()=>assetRecord(''),TypeError);
 
 for(const itemId of ['stick','wooden_pickaxe','leather_helmet','leather_chestplate','leather_leggings','leather_boots','raw_beef','leather','raw_mutton','raw_porkchop','raw_chicken','feather','rotten_flesh','bone','arrow','gunpowder','string']){
@@ -41,5 +51,6 @@ const snapshot=assetManifestSnapshot();
 assert.equal(Object.isFrozen(snapshot),true);assert.equal(Object.isFrozen(snapshot['item.stick']),true);
 assert.equal(snapshot['terrain.block_atlas'].source,ASSET_SOURCE.USER_SUPPLIED);
 assert.equal(snapshot['item.stone_pickaxe'].source,ASSET_SOURCE.USER_SUPPLIED);
+assert.equal(snapshot['entity.spider'].source,ASSET_SOURCE.USER_SUPPLIED);
 
-console.log('logical asset manifest + user-supplied Minecraft runtime bindings: PASS');
+console.log('logical asset manifest + user-supplied Minecraft runtime/entity bindings: PASS');

@@ -6,32 +6,20 @@ import {applyDamage,knockbackDirection} from './combat.js';
 import {resolveSpiderClimb} from './spider-rules.js';
 import {bedSleepCheckPointFromRespawn} from './bed-rules.js';
 import {SLEEP_MONSTER_HORIZONTAL,firstSleepBlocker} from './sleep-safety-rules.js';
+import {animateMobVisual,bindMobVisual,createMobModelTemplate,disposeMobModelResources} from './mob-model-renderer.js';
 
 const tempA=new THREE.Vector3(),tempB=new THREE.Vector3(),SPAWN_GROUND=new Set([BLOCK.GRASS,BLOCK.DIRT,BLOCK.STONE,BLOCK.SAND,BLOCK.COBBLESTONE]);
-
-function addBox(group,resources,material,w,h,d,x,y,z){const geometry=new THREE.BoxGeometry(w,h,d);resources.geometries.add(geometry);const mesh=new THREE.Mesh(geometry,material);mesh.position.set(x,y,z);group.add(mesh);return mesh;}
-function createHumanoidTemplate(def,resources){
-  const group=new THREE.Group(),body=new THREE.MeshLambertMaterial({color:def.color}),accent=new THREE.MeshLambertMaterial({color:def.accent});resources.materials.add(body);resources.materials.add(accent);
-  const scale=def.height/1.8;addBox(group,resources,body,.52,.52,.52,0,1.55*scale,0);addBox(group,resources,accent,.58,.68,.3,0,1.04*scale,0);addBox(group,resources,body,.18,.72,.2,-.39,1.08*scale,-.08);addBox(group,resources,body,.18,.72,.2,.39,1.08*scale,-.08);addBox(group,resources,accent,.22,.74,.24,-.15,.37*scale,0);addBox(group,resources,accent,.22,.74,.24,.15,.37*scale,0);return group;
-}
-function createSpiderTemplate(def,resources){
-  const group=new THREE.Group(),body=new THREE.MeshLambertMaterial({color:def.color}),accent=new THREE.MeshLambertMaterial({color:def.accent});resources.materials.add(body);resources.materials.add(accent);
-  addBox(group,resources,body,.82,.38,.95,0,.42,.2);addBox(group,resources,body,.76,.48,.78,0,.46,.72);addBox(group,resources,body,.58,.36,.52,0,.42,-.52);addBox(group,resources,accent,.34,.12,.04,0,.47,-.79);
-  const legZ=[-.38,-.12,.18,.46];for(const side of[-1,1])for(let i=0;i<4;i++){const leg=addBox(group,resources,body,.78,.1,.1,side*.68,.34,legZ[i]);leg.rotation.z=-side*.32;leg.rotation.y=side*(i<2?.22:-.22);}
-  return group;
-}
-function createMobTemplate(def,resources){return def.model==='spider'?createSpiderTemplate(def,resources):createHumanoidTemplate(def,resources);}
 
 export class HostileMobSystem{
   constructor(scene,world,{maxEntities=8,cellSize=8,onPlayerHit=()=>{},onProjectile=()=>{},onExplosion=()=>{},onDeath=()=>{}}={}){
     this.scene=scene;this.world=world;this.maxEntities=maxEntities;this.onPlayerHit=onPlayerHit;this.onProjectile=onProjectile;this.onExplosion=onExplosion;this.onDeath=onDeath;this.store=new EntityStore({cellSize});this.visuals=new Map();this.spawnTimer=.7;this.aiAccumulator=0;
-    this.resources={geometries:new Set(),materials:new Set()};this.templates=new Map();for(const[type,def]of Object.entries(HOSTILE_MOBS))this.templates.set(type,createMobTemplate(def,this.resources));
+    this.resources={geometries:new Set(),materials:new Set(),textures:new Set(),textureCache:new Map(),materialCache:new Map()};this.templates=new Map();for(const[type,def]of Object.entries(HOSTILE_MOBS))this.templates.set(type,createMobModelTemplate(type,def,this.resources));
   }
 
   spawn(type,position){
     const def=HOSTILE_MOBS[type];if(!def||this.store.size>=this.maxEntities)return null;
     const record=this.store.spawn(type,position,{hp:def.hp,hurtUntil:-Infinity,attackTimer:.3+Math.random()*.5,pushX:0,pushZ:0,hurtPulse:0,strafeDir:Math.random()<.5?-1:1,strafeTimer:1+Math.random()*1.5,fuse:0});
-    const visual=this.templates.get(type).clone(true);visual.position.set(position.x,position.y,position.z);this.scene.add(visual);this.visuals.set(record.id,visual);return record;
+    const visual=bindMobVisual(this.templates.get(type).clone(true));visual.position.set(position.x,position.y,position.z);this.scene.add(visual);this.visuals.set(record.id,visual);return record;
   }
 
   despawn(id){const visual=this.visuals.get(id);if(visual)this.scene.remove(visual);this.visuals.delete(id);return this.store.despawn(id);}
@@ -87,13 +75,13 @@ export class HostileMobSystem{
         else if(rise<=1.05&&drop<=2){position.x=nx;position.y=nextY;position.z=nz;this.store.setPosition(record.id,position);}
       }
     }
-    const visual=this.visuals.get(record.id);if(visual){if((def.attackStyle==='ranged'||def.attackStyle==='fuse')&&planar>.01)visual.rotation.y=Math.atan2(toX,toZ);else if(length>0)visual.rotation.y=Math.atan2(vx,vz);}this.attack(record,def,state,position,player,planar,vertical);
+    const visual=this.visuals.get(record.id);if(visual){visual.userData.mobSpeed=Math.min(1,length/Math.max(def.speed,.001));if((def.attackStyle==='ranged'||def.attackStyle==='fuse')&&planar>.01)visual.rotation.y=Math.atan2(toX,toZ)+Math.PI;else if(length>0)visual.rotation.y=Math.atan2(vx,vz)+Math.PI;}this.attack(record,def,state,position,player,planar,vertical);
   }
 
   tick(dt,player,gameTime){this.spawnTimer-=dt;if(this.spawnTimer<=0){this.spawnTimer=1.15;this.trySpawnAround(player,gameTime);}for(const record of[...this.store.values()]){const position=this.store.getPosition(record.id);if(!position)continue;const dx=position.x-player.position.x,dz=position.z-player.position.z;if(dx*dx+dz*dz>48*48){this.despawn(record.id);continue;}this.moveAndAttack(record,dt,player);}}
   update(dt,player,gameTime){
     if(!player)return;this.aiAccumulator=Math.min(.5,this.aiAccumulator+dt);while(this.aiAccumulator>=.1){this.tick(.1,player,gameTime);this.aiAccumulator-=.1;}
-    const smoothing=1-Math.exp(-14*dt);for(const record of this.store.values()){const position=this.store.getPosition(record.id),visual=this.visuals.get(record.id),def=HOSTILE_MOBS[record.type];if(!position||!visual||!def)continue;visual.position.lerp(tempA.set(position.x,position.y,position.z),smoothing);let scale=record.components.hurtPulse>0?1.08:1;if(def.attackStyle==='fuse'&&record.components.fuse>0){const progress=record.components.fuse/def.fuseTime;scale+=progress*.08*(.55+.45*Math.sin(record.components.fuse*28));}visual.scale.setScalar(scale);}
+    const smoothing=1-Math.exp(-14*dt);for(const record of this.store.values()){const position=this.store.getPosition(record.id),visual=this.visuals.get(record.id),def=HOSTILE_MOBS[record.type];if(!position||!visual||!def)continue;visual.position.lerp(tempA.set(position.x,position.y,position.z),smoothing);let scale=record.components.hurtPulse>0?1.08:1;if(def.attackStyle==='fuse'&&record.components.fuse>0){const progress=record.components.fuse/def.fuseTime;scale+=progress*.08*(.55+.45*Math.sin(record.components.fuse*28));}visual.scale.setScalar(scale);animateMobVisual(visual,dt,visual.userData.mobSpeed||0);}
   }
   sleepBlockerNear(respawnAnchor){
     const position=bedSleepCheckPointFromRespawn(respawnAnchor);if(!position)return null;
@@ -102,6 +90,6 @@ export class HostileMobSystem{
     return firstSleepBlocker(position,monsters);
   }
 
-  dispose(){for(const id of[...this.visuals.keys()])this.despawn(id);this.store.clear();for(const geometry of this.resources.geometries)geometry.dispose();for(const material of this.resources.materials)material.dispose();this.resources.geometries.clear();this.resources.materials.clear();this.templates.clear();}
+  dispose(){for(const id of[...this.visuals.keys()])this.despawn(id);this.store.clear();disposeMobModelResources(this.resources);this.templates.clear();}
   get size(){return this.store.size;}
 }
