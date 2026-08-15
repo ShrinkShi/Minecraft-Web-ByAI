@@ -1,0 +1,29 @@
+name: Minecraft asset source audit
+
+on:
+  pull_request:
+    paths:
+      - 'MC原版素材assets.zip'
+      - 'tools/audit-minecraft-assets.py'
+      - '.github/workflows/asset-source-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      - name: Inspect source archive
+        run: python tools/audit-minecraft-assets.py --json-out minecraft-assets-audit.json
+      - name: Upload deterministic audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: minecraft-assets-audit
+          path: minecraft-assets-audit.json
+          if-no-files-found: error
