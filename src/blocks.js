@@ -23,7 +23,7 @@ export const BLOCKS = {
   6:{name:'橡木原木',solid:true,hardness:2,tiles:[7,7,6],drops:'block:6'},
   7:{name:'橡树树叶',solid:true,transparent:true,hardness:.2,tiles:[8,8,8],drops:null},
   8:{name:'水',solid:false,liquid:true,transparent:true,hardness:100,tiles:[9,9,9],drops:null},
-  9:{name:'工作台',solid:true,hardness:2.5,tiles:[10,5,11],drops:'block:9'},
+  9:{name:'工作台',solid:true,hardness:2.5,tiles:[10,5,11],faces:{top:10,bottom:5,east:11,north:12,south:11,west:12},drops:'block:9'},
   10:{name:'圆石',solid:true,hardness:2,tiles:[13,13,13],drops:'block:10',requires:'pickaxe',minToolTier:'wood'}
 };
 
@@ -34,6 +34,7 @@ for(const id of BED_BLOCK_IDS){
 
 export function tileForFace(blockId,faceName){
   const block=BLOCKS[blockId]||BLOCKS[0];
+  if(Number.isInteger(block.faces?.[faceName]))return block.faces[faceName];
   if(faceName==='top')return block.tiles[0];
   if(faceName==='bottom')return block.tiles[1];
   return block.tiles[2];

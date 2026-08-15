@@ -1,0 +1,58 @@
+name: Minecraft asset source audit
+
+on:
+  pull_request:
+    paths:
+      - 'MC原版素材assets.zip'
+      - 'assets/**'
+      - 'tools/audit-minecraft-assets.py'
+      - 'tools/import-minecraft-assets.py'
+      - 'tools/build-minecraft-runtime-assets.py'
+      - 'tools/requirements-assets.txt'
+      - '.github/workflows/asset-source-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install pinned asset build dependency
+        run: python -m pip install -r tools/requirements-assets.txt
+      - name: Inspect source archive
+        run: python tools/audit-minecraft-assets.py --json-out minecraft-assets-audit.json
+      - name: Extract deterministic runtime source subset
+        run: python tools/import-minecraft-assets.py
+      - name: Build browser-ready runtime assets
+        run: python tools/build-minecraft-runtime-assets.py
+      - name: Verify tracked runtime assets match generated output
+        run: |
+          cmp build/minecraft-runtime-assets/textures/atlas.png assets/textures/atlas.png
+          for file in build/minecraft-runtime-assets/items/*.png; do
+            cmp "$file" "assets/items/$(basename "$file")"
+          done
+          diff -qr build/minecraft-runtime-assets/minecraft assets/minecraft
+      - name: Upload deterministic audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: minecraft-assets-audit
+          path: minecraft-assets-audit.json
+          if-no-files-found: error
+      - name: Upload selected runtime source subset
+        uses: actions/upload-artifact@v4
+        with:
+          name: minecraft-runtime-source
+          path: build/minecraft-runtime-source
+          if-no-files-found: error
+      - name: Upload browser-ready runtime assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: minecraft-runtime-assets
+          path: build/minecraft-runtime-assets
+          if-no-files-found: error
