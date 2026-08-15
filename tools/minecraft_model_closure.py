@@ -55,17 +55,21 @@ def safe_zip_name(name: str) -> bool:
 
 
 def canonical_asset_path(name: str) -> str | None:
-    """Return the canonical assets/... suffix from an arbitrary ZIP entry."""
+    """Return the canonical ``assets/...`` suffix from an arbitrary ZIP entry.
+
+    The supplied archive's historical outer folder is named
+    ``MC原版素材assets`` rather than containing a literal top-level ``assets``
+    directory.  The original selective importer therefore resolves resources by
+    canonical suffix.  Mirror that proven contract here by taking the *last*
+    ``assets/`` occurrence, whether it starts a path segment or is the suffix of
+    an arbitrary outer-folder name.
+    """
     normalized = normalize_zip_name(name)
     lowered = normalized.lower()
-    marker = "assets/"
-    if lowered.startswith(marker):
-        candidate = normalized
-    else:
-        index = lowered.find("/assets/")
-        if index == -1:
-            return None
-        candidate = normalized[index + 1 :]
+    index = lowered.rfind("assets/")
+    if index == -1:
+        return None
+    candidate = normalized[index:]
     if not CANONICAL_RE.fullmatch(candidate):
         return None
     return candidate
@@ -261,7 +265,7 @@ def resolve_block_model_closure(index: MinecraftArchiveIndex, block_ids: Iterabl
 
     def visit_model(model_id: str) -> None:
         normalized = normalize_resource_id(model_id)
-        namespace, path = split_resource_id(normalized)
+        _namespace, path = split_resource_id(normalized)
         if path in BUILTIN_MODEL_PATHS:
             builtin_models.add(normalized)
             return
@@ -276,7 +280,7 @@ def resolve_block_model_closure(index: MinecraftArchiveIndex, block_ids: Iterabl
         parent, texture_ids = model_dependencies(value, canonical=canonical)
         models.add(canonical)
         if parent is not None:
-            parent_namespace, parent_path = split_resource_id(parent)
+            _parent_namespace, parent_path = split_resource_id(parent)
             if parent_path in BUILTIN_MODEL_PATHS:
                 builtin_models.add(parent)
                 edges.add((canonical, "builtin-parent", parent))
