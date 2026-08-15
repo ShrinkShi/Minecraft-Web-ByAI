@@ -1,5 +1,6 @@
 import {suggestCommands} from './command-suggestions.js';
 import {hasMultiplayerCommandSender,sendMultiplayerCommand,subscribeMultiplayerCommandResults} from './multiplayer-command-channel.js';
+import {hasMultiplayerChatSender,sendMultiplayerChat,subscribeMultiplayerChatMessages} from './multiplayer-chat-channel.js';
 
 let installed=null;
 
@@ -12,13 +13,14 @@ function applyableIndices(suggestions){const result=[];for(let i=0;i<suggestions
 function appendChatMessage(message,type='system'){
   if(!documentReady())return null;const log=document.querySelector('#chat-log');if(!log)return null;const line=document.createElement('div');line.className=`chat-line ${type}`;line.textContent=String(message);log.append(line);while(log.children.length>8)log.firstChild.remove();line._timer=setTimeout(()=>line.classList.add('faded'),9000);return line;
 }
+function playerLabel(session){const value=String(session||'');const suffix=value.replace(/^s:/,'').slice(-6)||'unknown';return `玩家-${suffix}`;}
 function restoreGameplayPointerLock(){
   if(!documentReady()||typeof document.querySelector!=='function')return;const fine=typeof matchMedia!=='function'||matchMedia('(pointer: fine)').matches;if(!fine)return;const canvas=document.querySelector('#game-canvas');if(canvas&&typeof canvas.requestPointerLock==='function')try{const result=canvas.requestPointerLock();result?.catch?.(()=>{});}catch{}
 }
 
 export class ChatCommandCompletion{
   constructor({input=document.querySelector('#chat-input'),wrap=document.querySelector('#chat-input-wrap')}={}){
-    this.input=input;this.wrap=wrap;this.panel=null;this.suggestions=[];this.activeIndex=-1;this.bound=false;this.releaseCommandResults=null;
+    this.input=input;this.wrap=wrap;this.panel=null;this.suggestions=[];this.activeIndex=-1;this.bound=false;this.releaseCommandResults=null;this.releaseChatMessages=null;
     if(input&&wrap)this.bind();
   }
 
@@ -28,6 +30,7 @@ export class ChatCommandCompletion{
     this.onInput=()=>this.refresh(true);this.onFocus=()=>this.refresh(true);this.onBlur=()=>this.hide();
     this.onKeyDown=e=>this.handleKeyDown(e);
     this.releaseCommandResults=subscribeMultiplayerCommandResults(result=>appendChatMessage(result.message,result.ok?'system':'error'));
+    this.releaseChatMessages=subscribeMultiplayerChatMessages(message=>appendChatMessage(`<${playerLabel(message.sender)}> ${message.text}`,'chat'));
     this.input.addEventListener('input',this.onInput);this.input.addEventListener('focus',this.onFocus);this.input.addEventListener('blur',this.onBlur);this.input.addEventListener('keydown',this.onKeyDown,{capture:true});
     this.panel.addEventListener('pointerdown',e=>{const row=e.target.closest('[data-command-suggestion-index]');if(!row)return;e.preventDefault();const index=Number(row.dataset.commandSuggestionIndex);this.apply(index);});
     return this;
@@ -58,15 +61,22 @@ export class ChatCommandCompletion{
     const suggestion=this.suggestions[index];if(!suggestion||typeof suggestion.replacement!=='string'||!this.input)return false;
     this.input.value=suggestion.replacement;this.input.dispatchEvent(new Event('input',{bubbles:true}));this.input.focus();this.input.setSelectionRange(this.input.value.length,this.input.value.length);return true;
   }
+  finishMultiplayerSubmit(){this.input.value='';this.wrap.classList.add('hidden');this.input.blur();this.hide();restoreGameplayPointerLock();}
   submitMultiplayerCommand(e){
     const value=this.input?.value?.trim()||'';if(!value.startsWith('/')||!hasMultiplayerCommandSender())return false;
-    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation?.();this.input.value='';this.wrap.classList.add('hidden');this.input.blur();this.hide();
+    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation?.();this.finishMultiplayerSubmit();
     try{sendMultiplayerCommand(value);}catch(error){appendChatMessage(`指令发送失败：${error?.message||error}`,'error');}
-    restoreGameplayPointerLock();return true;
+    return true;
+  }
+  submitMultiplayerChat(e){
+    const value=this.input?.value?.trim()||'';if(!value||value.startsWith('/')||!hasMultiplayerChatSender())return false;
+    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation?.();this.finishMultiplayerSubmit();
+    try{sendMultiplayerChat(value);}catch(error){appendChatMessage(`聊天发送失败：${error?.message||error}`,'error');}
+    return true;
   }
   handleKeyDown(e){
     if(!this.chatOpen())return;
-    if(e.key==='Enter'&&this.submitMultiplayerCommand(e))return;
+    if(e.key==='Enter'){if(this.submitMultiplayerCommand(e))return;if(this.submitMultiplayerChat(e))return;}
     if(e.key==='Tab'){
       e.preventDefault();e.stopPropagation();
       if(!this.suggestions.length)this.refresh(true);
@@ -79,7 +89,7 @@ export class ChatCommandCompletion{
     }
   }
   dispose(){
-    if(!this.bound)return false;this.bound=false;this.releaseCommandResults?.();this.releaseCommandResults=null;this.input?.removeEventListener('input',this.onInput);this.input?.removeEventListener('focus',this.onFocus);this.input?.removeEventListener('blur',this.onBlur);this.input?.removeEventListener('keydown',this.onKeyDown,{capture:true});this.panel?.remove();this.panel=null;this.suggestions=[];this.activeIndex=-1;if(installed===this)installed=null;return true;
+    if(!this.bound)return false;this.bound=false;this.releaseCommandResults?.();this.releaseCommandResults=null;this.releaseChatMessages?.();this.releaseChatMessages=null;this.input?.removeEventListener('input',this.onInput);this.input?.removeEventListener('focus',this.onFocus);this.input?.removeEventListener('blur',this.onBlur);this.input?.removeEventListener('keydown',this.onKeyDown,{capture:true});this.panel?.remove();this.panel=null;this.suggestions=[];this.activeIndex=-1;if(installed===this)installed=null;return true;
   }
 }
 
