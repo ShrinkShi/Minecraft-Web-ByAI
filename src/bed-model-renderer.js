@@ -4,6 +4,7 @@ import {BED_TEXTURE_SIZE,bedHalfSpec,minecraftCuboidUvRects} from './bed-model-s
 
 const PIXEL=1/16;
 const FACE_ORDER=['right','left','top','bottom','front','back'];
+const BED_TEXTURE_ASSET_KEY='entity.bed.red';
 
 function addFace(positions,uvs,indices,vertices,rect){
   const base=positions.length/3,[tw,th]=BED_TEXTURE_SIZE,[u0,v0,u1,v1]=rect;
@@ -33,7 +34,8 @@ function cuboidGeometry(spec){
 
 export class BedModelRenderer{
   constructor(){
-    this.texture=new THREE.TextureLoader().load(requireAssetUrl('entity.bed.red'));
+    this.texture=new THREE.TextureLoader().load(requireAssetUrl(BED_TEXTURE_ASSET_KEY));
+    this.texture.name=BED_TEXTURE_ASSET_KEY;this.texture.userData.assetKey=BED_TEXTURE_ASSET_KEY;
     this.texture.magFilter=THREE.NearestFilter;this.texture.minFilter=THREE.NearestFilter;this.texture.generateMipmaps=false;this.texture.colorSpace=THREE.SRGBColorSpace;
     this.material=new THREE.MeshLambertMaterial({map:this.texture,transparent:true,alphaTest:.01});
     this.geometries=new Set();this.templates=new Map();
@@ -50,7 +52,6 @@ export class BedModelRenderer{
   create(descriptor){
     const template=this.templates.get(descriptor?.part);if(!template)return null;
     const group=template.clone(true);group.position.set(descriptor.x,descriptor.y,descriptor.z);group.rotation.y=descriptor.rotationY||0;group.userData.bedDescriptor={...descriptor};
-    // Rotate around the block centre rather than the local origin.
     if(group.rotation.y){
       const center=new THREE.Vector3(.5,0,.5),rotated=center.clone().applyAxisAngle(new THREE.Vector3(0,1,0),group.rotation.y);group.position.x+=center.x-rotated.x;group.position.z+=center.z-rotated.z;
     }
