@@ -27,7 +27,10 @@ WIDGETS = "assets/minecraft/textures/gui/widgets.png"
 INVENTORY = "assets/minecraft/textures/gui/container/inventory.png"
 
 GUI_SPRITES = {
+    "crosshair.png": (ICONS, (0, 0, 15, 15)),
     "hud-icons.png": (ICONS, (16, 0, 70, 36)),
+    "xp-background.png": (ICONS, (0, 64, 182, 69)),
+    "xp-progress.png": (ICONS, (0, 69, 182, 74)),
     "hotbar-left-cap.png": (WIDGETS, (0, 0, 1, 22)),
     **{
         f"hotbar-slot-{index}.png": (WIDGETS, (1 + index * 20, 0, 21 + index * 20, 22))
