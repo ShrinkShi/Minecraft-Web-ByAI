@@ -8,6 +8,7 @@ on:
       - 'tools/audit-minecraft-assets.py'
       - 'tools/import-minecraft-assets.py'
       - 'tools/build-minecraft-runtime-assets.py'
+      - 'tools/build-minecraft-gui-assets.py'
       - 'tools/minecraft_model_acceptance.py'
       - 'tools/minecraft_model_closure.py'
       - 'tools/check_minecraft_model_closure.py'
@@ -46,6 +47,8 @@ jobs:
         run: |
           cmp build/minecraft-model-atlas/model-texture-atlas.png assets/model-textures/model-texture-atlas.png
           cmp build/minecraft-model-atlas/model-texture-atlas.json assets/model-textures/model-texture-atlas.json
+      - name: Build deterministic vanilla GUI sprites
+        run: python tools/build-minecraft-gui-assets.py
       - name: Extract deterministic runtime source subset
         run: python tools/import-minecraft-assets.py
       - name: Build browser-ready runtime assets
@@ -55,6 +58,12 @@ jobs:
         with:
           name: minecraft-assets-audit
           path: minecraft-assets-audit.json
+          if-no-files-found: error
+      - name: Upload deterministic vanilla GUI sprites
+        uses: actions/upload-artifact@v4
+        with:
+          name: minecraft-gui-assets
+          path: build/minecraft-gui-assets
           if-no-files-found: error
       - name: Upload selected runtime source subset
         uses: actions/upload-artifact@v4
@@ -68,13 +77,14 @@ jobs:
           name: minecraft-runtime-assets
           path: build/minecraft-runtime-assets
           if-no-files-found: error
+      - name: Verify tracked vanilla GUI sprites match generated output
+        run: diff -qr build/minecraft-gui-assets assets/gui
       - name: Verify tracked runtime assets match generated output
         run: |
           cmp build/minecraft-runtime-assets/textures/atlas.png assets/textures/atlas.png
           for file in build/minecraft-runtime-assets/items/*.png; do
             cmp "$file" "assets/items/$(basename "$file")"
           done
-          diff -qr build/minecraft-runtime-assets/gui assets/gui
           diff -qr build/minecraft-runtime-assets/minecraft assets/minecraft
       - name: Upload deterministic model texture atlas
         uses: actions/upload-artifact@v4
