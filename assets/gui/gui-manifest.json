@@ -40,6 +40,19 @@
     }
   },
   "sprites": {
+    "crosshair.png": {
+      "crop": [
+        0,
+        0,
+        15,
+        15
+      ],
+      "size": [
+        15,
+        15
+      ],
+      "source": "assets/minecraft/textures/gui/icons.png"
+    },
     "hotbar-left-cap.png": {
       "crop": [
         0,
@@ -234,6 +247,32 @@
         18
       ],
       "source": "assets/minecraft/textures/gui/container/inventory.png"
+    },
+    "xp-background.png": {
+      "crop": [
+        0,
+        64,
+        182,
+        69
+      ],
+      "size": [
+        182,
+        5
+      ],
+      "source": "assets/minecraft/textures/gui/icons.png"
+    },
+    "xp-progress.png": {
+      "crop": [
+        0,
+        69,
+        182,
+        74
+      ],
+      "size": [
+        182,
+        5
+      ],
+      "source": "assets/minecraft/textures/gui/icons.png"
     }
   }
 }
