@@ -15,6 +15,7 @@ from zipfile import BadZipFile, ZipFile
 
 from PIL import Image, UnidentifiedImageError
 
+from minecraft_model_acceptance import MINECRAFT_MODEL_ACCEPTANCE_BLOCKS
 from minecraft_model_closure import (
     ClosureError,
     MinecraftArchiveIndex,
@@ -25,17 +26,7 @@ from minecraft_model_closure import (
 
 DEFAULT_ARCHIVE = Path("MC原版素材assets.zip")
 DEFAULT_OUTPUT = Path("build/minecraft-model-atlas")
-DEFAULT_BLOCKS = (
-    "minecraft:iron_ore",
-    "minecraft:glass",
-    "minecraft:oak_slab",
-    "minecraft:oak_stairs",
-    "minecraft:oak_door",
-    "minecraft:oak_fence",
-    "minecraft:torch",
-    "minecraft:grass_block",
-    "minecraft:crafting_table",
-)
+DEFAULT_BLOCKS = MINECRAFT_MODEL_ACCEPTANCE_BLOCKS
 ATLAS_FILE = "model-texture-atlas.png"
 MANIFEST_FILE = "model-texture-atlas.json"
 PACKING_FORMAT = "power-of-two-shelf-v1"
