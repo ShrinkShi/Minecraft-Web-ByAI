@@ -13,6 +13,7 @@ const GUI_FILES=Object.freeze({
   'gui.hotbar_left_cap':'hotbar-left-cap.png',
   'gui.hotbar_right_cap':'hotbar-right-cap.png',
   'gui.hotbar_selector':'hotbar-selector.png',
+  'gui.inventory_panel':'inventory-panel.png',
   'gui.inventory_slot':'inventory-slot.png',
   ...Object.fromEntries(Array.from({length:9},(_,index)=>[`gui.hotbar_slot_${index}`,`hotbar-slot-${index}.png`]))
 });
