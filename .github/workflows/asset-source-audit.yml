@@ -74,6 +74,7 @@ jobs:
           for file in build/minecraft-runtime-assets/items/*.png; do
             cmp "$file" "assets/items/$(basename "$file")"
           done
+          diff -qr build/minecraft-runtime-assets/gui assets/gui
           diff -qr build/minecraft-runtime-assets/minecraft assets/minecraft
       - name: Upload deterministic model texture atlas
         uses: actions/upload-artifact@v4
