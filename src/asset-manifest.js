@@ -9,7 +9,10 @@ export const ASSET_SOURCE=Object.freeze({
 const supplied=(kind,url,extra={})=>Object.freeze({kind,source:ASSET_SOURCE.USER_SUPPLIED,url,...extra});
 
 const GUI_FILES=Object.freeze({
+  'gui.crosshair':'crosshair.png',
   'gui.hud_icons':'hud-icons.png',
+  'gui.xp_background':'xp-background.png',
+  'gui.xp_progress':'xp-progress.png',
   'gui.hotbar_left_cap':'hotbar-left-cap.png',
   'gui.hotbar_right_cap':'hotbar-right-cap.png',
   'gui.hotbar_selector':'hotbar-selector.png',
