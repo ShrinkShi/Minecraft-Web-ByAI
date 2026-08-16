@@ -25,6 +25,28 @@ test('imported Minecraft runtime assets resolve and decode through the real HTTP
   expect(atlasResponse.headers()['content-type']).toContain('image/png');
   expect(await decodedImage(page,'/assets/textures/atlas.png')).toEqual({width:64,height:64,complete:true});
 
+  const modelManifestResponse=await request.get('/assets/model-textures/model-texture-atlas.json');
+  expect(modelManifestResponse.ok()).toBeTruthy();
+  expect(modelManifestResponse.headers()['content-type']).toContain('application/json');
+  const modelManifest=await modelManifestResponse.json();
+  expect(modelManifest.format).toBe(1);
+  expect(modelManifest.minecraftVersion).toBe('1.20.1');
+  expect(modelManifest.sourceArchiveSha256).toBe('b65a2211175af90664de9f41ea422f4869eee855f0da4bf6fe0715434ebe9c69');
+  expect(modelManifest.atlas).toMatchObject({
+    path:'model-texture-atlas.png',
+    width:128,
+    height:128,
+    gutterPx:1,
+    sha256:'865966f994cf36e1ae0f11fe2c3dd0d5962ab9290c92429eeacb0fcd2bed6ad9'
+  });
+  expect(Object.keys(modelManifest.textures)).toHaveLength(14);
+  expect(modelManifest.textures['minecraft:block/glass']).toBeTruthy();
+
+  const modelAtlasResponse=await request.get('/assets/model-textures/model-texture-atlas.png');
+  expect(modelAtlasResponse.ok()).toBeTruthy();
+  expect(modelAtlasResponse.headers()['content-type']).toContain('image/png');
+  expect(await decodedImage(page,'/assets/model-textures/model-texture-atlas.png')).toEqual({width:128,height:128,complete:true});
+
   for(const path of[
     '/assets/items/wooden_pickaxe.png',
     '/assets/items/leather_chestplate.png',

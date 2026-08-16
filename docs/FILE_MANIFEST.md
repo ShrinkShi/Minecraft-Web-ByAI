@@ -33,29 +33,40 @@
 | 路径 | 职责 | 约束 |
 |---|---|---|
 | `src/blocks.js` | 当前 block IDs/metadata/render classification/face tiles | gameplay registry 仍很小；下一阶段应由更通用 registry/model pipeline 扩张 |
-| `src/world.js` | browser chunk streaming、worker requests、edit overlay、mesh install/dispose、queries | chunk lifecycle 是 opaque/water/special visuals 的唯一 owner |
+| `src/world.js` | browser chunk streaming、worker requests、edit overlay、mesh install/dispose、queries | chunk lifecycle 是 opaque/water/special/model visuals 的 owner；GPU resource 必须显式 dispose |
 | `src/terrain-generator.js` | browser/server 共用 deterministic terrain generation | worldgen 升级时必须保持 shared deterministic source |
 | `src/world-worker.js` | terrain Worker adapter | 只包装纯 generator，不复制算法 |
-| `src/mesh-worker.js` | chunk visible-face meshing + water + special descriptors | full-cube fast path 必须保留；不得退化为一 block 一 Mesh |
+| `src/mesh-worker.js` | 当前 chunk visible-face meshing + water + special descriptors | legacy full-cube fast path 必须保留；generic model 接入不得退化为一 block 一 Mesh |
+| `src/minecraft-model-mesh-batch.js` | interpreted model face → chunk-level `opaque/cutout/translucent` TypedArray batches | texture/layer/tint/cull 通过纯 callback 注入；Worker 可 transferable；禁止 per-block material/Mesh |
 | `src/bed-rules.js` | bed facing/foot/head/partner/anchor metadata | gameplay state 与 visual geometry 分离 |
 | `src/bed-model-specs.js` | bed cuboid/UV/facing pure spec | Node-testable，不依赖 Three.js |
 | `src/bed-model-renderer.js` | texture-backed red-bed Three.js adapter/cache | 跟随 chunk/world lifecycle dispose |
 | `src/weather-rules.js` | rain/thunder pure profiles | 不操作 Three.js/DOM |
 | `src/weather-system.js` | pooled precipitation renderer | 固定容量/显式 resource disposal |
 
-## Minecraft asset pipeline
+## Minecraft resource / model / asset pipeline
 
 | 路径 | 职责 | 约束 |
 |---|---|---|
 | `MC原版素材assets.zip` | 用户提供的 Minecraft Java 1.20.1 client resource tree | source archive；存在资源不代表 runtime gameplay 已支持 |
-| `src/asset-manifest.js` | logical runtime asset key → source-backed runtime URL | 不允许 missing key 静默伪造“原版资源” |
-| `assets/minecraft/runtime-manifest.json` | imported runtime subset/provenance metadata | generated/import pipeline authority |
-| `scripts/audit-minecraft-assets.py` | source ZIP deterministic inventory/audit | source hash/layout/probes 必须稳定 |
-| `scripts/import-minecraft-assets.py` | selective resource extraction | 只导入明确 runtime subset |
-| `scripts/build-minecraft-runtime.py` | derived runtime assets/atlas build | 输出需可重建、checksum 可比 |
-| `.github/workflows/asset-source-audit.yml` | read-only asset reproducibility gate | final workflow 不得 self-push |
+| `src/asset-manifest.js` | logical runtime asset key → tracked source-backed runtime URL | 不允许 missing key 静默伪造“原版资源”；legacy terrain atlas 与 generic model atlas 是独立资源契约 |
+| `src/minecraft-resource-id.js` | Minecraft namespace/resource path 规范化与 browser asset path helpers | traversal/非法 segment fail-closed；model/blockstate/texture 层共用 |
+| `src/minecraft-model-resolver.js` | parent inheritance、texture variables、elements/faces 的纯 model 语义解析 | Node/browser-neutral；loadModel 注入；不操作 Three.js/DOM/Worker |
+| `src/minecraft-blockstate-resolver.js` | variants/weights/x-y/uvlock/multipart 条件解析与确定性选择 | caller 提供 deterministic selection；不调用 `Math.random()` |
+| `src/minecraft-model-geometry.js` | normalized elements → renderer-neutral cuboid faces/UV/normals/bounds | element rotation/rescale 在此处理；atlas 和 Three.js 不进入该层 |
+| `src/minecraft-model-instance.js` | blockstate model-instance x/y transform、cullface rotation、UV/uvlock | element rotation 与 model-instance rotation 分离 |
+| `src/minecraft-model-texture-binding.js` | tracked model-atlas manifest strict validator/resolver + #100 textureBinding adapter | 校验 canonical path/provenance/pixel↔UV/packing；render layer policy 由 caller 注入 |
+| `assets/minecraft/runtime-manifest.json` | 现有 selective runtime subset/provenance metadata | 与 generated model atlas contract 分离 |
+| `assets/model-textures/model-texture-atlas.png` | interpreted model 第一批 acceptance texture atlas | 128×128/1px gutter；由 source closure 确定性重建 |
+| `assets/model-textures/model-texture-atlas.json` | model texture ID → pixel/normalized region + provenance | runtime resolver 的数据输入；不承担 block render-layer policy |
+| `tools/audit-minecraft-assets.py` | source ZIP deterministic inventory/audit | source hash/layout/probes 必须稳定 |
+| `tools/import-minecraft-assets.py` | selective legacy runtime resource extraction | 只导入明确 runtime subset；不等于 model dependency closure |
+| `tools/build-minecraft-runtime-assets.py` | legacy browser-ready runtime assets build | 输出需可重建、checksum 可比 |
+| `tools/minecraft_model_closure.py` | blockstate → model parents → textures/metadata dependency closure | unsafe/ambiguous/missing/cyclic resource fail-closed；输出 provenance |
+| `tools/minecraft_model_atlas.py` | dependency closure → deterministic model texture atlas + manifest | 生成物必须与 tracked PNG/JSON 逐字节一致；当前 animated/non-square texture fail-closed |
+| `.github/workflows/asset-source-audit.yml` | read-only source/resource/atlas reproducibility gate | `contents: read`；不得 self-push；legacy runtime subset 与 model atlas 分别校验 |
 
-下一阶段将新增 generic Minecraft resource/model modules。要求：resource resolution/model parsing/blockstate matching 必须先是 Node/browser-neutral pure modules，再接 Worker/Three.js。
+当前 generic model 纯语义链已经到达 `blockstate/model → geometry → instance transform → chunk batching → tracked atlas binding`。下一步才允许把**预解析/缓存后的** model template 接入 Worker/VoxelWorld；chunk rebuild 热路径不得递归加载/解释 parent JSON。
 
 ## Inventory / items / crafting / progression
 
@@ -148,7 +159,7 @@
 | `.github/workflows/quality.yml` | Node syntax/logic + 2-way Chromium shard quality gate |
 | `docs/TESTING.md` | validation rules/exact-head policy |
 
-PR #94 baseline：131 logic/worker regression scripts + Chromium 1/2 + 2/2 均通过。
+测试数量只作为某个 exact HEAD 的交付证据，不作为长期固定常量；新增 `check-*.mjs` 会由 runner 自动发现。
 
 ## Documentation authority
 

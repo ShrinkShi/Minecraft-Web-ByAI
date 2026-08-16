@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-> 2026-08-16 documentation baseline: the previous `Unreleased` section had become a mixture of early-v0.4 snapshots and obsolete “future work” statements. This section now records the actual accumulated `main` state through PR #94. Detailed per-PR chronology remains available in Git history/Pull Requests; current roadmap truth lives in `docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md`.
+> 2026-08-16 documentation baseline: this section records the accumulated v0.4 state through the generic Minecraft model/resource pipeline. Detailed per-PR chronology remains available in Git history/Pull Requests; current roadmap truth lives in `docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md` and active implementation state in `docs/PROGRESS.md`.
 
 ### Project baseline / documentation
 
@@ -10,6 +10,7 @@
 - 建立 `docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md`，以 `DONE / PARTIAL / FOUNDATION / TODO / BLOCKED` 维护完整 Minecraft Java 1.20.1 parity roadmap；严格完整复刻规划完成度基线约 35%。
 - README、PROGRESS、ARCHITECTURE、TESTING、FILE_MANIFEST 重新对齐当前代码，不再把历史 PR 的 out-of-scope 自动当作今天的 TODO。
 - `docs/PROGRESS.md` 改为 active dashboard；以后所有改变 Minecraft parity 的 PR 必须同步 feature matrix。
+- generic Minecraft model pipeline 进入架构责任清单，明确 pure resolver/compiler、deterministic assets、Worker batching 与 Three.js runtime 的分层边界。
 
 ### Client / runtime / platform
 
@@ -29,6 +30,8 @@
 - 加入 pooled rain/thunder precipitation renderer；当前仍没有自动天气周期、雪、闪电实体/伤害或完整水体传播。
 - 修复工作台 cardinal face texture mapping。
 - 两格红床不再使用红 tint full-cube visual：PR #94 将床标记为 special/non-full-cube render，mesh Worker 输出 special descriptors，`BedModelRenderer` 使用导入的 Java 1.20.1 `entity/bed/red.png` 构建 partial red-bed visual，并绑定 chunk remesh/unload 生命周期。
+- PR #96–#100 建立 renderer-neutral Minecraft block model 解释/编译链：resource IDs、parent/texture inheritance、blockstate variants/multipart、cuboid geometry、element/model rotation、`uvlock`、cull/tint 以及 chunk-level `opaque/cutout/translucent` TypedArray batching。
+- generic model batching明确保持 chunk-level shared buffers/material contract，不允许退化为“一 block 一 Three.js Mesh”。
 
 ### Survival / Inventory / crafting
 
@@ -87,19 +90,23 @@ v0.4 已从协议前置发展为真实 Node authoritative server/runtime：
 - terrain atlas 迁移为 Minecraft 1.20.1 original texture subset；当前没有 runtime biome tint，因此 grass/foliage/water compatibility 使用明确记录的 default/Plains tint 处理。
 - 导入 current item textures、iron-ore/white-wool atlas tiles、red-bed entity texture、八种 current mob texture sheets。
 - red bed inventory icon 仍是明确的程序化临时 SVG：source archive 没有 standalone `textures/item/red_bed.png`，不能把不存在的资源伪装成已导入原版 item icon。
+- PR #101 建立 deterministic blockstate/model parent/texture dependency closure；unsafe/ambiguous/missing/cyclic source dependency fail-closed，并为每个文件保留 SHA-256/provenance。
+- PR #102 从第一批 9 个 acceptance block roots 自动得到 9 blockstates / 42 models / 14 textures / 0 metadata 的 65-file closure，生成并跟踪独立 128×128 model texture atlas 与 manifest；CI 从 source ZIP 重建并逐字节比较 tracked PNG/JSON，workflow 保持 `contents: read`。
+- model atlas 与 legacy 4×4 terrain atlas 保持独立，避免 generic model expansion 改写既有 tile-ID fast-path contract。
+- PR #103 增加 strict model-atlas runtime resolver/binding：校验 canonical resource path、source provenance、SHA metadata、pixel region↔normalized UV、closure texture count、power-of-two/gutter/packing contract，并直接适配 #100 chunk batcher 的 texture-binding callback；render-layer policy 仍由 caller 注入。
 
 ### Engineering quality
 
 - `npm run test:logic` 已改为 `scripts/run-logic-checks.mjs` 自动发现回归，不再维护容易漂移的手工串联列表。
 - `Repository quality`：Node 22 syntax + logic/server/Worker regressions，再运行两个 Chromium shards；同 ref 新 push 会取消旧 run。
-- PR #94 delivery head 的 static gate 记录为 131 logic/worker regression scripts，Chromium 1/2 与 2/2 均成功。
 - Minecraft assets 另有 read-only deterministic source audit；最终 workflow 不保留 self-push 权限。
 - browser failures 保留 Playwright trace/screenshot/report artifacts。
+- logic regression 数量不再作为长期固定常量；每个 delivery PR 只记录 exact HEAD 当时自动发现并通过的实际数量。
 
 ### Current major limitations
 
 - Minecraft content breadth 仍是主要缺口：当前正式 gameplay block families 约 11 类、runtime item IDs 约 28、recipes 5。
-- 尚无 generic Minecraft JSON blockstate/model interpreter；大量已跟踪 1.20.1 models/blockstates 尚不能批量进入 gameplay。
+- generic blockstate/model **纯语义与 atlas/batching 基础已经存在**，但尚未把预解析 model templates 正式接入 `mesh-worker.js` / `VoxelWorld`，因此大量原版 blocks 还没有进入 gameplay registry/worldgen。
 - worldgen 仍是 16×16×64 deterministic fBm heightmap + basic surface/sea/oak tree，不是 vanilla biome/cave/ore/feature/structure pipeline。
 - hunger/saturation、完整 food/farming/smelting/tool progression、enchanting/brewing/status effects 尚未完成。
 - mobs/PvE/projectiles/explosions 仍不是 multiplayer server-authoritative domain。

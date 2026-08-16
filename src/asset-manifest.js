@@ -10,6 +10,7 @@ const supplied=(kind,url,extra={})=>Object.freeze({kind,source:ASSET_SOURCE.USER
 
 const RECORDS=Object.freeze({
   'terrain.block_atlas':supplied('texture-atlas','./assets/textures/atlas.png',{minecraftVersion:'1.20.1'}),
+  'block.model_atlas':supplied('texture-atlas','./assets/model-textures/model-texture-atlas.png',{minecraftVersion:'1.20.1'}),
   'block.iron_ore':supplied('atlas-tile','./assets/textures/atlas.png',{tile:14}),
   'block.white_wool':supplied('atlas-tile','./assets/textures/atlas.png',{tile:15}),
 
@@ -43,7 +44,8 @@ const RECORDS=Object.freeze({
   'entity.skeleton':supplied('entity-texture','./assets/minecraft/textures/entity/skeleton/skeleton.png'),
   'entity.creeper':supplied('entity-texture','./assets/minecraft/textures/entity/creeper/creeper.png'),
   'entity.spider':supplied('entity-texture','./assets/minecraft/textures/entity/spider/spider.png'),
-  'metadata.minecraft_runtime':supplied('asset-metadata','./assets/minecraft/runtime-manifest.json')
+  'metadata.minecraft_runtime':supplied('asset-metadata','./assets/minecraft/runtime-manifest.json'),
+  'metadata.minecraft_model_atlas':supplied('asset-metadata','./assets/model-textures/model-texture-atlas.json',{minecraftVersion:'1.20.1'})
 });
 
 export const ASSET_KEYS=Object.freeze(Object.keys(RECORDS));
