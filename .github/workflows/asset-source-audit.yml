@@ -41,6 +41,10 @@ jobs:
         run: python tools/check_minecraft_model_atlas.py
       - name: Build deterministic model texture atlas
         run: python tools/build-minecraft-model-atlas.py
+      - name: Verify tracked model texture atlas matches generated output
+        run: |
+          cmp build/minecraft-model-atlas/model-texture-atlas.png assets/minecraft/model-texture-atlas.png
+          cmp build/minecraft-model-atlas/model-texture-atlas.json assets/minecraft/model-texture-atlas.json
       - name: Extract deterministic runtime source subset
         run: python tools/import-minecraft-assets.py
       - name: Build browser-ready runtime assets
