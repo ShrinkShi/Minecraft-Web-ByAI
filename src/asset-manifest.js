@@ -41,7 +41,7 @@ const RECORDS=Object.freeze({
   'entity.pig':supplied('entity-texture','./assets/minecraft/textures/entity/pig/pig.png'),
   'entity.chicken':supplied('entity-texture','./assets/minecraft/textures/entity/chicken.png'),
   'entity.zombie':supplied('entity-texture','./assets/minecraft/textures/entity/zombie/zombie.png'),
-  'entity.skeleton':supplied('entity-texture','./assets/minecraft/textures/entity/skeleton.png'),
+  'entity.skeleton':supplied('entity-texture','./assets/minecraft/textures/entity/skeleton/skeleton.png'),
   'entity.creeper':supplied('entity-texture','./assets/minecraft/textures/entity/creeper/creeper.png'),
   'entity.spider':supplied('entity-texture','./assets/minecraft/textures/entity/spider/spider.png'),
   'metadata.minecraft_runtime':supplied('asset-metadata','./assets/minecraft/runtime-manifest.json'),
