@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
+from minecraft_model_acceptance import MINECRAFT_MODEL_ACCEPTANCE_BLOCKS
 from minecraft_model_closure import (
     ClosureError,
     MinecraftArchiveIndex,
@@ -23,17 +24,6 @@ from minecraft_model_closure import (
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE_ARCHIVE = ROOT / "MC原版素材assets.zip"
-ACCEPTANCE_BLOCKS = (
-    "minecraft:iron_ore",
-    "minecraft:glass",
-    "minecraft:oak_slab",
-    "minecraft:oak_stairs",
-    "minecraft:oak_door",
-    "minecraft:oak_fence",
-    "minecraft:torch",
-    "minecraft:grass_block",
-    "minecraft:crafting_table",
-)
 
 
 def write_json(archive: ZipFile, path: str, value: object) -> None:
@@ -134,7 +124,6 @@ def assert_synthetic() -> None:
             assert (output / "assets/minecraft/textures/block/overlay.png").read_bytes() == b"overlay-png"
             assert (output / "assets/minecraft/textures/block/overlay.png.mcmeta").exists()
 
-        # Missing direct texture references fail before an incomplete closure can be emitted.
         missing_path = temp_path / "missing.zip"
         with ZipFile(missing_path, "w", ZIP_DEFLATED) as archive:
             prefix = "assets/minecraft/"
@@ -148,7 +137,6 @@ def assert_synthetic() -> None:
             else:
                 raise AssertionError("missing direct texture did not fail closed")
 
-        # Parent cycles are rejected deterministically.
         cycle_path = temp_path / "cycle.zip"
         with ZipFile(cycle_path, "w", ZIP_DEFLATED) as archive:
             prefix = "assets/minecraft/"
@@ -163,7 +151,6 @@ def assert_synthetic() -> None:
             else:
                 raise AssertionError("model parent cycle did not fail closed")
 
-        # Canonical duplicates under different outer roots are ambiguous by design.
         duplicate_path = temp_path / "duplicate.zip"
         with ZipFile(duplicate_path, "w", ZIP_DEFLATED) as archive:
             archive.writestr("one/assets/minecraft/textures/block/stone.png", b"one")
@@ -182,21 +169,19 @@ def assert_real_source() -> None:
         raise AssertionError(f"tracked source archive is missing: {SOURCE_ARCHIVE}")
     with ZipFile(SOURCE_ARCHIVE) as archive:
         index = MinecraftArchiveIndex(archive)
-        result = resolve_block_model_closure(index, ACCEPTANCE_BLOCKS)
+        result = resolve_block_model_closure(index, MINECRAFT_MODEL_ACCEPTANCE_BLOCKS)
         manifest = manifest_for(index, result, archive_path=SOURCE_ARCHIVE)
 
-        assert result.roots == tuple(sorted(ACCEPTANCE_BLOCKS))
-        assert len(result.blockstates) == len(ACCEPTANCE_BLOCKS)
-        assert len(result.models) > len(ACCEPTANCE_BLOCKS), "stateful acceptance blocks must pull model dependencies"
+        assert result.roots == tuple(sorted(MINECRAFT_MODEL_ACCEPTANCE_BLOCKS))
+        assert len(result.blockstates) == len(MINECRAFT_MODEL_ACCEPTANCE_BLOCKS)
+        assert len(result.models) > len(MINECRAFT_MODEL_ACCEPTANCE_BLOCKS), "stateful acceptance blocks must pull model dependencies"
         assert len(result.textures) >= 8
         assert len(result.files) == manifest["counts"]["files"]
 
-        for block in ACCEPTANCE_BLOCKS:
+        for block in MINECRAFT_MODEL_ACCEPTANCE_BLOCKS:
             name = block.split(":", 1)[1]
             assert f"assets/minecraft/blockstates/{name}.json" in result.blockstates
 
-        # These are known dependency relations from the tracked 1.20.1 source,
-        # but they were not part of the old hand-maintained runtime subset.
         required_closure_files = {
             "assets/minecraft/models/block/cube.json",
             "assets/minecraft/models/block/cube_all.json",
@@ -210,8 +195,6 @@ def assert_real_source() -> None:
         missing = required_closure_files.difference(result.files)
         assert not missing, f"real 1.20.1 closure missed expected resources: {sorted(missing)}"
 
-        # Every emitted file must resolve to one unique source entry and have
-        # checksum/byte provenance in the deterministic manifest.
         for canonical in result.files:
             record = manifest["files"][canonical]
             assert len(record["sha256"]) == 64
