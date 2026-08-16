@@ -17,7 +17,7 @@ test('desktop gameplay hides debug by default and keeps F3/F5 presentation in sy
   await expect(canvas).toHaveAttribute('data-view-mode','0');
   await expect(held).not.toHaveClass(/hidden/);
   await expect(held.locator('.fp-arm')).toHaveCount(1);
-  await expect(held.locator('.fp-item .item-icon,.fp-item .slot-swatch')).toHaveCount(1);
+  await expect(held.locator('.fp-item .item-icon,.fp-item .slot-swatch,.fp-item .block-item-icon')).toHaveCount(1);
 
   await page.keyboard.press('F3');await expect(debug).not.toHaveClass(/hidden/);await expect(debug).toContainText('Minecraft Web By AI');
   await page.keyboard.press('F3');await expect(debug).toHaveClass(/hidden/);
