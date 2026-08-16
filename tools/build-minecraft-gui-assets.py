@@ -22,10 +22,12 @@ from minecraft_model_closure import ClosureError, MinecraftArchiveIndex, sha256_
 DEFAULT_ARCHIVE = Path("MC原版素材assets.zip")
 DEFAULT_OUTPUT = Path("build/minecraft-gui-assets")
 MINECRAFT_VERSION = "1.20.1"
+ICONS = "assets/minecraft/textures/gui/icons.png"
 WIDGETS = "assets/minecraft/textures/gui/widgets.png"
+INVENTORY = "assets/minecraft/textures/gui/container/inventory.png"
 
 GUI_SPRITES = {
-    "hud-icons.png": ("assets/minecraft/textures/gui/icons.png", (16, 0, 70, 36)),
+    "hud-icons.png": (ICONS, (16, 0, 70, 36)),
     "hotbar-left-cap.png": (WIDGETS, (0, 0, 1, 22)),
     **{
         f"hotbar-slot-{index}.png": (WIDGETS, (1 + index * 20, 0, 21 + index * 20, 22))
@@ -33,13 +35,9 @@ GUI_SPRITES = {
     },
     "hotbar-right-cap.png": (WIDGETS, (181, 0, 182, 22)),
     "hotbar-selector.png": (WIDGETS, (0, 22, 24, 46)),
-    "inventory-slot.png": ("assets/minecraft/textures/gui/container/inventory.png", (7, 83, 25, 101)),
+    "inventory-slot.png": (INVENTORY, (7, 83, 25, 101)),
 }
-EXPECTED_SOURCE_SIZE = {
-    "assets/minecraft/textures/gui/icons.png": (256, 256),
-    WIDGETS: (256, 256),
-    "assets/minecraft/textures/gui/container/inventory.png": (256, 256),
-}
+EXPECTED_SOURCE_SIZE = {ICONS: (256, 256), WIDGETS: (256, 256), INVENTORY: (256, 256)}
 
 
 class GuiAssetError(RuntimeError):
@@ -63,7 +61,7 @@ def load_png(index: MinecraftArchiveIndex, canonical: str) -> Image.Image:
 def validate_hotbar_partition(widgets: Image.Image) -> None:
     """Prove that emitted cap/slot crops exactly partition the source 182x22 hotbar.
 
-    Slots are deliberately *not* assumed identical. The tracked 1.20.1 sheet has
+    Slots are deliberately not assumed identical. The tracked 1.20.1 sheet has
     pixel differences between slot regions, so preserving all nine source crops
     is the only byte-faithful contract.
     """
@@ -100,21 +98,13 @@ def build_gui_assets(archive_path: Path, output: Path) -> dict[str, object]:
                 sprites[destination] = {
                     "source": canonical,
                     "crop": list(crop_box),
-                    "width": sprite.width,
-                    "height": sprite.height,
-                    "sha256": sha256_file(target),
+                    "size": [sprite.width, sprite.height],
                 }
 
             sources: dict[str, dict[str, object]] = {}
             for canonical in sorted(EXPECTED_SOURCE_SIZE):
                 record = index.record(canonical)
-                sources[canonical] = {
-                    "source": record.source,
-                    "sha256": record.sha256,
-                    "bytes": record.size,
-                    "width": images[canonical].width,
-                    "height": images[canonical].height,
-                }
+                sources[canonical] = {"sha256": record.sha256, "bytes": record.size}
     except (FileNotFoundError, BadZipFile, ClosureError) as exc:
         raise GuiAssetError(f"cannot build Minecraft GUI assets: {exc}") from exc
 
