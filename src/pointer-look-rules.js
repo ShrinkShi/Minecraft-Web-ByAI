@@ -12,8 +12,8 @@ export function pointerLookIntent(movementX,movementY,{sensitivity=POINTER_LOOK_
   if(limit<=0)throw new RangeError('maxEventDelta must be > 0');
   const safeX=Math.max(-limit,Math.min(limit,x)),safeY=Math.max(-limit,Math.min(limit,y));
   return Object.freeze({
-    yawDelta:-safeX*scale,
-    pitchDelta:-safeY*scale,
+    yawDelta:safeX===0?0:-safeX*scale,
+    pitchDelta:safeY===0?0:-safeY*scale,
     clamped:safeX!==x||safeY!==y
   });
 }
