@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Extract the runtime subset used by Minecraft-Web-ByAI from the source ZIP.
+"""Extract the browser runtime subset from the tracked Minecraft source ZIP.
 
-The source archive may have an arbitrary top-level folder. Files are therefore
-resolved by unique Minecraft resource suffix rather than by trusting that root.
-The output tree is deterministic and includes a checksum manifest so generated
-runtime files remain traceable to the exact user-supplied archive.
+Legacy gameplay resources remain an explicit selective list. Generic block-model
+JSON is different: its blockstate/model parent closure is derived by the shared
+minecraft_model_closure resolver so the runtime cannot drift from the dependency
+set already proven by the atlas/source audits.
 """
 
 from __future__ import annotations
@@ -12,15 +12,20 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 from pathlib import Path, PurePosixPath
 from zipfile import BadZipFile, ZipFile
 
+from minecraft_model_acceptance import MINECRAFT_MODEL_ACCEPTANCE_BLOCKS
+from minecraft_model_closure import ClosureError, MinecraftArchiveIndex, resolve_block_model_closure
+
 DEFAULT_ARCHIVE = "MC原版素材assets.zip"
 DEFAULT_OUTPUT = "build/minecraft-runtime-source"
+MODEL_CANONICAL_PREFIX = "assets/minecraft/"
 
 # Destination relative to output -> canonical suffix inside a Minecraft client
-# resource tree. Keep this list limited to gameplay already present in the repo
-# plus the next explicitly declared missing resources.
+# resource tree. Generic blockstates/models are intentionally NOT hand-listed;
+# they are appended from the deterministic model dependency closure below.
 RUNTIME_FILES = {
     # Core world textures / atlas inputs.
     "textures/block/grass_block_top.png": "assets/minecraft/textures/block/grass_block_top.png",
@@ -80,13 +85,9 @@ RUNTIME_FILES = {
     # a standalone textures/item/red_bed.png resource.
     "textures/entity/bed/red.png": "assets/minecraft/textures/entity/bed/red.png",
 
-    # JSON resources needed for later model/blockstate interpretation.
-    "models/block/grass_block.json": "assets/minecraft/models/block/grass_block.json",
-    "models/block/crafting_table.json": "assets/minecraft/models/block/crafting_table.json",
+    # Item JSON is still an explicit current-runtime subset.
     "models/item/stick.json": "assets/minecraft/models/item/stick.json",
     "models/item/wooden_pickaxe.json": "assets/minecraft/models/item/wooden_pickaxe.json",
-    "blockstates/grass_block.json": "assets/minecraft/blockstates/grass_block.json",
-    "blockstates/crafting_table.json": "assets/minecraft/blockstates/crafting_table.json",
 }
 
 
@@ -121,6 +122,28 @@ def resolve_unique(names: list[str], suffix: str) -> str:
     return matches[0]
 
 
+def runtime_model_destination(canonical: str) -> str:
+    if not canonical.startswith(MODEL_CANONICAL_PREFIX):
+        raise ClosureError(f"runtime model resource is outside minecraft namespace: {canonical}")
+    relative = canonical[len(MODEL_CANONICAL_PREFIX) :]
+    if not (relative.startswith("blockstates/") or relative.startswith("models/block/")):
+        raise ClosureError(f"unexpected runtime model resource path: {canonical}")
+    return relative
+
+
+def write_record(output: Path, records: dict[str, dict[str, object]], destination: str, source: str, payload: bytes) -> None:
+    if destination in records:
+        raise ClosureError(f"duplicate runtime destination: {destination}")
+    target = output / destination
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(payload)
+    records[destination] = {
+        "source": source,
+        "sha256": sha256_bytes(payload),
+        "bytes": len(payload),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("archive", nargs="?", default=DEFAULT_ARCHIVE)
@@ -128,6 +151,8 @@ def main() -> int:
     args = parser.parse_args()
 
     output = Path(args.output)
+    if output.exists():
+        shutil.rmtree(output)
     output.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -135,24 +160,27 @@ def main() -> int:
             names = [normalize_name(info.filename) for info in archive.infolist() if not info.is_dir()]
             unsafe = [name for name in names if not safe_name(name)]
             if unsafe:
-                raise SystemExit(f"asset archive contains unsafe paths: {unsafe[:5]}")
+                raise ClosureError(f"asset archive contains unsafe paths: {unsafe[:5]}")
 
-            records = {}
+            records: dict[str, dict[str, object]] = {}
             for destination, suffix in sorted(RUNTIME_FILES.items()):
                 source = resolve_unique(names, suffix)
-                payload = archive.read(source)
-                target = output / destination
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(payload)
-                records[destination] = {
-                    "source": source,
-                    "sha256": sha256_bytes(payload),
-                    "bytes": len(payload),
-                }
+                write_record(output, records, destination, source, archive.read(source))
+
+            index = MinecraftArchiveIndex(archive)
+            closure = resolve_block_model_closure(index, MINECRAFT_MODEL_ACCEPTANCE_BLOCKS)
+            blockstates: list[str] = []
+            models: list[str] = []
+            for canonical in (*closure.blockstates, *closure.models):
+                destination = runtime_model_destination(canonical)
+                record = index.record(canonical)
+                write_record(output, records, destination, record.source, index.read(canonical))
+                (blockstates if canonical in closure.blockstates else models).append(destination)
     except (FileNotFoundError, BadZipFile) as exc:
         raise SystemExit(f"asset import failed: {exc}") from exc
-    except KeyError as exc:
-        raise SystemExit(f"asset import failed: {exc.args[0]}") from exc
+    except (KeyError, ClosureError) as exc:
+        message = exc.args[0] if isinstance(exc, KeyError) else str(exc)
+        raise SystemExit(f"asset import failed: {message}") from exc
 
     manifest = {
         "format": 1,
@@ -160,11 +188,21 @@ def main() -> int:
         "sourceArchive": args.archive,
         "sourceArchiveSha256": sha256_file(args.archive),
         "files": records,
+        "modelRuntimeClosure": {
+            "roots": list(closure.roots),
+            "counts": {
+                "blockstates": len(blockstates),
+                "models": len(models),
+            },
+            "blockstates": blockstates,
+            "models": models,
+        },
     }
     manifest_path = output / "source-manifest.json"
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"imported {len(records)} Minecraft resources into {output}")
     print(f"source archive sha256: {manifest['sourceArchiveSha256']}")
+    print(f"model runtime closure: {len(blockstates)} blockstates, {len(models)} models")
     return 0
 
 
