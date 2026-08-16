@@ -23,7 +23,7 @@ function escapeCssUrl(value){return String(value).replaceAll('"','\\"');}
 function styleText(){
   const hotbarSlotRules=HOTBAR_SLOTS.map((url,index)=>`#hotbar>.hotbar-slot:nth-of-type(${index+1}){background-image:url("${escapeCssUrl(url)}")!important}`).join('\n');
   return `
-#crosshair{width:30px!important;height:30px!important;margin:-15px 0 0 -15px!important;border:0!important;background:url("${escapeCssUrl(CROSSHAIR)}") 0 0/30px 30px no-repeat!important;box-shadow:none!important;image-rendering:pixelated!important}
+#crosshair{width:30px!important;height:30px!important;margin:0!important;transform:translate(-50%,-50%)!important;border:0!important;background:url("${escapeCssUrl(CROSSHAIR)}") 0 0/30px 30px no-repeat!important;box-shadow:none!important;image-rendering:pixelated!important}
 #crosshair::before,#crosshair::after{display:none!important;content:none!important}
 .status-stack{left:50%!important;right:auto!important;bottom:8px!important;transform:translateX(-50%)!important;width:364px!important;display:flex!important;flex-direction:column!important;align-items:center!important;gap:0!important;pointer-events:none}
 #armor-row,.status-row{width:364px!important;padding:0!important;margin:0!important;border:0!important;background:none!important;box-shadow:none!important}
@@ -33,7 +33,8 @@ function styleText(){
 #hearts,#hunger{display:flex!important;width:162px!important;height:18px!important;gap:0!important;align-items:center!important;padding:0!important;margin:0!important}
 #hearts{justify-content:flex-start!important}
 #hunger{justify-content:flex-start!important;flex-direction:row-reverse!important}
-#hearts i,#hunger i,#armor-row i{display:block!important;flex:0 0 18px!important;width:18px!important;height:18px!important;margin:0!important;background-image:url("${escapeCssUrl(HUD_ICONS)}")!important;background-repeat:no-repeat!important;background-size:108px 72px!important;image-rendering:pixelated!important;color:transparent!important;text-shadow:none!important;font-size:0!important}
+#hearts i,#hunger i,#armor-row i{display:block!important;position:relative!important;transform:none!important;opacity:1!important;flex:0 0 18px!important;width:18px!important;height:18px!important;margin:0!important;background-color:transparent!important;background-image:url("${escapeCssUrl(HUD_ICONS)}")!important;background-repeat:no-repeat!important;background-size:108px 72px!important;image-rendering:pixelated!important;color:transparent!important;text-shadow:none!important;font-size:0!important}
+#hearts .heart::before,#hearts .heart::after,#hunger .food::before,#hunger .food::after,#armor-row .armor-icon::before,#armor-row .armor-icon::after{display:none!important;content:none!important}
 #hearts i:not(:last-child){margin-right:-2px!important}
 #hunger i:not(:last-child){margin-left:-2px!important}
 #armor-row i:not(:last-child){margin-right:-2px!important}
@@ -64,16 +65,17 @@ ${hotbarSlotRules}
 #inventory .inventory-panel{position:relative!important;width:352px!important;height:332px!important;min-width:352px!important;max-width:352px!important;padding:0!important;margin:0!important;background:url("${escapeCssUrl(INVENTORY_PANEL)}") 0 0/352px 332px no-repeat!important;color:#3f3f3f!important;border:0!important;border-radius:0!important;box-shadow:none!important;image-rendering:pixelated!important;overflow:visible!important}
 #inventory .inventory-title{display:none!important}
 #inventory .inventory-top{display:block!important;position:static!important;width:0!important;height:0!important;margin:0!important;padding:0!important}
-#inventory #equipment-slots{position:absolute!important;left:16px!important;top:16px!important;width:36px!important;height:144px!important;display:grid!important;grid-template-columns:36px!important;grid-template-rows:repeat(4,36px)!important;gap:0!important;margin:0!important;padding:0!important}
+#inventory #equipment-slots{position:absolute!important;left:16px!important;top:16px!important;width:36px!important;height:144px!important;display:grid!important;grid-template-columns:36px!important;grid-template-rows:repeat(4,36px)!important;gap:0!important;margin:0!important;padding:0!important;align-content:start!important}
+#inventory .equipment-slot:empty::before,#inventory .equipment-slot:empty::after{display:none!important;content:none!important}
 #inventory .player-preview{position:absolute!important;left:52px!important;top:16px!important;width:100px!important;height:144px!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;color:transparent!important;font-size:0!important;box-shadow:none!important;pointer-events:none!important}
 #inventory .crafting-area{position:static!important;width:0!important;height:0!important;margin:0!important;padding:0!important;border:0!important;background:none!important}
 #inventory .crafting-area>span,#inventory .crafting-line>b{display:none!important}
 #inventory .crafting-line{display:block!important;position:static!important;width:0!important;height:0!important;margin:0!important;padding:0!important}
 #inventory #craft-grid-2{position:absolute!important;left:196px!important;top:34px!important;width:72px!important;height:72px!important;display:grid!important;grid-template-columns:repeat(2,36px)!important;grid-template-rows:repeat(2,36px)!important;gap:0!important;margin:0!important;padding:0!important}
-#inventory #craft-result-2{position:absolute!important;left:308px!important;top:56px!important;width:36px!important;height:36px!important;margin:0!important;padding:0!important}
+#inventory #craft-result-2{position:absolute!important;left:308px!important;top:56px!important;width:36px!important;height:36px!important;margin:0!important;padding:0!important;display:grid!important;place-items:center!important}
 #inventory #inventory-grid{position:absolute!important;left:16px!important;top:168px!important;width:324px!important;height:108px!important;display:grid!important;grid-template-columns:repeat(9,36px)!important;grid-template-rows:repeat(3,36px)!important;gap:0!important;margin:0!important;padding:0!important}
 #inventory #inventory-hotbar{position:absolute!important;left:16px!important;top:284px!important;width:324px!important;height:36px!important;display:grid!important;grid-template-columns:repeat(9,36px)!important;grid-template-rows:36px!important;gap:0!important;margin:0!important;padding:0!important}
-#inventory .inv-slot{width:36px!important;height:36px!important;min-width:36px!important;padding:2px!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;image-rendering:pixelated!important}
+#inventory .inv-slot{width:36px!important;height:36px!important;min-width:36px!important;aspect-ratio:auto!important;padding:2px!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;image-rendering:pixelated!important}
 #inventory .inv-slot:hover{background:rgba(255,255,255,.22)!important;filter:none!important}
 #workbench .inventory-panel{background:#c6c6c6!important;color:#3f3f3f!important;border:4px solid #000!important;border-top-color:#fff!important;border-left-color:#fff!important;border-right-color:#555!important;border-bottom-color:#555!important;box-shadow:0 0 0 2px #000!important;border-radius:0!important}
 #workbench .inventory-panel h2,#workbench .inventory-panel h3{color:#3f3f3f!important;text-shadow:none!important;font-weight:400!important}
