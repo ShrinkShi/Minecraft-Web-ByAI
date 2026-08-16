@@ -41,73 +41,198 @@
   },
   "sprites": {
     "hotbar-left-cap.png": {
-      "crop": [0, 0, 1, 22],
-      "size": [1, 22],
+      "crop": [
+        0,
+        0,
+        1,
+        22
+      ],
+      "size": [
+        1,
+        22
+      ],
       "source": "assets/minecraft/textures/gui/widgets.png"
     },
     "hotbar-right-cap.png": {
-      "crop": [181, 0, 182, 22],
-      "size": [1, 22],
+      "crop": [
+        181,
+        0,
+        182,
+        22
+      ],
+      "size": [
+        1,
+        22
+      ],
       "source": "assets/minecraft/textures/gui/widgets.png"
     },
     "hotbar-selector.png": {
-      "crop": [0, 22, 24, 46],
-      "size": [24, 24],
+      "crop": [
+        0,
+        22,
+        24,
+        46
+      ],
+      "size": [
+        24,
+        24
+      ],
       "source": "assets/minecraft/textures/gui/widgets.png"
     },
     "hotbar-slot-0.png": {
-      "crop": [1, 0, 21, 22],
-      "size": [20, 22],
+      "crop": [
+        1,
+        0,
+        21,
+        22
+      ],
+      "size": [
+        20,
+        22
+      ],
       "source": "assets/minecraft/textures/gui/widgets.png"
     },
     "hotbar-slot-1.png": {
-      "crop": [21, 0, 41, 22],
-      "size": [20, 22],
+      "crop": [
+        21,
+        0,
+        41,
+        22
+      ],
+      "size": [
+        20,
+        22
+      ],
       "source": "assets/minecraft/textures/gui/widgets.png"
     },
     "hotbar-slot-2.png": {
-      "crop": [41, 0, 61, 22],
-      "size": [20, 22],
+      "crop": [
+        41,
+        0,
+        61,
+        22
+      ],
+      "size": [
+        20,
+        22
+      ],
       "source": "assets/minecraft/textures/gui/widgets.png"
     },
     "hotbar-slot-3.png": {
-      "crop": [61, 0, 81, 22],
-      "size": [20, 22],
+      "crop": [
+        61,
+        0,
+        81,
+        22
+      ],
+      "size": [
+        20,
+        22
+      ],
       "source": "assets/minecraft/textures/gui/widgets.png"
     },
     "hotbar-slot-4.png": {
-      "crop": [81, 0, 101, 22],
-      "size": [20, 22],
+      "crop": [
+        81,
+        0,
+        101,
+        22
+      ],
+      "size": [
+        20,
+        22
+      ],
       "source": "assets/minecraft/textures/gui/widgets.png"
     },
     "hotbar-slot-5.png": {
-      "crop": [101, 0, 121, 22],
-      "size": [20, 22],
+      "crop": [
+        101,
+        0,
+        121,
+        22
+      ],
+      "size": [
+        20,
+        22
+      ],
       "source": "assets/minecraft/textures/gui/widgets.png"
     },
     "hotbar-slot-6.png": {
-      "crop": [121, 0, 141, 22],
-      "size": [20, 22],
+      "crop": [
+        121,
+        0,
+        141,
+        22
+      ],
+      "size": [
+        20,
+        22
+      ],
       "source": "assets/minecraft/textures/gui/widgets.png"
     },
     "hotbar-slot-7.png": {
-      "crop": [141, 0, 161, 22],
-      "size": [20, 22],
+      "crop": [
+        141,
+        0,
+        161,
+        22
+      ],
+      "size": [
+        20,
+        22
+      ],
       "source": "assets/minecraft/textures/gui/widgets.png"
     },
     "hotbar-slot-8.png": {
-      "crop": [161, 0, 181, 22],
-      "size": [20, 22],
+      "crop": [
+        161,
+        0,
+        181,
+        22
+      ],
+      "size": [
+        20,
+        22
+      ],
       "source": "assets/minecraft/textures/gui/widgets.png"
     },
     "hud-icons.png": {
-      "crop": [16, 0, 70, 36],
-      "size": [54, 36],
+      "crop": [
+        16,
+        0,
+        70,
+        36
+      ],
+      "size": [
+        54,
+        36
+      ],
       "source": "assets/minecraft/textures/gui/icons.png"
     },
+    "inventory-panel.png": {
+      "crop": [
+        0,
+        0,
+        176,
+        166
+      ],
+      "size": [
+        176,
+        166
+      ],
+      "source": "assets/minecraft/textures/gui/container/inventory.png"
+    },
     "inventory-slot.png": {
-      "crop": [7, 83, 25, 101],
-      "size": [18, 18],
+      "crop": [
+        7,
+        83,
+        25,
+        101
+      ],
+      "size": [
+        18,
+        18
+      ],
       "source": "assets/minecraft/textures/gui/container/inventory.png"
     }
   }
