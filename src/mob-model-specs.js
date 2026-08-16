@@ -1,3 +1,5 @@
+import {minecraftEntityCuboidUvRects} from './minecraft-entity-cuboid-uv.js';
+
 const box=(name,size,offset,uv,{material='base',inflate=0}={})=>Object.freeze({name,size:Object.freeze(size),offset:Object.freeze(offset),uv:Object.freeze(uv),material,inflate});
 const part=(name,pivot,boxes,{rotation=[0,0,0],walk=null}={})=>Object.freeze({name,pivot:Object.freeze(pivot),rotation:Object.freeze(rotation),walk,boxes:Object.freeze(boxes)});
 const model=(textureSize,heightPixels,materials,parts)=>Object.freeze({textureSize:Object.freeze(textureSize),heightPixels,materials:Object.freeze(materials),parts:Object.freeze(parts)});
@@ -40,7 +42,9 @@ export const MOB_MODEL_SPECS=Object.freeze({
     part('backRightLeg',[-3,6,5],[box('backRightLeg',[4,6,4],[-2,-6,-2],[0,16])],{walk:'leg-left'})
   ]),
   cow:model([64,32],28,{base:'entity.cow'},[
-    part('body',[0,16,2],[box('body',[12,18,10],[-6,-9,-9],[18,4])],{rotation:[Math.PI/2,0,0]}),
+    // The rotated body must meet the 12px-high legs at y=12. The previous
+    // y=16 pivot left a visible floating gap and made the body dominate the head.
+    part('body',[0,13,2],[box('body',[12,18,10],[-6,-9,-9],[18,4])],{rotation:[Math.PI/2,0,0]}),
     part('head',[0,20,-8],[box('head',[8,8,6],[-4,-4,-6],[0,0]),box('muzzle',[8,3,1],[-4,-3,-7],[0,16]),box('leftHorn',[1,3,1],[4,2,-4],[22,0]),box('rightHorn',[1,3,1],[-5,2,-4],[22,0])]),
     part('frontLeftLeg',[4,12,-5],[box('frontLeftLeg',[4,12,4],[-2,-12,-2],[0,16])],{walk:'leg-left'}),
     part('frontRightLeg',[-4,12,-5],[box('frontRightLeg',[4,12,4],[-2,-12,-2],[0,16])],{walk:'leg-right'}),
@@ -75,18 +79,5 @@ export const MOB_MODEL_SPECS=Object.freeze({
 });
 
 export const MOB_MODEL_TYPES=Object.freeze(Object.keys(MOB_MODEL_SPECS));
-
-export function minecraftCubeUvRects(u,v,width,height,depth){
-  const x0=u,x1=u+depth,x2=x1+width,x3=x2+width,x4=x3+depth;
-  const y0=v,y1=v+depth,y2=y1+height;
-  return Object.freeze({
-    left:Object.freeze([x0,y1,x1,y2]),
-    front:Object.freeze([x1,y1,x2,y2]),
-    right:Object.freeze([x2,y1,x3,y2]),
-    back:Object.freeze([x3,y1,x4,y2]),
-    top:Object.freeze([x1,y0,x2,y1]),
-    bottom:Object.freeze([x2,y0,x3,y1])
-  });
-}
-
+export const minecraftCubeUvRects=minecraftEntityCuboidUvRects;
 export function mobModelSpec(type){return MOB_MODEL_SPECS[type]||null;}
