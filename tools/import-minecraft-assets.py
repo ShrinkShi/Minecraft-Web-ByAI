@@ -49,6 +49,11 @@ RUNTIME_FILES = {
     "textures/block/iron_ore.png": "assets/minecraft/textures/block/iron_ore.png",
     "textures/block/white_wool.png": "assets/minecraft/textures/block/white_wool.png",
 
+    # Vanilla 1.20.1 HUD/hotbar/inventory sheets used by the browser UI.
+    "textures/gui/icons.png": "assets/minecraft/textures/gui/icons.png",
+    "textures/gui/widgets.png": "assets/minecraft/textures/gui/widgets.png",
+    "textures/gui/container/inventory.png": "assets/minecraft/textures/gui/container/inventory.png",
+
     # Inventory / hotbar / drops already represented by gameplay definitions.
     "textures/item/stick.png": "assets/minecraft/textures/item/stick.png",
     "textures/item/wooden_pickaxe.png": "assets/minecraft/textures/item/wooden_pickaxe.png",
