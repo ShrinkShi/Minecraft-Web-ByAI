@@ -15,7 +15,8 @@ function addFace(positions,uvs,indices,vertices,rect){
 }
 
 function cuboidGeometry(spec){
-  const [w,h,d]=spec.size,[x,y,z]=spec.offset,x1=x+w,y1=y+h,z1=z+d,rects=minecraftCuboidUvRects(spec.uv[0],spec.uv[1],w,h,d);
+  const [w,h,d]=spec.size,[x,y,z]=spec.offset,x1=x+w,y1=y+h,z1=z+d;
+  const rects={...minecraftCuboidUvRects(spec.uv[0],spec.uv[1],w,h,d),...(spec.faceUv||{})};
   const faces={
     right:[[x1,y,z],[x1,y1,z],[x1,y1,z1],[x1,y,z1]],
     left:[[x,y,z1],[x,y1,z1],[x,y1,z],[x,y,z]],
