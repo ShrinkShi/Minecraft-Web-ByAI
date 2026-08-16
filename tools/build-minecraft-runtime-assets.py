@@ -74,10 +74,11 @@ GUI_SPRITES = {
     # x/y bounds are from the tracked Java 1.20.1 source sheets. The HUD crop
     # retains normal hearts, armor and hunger sprites with their original 9px grid.
     "hud-icons.png": ("textures/gui/icons.png", (16, 0, 70, 36)),
-    # Preserve the 182x22 vanilla hotbar byte-for-byte after cropping, but split
-    # it into two 91px halves so Git/blob staging and HTTP caching remain small.
-    "hotbar-left.png": ("textures/gui/widgets.png", (0, 0, 91, 22)),
-    "hotbar-right.png": ("textures/gui/widgets.png", (91, 0, 182, 22)),
+    # widgets.png hotbar layout is exactly: 1px left cap + nine identical 20x22
+    # slots + 1px right cap. CI/source tests reconstruct it pixel-for-pixel.
+    "hotbar-left-cap.png": ("textures/gui/widgets.png", (0, 0, 1, 22)),
+    "hotbar-slot.png": ("textures/gui/widgets.png", (1, 0, 21, 22)),
+    "hotbar-right-cap.png": ("textures/gui/widgets.png", (181, 0, 182, 22)),
     "hotbar-selector.png": ("textures/gui/widgets.png", (0, 22, 24, 46)),
     # Survival inventory GUI is the upper-left 176x166 region of inventory.png.
     "inventory.png": ("textures/gui/container/inventory.png", (0, 0, 176, 166)),
