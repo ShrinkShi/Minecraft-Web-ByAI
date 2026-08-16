@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Build browser-ready art from the selectively imported Minecraft resources.
+"""Build browser-ready art from selectively imported Minecraft resources.
 
-This stage intentionally keeps simulation/gameplay definitions out of the
-binary import process. It produces a stable 4x4 terrain atlas compatible with
-existing chunk UVs plus file-backed item icons. Vanilla tint-index textures are
-baked with Plains defaults until the runtime grows biome-aware tinting.
+The legacy 4x4 terrain atlas stays byte-compatible. Generic blockstate/model JSON
+is passed through from the deterministic runtime closure so browser loaders can
+resolve model parents without duplicating the dependency graph here.
 """
 
 from __future__ import annotations
@@ -71,12 +70,8 @@ ITEM_FILES = {
 
 PASS_THROUGH = [
     "source-manifest.json",
-    "models/block/grass_block.json",
-    "models/block/crafting_table.json",
     "models/item/stick.json",
     "models/item/wooden_pickaxe.json",
-    "blockstates/grass_block.json",
-    "blockstates/crafting_table.json",
     "textures/entity/bed/red.png",
     "textures/entity/cow/cow.png",
     "textures/entity/sheep/sheep.png",
@@ -90,6 +85,7 @@ PASS_THROUGH = [
     "textures/block/water_still.png.mcmeta",
     "textures/block/water_flow.png.mcmeta",
 ]
+MODEL_REFERENCE_ROOTS = ("models/block", "blockstates")
 
 
 def sha256_file(path: Path) -> str:
@@ -180,9 +176,21 @@ def build_items(source: Path, output: Path) -> dict[str, object]:
     return records
 
 
+def reference_file_list(source: Path) -> list[str]:
+    relatives = set(PASS_THROUGH)
+    for root_name in MODEL_REFERENCE_ROOTS:
+        root = source / root_name
+        if not root.is_dir():
+            raise FileNotFoundError(f"missing runtime model closure directory: {root}")
+        for path in root.rglob("*"):
+            if path.is_file():
+                relatives.add(path.relative_to(source).as_posix())
+    return sorted(relatives)
+
+
 def copy_reference_files(source: Path, output: Path) -> dict[str, str]:
     records = {}
-    for relative in PASS_THROUGH:
+    for relative in reference_file_list(source):
         origin = source / relative
         target = output / "minecraft" / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -201,6 +209,9 @@ def main() -> int:
     if not source_manifest_path.exists():
         raise SystemExit(f"missing selective source manifest: {source_manifest_path}")
     source_manifest = json.loads(source_manifest_path.read_text(encoding="utf-8"))
+    model_runtime_closure = source_manifest.get("modelRuntimeClosure")
+    if not isinstance(model_runtime_closure, dict):
+        raise SystemExit("selective source manifest is missing modelRuntimeClosure")
 
     if args.output.exists():
         shutil.rmtree(args.output)
@@ -214,6 +225,7 @@ def main() -> int:
         "format": 1,
         "minecraftVersion": source_manifest["minecraftVersion"],
         "sourceArchiveSha256": source_manifest["sourceArchiveSha256"],
+        "modelRuntimeClosure": model_runtime_closure,
         "tintProfile": {
             "grass": PLAINS_GRASS,
             "foliage": PLAINS_FOLIAGE,
@@ -229,6 +241,11 @@ def main() -> int:
     manifest_path.write_text(json.dumps(runtime_manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"built terrain atlas + {len(items)} item icons from Minecraft source")
     print(f"runtime atlas sha256: {atlas['sha256']}")
+    print(
+        "runtime model JSON:",
+        f"{model_runtime_closure['counts']['blockstates']} blockstates,",
+        f"{model_runtime_closure['counts']['models']} models",
+    )
     return 0
 
 
