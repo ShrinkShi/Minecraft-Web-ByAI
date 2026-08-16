@@ -31,13 +31,19 @@ assert.deepEqual(manifest.sources,{
   'assets/minecraft/textures/gui/widgets.png':{bytes:15444,sha256:'26a3d4b8a23b75fdb7a0c5e8b7835ce8bdf98873a81695dde9f7010845edfe8b'}
 });
 
+const icons='assets/minecraft/textures/gui/icons.png';
 const widgets='assets/minecraft/textures/gui/widgets.png';
+const inventory='assets/minecraft/textures/gui/container/inventory.png';
 const expected={
+  'crosshair.png':{source:icons,crop:[0,0,15,15],size:[15,15],sha256:'4d1ed9f1ef8d0153ba0be9e91bed64d1879a02102e89215001734f7826ee960a'},
+  'hud-icons.png':{source:icons,crop:[16,0,70,36],size:[54,36],sha256:'040a911feb751ec7babb7aca323d0614516b5bf87952fea449b8d7e611978647'},
+  'xp-background.png':{source:icons,crop:[0,64,182,69],size:[182,5],sha256:'f84dc61e621a0fc8da32b0bd73177938a35a6a88b5551c4737caa5d12c5524c8'},
+  'xp-progress.png':{source:icons,crop:[0,69,182,74],size:[182,5],sha256:'97edbcab1e8e6becb7d1edd9f3a9b21574079aa2cddaba420b2f58c631624535'},
   'hotbar-left-cap.png':{source:widgets,crop:[0,0,1,22],size:[1,22],sha256:'744876fe2a9a5811e1e1423c1943efa03083346badb479747787477a65f86c86'},
   'hotbar-right-cap.png':{source:widgets,crop:[181,0,182,22],size:[1,22],sha256:'744876fe2a9a5811e1e1423c1943efa03083346badb479747787477a65f86c86'},
   'hotbar-selector.png':{source:widgets,crop:[0,22,24,46],size:[24,24],sha256:'bb1dae5e8223e61bf6da7f4db1a257d4f4efbf501a9f7409d73a227561b287c9'},
-  'hud-icons.png':{source:'assets/minecraft/textures/gui/icons.png',crop:[16,0,70,36],size:[54,36],sha256:'040a911feb751ec7babb7aca323d0614516b5bf87952fea449b8d7e611978647'},
-  'inventory-slot.png':{source:'assets/minecraft/textures/gui/container/inventory.png',crop:[7,83,25,101],size:[18,18],sha256:'f657453525d95c6f5c67fdaedb8feb5ed339c6716712ad2cfc9ce33070785beb'}
+  'inventory-panel.png':{source:inventory,crop:[0,0,176,166],size:[176,166],sha256:'67eeab584739a50cc73e1e822ec123a5d968196a40c8431e71b6dd56b06d107e'},
+  'inventory-slot.png':{source:inventory,crop:[7,83,25,101],size:[18,18],sha256:'f657453525d95c6f5c67fdaedb8feb5ed339c6716712ad2cfc9ce33070785beb'}
 };
 const slotHashes=[
   'e168f50b761cf7a154266ba548b65c9d0ac440686306c492e131b9dad9b5f724',
@@ -64,4 +70,4 @@ for(const [name,recordExpected] of Object.entries(expected)){
   assert.equal(sha256(path),recordExpected.sha256,`${name} must equal the staged deterministic GUI artifact bytes`);
 }
 
-console.log('Minecraft Java 1.20.1 split GUI sprites + exact source provenance: PASS');
+console.log('Minecraft Java 1.20.1 HUD/hotbar/inventory GUI sprites + exact source provenance: PASS');
