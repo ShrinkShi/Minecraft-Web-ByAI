@@ -1,4 +1,4 @@
 import {installVanillaUiPresentation} from './vanilla-ui-presentation.js';
+import './main.js';
 
 installVanillaUiPresentation();
-await import('./main.js');
