@@ -3,7 +3,9 @@
 
 The legacy 4x4 terrain atlas stays byte-compatible. Generic blockstate/model JSON
 is passed through from the deterministic runtime closure so browser loaders can
-resolve model parents without duplicating the dependency graph here.
+resolve model parents without duplicating the dependency graph here. Vanilla GUI
+sheets are cropped into compact deterministic runtime sprites so the browser does
+not load unused 256x256 pixels while provenance remains tied to the source ZIP.
 """
 
 from __future__ import annotations
@@ -68,13 +70,20 @@ ITEM_FILES = {
     "string.png": ("string.png", None),
 }
 
+GUI_SPRITES = {
+    # x/y bounds are from the tracked Java 1.20.1 source sheets. The HUD crop
+    # retains normal hearts, armor and hunger sprites with their original 9px grid.
+    "hud-icons.png": ("textures/gui/icons.png", (16, 0, 70, 36)),
+    # First 22px = 182x22 hotbar; y=22..45 retains the 24px selector sprite.
+    "hotbar.png": ("textures/gui/widgets.png", (0, 0, 182, 46)),
+    # Survival inventory GUI is the upper-left 176x166 region of inventory.png.
+    "inventory.png": ("textures/gui/container/inventory.png", (0, 0, 176, 166)),
+}
+
 PASS_THROUGH = [
     "source-manifest.json",
     "models/item/stick.json",
     "models/item/wooden_pickaxe.json",
-    "textures/gui/icons.png",
-    "textures/gui/widgets.png",
-    "textures/gui/container/inventory.png",
     "textures/entity/bed/red.png",
     "textures/entity/cow/cow.png",
     "textures/entity/sheep/sheep.png",
@@ -179,6 +188,30 @@ def build_items(source: Path, output: Path) -> dict[str, object]:
     return records
 
 
+def build_gui(source: Path, output: Path) -> dict[str, object]:
+    records = {}
+    target_dir = output / "gui"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    for destination, (source_name, crop_box) in sorted(GUI_SPRITES.items()):
+        source_path = source / source_name
+        with Image.open(source_path) as image:
+            rgba = image.convert("RGBA")
+            left, top, right, bottom = crop_box
+            if left < 0 or top < 0 or right > rgba.width or bottom > rgba.height or right <= left or bottom <= top:
+                raise ValueError(f"GUI crop {destination} is outside source dimensions {rgba.size}: {crop_box}")
+            sprite = rgba.crop(crop_box)
+        target = target_dir / destination
+        sprite.save(target, format="PNG", compress_level=9, optimize=False)
+        records[destination] = {
+            "source": source_name,
+            "crop": list(crop_box),
+            "width": sprite.width,
+            "height": sprite.height,
+            "sha256": sha256_file(target),
+        }
+    return records
+
+
 def reference_file_list(source: Path) -> list[str]:
     relatives = set(PASS_THROUGH)
     for root_name in MODEL_REFERENCE_ROOTS:
@@ -222,6 +255,7 @@ def main() -> int:
 
     atlas = build_atlas(args.source, args.output)
     items = build_items(args.source, args.output)
+    gui = build_gui(args.source, args.output)
     reference_files = copy_reference_files(args.source, args.output)
 
     runtime_manifest = {
@@ -237,12 +271,13 @@ def main() -> int:
         },
         "atlas": atlas,
         "items": items,
+        "gui": gui,
         "referenceFiles": reference_files,
     }
     manifest_path = args.output / "minecraft/runtime-manifest.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(runtime_manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"built terrain atlas + {len(items)} item icons from Minecraft source")
+    print(f"built terrain atlas + {len(items)} item icons + {len(gui)} GUI sprites from Minecraft source")
     print(f"runtime atlas sha256: {atlas['sha256']}")
     print(
         "runtime model JSON:",
