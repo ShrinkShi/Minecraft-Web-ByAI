@@ -1,19 +1,21 @@
 import {bedBlockMeta} from './bed-rules.js';
+import {minecraftEntityCuboidUvRects} from './minecraft-entity-cuboid-uv.js';
 
 export const BED_TEXTURE_SIZE=Object.freeze([64,64]);
 export const BED_MODEL_HEIGHT=9/16;
 
-const cuboid=(name,size,offset,uv)=>Object.freeze({name,size:Object.freeze(size),offset:Object.freeze(offset),uv:Object.freeze(uv)});
+const freezeFaceUv=faceUv=>Object.freeze(Object.fromEntries(Object.entries(faceUv||{}).map(([face,rect])=>[face,Object.freeze([...rect])])));
+const cuboid=(name,size,offset,uv,{faceUv={}}={})=>Object.freeze({name,size:Object.freeze(size),offset:Object.freeze(offset),uv:Object.freeze(uv),faceUv:freezeFaceUv(faceUv)});
 
 // Canonical orientation points from foot -> head along local +Z. Each block
 // renders one half so chunk rebuild/unload remains authoritative even when a bed
-// crosses a chunk boundary. The sheet offsets follow the classic 64x64 bed
-// entity layout carried by the user-supplied 1.20.1 resources.
+// crosses a chunk boundary. The supplied 64x64 bed entity sheet is not a block
+// atlas: the visually exposed mattress tops use dedicated sheet rectangles.
 export const BED_HALF_SPECS=Object.freeze({
   foot:Object.freeze({
     part:'foot',
     cuboids:Object.freeze([
-      cuboid('foot-mattress',[16,6,16],[0,3,0],[0,22]),
+      cuboid('foot-mattress',[16,6,16],[0,3,0],[0,22],{faceUv:{top:[2,28,18,44]}}),
       cuboid('foot-left-leg',[3,3,3],[0,0,0],[50,0]),
       cuboid('foot-right-leg',[3,3,3],[13,0,0],[50,6])
     ])
@@ -21,7 +23,7 @@ export const BED_HALF_SPECS=Object.freeze({
   head:Object.freeze({
     part:'head',
     cuboids:Object.freeze([
-      cuboid('head-mattress',[16,6,16],[0,3,0],[0,0]),
+      cuboid('head-mattress',[16,6,16],[0,3,0],[0,0],{faceUv:{top:[10,6,26,22]}}),
       cuboid('head-left-leg',[3,3,3],[0,0,13],[50,12]),
       cuboid('head-right-leg',[3,3,3],[13,0,13],[50,18])
     ])
@@ -30,18 +32,7 @@ export const BED_HALF_SPECS=Object.freeze({
 
 export const BED_FACING_ROTATION=Object.freeze({south:0,north:Math.PI,east:Math.PI/2,west:-Math.PI/2});
 
-export function minecraftCuboidUvRects(u,v,width,height,depth){
-  const x0=u,x1=u+depth,x2=x1+width,x3=x2+width,x4=x3+depth;
-  const y0=v,y1=v+depth,y2=y1+height;
-  return Object.freeze({
-    left:Object.freeze([x0,y1,x1,y2]),
-    front:Object.freeze([x1,y1,x2,y2]),
-    right:Object.freeze([x2,y1,x3,y2]),
-    back:Object.freeze([x3,y1,x4,y2]),
-    top:Object.freeze([x1,y0,x2,y1]),
-    bottom:Object.freeze([x2,y0,x3,y1])
-  });
-}
+export const minecraftCuboidUvRects=minecraftEntityCuboidUvRects;
 
 export function bedHalfSpec(part){return BED_HALF_SPECS[part]||null;}
 
