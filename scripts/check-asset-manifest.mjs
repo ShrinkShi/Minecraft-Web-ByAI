@@ -6,11 +6,11 @@ import {ITEMS} from '../src/items.js';
 
 assert.equal(ASSET_MANIFEST_VERSION,2);
 for(const key of [
-  'terrain.block_atlas','block.iron_ore','block.white_wool','item.stick','item.wooden_pickaxe','item.stone_pickaxe','item.raw_iron',
+  'terrain.block_atlas','block.model_atlas','block.iron_ore','block.white_wool','item.stick','item.wooden_pickaxe','item.stone_pickaxe','item.raw_iron',
   'item.leather_helmet','item.leather_chestplate','item.leather_leggings','item.leather_boots','item.raw_beef','item.leather','item.raw_mutton',
   'item.raw_porkchop','item.raw_chicken','item.feather','item.rotten_flesh','item.bone','item.arrow','item.gunpowder','item.string',
   'entity.bed.red','entity.cow','entity.sheep','entity.sheep_fur','entity.pig','entity.chicken','entity.zombie','entity.skeleton','entity.creeper','entity.spider',
-  'metadata.minecraft_runtime'
+  'metadata.minecraft_runtime','metadata.minecraft_model_atlas'
 ])assert.ok(ASSET_KEYS.includes(key),`${key} must be declared`);
 
 for(const key of ASSET_KEYS){
@@ -22,6 +22,8 @@ for(const key of ASSET_KEYS){
 }
 
 assert.equal(assetUrl('terrain.block_atlas'),'./assets/textures/atlas.png');
+assert.equal(assetUrl('block.model_atlas'),'./assets/model-textures/model-texture-atlas.png');
+assert.equal(assetUrl('metadata.minecraft_model_atlas'),'./assets/model-textures/model-texture-atlas.json');
 assert.equal(assetUrl('item.stick'),'./assets/items/stick.png');
 assert.equal(assetUrl('item.wooden_pickaxe'),'./assets/items/wooden_pickaxe.png');
 assert.equal(assetUrl('item.stone_pickaxe'),'./assets/items/stone_pickaxe.png');
@@ -50,7 +52,9 @@ assert.equal(ITEMS.bed.entityAssetKey,'entity.bed.red');
 const snapshot=assetManifestSnapshot();
 assert.equal(Object.isFrozen(snapshot),true);assert.equal(Object.isFrozen(snapshot['item.stick']),true);
 assert.equal(snapshot['terrain.block_atlas'].source,ASSET_SOURCE.USER_SUPPLIED);
+assert.equal(snapshot['block.model_atlas'].source,ASSET_SOURCE.USER_SUPPLIED);
+assert.equal(snapshot['metadata.minecraft_model_atlas'].source,ASSET_SOURCE.USER_SUPPLIED);
 assert.equal(snapshot['item.stone_pickaxe'].source,ASSET_SOURCE.USER_SUPPLIED);
 assert.equal(snapshot['entity.spider'].source,ASSET_SOURCE.USER_SUPPLIED);
 
-console.log('logical asset manifest + user-supplied Minecraft runtime/entity bindings: PASS');
+console.log('logical asset manifest + user-supplied Minecraft runtime/entity/model-atlas bindings: PASS');
