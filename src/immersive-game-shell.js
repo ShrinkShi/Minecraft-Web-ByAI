@@ -27,8 +27,12 @@ function styleText(){return `
 
 let installed=null;
 
+function hasBrowserDom(){
+  return typeof document!=='undefined'&&typeof window!=='undefined'&&typeof document.querySelector==='function'&&typeof document.querySelectorAll==='function'&&typeof document.createElement==='function'&&!!document.head&&typeof MutationObserver!=='undefined';
+}
+
 export function installImmersiveGameShell(canvas){
-  if(typeof document==='undefined'||typeof window==='undefined'||!canvas)return()=>{};
+  if(!canvas||!hasBrowserDom())return()=>{};
   if(installed){installed.refs++;return()=>installed.release();}
   const hud=document.querySelector('#hud'),debug=document.querySelector('#debug'),hotbar=document.querySelector('#hotbar');
   if(!hud||!debug||!hotbar)return()=>{};
@@ -55,19 +59,17 @@ export function installImmersiveGameShell(canvas){
 
   async function lockKeyboard(){
     if(!gameFocused()||!desktopPointer())return false;
-    const keyboard=navigator.keyboard;
+    const keyboard=globalThis.navigator?.keyboard;
     if(!keyboard||typeof keyboard.lock!=='function')return false;
     try{await keyboard.lock([...GAMEPLAY_KEY_LOCK_CODES]);return true;}catch{return false;}
   }
-  function unlockKeyboard(){try{navigator.keyboard?.unlock?.();}catch{}}
+  function unlockKeyboard(){try{globalThis.navigator?.keyboard?.unlock?.();}catch{}}
 
   async function enterImmersiveControl(event){
     if(!gameFocused()||!desktopPointer()||document.pointerLockElement===canvas)return;
-    // Own the first canvas focus click so fullscreen -> keyboard lock -> pointer
-    // lock happens in a deterministic order under one user activation.
     event.preventDefault();event.stopImmediatePropagation();
     try{
-      if(!document.fullscreenElement&&document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen({navigationUI:'hide'});
+      if(!document.fullscreenElement&&document.documentElement?.requestFullscreen)await document.documentElement.requestFullscreen({navigationUI:'hide'});
     }catch{}
     await lockKeyboard();
     try{await canvas.requestPointerLock?.();}catch{}
