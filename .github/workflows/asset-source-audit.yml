@@ -8,6 +8,7 @@ on:
       - 'tools/audit-minecraft-assets.py'
       - 'tools/import-minecraft-assets.py'
       - 'tools/build-minecraft-runtime-assets.py'
+      - 'tools/minecraft_model_acceptance.py'
       - 'tools/minecraft_model_closure.py'
       - 'tools/check_minecraft_model_closure.py'
       - 'tools/check_minecraft_model_direct_face.py'
@@ -49,13 +50,6 @@ jobs:
         run: python tools/import-minecraft-assets.py
       - name: Build browser-ready runtime assets
         run: python tools/build-minecraft-runtime-assets.py
-      - name: Verify tracked runtime assets match generated output
-        run: |
-          cmp build/minecraft-runtime-assets/textures/atlas.png assets/textures/atlas.png
-          for file in build/minecraft-runtime-assets/items/*.png; do
-            cmp "$file" "assets/items/$(basename "$file")"
-          done
-          diff -qr build/minecraft-runtime-assets/minecraft assets/minecraft
       - name: Upload deterministic audit report
         uses: actions/upload-artifact@v4
         with:
@@ -74,6 +68,13 @@ jobs:
           name: minecraft-runtime-assets
           path: build/minecraft-runtime-assets
           if-no-files-found: error
+      - name: Verify tracked runtime assets match generated output
+        run: |
+          cmp build/minecraft-runtime-assets/textures/atlas.png assets/textures/atlas.png
+          for file in build/minecraft-runtime-assets/items/*.png; do
+            cmp "$file" "assets/items/$(basename "$file")"
+          done
+          diff -qr build/minecraft-runtime-assets/minecraft assets/minecraft
       - name: Upload deterministic model texture atlas
         uses: actions/upload-artifact@v4
         with:
