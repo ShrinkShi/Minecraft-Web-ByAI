@@ -5,6 +5,8 @@ import {normalizeMinecraftResourceId} from './minecraft-resource-id.js';
 const SHA256_RE=/^[0-9a-f]{64}$/;
 const RENDER_LAYER_SET=new Set(MINECRAFT_MODEL_RENDER_LAYERS);
 const REGION_EPSILON=1e-12;
+const ATLAS_PACKING='power-of-two-shelf-v1';
+const ATLAS_GUTTER_PX=1;
 
 function object(value,label){
   if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError(`${label} must be an object`);
@@ -30,6 +32,8 @@ function sha256(value,label){
   if(typeof value!=='string'||!SHA256_RE.test(value))throw new TypeError(`${label} must be a lowercase SHA-256 hex digest`);
   return value;
 }
+
+function powerOfTwo(value){return value>0&&(value&(value-1))===0;}
 
 function normalizedRegion(raw,label){
   object(raw,label);
@@ -73,9 +77,22 @@ function validateRegionMapping(region,pixels,atlasWidth,atlasHeight,label){
   }
 }
 
+function canonicalTexturePath(resourceId){
+  const separator=resourceId.indexOf(':');
+  const namespace=resourceId.slice(0,separator);
+  const path=resourceId.slice(separator+1);
+  return `assets/${namespace}/textures/${path}.png`;
+}
+
 function normalizeTextureRecord(resourceId,raw,atlasWidth,atlasHeight){
   const label=`model atlas texture ${resourceId}`;
   object(raw,label);
+  const canonical=nonEmptyString(raw.canonical,`${label}.canonical`);
+  const expectedCanonical=canonicalTexturePath(resourceId);
+  if(canonical!==expectedCanonical)throw new RangeError(`${label}.canonical must match its resource ID`);
+  const source=nonEmptyString(raw.source,`${label}.source`);
+  if(!source.replaceAll('\\','/').endsWith(canonical))throw new RangeError(`${label}.source must end with its canonical path`);
+
   const width=integer(raw.width,`${label}.width`,{min:1});
   const height=integer(raw.height,`${label}.height`,{min:1});
   const pixels=pixelRegion(raw.pixelRegion,`${label}.pixelRegion`,atlasWidth,atlasHeight);
@@ -84,14 +101,24 @@ function normalizeTextureRecord(resourceId,raw,atlasWidth,atlasHeight){
   validateRegionMapping(region,pixels,atlasWidth,atlasHeight,`${label}.region`);
   return Object.freeze({
     resourceId,
-    canonical:nonEmptyString(raw.canonical,`${label}.canonical`),
-    source:nonEmptyString(raw.source,`${label}.source`),
+    canonical,
+    source,
     sourceSha256:sha256(raw.sourceSha256,`${label}.sourceSha256`),
     sourceBytes:integer(raw.sourceBytes,`${label}.sourceBytes`,{min:1}),
     width,
     height,
     pixelRegion:pixels,
     region
+  });
+}
+
+function normalizeClosure(raw){
+  object(raw,'Minecraft model atlas manifest.closure');
+  return Object.freeze({
+    blockstates:integer(raw.blockstates,'Minecraft model atlas manifest.closure.blockstates'),
+    models:integer(raw.models,'Minecraft model atlas manifest.closure.models'),
+    textures:integer(raw.textures,'Minecraft model atlas manifest.closure.textures'),
+    metadata:integer(raw.metadata,'Minecraft model atlas manifest.closure.metadata')
   });
 }
 
@@ -110,7 +137,12 @@ export function normalizeMinecraftModelAtlasManifest(raw){
     packing:nonEmptyString(atlasRaw.packing,'Minecraft model atlas manifest.atlas.packing')
   });
   if(atlas.path!=='model-texture-atlas.png')throw new RangeError('Minecraft model atlas manifest.atlas.path must name model-texture-atlas.png');
+  if(atlas.width!==atlas.height||!powerOfTwo(atlas.width))throw new RangeError('Minecraft model atlas must be a square power-of-two texture');
+  if(atlas.gutterPx!==ATLAS_GUTTER_PX)throw new RangeError(`Minecraft model atlas gutter must be ${ATLAS_GUTTER_PX}px for manifest format 1`);
+  if(atlas.packing!==ATLAS_PACKING)throw new RangeError(`Minecraft model atlas packing must be ${ATLAS_PACKING} for manifest format 1`);
 
+  const closure=normalizeClosure(raw.closure);
+  const sourceArchiveSha256=sha256(raw.sourceArchiveSha256,'Minecraft model atlas manifest.sourceArchiveSha256');
   const rawTextures=object(raw.textures,'Minecraft model atlas manifest.textures');
   const textures=Object.create(null);
   for(const [rawId,rawRecord] of Object.entries(rawTextures)){
@@ -118,11 +150,15 @@ export function normalizeMinecraftModelAtlasManifest(raw){
     if(resourceId!==rawId)throw new TypeError(`model atlas texture key must be canonical: ${rawId}`);
     textures[resourceId]=normalizeTextureRecord(resourceId,rawRecord,atlas.width,atlas.height);
   }
-  if(!Object.keys(textures).length)throw new RangeError('Minecraft model atlas manifest.textures must not be empty');
+  const textureCount=Object.keys(textures).length;
+  if(!textureCount)throw new RangeError('Minecraft model atlas manifest.textures must not be empty');
+  if(closure.textures!==textureCount)throw new RangeError('Minecraft model atlas closure texture count must match manifest.textures');
 
   return Object.freeze({
     format:1,
     minecraftVersion:'1.20.1',
+    sourceArchiveSha256,
+    closure,
     atlas,
     textures:Object.freeze(textures)
   });
@@ -153,14 +189,13 @@ export function createMinecraftModelAtlasResolver(rawManifest){
 }
 
 export function createMinecraftModelTextureBinding(atlasResolver,{resolveLayer}={}){
-  if(!atlasResolver||typeof atlasResolver.requireRegion!=='function')throw new TypeError('atlasResolver must expose requireRegion(texture)');
+  if(!atlasResolver||typeof atlasResolver.requireTextureRecord!=='function')throw new TypeError('atlasResolver must expose requireTextureRecord(texture)');
   if(typeof resolveLayer!=='function')throw new TypeError('resolveLayer must be a function');
   return (texture,face,instance)=>{
-    const resourceId=normalizeMinecraftResourceId(texture);
-    const region=atlasResolver.requireRegion(resourceId);
-    const layer=resolveLayer(resourceId,face,instance);
+    const record=atlasResolver.requireTextureRecord(texture);
+    const layer=resolveLayer(record.resourceId,face,instance);
     if(!RENDER_LAYER_SET.has(layer))throw new RangeError(`unsupported Minecraft model render layer: ${layer}`);
-    return Object.freeze({layer,region});
+    return Object.freeze({layer,region:record.region});
   };
 }
 
