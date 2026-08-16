@@ -5,6 +5,9 @@ assert.deepEqual([...MOB_MODEL_TYPES].sort(),['chicken','cow','creeper','pig','s
 assert.deepEqual(minecraftCubeUvRects(0,0,8,8,8),{
   left:[0,8,8,16],front:[8,8,16,16],right:[16,8,24,16],back:[24,8,32,16],top:[8,0,16,8],bottom:[16,0,24,8]
 });
+assert.deepEqual(minecraftCubeUvRects(18,4,12,18,10),{
+  left:[18,14,28,32],front:[28,14,40,32],right:[40,14,50,32],back:[50,14,62,32],top:[28,4,40,14],bottom:[40,4,52,14]
+});
 
 for(const type of MOB_MODEL_TYPES){
   const spec=mobModelSpec(type);assert.equal(spec,MOB_MODEL_SPECS[type]);
@@ -27,6 +30,7 @@ for(const type of MOB_MODEL_TYPES){
   assert.ok(boxCount>=5,`${type} must no longer collapse to a generic colored body/head proxy`);
 }
 
+assert.deepEqual(MOB_MODEL_SPECS.cow.parts.find(part=>part.name==='body').pivot,[0,13,2],'cow body must meet the top of its 12px legs instead of floating above them');
 assert.equal(MOB_MODEL_SPECS.creeper.parts.filter(part=>part.name.endsWith('Leg')).length,4);
 assert.equal(MOB_MODEL_SPECS.spider.parts.filter(part=>/Leg\d+$/.test(part.name)).length,8);
 assert.ok(MOB_MODEL_SPECS.sheep.materials.fur==='entity.sheep_fur');
@@ -34,4 +38,4 @@ assert.ok(MOB_MODEL_SPECS.sheep.parts.some(part=>part.boxes.some(box=>box.materi
 assert.equal(MOB_MODEL_SPECS.skeleton.parts.find(part=>part.name==='leftArm').boxes[0].size[0],2,'skeleton limbs must stay visually thinner than zombie limbs');
 assert.ok(MOB_MODEL_SPECS.chicken.parts.some(part=>part.name==='leftWing')&&MOB_MODEL_SPECS.chicken.parts.some(part=>part.name==='rightWing'));
 
-console.log('vanilla-compatible mob cuboids + articulated parts + UV bounds: PASS');
+console.log('vanilla-compatible mob cuboids + corrected cow placement + articulated UV bounds: PASS');
