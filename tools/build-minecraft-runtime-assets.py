@@ -80,8 +80,9 @@ GUI_SPRITES = {
     "hotbar-slot.png": ("textures/gui/widgets.png", (1, 0, 21, 22)),
     "hotbar-right-cap.png": ("textures/gui/widgets.png", (181, 0, 182, 22)),
     "hotbar-selector.png": ("textures/gui/widgets.png", (0, 22, 24, 46)),
-    # Survival inventory GUI is the upper-left 176x166 region of inventory.png.
-    "inventory.png": ("textures/gui/container/inventory.png", (0, 0, 176, 166)),
+    # Existing DOM inventory/crafting/equipment semantics stay authoritative;
+    # reuse the exact vanilla 18x18 slot instead of freezing the whole panel bitmap.
+    "inventory-slot.png": ("textures/gui/container/inventory.png", (7, 83, 25, 101)),
 }
 
 PASS_THROUGH = [
