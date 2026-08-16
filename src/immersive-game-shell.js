@@ -22,6 +22,7 @@ function styleText(){return `
 #first-person-held-overlay .fp-item{position:absolute;right:106px;bottom:58px;width:96px;height:96px;display:grid;place-items:center;transform:rotate(-18deg) scale(1.08);transform-origin:50% 80%;filter:drop-shadow(4px 5px 1px #0009)}
 #first-person-held-overlay .fp-item>.item-icon{width:32px;height:32px;transform:scale(2.6);image-rendering:pixelated}
 #first-person-held-overlay .fp-item>.slot-swatch{width:30px;height:30px;transform:scale(2.65);image-rendering:pixelated}
+#first-person-held-overlay .fp-item>.block-item-icon{width:32px!important;height:32px!important;transform:scale(2.6);transform-origin:50% 50%;image-rendering:pixelated}
 @media(max-width:800px),(pointer:coarse){#first-person-held-overlay{right:2vw;bottom:-45px;transform:scale(.76)}}
 `;}
 
@@ -52,8 +53,8 @@ export function installImmersiveGameShell(canvas){
     const firstPerson=(canvas.dataset.viewMode??'0')==='0',active=gameFocused()&&firstPerson;
     overlay.classList.toggle('hidden',!active);
     if(!active)return;
-    const selected=hotbar.querySelector('.hotbar-slot.selected'),source=selected?.querySelector('.item-icon,.slot-swatch');
-    const signature=source?`${source.tagName}|${source.getAttribute('src')||''}|${source.getAttribute('style')||''}`:'';
+    const selected=hotbar.querySelector('.hotbar-slot.selected'),source=selected?.querySelector('.item-icon,.slot-swatch,.block-item-icon');
+    const signature=source?`${source.tagName}|${source.getAttribute('src')||''}|${source.getAttribute('style')||''}|${source.dataset?.itemId||''}`:'';
     if(signature===lastItemSignature)return;lastItemSignature=signature;item.textContent='';if(source)item.append(source.cloneNode(true));
   }
 
@@ -91,7 +92,7 @@ export function installImmersiveGameShell(canvas){
   function onFullscreenChange(){if(!document.fullscreenElement)unlockKeyboard();else if(document.pointerLockElement===canvas)void lockKeyboard();}
 
   const observer=new MutationObserver(syncOverlay);
-  observer.observe(hotbar,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style','src']});
+  observer.observe(hotbar,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style','src','data-item-id']});
   observer.observe(canvas,{attributes:true,attributeFilter:['data-view-mode']});
   observer.observe(hud,{attributes:true,attributeFilter:['class']});
   for(const panel of panels())observer.observe(panel,{attributes:true,attributeFilter:['class']});
