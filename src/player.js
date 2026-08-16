@@ -8,6 +8,7 @@ import {
   PLAYER_COLLISION_RADIUS,
   PLAYER_COLLISION_HEIGHT,
   PLAYER_EYE_HEIGHT,
+  PLAYER_WATER_EXIT_STEP_HEIGHT,
   playerCollidesBlocks,
   resolvePlayerAxisMove,
   probePlayerGrounded,
@@ -73,10 +74,10 @@ export class PlayerController{
     return playerCollidesBlocks(pos,(x,y,z)=>!!BLOCKS[this.world.getBlock(x,y,z)]?.solid,{radius:this.radius,height:this.height});
   }
 
-  moveAxis(axis,amount){
-    if(!amount)return;
-    const result=resolvePlayerAxisMove({position:this.position,velocity:this.velocity,grounded:this.grounded,axis,amount,collides:position=>this.collides(position)});
-    this.position.set(result.position.x,result.position.y,result.position.z);this.velocity.set(result.velocity.x,result.velocity.y,result.velocity.z);this.grounded=result.grounded;return result.moved;
+  moveAxis(axis,amount,{stepHeight=0}={}){
+    if(!amount)return null;
+    const result=resolvePlayerAxisMove({position:this.position,velocity:this.velocity,grounded:this.grounded,axis,amount,collides:position=>this.collides(position),stepHeight});
+    this.position.set(result.position.x,result.position.y,result.position.z);this.velocity.set(result.velocity.x,result.velocity.y,result.velocity.z);this.grounded=result.grounded;return result;
   }
 
   waterCoverage(){
@@ -93,7 +94,10 @@ export class PlayerController{
       this.moveAxis('x',motion.displacement.x);this.moveAxis('z',motion.displacement.z);this.moveAxis('y',motion.displacement.y);this.velocity.set(0,0,0);
     }else{
       this.grounded=false;
-      this.moveAxis('x',motion.displacement.x);this.moveAxis('z',motion.displacement.z);this.moveAxis('y',motion.displacement.y);
+      const waterExitStep=this.controlState.jump&&this.swimCoverage>0?PLAYER_WATER_EXIT_STEP_HEIGHT:0;
+      const xMove=this.moveAxis('x',motion.displacement.x,{stepHeight:waterExitStep});
+      this.moveAxis('z',motion.displacement.z,{stepHeight:xMove?.stepped?0:waterExitStep});
+      this.moveAxis('y',motion.displacement.y);
       this.velocity.x*=motion.horizontalDrag;this.velocity.z*=motion.horizontalDrag;
       if(this.position.y<-10)this.hp=0;
     }
@@ -110,7 +114,8 @@ export class PlayerController{
     if(this.viewMode===0){this.camera.position.copy(target);this.camera.rotation.order='YXZ';this.camera.rotation.y=this.yaw;this.camera.rotation.x=this.pitch;}
     else{const sign=this.viewMode===1?-1:1;this.camera.position.copy(target).addScaledVector(forward,sign*4).add(new THREE.Vector3(0,.35,0));this.camera.lookAt(target);}
     if(this.avatar){this.avatar.visible=this.viewMode!==0;this.avatar.position.copy(this.position);this.avatar.rotation.y=this.yaw;}
+    if(this.canvas)this.canvas.dataset.viewMode=String(this.viewMode);
   }
 
-  dispose(){if(this.avatar){this.scene?.remove(this.avatar);for(const child of this.avatar.children){child.geometry?.dispose();child.material?.dispose();}}}
+  dispose(){if(this.canvas)delete this.canvas.dataset.viewMode;if(this.avatar){this.scene?.remove(this.avatar);for(const child of this.avatar.children){child.geometry?.dispose();child.material?.dispose();}}}
 }
