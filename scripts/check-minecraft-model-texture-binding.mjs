@@ -15,6 +15,8 @@ const resolver=createMinecraftModelAtlasResolver(raw);
 
 assert.equal(resolver.manifest.format,1);
 assert.equal(resolver.manifest.minecraftVersion,'1.20.1');
+assert.equal(resolver.manifest.sourceArchiveSha256,'b65a2211175af90664de9f41ea422f4869eee855f0da4bf6fe0715434ebe9c69');
+assert.deepEqual(resolver.manifest.closure,{blockstates:9,models:42,textures:14,metadata:0});
 assert.equal(resolver.textureCount,14);
 assert.deepEqual(resolver.atlas,{
   path:'model-texture-atlas.png',
@@ -25,6 +27,7 @@ assert.deepEqual(resolver.atlas,{
   packing:'power-of-two-shelf-v1'
 });
 assert.equal(Object.isFrozen(resolver.manifest),true);
+assert.equal(Object.isFrozen(resolver.manifest.closure),true);
 assert.equal(Object.isFrozen(resolver.manifest.textures),true);
 assert.equal(Object.isFrozen(resolver.requireRegion('block/glass')),true);
 
@@ -108,5 +111,33 @@ assert.throws(()=>normalizeMinecraftModelAtlasManifest(badPixels),/inside the at
 const nonCanonical=structuredClone(raw);
 nonCanonical.textures={'block/glass':structuredClone(raw.textures['minecraft:block/glass'])};
 assert.throws(()=>normalizeMinecraftModelAtlasManifest(nonCanonical),/texture key must be canonical/);
+
+const badCanonical=structuredClone(raw);
+badCanonical.textures['minecraft:block/glass'].canonical='assets/minecraft/textures/block/iron_ore.png';
+assert.throws(()=>normalizeMinecraftModelAtlasManifest(badCanonical),/canonical must match its resource ID/);
+
+const badSource=structuredClone(raw);
+badSource.textures['minecraft:block/glass'].source='elsewhere/glass.png';
+assert.throws(()=>normalizeMinecraftModelAtlasManifest(badSource),/source must end with its canonical path/);
+
+const badClosureCount=structuredClone(raw);
+badClosureCount.closure.textures=13;
+assert.throws(()=>normalizeMinecraftModelAtlasManifest(badClosureCount),/closure texture count must match/);
+
+const badAtlasWidth=structuredClone(raw);
+badAtlasWidth.atlas.width=96;
+assert.throws(()=>normalizeMinecraftModelAtlasManifest(badAtlasWidth),/square power-of-two/);
+
+const badGutter=structuredClone(raw);
+badGutter.atlas.gutterPx=2;
+assert.throws(()=>normalizeMinecraftModelAtlasManifest(badGutter),/gutter must be 1px/);
+
+const badPacking=structuredClone(raw);
+badPacking.atlas.packing='experimental';
+assert.throws(()=>normalizeMinecraftModelAtlasManifest(badPacking),/packing must be power-of-two-shelf-v1/);
+
+const badArchiveSha=structuredClone(raw);
+badArchiveSha.sourceArchiveSha256='not-a-sha';
+assert.throws(()=>normalizeMinecraftModelAtlasManifest(badArchiveSha),/sourceArchiveSha256 must be a lowercase SHA-256/);
 
 console.log('tracked Minecraft model atlas manifest + strict texture binding resolver: PASS');
