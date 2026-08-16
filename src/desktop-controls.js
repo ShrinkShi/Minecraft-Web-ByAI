@@ -1,6 +1,7 @@
 import {DoubleTapForwardSprint} from './sprint-gesture.js';
 import {ensureChatCommandCompletion} from './chat-command-completion.js';
 import {pointerLookIntent} from './pointer-look-rules.js';
+import {installImmersiveGameShell} from './immersive-game-shell.js';
 
 const MOVEMENT_CODES=new Set(['KeyW','KeyA','KeyS','KeyD']);
 const BUTTON_CODES=new Map([['Space','jump'],['ShiftLeft','sneak'],['ShiftRight','sneak'],['KeyR','sprint']]);
@@ -10,7 +11,7 @@ export const desktopButtonForCode=code=>BUTTON_CODES.get(code)||null;
 
 export class DesktopControls{
   constructor(canvas,bus){
-    this.canvas=canvas;this.bus=bus;this.source='desktop';this.gameplayEnabled=false;this.keys=new Set();this.forwardSprint=new DoubleTapForwardSprint();this.pointerMoveReady=false;ensureChatCommandCompletion();this.bind();
+    this.canvas=canvas;this.bus=bus;this.source='desktop';this.gameplayEnabled=false;this.keys=new Set();this.forwardSprint=new DoubleTapForwardSprint();this.pointerMoveReady=false;this.releaseImmersiveShell=installImmersiveGameShell(canvas);ensureChatCommandCompletion();this.bind();
   }
 
   bind(){
@@ -60,5 +61,5 @@ export class DesktopControls{
 
   reset(){this.keys.clear();this.forwardSprint.reset();this.bus.resetSource(this.source);}
   setGameplayEnabled(enabled){const next=!!enabled;if(next===this.gameplayEnabled)return;this.gameplayEnabled=next;this.pointerMoveReady=false;if(!next)this.reset();}
-  dispose(){this.reset();window.removeEventListener('keydown',this.onKeyDown);window.removeEventListener('keyup',this.onKeyUp);window.removeEventListener('blur',this.onWindowBlur);document.removeEventListener('mousemove',this.onMouseMove);this.canvas.removeEventListener('mousedown',this.onMouseDown);window.removeEventListener('mouseup',this.onMouseUp);this.canvas.removeEventListener('wheel',this.onWheel);this.canvas.removeEventListener('click',this.onCanvasClick);}
+  dispose(){this.reset();this.releaseImmersiveShell?.();this.releaseImmersiveShell=null;window.removeEventListener('keydown',this.onKeyDown);window.removeEventListener('keyup',this.onKeyUp);window.removeEventListener('blur',this.onWindowBlur);document.removeEventListener('mousemove',this.onMouseMove);this.canvas.removeEventListener('mousedown',this.onMouseDown);window.removeEventListener('mouseup',this.onMouseUp);this.canvas.removeEventListener('wheel',this.onWheel);this.canvas.removeEventListener('click',this.onCanvasClick);}
 }
