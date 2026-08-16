@@ -35,6 +35,7 @@ GUI_SPRITES = {
     },
     "hotbar-right-cap.png": (WIDGETS, (181, 0, 182, 22)),
     "hotbar-selector.png": (WIDGETS, (0, 22, 24, 46)),
+    "inventory-panel.png": (INVENTORY, (0, 0, 176, 166)),
     "inventory-slot.png": (INVENTORY, (7, 83, 25, 101)),
 }
 EXPECTED_SOURCE_SIZE = {ICONS: (256, 256), WIDGETS: (256, 256), INVENTORY: (256, 256)}
