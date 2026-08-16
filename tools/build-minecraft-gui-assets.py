@@ -22,18 +22,22 @@ from minecraft_model_closure import ClosureError, MinecraftArchiveIndex, sha256_
 DEFAULT_ARCHIVE = Path("MC原版素材assets.zip")
 DEFAULT_OUTPUT = Path("build/minecraft-gui-assets")
 MINECRAFT_VERSION = "1.20.1"
+WIDGETS = "assets/minecraft/textures/gui/widgets.png"
 
 GUI_SPRITES = {
     "hud-icons.png": ("assets/minecraft/textures/gui/icons.png", (16, 0, 70, 36)),
-    "hotbar-left-cap.png": ("assets/minecraft/textures/gui/widgets.png", (0, 0, 1, 22)),
-    "hotbar-slot.png": ("assets/minecraft/textures/gui/widgets.png", (1, 0, 21, 22)),
-    "hotbar-right-cap.png": ("assets/minecraft/textures/gui/widgets.png", (181, 0, 182, 22)),
-    "hotbar-selector.png": ("assets/minecraft/textures/gui/widgets.png", (0, 22, 24, 46)),
+    "hotbar-left-cap.png": (WIDGETS, (0, 0, 1, 22)),
+    **{
+        f"hotbar-slot-{index}.png": (WIDGETS, (1 + index * 20, 0, 21 + index * 20, 22))
+        for index in range(9)
+    },
+    "hotbar-right-cap.png": (WIDGETS, (181, 0, 182, 22)),
+    "hotbar-selector.png": (WIDGETS, (0, 22, 24, 46)),
     "inventory-slot.png": ("assets/minecraft/textures/gui/container/inventory.png", (7, 83, 25, 101)),
 }
 EXPECTED_SOURCE_SIZE = {
     "assets/minecraft/textures/gui/icons.png": (256, 256),
-    "assets/minecraft/textures/gui/widgets.png": (256, 256),
+    WIDGETS: (256, 256),
     "assets/minecraft/textures/gui/container/inventory.png": (256, 256),
 }
 
@@ -56,12 +60,21 @@ def load_png(index: MinecraftArchiveIndex, canonical: str) -> Image.Image:
     return result
 
 
-def validate_hotbar_repetition(widgets: Image.Image) -> None:
-    reference = widgets.crop((1, 0, 21, 22)).tobytes()
+def validate_hotbar_partition(widgets: Image.Image) -> None:
+    """Prove that emitted cap/slot crops exactly partition the source 182x22 hotbar.
+
+    Slots are deliberately *not* assumed identical. The tracked 1.20.1 sheet has
+    pixel differences between slot regions, so preserving all nine source crops
+    is the only byte-faithful contract.
+    """
+    rebuilt = Image.new("RGBA", (182, 22), (0, 0, 0, 0))
+    rebuilt.paste(widgets.crop((0, 0, 1, 22)), (0, 0))
     for index in range(9):
         x = 1 + index * 20
-        if widgets.crop((x, 0, x + 20, 22)).tobytes() != reference:
-            raise GuiAssetError(f"widgets.png hotbar slot {index} no longer matches the 20x22 repetition contract")
+        rebuilt.paste(widgets.crop((x, 0, x + 20, 22)), (x, 0))
+    rebuilt.paste(widgets.crop((181, 0, 182, 22)), (181, 0))
+    if rebuilt.tobytes() != widgets.crop((0, 0, 182, 22)).tobytes():
+        raise GuiAssetError("widgets.png hotbar partition does not reconstruct the exact 182x22 source region")
 
 
 def build_gui_assets(archive_path: Path, output: Path) -> dict[str, object]:
@@ -69,7 +82,7 @@ def build_gui_assets(archive_path: Path, output: Path) -> dict[str, object]:
         with ZipFile(archive_path) as archive:
             index = MinecraftArchiveIndex(archive)
             images = {canonical: load_png(index, canonical) for canonical in EXPECTED_SOURCE_SIZE}
-            validate_hotbar_repetition(images["assets/minecraft/textures/gui/widgets.png"])
+            validate_hotbar_partition(images[WIDGETS])
 
             if output.exists():
                 shutil.rmtree(output)
@@ -105,6 +118,7 @@ def build_gui_assets(archive_path: Path, output: Path) -> dict[str, object]:
     except (FileNotFoundError, BadZipFile, ClosureError) as exc:
         raise GuiAssetError(f"cannot build Minecraft GUI assets: {exc}") from exc
 
+    slot_names = [f"hotbar-slot-{index}.png" for index in range(9)]
     manifest: dict[str, object] = {
         "format": 1,
         "minecraftVersion": MINECRAFT_VERSION,
@@ -115,10 +129,12 @@ def build_gui_assets(archive_path: Path, output: Path) -> dict[str, object]:
         "hotbar": {
             "width": 182,
             "height": 22,
-            "leftCapWidth": 1,
+            "leftCap": "hotbar-left-cap.png",
+            "slots": slot_names,
             "slotWidth": 20,
             "slotCount": 9,
-            "rightCapWidth": 1,
+            "rightCap": "hotbar-right-cap.png",
+            "selector": "hotbar-selector.png",
             "selectorWidth": 24,
             "selectorHeight": 24,
         },
