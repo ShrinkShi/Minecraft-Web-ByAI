@@ -14,8 +14,8 @@ const pngSize=path=>{
 
 assert.equal(manifest.format,1);
 assert.equal(manifest.minecraftVersion,'1.20.1');
-assert.equal(manifest.sourceArchive,'MC原版素材assets.zip');
-assert.equal(manifest.sourceArchiveSha256,'b65a2211175af90664de9f41ea422f4869eee855f0da4bf6fe0715434ebe9c69');
+assert.equal(manifest.sourceKind,'directory');
+assert.equal(manifest.sourceRoot,'MC原版素材assets');
 assert.deepEqual(manifest.hotbar,{
   width:182,height:22,
   leftCap:'hotbar-left-cap.png',
@@ -26,9 +26,9 @@ assert.deepEqual(manifest.hotbar,{
 });
 
 assert.deepEqual(manifest.sources,{
-  'assets/minecraft/textures/gui/container/inventory.png':{bytes:2195,sha256:'1952f9978a96e15197ad58d998a40840a86f41b1c8cd4323e04fd8eeff9f7337'},
-  'assets/minecraft/textures/gui/icons.png':{bytes:8081,sha256:'8d720587f99e2c3d495706ea72249e9b2cc1d1cc9bcd75d4367613e71b898d28'},
-  'assets/minecraft/textures/gui/widgets.png':{bytes:15444,sha256:'26a3d4b8a23b75fdb7a0c5e8b7835ce8bdf98873a81695dde9f7010845edfe8b'}
+  'assets/minecraft/textures/gui/container/inventory.png':{bytes:2195,sha256:'1952f9978a96e15197ad58d998a40840a86f41b1c8cd4323e04fd8eeff9f7337',source:'MC原版素材assets/minecraft/textures/gui/container/inventory.png'},
+  'assets/minecraft/textures/gui/icons.png':{bytes:8081,sha256:'8d720587f99e2c3d495706ea72249e9b2cc1d1cc9bcd75d4367613e71b898d28',source:'MC原版素材assets/minecraft/textures/gui/icons.png'},
+  'assets/minecraft/textures/gui/widgets.png':{bytes:15444,sha256:'26a3d4b8a23b75fdb7a0c5e8b7835ce8bdf98873a81695dde9f7010845edfe8b',source:'MC原版素材assets/minecraft/textures/gui/widgets.png'}
 });
 
 const icons='assets/minecraft/textures/gui/icons.png';
@@ -70,4 +70,4 @@ for(const [name,recordExpected] of Object.entries(expected)){
   assert.equal(sha256(path),recordExpected.sha256,`${name} must equal the staged deterministic GUI artifact bytes`);
 }
 
-console.log('Minecraft Java 1.20.1 HUD/hotbar/inventory GUI sprites + exact source provenance: PASS');
+console.log('Minecraft Java 1.20.1 HUD/hotbar/inventory GUI sprites + extracted source provenance: PASS');
