@@ -2,6 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.m
 import {BLOCKS,CHUNK_SIZE,WORLD_HEIGHT} from './blocks.js';
 import {requireAssetUrl} from './asset-manifest.js';
 import {BedModelRenderer} from './bed-model-renderer.js';
+import {MinecraftModelWorldRenderer} from './minecraft-model-world-renderer.js';
 
 const key=(cx,cz)=>`${cx},${cz}`;
 const floorDiv=(n,d)=>Math.floor(n/d);
@@ -23,19 +24,36 @@ export class VoxelWorld{
     this.meshVersions=new Map();
     this.meshQueue=new Set();
     this.meshWorkerBusy=false;
+    this.meshWorkerReady=false;
     this.initialPending=new Set();
     this.initialTotal=0;
     this.centerChunk={cx:Number.NaN,cz:Number.NaN};
     this.edits=this.importEdits(savedEdits);
+    this.disposed=false;
     this.atlasTexture=this.makeAtlasTexture();
     this.material=this.makeOpaqueMaterial();
     this.waterMaterial=this.makeWaterMaterial();
     this.bedRenderer=new BedModelRenderer();
+    this.minecraftModelRenderer=new MinecraftModelWorldRenderer(scene);
     this.terrainWorker=new Worker(new URL('./world-worker.js',import.meta.url),{type:'module'});
     this.meshWorker=new Worker(new URL('./mesh-worker.js',import.meta.url),{type:'module'});
     this.terrainWorker.onmessage=e=>this.onTerrainWorker(e.data);
     this.meshWorker.onmessage=e=>this.onMeshWorker(e.data);
     this.terrainWorker.postMessage({type:'init',seed,prompt});
+    this.minecraftModelRenderer.initializeWorker(this.meshWorker).then(state=>{
+      if(this.disposed)return;
+      if(state==='fallback'){
+        this.meshWorkerReady=true;
+        this.pumpMeshQueue();
+      }
+    }).catch(error=>{
+      if(this.disposed)return;
+      this.minecraftModelRenderer.status='fallback';
+      this.minecraftModelRenderer.error=String(error?.message||error);
+      this.meshWorkerReady=true;
+      console.warn('Minecraft interpreted-model initialization failed before worker bootstrap.',error);
+      this.pumpMeshQueue();
+    });
   }
 
   makeAtlasTexture(){
@@ -136,6 +154,7 @@ export class VoxelWorld{
       if(!mesh)continue;
       this.scene.remove(mesh);mesh.geometry.dispose();
     }
+    this.minecraftModelRenderer.disposeChunkMeshes(record.interpreted);
     if(record.specials)this.scene.remove(record.specials);
     this.meshes.delete(chunkKey);
   }
@@ -183,7 +202,7 @@ export class VoxelWorld{
   }
 
   pumpMeshQueue(){
-    if(this.meshWorkerBusy)return;
+    if(this.meshWorkerBusy||!this.meshWorkerReady)return;
     while(this.meshQueue.size){
       const chunkKey=this.meshQueue.values().next().value;
       this.meshQueue.delete(chunkKey);
@@ -238,14 +257,21 @@ export class VoxelWorld{
   }
 
   onMeshWorker(m){
+    const modelSignal=this.minecraftModelRenderer.handleWorkerMessage(m);
+    if(modelSignal?.handled){
+      this.meshWorkerReady=modelSignal.ready;
+      this.pumpMeshQueue();
+      return;
+    }
     if(m.type!=='mesh')return;
     this.meshWorkerBusy=false;
     if(this.meshVersions.get(m.key)===m.version&&this.chunks.has(m.key)){
       this.disposeChunkMeshes(m.key);
       const opaque=this.makeChunkMesh(m.opaque,this.material,m.cx,m.cz,0);
       const water=this.makeChunkMesh(m.water,this.waterMaterial,m.cx,m.cz,1);
+      const interpreted=this.minecraftModelRenderer.makeChunkMeshes(m.interpreted,m.cx,m.cz);
       const specials=this.makeChunkSpecials(m.specials,m.cx,m.cz);
-      if(opaque||water||specials)this.meshes.set(m.key,{opaque,water,specials});
+      if(opaque||water||interpreted||specials)this.meshes.set(m.key,{opaque,water,interpreted,specials});
     }
     this.pumpMeshQueue();
   }
@@ -292,10 +318,13 @@ export class VoxelWorld{
   }
 
   dispose(){
+    if(this.disposed)return;
+    this.disposed=true;
     this.terrainWorker.terminate();this.meshWorker.terminate();
     for(const chunkKey of [...this.meshes.keys()])this.disposeChunkMeshes(chunkKey);
     this.chunks.clear();this.pending.clear();this.meshQueue.clear();
     this.bedRenderer.dispose();
+    this.minecraftModelRenderer.dispose();
     this.material.dispose();this.waterMaterial.dispose();this.atlasTexture.dispose();
   }
 }

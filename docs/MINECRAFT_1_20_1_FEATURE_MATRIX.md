@@ -14,7 +14,7 @@ This matrix is the roadmap authority. Percentages are planning estimates, not au
 
 | Domain | Planning completion | Status | Main gaps |
 |---|---:|---|---|
-| Browser engine / chunk / rendering foundation | 85% | PARTIAL | lighting parity, generic non-cube models, advanced particles, broader performance work |
+| Browser engine / chunk / rendering foundation | 85% | PARTIAL | lighting parity, generic non-cube gameplay breadth, advanced particles, broader performance work |
 | Desktop/mobile controls and core UI | 75% | PARTIAL | full settings/accessibility, polished mobile customization, broader browser/device matrix |
 | Singleplayer survival core | 55% | PARTIAL | hunger/food breadth, smelting, farming, full progression, effects/enchanting/brewing |
 | Blocks/items/recipes breadth | 15% | PARTIAL | most 1.20.1 registry content is not exposed |
@@ -22,7 +22,7 @@ This matrix is the roadmap authority. Percentages are planning estimates, not au
 | Entities / PvE | 35% | PARTIAL | species breadth, pathfinding/spawn parity, breeding/taming/riding, server authority |
 | Multiplayer server foundation | 65% | PARTIAL | persistence, rooms/auth/operators, server PvE, shared persistent containers |
 | Full multiplayer Minecraft parity | 48% | PARTIAL | same as above plus prediction/reconciliation and wider gameplay coverage |
-| Original resource integration | 35% | PARTIAL | generic model/blockstate interpretation, much wider registry use, audio |
+| Original resource integration | 35% | PARTIAL | much wider registry use, item models, tint/animation, audio |
 | Audio/music | 0% | BLOCKED | supplied archive contains no sound object set or sounds.json |
 | Redstone | 3% | FOUNDATION | block state/update scheduler/power graph/components |
 | Farming/food/smelting | 8% | FOUNDATION | furnaces, food effects, crops, breeding, recipes |
@@ -44,13 +44,13 @@ This matrix is the roadmap authority. Percentages are planning estimates, not au
 | First/third-person camera modes | DONE | F5 cycle implemented. |
 | Chunk streaming | DONE | Load/unload around player with explicit geometry disposal. |
 | Terrain Worker | DONE | Deterministic shared generator. |
-| Mesh Worker | DONE | Opaque/water passes plus special bed descriptors. |
-| Chunk merged mesh rendering | DONE | Avoids one Mesh per block. |
+| Mesh Worker | DONE | Legacy opaque/water + bed descriptors + opt-in interpreted model batches. |
+| Chunk merged mesh rendering | DONE | Legacy and interpreted paths remain chunk-batched; no one-Mesh-per-block runtime. |
 | Local/pinned Three.js runtime | DONE | Historical runtime CDN dependency removed. |
 | Water transparent pass | PARTIAL | No vanilla fluid levels/flow/animation/refraction. |
 | Bed special model renderer | DONE | Red bed world visual uses imported entity texture; logical collision still simplified. |
-| General blockstate/model JSON interpreter | TODO | Highest-priority content multiplier. |
-| General multipart/variant model support | TODO | Required for fences, panes, redstone, stairs, etc. |
+| General blockstate/model JSON interpreter | PARTIAL | Source-backed JSON now preloads/compiles into a real Worker/VoxelWorld opt-in path; only a tiny gameplay registry currently consumes it. |
+| General multipart/variant model support | PARTIAL | Weighted variants/multipart compile and execute in the runtime; generalized gameplay-state/neighbor-state mapping is not wired yet. |
 | Animated block/item textures | TODO | Water animation metadata retained but playback absent. |
 | Biome tint/color resolver | TODO | Current compatibility uses baked/default tint where required. |
 | Vanilla lighting model | TODO | Current lighting/day-night is simplified. |
@@ -69,9 +69,9 @@ The bed uses multiple internal block-state IDs, but counts as one gameplay famil
 | Feature family | Status | Notes |
 |---|---|---|
 | Basic full cubes | PARTIAL | Small hand-authored registry only. |
-| Directional full cubes | PARTIAL | Crafting table cardinal faces supported. |
+| Directional full cubes | PARTIAL | Crafting table gameplay semantics exist; its visual is the first live source-backed interpreted-model runtime proof. |
 | Beds | PARTIAL | Two-block state + rendering + sleep/respawn; full vanilla support/update/bounce/dimension rules incomplete. |
-| Ores | TODO | Iron ore texture exists in imported resources but gameplay registry/worldgen is not wired. |
+| Ores | TODO | Iron ore source resources are tracked but gameplay registry/worldgen is not wired. |
 | Stone variants | TODO | Granite/diorite/andesite/deepslate/tuff/etc. |
 | Wood families | TODO | Only oak foundation is exposed. |
 | Logs/stripped wood | TODO | Registry/model/state expansion needed. |
@@ -280,7 +280,7 @@ Current recipes: five.
 | Imported implemented item textures | DONE | Current item subset. |
 | Imported 8 current mob texture sheets | DONE | Texture-backed cuboid models. |
 | Imported red-bed entity texture | DONE | Used by world bed renderer. |
-| Full block/model resource interpretation | TODO | Current asset archive is under-used. |
+| Full block/model resource interpretation | PARTIAL | Source-backed closure and model atlas now feed a live opt-in Worker/VoxelWorld runtime; broad registry/state coverage remains missing. |
 | Full item model interpretation | TODO | Current items mostly bind direct textures. |
 | Entity geometry exact model-layer parity | PARTIAL | Current models are compatible reconstructions. |
 | Player skin pipeline | TODO | None. |
@@ -310,32 +310,11 @@ Current recipes: five.
 
 | Feature | Status | Notes |
 |---|---|---|
-| Node syntax/logic regression gate | DONE | 131 logic/worker regressions at PR #94 baseline. |
-| Chromium E2E | DONE | Sharded browser smoke with multiplayer scenarios. |
+| Node syntax/logic regression gate | DONE | PR #108 delivery candidate reaches 146 automatically discovered logic/server/Worker regressions. |
+| Chromium E2E | DONE | Sharded browser smoke; PR #108 candidate covers 35 tests including real interpreted-model Worker/VoxelWorld integration. |
 | Asset source reproducibility audit | DONE | Used for imported Minecraft source subset. |
 | GitHub Pages deployment | DONE | Current public Web delivery path. |
 | Failure artifacts | DONE | Browser failures preserve diagnostics. |
 | Real Android device coverage | TODO | Automated Chromium emulation exists, real device matrix does not. |
 | iOS Safari coverage | TODO | Not yet established. |
 | Load/performance budgets | FOUNDATION | Runtime is designed for bounded objects/workers; formal budgets/benchmarks need expansion. |
-| Long-session memory regression | TODO | Important for the project's explicit anti-leak goal. |
-| Multiplayer soak/load testing | TODO | Required before public-server claims. |
-
-## Roadmap order
-
-The current approved execution order is:
-
-1. keep this baseline/matrix synchronized;
-2. implement Minecraft JSON blockstate/model interpretation;
-3. build broad block/item registries and batch resource integration;
-4. complete survival progression: tools/ores/furnace/food/farming/breeding;
-5. replace the simple heightmap world with biome/cave/ore/feature/structure generation;
-6. move mobs/PvE/projectiles/explosions to authoritative server ownership;
-7. add persistent shared block containers, starting with chest/furnace;
-8. build neighbor updates, scheduled ticks and redstone;
-9. add Nether → portal → brewing/enchanting → End → boss progression;
-10. source audio and complete AudioEngine, lighting, particles, animated textures, biome tint, skins/nameplates and the remaining server/product shell.
-
-## Matrix maintenance rule
-
-Every PR that adds/removes Minecraft parity must update the affected rows here. A PR that only adds architecture should normally move a row from `TODO` to `FOUNDATION` or `PARTIAL`, not directly to `DONE`.
