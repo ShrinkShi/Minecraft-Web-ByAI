@@ -62,10 +62,12 @@ const RECORDS=Object.freeze({
   'entity.skeleton':supplied('entity-texture','./assets/minecraft/textures/entity/skeleton/skeleton.png'),
   'entity.creeper':supplied('entity-texture','./assets/minecraft/textures/entity/creeper/creeper.png'),
   'entity.spider':supplied('entity-texture','./assets/minecraft/textures/entity/spider/spider.png'),
+  'entity.player.steve':supplied('entity-texture','./assets/minecraft/textures/entity/player/wide/steve.png',{minecraftVersion:'1.20.1'}),
   ...GUI_RECORDS,
   'metadata.minecraft_runtime':supplied('asset-metadata','./assets/minecraft/runtime-manifest.json'),
   'metadata.minecraft_model_atlas':supplied('asset-metadata','./assets/model-textures/model-texture-atlas.json',{minecraftVersion:'1.20.1'}),
-  'metadata.minecraft_gui':supplied('asset-metadata','./assets/gui/gui-manifest.json',{minecraftVersion:'1.20.1'})
+  'metadata.minecraft_gui':supplied('asset-metadata','./assets/gui/gui-manifest.json',{minecraftVersion:'1.20.1'}),
+  'metadata.minecraft_player':supplied('asset-metadata','./assets/minecraft/player-assets-manifest.json',{minecraftVersion:'1.20.1'})
 });
 
 export const ASSET_KEYS=Object.freeze(Object.keys(RECORDS));
