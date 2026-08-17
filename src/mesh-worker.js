@@ -2,7 +2,7 @@ import {BLOCKS,CHUNK_SIZE,WORLD_HEIGHT,ATLAS_COLS,ATLAS_ROWS,tileForFace} from '
 import {bedVisualDescriptor} from './bed-model-specs.js';
 import {buildMinecraftModelMeshBatches} from './minecraft-model-mesh-batch.js';
 import {createMinecraftModelAtlasResolver,createMinecraftModelTextureBinding} from './minecraft-model-texture-binding.js';
-import {assertMinecraftModelRuntime,instantiateMinecraftModelTemplate,minecraftModelLayerForTexture} from './minecraft-model-runtime.js';
+import {assertMinecraftModelRuntime,instantiateMinecraftModelTemplate,minecraftModelTextureLayerResolver} from './minecraft-model-runtime.js';
 
 const FACES=[
   {n:[1,0,0],name:'east',v:[[1,0,0],[1,1,0],[1,1,1],[1,0,1]]},
@@ -158,7 +158,7 @@ function initializeMinecraftModelRuntime(message){
   try{
     const runtime=assertMinecraftModelRuntime(message.runtime);
     const atlasResolver=createMinecraftModelAtlasResolver(message.atlasManifest);
-    const binding=createMinecraftModelTextureBinding(atlasResolver,{resolveLayer:minecraftModelLayerForTexture});
+    const binding=createMinecraftModelTextureBinding(atlasResolver,{resolveLayer:minecraftModelTextureLayerResolver});
     minecraftModelRuntime=runtime;
     minecraftModelTextureBinding=binding;
     self.postMessage({type:'minecraft-model-runtime-ready',blockIds:[...runtime.blockIds],textureCount:atlasResolver.textureCount});
