@@ -9,12 +9,12 @@ for(const key of [
   'terrain.block_atlas','block.model_atlas','block.iron_ore','block.white_wool','block.glass','item.stick','item.wooden_pickaxe','item.stone_pickaxe','item.raw_iron',
   'item.leather_helmet','item.leather_chestplate','item.leather_leggings','item.leather_boots','item.raw_beef','item.leather','item.raw_mutton',
   'item.raw_porkchop','item.raw_chicken','item.feather','item.rotten_flesh','item.bone','item.arrow','item.gunpowder','item.string',
-  'entity.bed.red','entity.cow','entity.sheep','entity.sheep_fur','entity.pig','entity.chicken','entity.zombie','entity.skeleton','entity.creeper','entity.spider',
-  'metadata.minecraft_runtime','metadata.minecraft_model_atlas'
+  'entity.bed.red','entity.cow','entity.sheep','entity.sheep_fur','entity.pig','entity.chicken','entity.zombie','entity.skeleton','entity.creeper','entity.spider','entity.player.steve',
+  'metadata.minecraft_runtime','metadata.minecraft_model_atlas','metadata.minecraft_player'
 ])assert.ok(ASSET_KEYS.includes(key),`${key} must be declared`);
 
 for(const key of ASSET_KEYS){
-  const record=assetRecord(key);assert.ok(record,`${key} must resolve to a manifest record`);assert.equal(record.source,ASSET_SOURCE.USER_SUPPLIED,`${key} must resolve from the user-supplied Minecraft archive`);
+  const record=assetRecord(key);assert.ok(record,`${key} must resolve to a manifest record`);assert.equal(record.source,ASSET_SOURCE.USER_SUPPLIED,`${key} must resolve from the user-supplied original Minecraft source assets`);
   assert.match(record.url,/^\.\/assets\//,`${key} must remain inside ./assets/`);
   assert.equal(existsSync(resolve(process.cwd(),record.url)),true,`${key} must point at a tracked runtime file`);
   assert.equal(assetAvailable(key),true,`${key} must be available`);
@@ -24,6 +24,7 @@ for(const key of ASSET_KEYS){
 assert.equal(assetUrl('terrain.block_atlas'),'./assets/textures/atlas.png');
 assert.equal(assetUrl('block.model_atlas'),'./assets/model-textures/model-texture-atlas.png');
 assert.equal(assetUrl('metadata.minecraft_model_atlas'),'./assets/model-textures/model-texture-atlas.json');
+assert.equal(assetUrl('metadata.minecraft_player'),'./assets/minecraft/player-assets-manifest.json');
 assert.equal(assetUrl('block.glass'),'./assets/items/glass.png');
 assert.equal(assetUrl('item.stick'),'./assets/items/stick.png');
 assert.equal(assetUrl('item.wooden_pickaxe'),'./assets/items/wooden_pickaxe.png');
@@ -41,6 +42,7 @@ assert.equal(assetUrl('entity.zombie'),'./assets/minecraft/textures/entity/zombi
 assert.equal(assetUrl('entity.skeleton'),'./assets/minecraft/textures/entity/skeleton/skeleton.png');
 assert.equal(assetUrl('entity.creeper'),'./assets/minecraft/textures/entity/creeper/creeper.png');
 assert.equal(assetUrl('entity.spider'),'./assets/minecraft/textures/entity/spider/spider.png');
+assert.equal(assetUrl('entity.player.steve'),'./assets/minecraft/textures/entity/player/wide/steve.png');
 assert.throws(()=>assetRecord(''),TypeError);
 
 for(const itemId of ['stick','wooden_pickaxe','leather_helmet','leather_chestplate','leather_leggings','leather_boots','raw_beef','leather','raw_mutton','raw_porkchop','raw_chicken','feather','rotten_flesh','bone','arrow','gunpowder','string']){
@@ -59,7 +61,9 @@ assert.equal(snapshot['terrain.block_atlas'].source,ASSET_SOURCE.USER_SUPPLIED);
 assert.equal(snapshot['block.model_atlas'].source,ASSET_SOURCE.USER_SUPPLIED);
 assert.equal(snapshot['block.glass'].source,ASSET_SOURCE.USER_SUPPLIED);
 assert.equal(snapshot['metadata.minecraft_model_atlas'].source,ASSET_SOURCE.USER_SUPPLIED);
+assert.equal(snapshot['metadata.minecraft_player'].source,ASSET_SOURCE.USER_SUPPLIED);
 assert.equal(snapshot['item.stone_pickaxe'].source,ASSET_SOURCE.USER_SUPPLIED);
 assert.equal(snapshot['entity.spider'].source,ASSET_SOURCE.USER_SUPPLIED);
+assert.equal(snapshot['entity.player.steve'].source,ASSET_SOURCE.USER_SUPPLIED);
 
-console.log('logical asset manifest + source-backed glass/runtime/entity/model-atlas bindings: PASS');
+console.log('logical asset manifest + original-Minecraft source-backed glass/runtime/entity/player/model-atlas bindings: PASS');
