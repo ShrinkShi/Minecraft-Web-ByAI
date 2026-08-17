@@ -56,7 +56,7 @@ export class PlayerModelFactory{
   create(){
     if(this.disposed)throw new Error('player model factory is disposed');
     const root=this.template.clone(true),parts={};root.traverse(object=>{if(object.name?.startsWith('player:'))parts[object.name.slice('player:'.length)]=object;});
-    const visual={root,poseRoot:root.getObjectByName('player-pose-root'),modelRoot:root.getObjectByName('player-model-root'),parts,state:{walkPhase:0,primaryPulse:0,useRemaining:0,deathProgress:0}};
+    const visual={root,poseRoot:root.getObjectByName('player-pose-root'),modelRoot:root.getObjectByName('player-model-root'),parts,state:{walkPhase:0,actionPhase:0,primaryPulse:0,useRemaining:0,deathProgress:0}};
     root.userData.playerVisualState=visual.state;return visual;
   }
 
@@ -72,8 +72,8 @@ export class PlayerModelFactory{
     for(const part of Object.values(parts))part.rotation.set(0,0,0);
     parts.head.rotation.x=pose.headPitch;parts.head.rotation.y=pose.headYaw;
     parts.leftArm.rotation.x=-swing;parts.rightArm.rotation.x=swing;parts.leftLeg.rotation.x=swing;parts.rightLeg.rotation.x=-swing;
-    const attacking=pose.primary||state.primaryPulse>0;
-    if(attacking){const attack=Math.sin((state.walkPhase*1.65+performance.now()*.014)%Math.PI);parts.rightArm.rotation.x=-.65-Math.abs(attack)*1.25;parts.rightArm.rotation.z=-.08;}
+    const attacking=pose.primary||state.primaryPulse>0;if(attacking)state.actionPhase=(state.actionPhase+dt*14)%(Math.PI*2);else state.actionPhase=0;
+    if(attacking){const attack=Math.abs(Math.sin(state.actionPhase));parts.rightArm.rotation.x=-.65-attack*1.25;parts.rightArm.rotation.z=-.08;}
     if(state.useRemaining>0){const t=Math.min(1,state.useRemaining/.34);parts.rightArm.rotation.x=-1.05-Math.sin((1-t)*Math.PI)*.22;parts.rightArm.rotation.y=-.28;parts.rightArm.rotation.z=-.12;}
     visual.modelRoot.rotation.x=pose.sprint&&moving>.15?-.12:0;
     const death=easeOutCubic(state.deathProgress);visual.poseRoot.rotation.set(0,0,-Math.PI/2*death);visual.poseRoot.position.set(0,.08*death,0);
