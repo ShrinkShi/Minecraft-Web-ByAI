@@ -99,15 +99,21 @@ test('source-backed glass uses translucent Worker mesh, culls shared faces, and 
   await runCommand(page,'/give glass 1');
   await key(page,'KeyE');
   await expect(page.locator('#inventory')).not.toHaveClass(/hidden/);
-  const glassItem=page.locator('#inventory-grid [data-inv-index]').filter({has:page.locator('img[alt="玻璃"]')}).first();
+  const glassItem=page.locator('#inventory-grid [data-inv-index]').filter({has:page.locator('.block-item-icon[data-item-id="block:20"]')}).first();
   await expect(glassItem).toBeVisible();
-  await expect(glassItem.locator('img[alt="玻璃"]')).toHaveAttribute('src',/assets\/items\/glass\.png/);
+  const inventoryPreview=glassItem.locator('.block-item-icon[data-item-id="block:20"]');
+  await expect(inventoryPreview).toBeVisible();
+  await expect(inventoryPreview.locator('.block-face')).toHaveCount(3);
+  for(const faceName of ['left','right','top'])await expect(inventoryPreview.locator(`.block-face.${faceName}`)).toHaveCSS('background-image',/assets\/items\/glass\.png/);
   await glassItem.click({modifiers:['Shift']});
   await key(page,'Escape');
   await expect(page.locator('#inventory')).toHaveClass(/hidden/);
   const selected=page.locator('#hotbar [data-hotbar-index="0"]');
   await expect(selected).toHaveAttribute('title','玻璃');
-  await expect(selected.locator('img[alt="玻璃"]')).toBeVisible();
+  const hotbarPreview=selected.locator('.block-item-icon[data-item-id="block:20"]');
+  await expect(hotbarPreview).toBeVisible();
+  await expect(hotbarPreview.locator('.block-face')).toHaveCount(3);
+  for(const faceName of ['left','right','top'])await expect(hotbarPreview.locator(`.block-face.${faceName}`)).toHaveCSS('background-image',/assets\/items\/glass\.png/);
 
   await lockPointer(page);
   const target=await page.evaluate(()=>globalThis.__minecraftE2E?.prepareSingleplayerMiningTarget?.(20)||null);
