@@ -17,12 +17,12 @@ export class ServerFurnaceContainerState{
   constructor(target,{state=null,revision:initialRevision=0}={}){
     this.target=cell(target);this.revision=revision(initialRevision);this.state=state?cloneState(state):createFurnaceState();
   }
-  advanceRevision(){this.revision=nextNetworkSequence(this.revision);return this.revision;}
+  advanceRevision(steps=1){steps=count(steps,'furnace revision steps',{max:1_000_000});for(let i=0;i<steps;i++)this.revision=nextNetworkSequence(this.revision);return this.revision;}
   snapshot(){const state=cloneState(this.state);return Object.freeze({target:this.target,revision:this.revision,slots:state.slots,burnRemaining:state.burnRemaining,burnTotal:state.burnTotal,cookProgress:state.cookProgress,cookTotal:state.cookTotal,storedExperience:state.storedExperience,lit:state.burnRemaining>0});}
   insert(slot,value,{expectedRevision=this.revision}={}){
     expectedRevision=revision(expectedRevision);if(expectedRevision!==this.revision)return conflict(this);
     if(slot!==FURNACE_SLOT.INPUT&&slot!==FURNACE_SLOT.FUEL)throw new RangeError('furnace insert slot must be INPUT or FUEL');
-    const incoming=normalizeFurnaceStack(value,{label:'furnace insert stack'});if(!furnaceCanInsert(slot,incoming.id))return Object.freeze({changed:false,reason:slot===FURNACE_SLOT.INPUT?'not-smeltable':'not-fuel',remaining:incoming.count,container:this.snapshot()});
+    const incoming=normalizeFurnaceStack(value,{label:'furnace insert stack'});if(!furnaceCanInsert(slot,incoming.id))return Object.freeze({changed:false,reason:'slot-rejects-item',remaining:incoming.count,container:this.snapshot()});
     const slots=this.state.slots.map(stack=>stack?{...stack}:null),current=slots[slot];if(current&&current.id!==incoming.id)return Object.freeze({changed:false,reason:'slot-occupied',remaining:incoming.count,container:this.snapshot()});
     const capacity=FURNACE_STACK_LIMIT-(current?.count||0),moved=Math.min(capacity,incoming.count);if(moved<=0)return Object.freeze({changed:false,reason:'slot-full',remaining:incoming.count,container:this.snapshot()});
     slots[slot]=current?{id:current.id,count:current.count+moved}:{id:incoming.id,count:moved};this.state=createFurnaceState({...this.state,slots});this.advanceRevision();
@@ -35,7 +35,7 @@ export class ServerFurnaceContainerState{
     const experience=slots[FURNACE_SLOT.OUTPUT]?0:this.state.storedExperience;this.state=createFurnaceState({...this.state,slots,storedExperience:experience?0:this.state.storedExperience});this.advanceRevision();
     return Object.freeze({changed:true,reason:'output-taken',taken:stack,experience,container:this.snapshot()});
   }
-  tick(ticks=1){const result=tickFurnace(this.state,ticks);if(result.changed){this.state=result.state;this.advanceRevision();}return Object.freeze({...result,container:this.snapshot()});}
+  tick(ticks=1){const result=tickFurnace(this.state,ticks);if(result.changed)this.state=result.state;if(result.transactionMutations>0)this.advanceRevision(result.transactionMutations);return Object.freeze({...result,container:this.snapshot()});}
   drain(){const snapshot=this.snapshot(),contents=Object.freeze(snapshot.slots.filter(Boolean).map(cloneStack)),experience=snapshot.storedExperience;if(!contents.length&&!experience)return Object.freeze({changed:false,contents,experience,container:snapshot});this.state=createFurnaceState();this.advanceRevision();return Object.freeze({changed:true,contents,experience,container:this.snapshot()});}
   serialize(){const snapshot=this.snapshot();return Object.freeze({target:snapshot.target,revision:snapshot.revision,state:Object.freeze({slots:snapshot.slots,burnRemaining:snapshot.burnRemaining,burnTotal:snapshot.burnTotal,cookProgress:snapshot.cookProgress,cookTotal:snapshot.cookTotal,storedExperience:snapshot.storedExperience})});}
 }
@@ -47,7 +47,7 @@ export class ServerFurnaceContainerHub{
   open(target){const id=key(target);let state=this.states.get(id);if(!state){state=new ServerFurnaceContainerState(target);this.states.set(id,state);}return state.snapshot();}
   state(target){const id=key(target),state=this.states.get(id);if(!state)throw new Error(`no furnace state for cell: ${id}`);return state;}
   snapshot(target){return this.state(target).snapshot();}
-  tickAll(ticks=1){let changed=0,smelted=0;for(const state of this.states.values()){const result=state.tick(ticks);if(result.changed)changed++;smelted+=result.smelted;}return Object.freeze({changed,smelted,furnaces:this.furnaceCount});}
+  tickAll(ticks=1){let changed=0,transactionMutations=0,smelted=0;for(const state of this.states.values()){const result=state.tick(ticks);if(result.changed)changed++;transactionMutations+=result.transactionMutations;smelted+=result.smelted;}return Object.freeze({changed,transactionMutations,smelted,furnaces:this.furnaceCount});}
   break(target){const id=key(target),state=this.states.get(id);if(!state)return Object.freeze({changed:false,contents:Object.freeze([]),experience:0});const drained=state.drain();this.states.delete(id);return Object.freeze({changed:true,contents:drained.contents,experience:drained.experience});}
   restore(record){if(!record||typeof record!=='object'||Array.isArray(record))throw new TypeError('furnace restore record must be an object');const id=key(record.target);if(this.states.has(id))throw new Error(`furnace state already exists for cell: ${id}`);const state=new ServerFurnaceContainerState(record.target,{state:record.state,revision:record.revision});this.states.set(id,state);return state.snapshot();}
   serialize(){return Object.freeze([...this.states.values()].map(state=>state.serialize()));}
