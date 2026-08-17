@@ -34,7 +34,7 @@ export function createBlockItemCanvas(definition,{atlasUrl,size=32}={}){
   const sources=Object.fromEntries(['top','left','right'].map(face=>[face,faceSource(definition,face,atlasUrl)]));if(Object.values(sources).some(source=>!source))return null;
   const canvas=document.createElement('canvas');canvas.className='block-item-canvas';canvas.width=size;canvas.height=size;canvas.setAttribute('aria-hidden','true');canvas.dataset.renderState='loading';
   Promise.all(Object.entries(sources).map(async([face,source])=>[face,source,await imageFor(source.url)])).then(entries=>{
-    if(!canvas.isConnected&&canvas.dataset.allowDetached!=='1')return;const ctx=canvas.getContext('2d');ctx.clearRect(0,0,size,size);ctx.imageSmoothingEnabled=false;
+    const ctx=canvas.getContext('2d');if(!ctx)throw new Error('2D canvas context is unavailable for block item icon');ctx.clearRect(0,0,size,size);ctx.imageSmoothingEnabled=false;
     for(const face of['left','right','top']){const [,source,image]=entries.find(entry=>entry[0]===face);drawMappedFace(ctx,image,source,FACE_POINTS[face]);shade(ctx,face);}
     canvas.dataset.renderState='ready';canvas.dispatchEvent(new CustomEvent('block-item-rendered',{bubbles:true}));
   }).catch(error=>{canvas.dataset.renderState='error';canvas.dataset.renderError=error?.message||String(error);});
