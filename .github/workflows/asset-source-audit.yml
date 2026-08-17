@@ -9,6 +9,7 @@ on:
       - 'tools/import-minecraft-assets.py'
       - 'tools/build-minecraft-runtime-assets.py'
       - 'tools/build-minecraft-gui-assets.py'
+      - 'tools/build-minecraft-player-assets.py'
       - 'tools/minecraft_model_acceptance.py'
       - 'tools/minecraft_model_closure.py'
       - 'tools/check_minecraft_model_closure.py'
@@ -49,10 +50,17 @@ jobs:
           cmp build/minecraft-model-atlas/model-texture-atlas.json assets/model-textures/model-texture-atlas.json
       - name: Build deterministic vanilla GUI sprites
         run: python tools/build-minecraft-gui-assets.py
+      - name: Build deterministic Steve player asset
+        run: python tools/build-minecraft-player-assets.py
       - name: Extract deterministic runtime source subset
         run: python tools/import-minecraft-assets.py
       - name: Build browser-ready runtime assets
         run: python tools/build-minecraft-runtime-assets.py
+      - name: Merge deterministic player asset into browser runtime output
+        run: |
+          mkdir -p build/minecraft-runtime-assets/minecraft/textures/entity/player/wide
+          cp build/minecraft-player-assets/textures/entity/player/wide/steve.png build/minecraft-runtime-assets/minecraft/textures/entity/player/wide/steve.png
+          cp build/minecraft-player-assets/player-assets-manifest.json build/minecraft-runtime-assets/minecraft/player-assets-manifest.json
       - name: Upload deterministic audit report
         uses: actions/upload-artifact@v4
         with:
@@ -64,6 +72,12 @@ jobs:
         with:
           name: minecraft-gui-assets
           path: build/minecraft-gui-assets
+          if-no-files-found: error
+      - name: Upload deterministic Steve player asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: minecraft-player-assets
+          path: build/minecraft-player-assets
           if-no-files-found: error
       - name: Upload selected runtime source subset
         uses: actions/upload-artifact@v4
