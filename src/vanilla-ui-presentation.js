@@ -1,5 +1,5 @@
 import {requireAssetUrl} from './asset-manifest.js';
-import {blockItemAtlasStyle,blockItemFaceTextures,blockItemFaceTiles} from './block-item-preview.js';
+import {createBlockItemCanvas} from './block-item-canvas-renderer.js';
 import {ITEMS} from './items.js';
 import {UI} from './ui.js';
 
@@ -67,7 +67,8 @@ ${hotbarSlotRules}
 #inventory .inventory-top{display:block!important;position:static!important;width:0!important;height:0!important;margin:0!important;padding:0!important}
 #inventory #equipment-slots{position:absolute!important;left:16px!important;top:16px!important;width:36px!important;height:144px!important;display:grid!important;grid-template-columns:36px!important;grid-template-rows:repeat(4,36px)!important;gap:0!important;margin:0!important;padding:0!important;align-content:start!important}
 #inventory .equipment-slot:empty::before,#inventory .equipment-slot:empty::after{display:none!important;content:none!important}
-#inventory .player-preview{position:absolute!important;left:52px!important;top:16px!important;width:100px!important;height:144px!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;color:transparent!important;font-size:0!important;box-shadow:none!important;pointer-events:none!important}
+#inventory .player-preview{position:absolute!important;left:52px!important;top:16px!important;width:100px!important;height:144px!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;color:transparent!important;font-size:0!important;box-shadow:none!important;pointer-events:auto!important;overflow:hidden!important}
+#inventory .player-preview canvas{display:block!important;width:100%!important;height:100%!important;image-rendering:pixelated!important}
 #inventory .crafting-area{position:static!important;width:0!important;height:0!important;margin:0!important;padding:0!important;border:0!important;background:none!important}
 #inventory .crafting-area>span,#inventory .crafting-line>b{display:none!important}
 #inventory .crafting-line{display:block!important;position:static!important;width:0!important;height:0!important;margin:0!important;padding:0!important}
@@ -84,10 +85,7 @@ ${hotbarSlotRules}
 #workbench .inv-slot:hover,#workbench .craft-slot:hover,#workbench .result-slot:hover{filter:brightness(1.12)}
 #inventory .item-icon,#inventory .block-item-icon,#workbench .item-icon,#workbench .block-item-icon{width:32px!important;height:32px!important;margin:0 auto!important}
 .block-item-icon{position:relative;display:inline-block;width:32px;height:32px;overflow:visible;filter:drop-shadow(1px 2px 0 #0008);image-rendering:pixelated}
-.block-item-icon .block-face{position:absolute;display:block;background-image:url("${escapeCssUrl(TERRAIN_ATLAS)}");background-repeat:no-repeat;image-rendering:pixelated;transform-origin:0 0;backface-visibility:hidden}
-.block-item-icon .block-face.top{left:7px;top:1px;width:24px;height:24px;clip-path:polygon(50% 0,100% 28%,50% 56%,0 28%)}
-.block-item-icon .block-face.left{left:1px;top:8px;width:24px;height:24px;clip-path:polygon(25% 0,75% 28%,75% 100%,25% 72%);filter:brightness(.78)}
-.block-item-icon .block-face.right{left:13px;top:8px;width:24px;height:24px;clip-path:polygon(0 28%,50% 0,50% 72%,0 100%);filter:brightness(.62)}
+.block-item-canvas{display:block;width:32px;height:32px;image-rendering:pixelated}
 #oxygen .oxygen-bubble{background-image:url("${escapeCssUrl(HUD_ICONS)}")!important;background-size:108px 72px!important;background-position:0 -36px!important;image-rendering:pixelated!important}
 #oxygen .oxygen-bubble.empty{visibility:hidden!important}
 @media(max-width:700px),(pointer:coarse){.status-stack{bottom:64px!important;transform:translateX(-50%) scale(.82)!important;transform-origin:bottom center!important}#inventory .inventory-panel{transform:scale(.78)!important;transform-origin:center center!important}}
@@ -95,29 +93,9 @@ ${hotbarSlotRules}
 }
 
 function createBlockItemIcon(itemId){
-  const definition=ITEMS[itemId];
-  const tiles=blockItemFaceTiles(definition),textures=blockItemFaceTextures(definition);
-  if((!tiles&&!textures)||typeof document==='undefined')return null;
-  const root=document.createElement('span');
-  root.className='block-item-icon';
-  root.dataset.itemId=String(itemId);
-  root.setAttribute('aria-label',definition?.name||String(itemId));
-  root.title=definition?.name||String(itemId);
-  for(const faceName of ['left','right','top']){
-    const face=document.createElement('span');
-    face.className=`block-face ${faceName}`;
-    if(textures){
-      face.style.backgroundImage=`url("${escapeCssUrl(textures[faceName])}")`;
-      face.style.backgroundSize='24px 24px';
-      face.style.backgroundPosition='0 0';
-    }else{
-      const style=blockItemAtlasStyle(tiles[faceName],{facePixels:24});
-      face.style.backgroundSize=style.backgroundSize;
-      face.style.backgroundPosition=style.backgroundPosition;
-    }
-    root.append(face);
-  }
-  return root;
+  const definition=ITEMS[itemId];if(!definition||typeof document==='undefined')return null;
+  const canvas=createBlockItemCanvas(definition,{atlasUrl:TERRAIN_ATLAS});if(!canvas)return null;
+  const root=document.createElement('span');root.className='block-item-icon';root.dataset.itemId=String(itemId);root.setAttribute('aria-label',definition.name||String(itemId));root.title=definition.name||String(itemId);root.append(canvas);return root;
 }
 
 function renderVanillaArmor(armorPoints=0){
