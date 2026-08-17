@@ -185,7 +185,7 @@ export class VoxelWorld{
     if(saved)for(const [i,id] of saved)if(i>=0&&i<data.length)data[i]=id;
     this.chunks.set(chunkKey,data);
     this.requestMesh(m.cx,m.cz);
-    this.requestMesh(m.cx-1,m.cz);this.requestMesh(m.cx+1,m.cz);this.requestMesh(m.cx,cz-1);this.requestMesh(m.cx,m.cz+1);
+    this.requestMesh(m.cx-1,m.cz);this.requestMesh(m.cx+1,m.cz);this.requestMesh(m.cx,m.cz-1);this.requestMesh(m.cx,m.cz+1);
     if(this.initialPending.delete(chunkKey))this.reportInitialProgress();
   }
 
