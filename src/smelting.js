@@ -42,12 +42,12 @@ export function createFurnaceState(value={}){
   if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError('furnace state must be an object');
   const slots=Array.isArray(value.slots)?value.slots:[null,null,null];
   if(slots.length!==FURNACE_SLOT_COUNT)throw new RangeError(`furnace slots must contain ${FURNACE_SLOT_COUNT} entries`);
+  const burnRemaining=integer(value.burnRemaining??0,'burnRemaining'),burnTotal=integer(value.burnTotal??0,'burnTotal'),cookProgress=integer(value.cookProgress??0,'cookProgress'),cookTotal=integer(value.cookTotal??0,'cookTotal');
+  if(burnRemaining>burnTotal)throw new RangeError('burnRemaining cannot exceed burnTotal');
+  if(cookProgress>cookTotal)throw new RangeError('cookProgress cannot exceed cookTotal');
   return Object.freeze({
     slots:Object.freeze(slots.map((stack,index)=>normalizeFurnaceStack(stack,{label:`furnace slot ${index}`}))),
-    burnRemaining:integer(value.burnRemaining??0,'burnRemaining'),
-    burnTotal:integer(value.burnTotal??0,'burnTotal'),
-    cookProgress:integer(value.cookProgress??0,'cookProgress'),
-    cookTotal:integer(value.cookTotal??0,'cookTotal'),
+    burnRemaining,burnTotal,cookProgress,cookTotal,
     storedExperience:finite(value.storedExperience??0,'storedExperience')
   });
 }
@@ -60,14 +60,14 @@ function produce(slots,recipe){const output=slots[FURNACE_SLOT.OUTPUT];if(output
 
 export function tickFurnace(value,ticks=1){
   const initial=createFurnaceState(value);ticks=integer(ticks,'ticks',{min:0,max:1_000_000});
-  if(ticks===0)return Object.freeze({state:initial,changed:false,smelted:0,consumedFuel:0,experienceGained:0});
+  if(ticks===0)return Object.freeze({state:initial,changed:false,transactionMutations:0,smelted:0,consumedFuel:0,experienceGained:0});
   const slots=cloneSlots(initial.slots);let burnRemaining=initial.burnRemaining,burnTotal=initial.burnTotal,cookProgress=initial.cookProgress,cookTotal=initial.cookTotal,storedExperience=initial.storedExperience;
-  let changed=false,smelted=0,consumedFuel=0,experienceGained=0;
+  let changed=false,transactionMutations=0,smelted=0,consumedFuel=0,experienceGained=0;
   for(let tick=0;tick<ticks;tick++){
     let recipe=canSmelt(slots);
     if(burnRemaining<=0&&recipe){
       const fuel=slots[FURNACE_SLOT.FUEL],duration=furnaceFuelTicks(fuel?.id);
-      if(duration>0){consumeOne(slots,FURNACE_SLOT.FUEL);burnRemaining=duration;burnTotal=duration;consumedFuel++;changed=true;}
+      if(duration>0){consumeOne(slots,FURNACE_SLOT.FUEL);burnRemaining=duration;burnTotal=duration;consumedFuel++;transactionMutations++;changed=true;}
     }
     recipe=canSmelt(slots);
     const burningThisTick=burnRemaining>0;
@@ -76,22 +76,22 @@ export function tickFurnace(value,ticks=1){
       if(cookTotal!==recipe.cookTicks){cookTotal=recipe.cookTicks;changed=true;}
       cookProgress++;changed=true;
       if(cookProgress>=recipe.cookTicks){
-        consumeOne(slots,FURNACE_SLOT.INPUT);produce(slots,recipe);cookProgress=0;storedExperience+=recipe.experience;experienceGained+=recipe.experience;smelted++;changed=true;
+        consumeOne(slots,FURNACE_SLOT.INPUT);produce(slots,recipe);cookProgress=0;storedExperience+=recipe.experience;experienceGained+=recipe.experience;smelted++;transactionMutations++;changed=true;
       }
     }else if(cookProgress>0){
       const next=Math.max(0,cookProgress-2);if(next!==cookProgress){cookProgress=next;changed=true;}
       if(cookProgress===0&&cookTotal!==0){cookTotal=0;changed=true;}
-    }else if(!recipe&&cookTotal!==0){cookTotal=0;changed=true;
-    }
+    }else if(!recipe&&cookTotal!==0){cookTotal=0;changed=true;}
     if(burnRemaining===0&&burnTotal!==0){burnTotal=0;changed=true;}
   }
   const state=createFurnaceState({slots,burnRemaining,burnTotal,cookProgress,cookTotal,storedExperience});
-  return Object.freeze({state,changed,smelted,consumedFuel,experienceGained});
+  return Object.freeze({state,changed,transactionMutations,smelted,consumedFuel,experienceGained});
 }
 
 export function furnaceCanInsert(slot,itemId){
   integer(slot,'furnace slot',{min:0,max:FURNACE_SLOT_COUNT-1});
-  if(slot===FURNACE_SLOT.INPUT)return isSmeltable(itemId);
+  if(typeof itemId!=='string'||!itemId)return false;
+  if(slot===FURNACE_SLOT.INPUT)return true;
   if(slot===FURNACE_SLOT.FUEL)return isFurnaceFuel(itemId);
   return false;
 }
