@@ -3,7 +3,7 @@ name: Minecraft asset source audit
 on:
   pull_request:
     paths:
-      - 'MC原版素材assets.zip'
+      - 'MC原版素材assets/**'
       - 'assets/**'
       - 'tools/audit-minecraft-assets.py'
       - 'tools/import-minecraft-assets.py'
@@ -34,7 +34,7 @@ jobs:
           python-version: '3.13'
       - name: Install pinned asset build dependency
         run: python -m pip install -r tools/requirements-assets.txt
-      - name: Inspect source archive
+      - name: Inspect extracted source directory
         run: python tools/audit-minecraft-assets.py --json-out minecraft-assets-audit.json
       - name: Validate model dependency closure
         run: |
@@ -44,6 +44,12 @@ jobs:
         run: python tools/check_minecraft_model_atlas.py
       - name: Build deterministic model texture atlas
         run: python tools/build-minecraft-model-atlas.py
+      - name: Upload deterministic model texture atlas
+        uses: actions/upload-artifact@v4
+        with:
+          name: minecraft-model-texture-atlas
+          path: build/minecraft-model-atlas
+          if-no-files-found: error
       - name: Verify tracked model texture atlas matches generated output
         run: |
           cmp build/minecraft-model-atlas/model-texture-atlas.png assets/model-textures/model-texture-atlas.png
@@ -52,7 +58,7 @@ jobs:
         run: python tools/build-minecraft-gui-assets.py
       - name: Build deterministic Steve player asset
         run: python tools/build-minecraft-player-assets.py
-      - name: Extract deterministic runtime source subset
+      - name: Copy deterministic runtime source subset
         run: python tools/import-minecraft-assets.py
       - name: Build browser-ready runtime assets
         run: python tools/build-minecraft-runtime-assets.py
@@ -93,6 +99,11 @@ jobs:
           if-no-files-found: error
       - name: Verify tracked vanilla GUI sprites match generated output
         run: diff -qr build/minecraft-gui-assets assets/gui
+      - name: Verify tracked Steve asset matches original source and generated output
+        run: |
+          cmp MC原版素材assets/minecraft/textures/entity/player/wide/steve.png assets/minecraft/textures/entity/player/wide/steve.png
+          cmp build/minecraft-player-assets/textures/entity/player/wide/steve.png assets/minecraft/textures/entity/player/wide/steve.png
+          cmp build/minecraft-player-assets/player-assets-manifest.json assets/minecraft/player-assets-manifest.json
       - name: Verify tracked runtime assets match generated output
         run: |
           cmp build/minecraft-runtime-assets/textures/atlas.png assets/textures/atlas.png
@@ -100,9 +111,3 @@ jobs:
             cmp "$file" "assets/items/$(basename "$file")"
           done
           diff -qr build/minecraft-runtime-assets/minecraft assets/minecraft
-      - name: Upload deterministic model texture atlas
-        uses: actions/upload-artifact@v4
-        with:
-          name: minecraft-model-texture-atlas
-          path: build/minecraft-model-atlas
-          if-no-files-found: error
