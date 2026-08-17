@@ -24,7 +24,7 @@ for(const key of ASSET_KEYS){
 assert.equal(assetUrl('terrain.block_atlas'),'./assets/textures/atlas.png');
 assert.equal(assetUrl('block.model_atlas'),'./assets/model-textures/model-texture-atlas.png');
 assert.equal(assetUrl('metadata.minecraft_model_atlas'),'./assets/model-textures/model-texture-atlas.json');
-assert.equal(assetUrl('block.glass'),'./assets/minecraft/textures/block/glass.png');
+assert.equal(assetUrl('block.glass'),'./assets/items/glass.png');
 assert.equal(assetUrl('item.stick'),'./assets/items/stick.png');
 assert.equal(assetUrl('item.wooden_pickaxe'),'./assets/items/wooden_pickaxe.png');
 assert.equal(assetUrl('item.stone_pickaxe'),'./assets/items/stone_pickaxe.png');
