@@ -26,8 +26,8 @@
     "minecraft:oak_stairs",
     "minecraft:torch"
   ],
-  "sourceArchive": "MC原版素材assets.zip",
-  "sourceArchiveSha256": "b65a2211175af90664de9f41ea422f4869eee855f0da4bf6fe0715434ebe9c69",
+  "sourceKind": "directory",
+  "sourceRoot": "MC原版素材assets",
   "textures": {
     "minecraft:block/crafting_table_front": {
       "canonical": "assets/minecraft/textures/block/crafting_table_front.png",
@@ -44,7 +44,7 @@
         "v0": 0.0078125,
         "v1": 0.1328125
       },
-      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/block/crafting_table_front.png",
+      "source": "MC原版素材assets/minecraft/textures/block/crafting_table_front.png",
       "sourceBytes": 351,
       "sourceSha256": "ff53d9803d469fec24d2bc0d547f5e2155b080788f3cd701ca3e39973985665d",
       "width": 16
@@ -64,7 +64,7 @@
         "v0": 0.0078125,
         "v1": 0.1328125
       },
-      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/block/crafting_table_side.png",
+      "source": "MC原版素材assets/minecraft/textures/block/crafting_table_side.png",
       "sourceBytes": 337,
       "sourceSha256": "414736f6eab354a21063908a71e0372a6c52191d808113f1c8bfbbdf4c39ffc3",
       "width": 16
@@ -84,7 +84,7 @@
         "v0": 0.0078125,
         "v1": 0.1328125
       },
-      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/block/crafting_table_top.png",
+      "source": "MC原版素材assets/minecraft/textures/block/crafting_table_top.png",
       "sourceBytes": 262,
       "sourceSha256": "989c4e768fa5f145e5eea1027c1fe4c6adcf5eaf5234dc4140bb6404b4c1b532",
       "width": 16
@@ -104,7 +104,7 @@
         "v0": 0.0078125,
         "v1": 0.1328125
       },
-      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/block/dirt.png",
+      "source": "MC原版素材assets/minecraft/textures/block/dirt.png",
       "sourceBytes": 266,
       "sourceSha256": "fb0450253248276e0b8d653d5a4d21c59763cbf775c0e048469ff500afaaef68",
       "width": 16
@@ -124,7 +124,7 @@
         "v0": 0.0078125,
         "v1": 0.1328125
       },
-      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/block/glass.png",
+      "source": "MC原版素材assets/minecraft/textures/block/glass.png",
       "sourceBytes": 147,
       "sourceSha256": "cb89c706dce86eac3123cef087d359b5f23098b658a468fb91662b4a9922bcd0",
       "width": 16
@@ -144,7 +144,7 @@
         "v0": 0.0078125,
         "v1": 0.1328125
       },
-      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/block/grass_block_side.png",
+      "source": "MC原版素材assets/minecraft/textures/block/grass_block_side.png",
       "sourceBytes": 408,
       "sourceSha256": "dedaa0171af63df63a6cf7e3e6c7078d4d5830fd93923f3005302ed0f02104c5",
       "width": 16
@@ -164,7 +164,7 @@
         "v0": 0.0078125,
         "v1": 0.1328125
       },
-      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/block/grass_block_side_overlay.png",
+      "source": "MC原版素材assets/minecraft/textures/block/grass_block_side_overlay.png",
       "sourceBytes": 177,
       "sourceSha256": "43d98318407d9d122b83468cf183d18722e548c2144f9c2ffe2021b5c3e770e0",
       "width": 16
@@ -184,7 +184,7 @@
         "v0": 0.1484375,
         "v1": 0.2734375
       },
-      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/block/grass_block_snow.png",
+      "source": "MC原版素材assets/minecraft/textures/block/grass_block_snow.png",
       "sourceBytes": 307,
       "sourceSha256": "53f100fe981f39331c8197bf8044dd3a79d1e5ede87c6b32996091758145c485",
       "width": 16
@@ -204,7 +204,7 @@
         "v0": 0.1484375,
         "v1": 0.2734375
       },
-      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/block/grass_block_top.png",
+      "source": "MC原版素材assets/minecraft/textures/block/grass_block_top.png",
       "sourceBytes": 560,
       "sourceSha256": "b2aa2204118c7323c0f8d263eb30dee99b6b69cb1f6df3115272a69fd188e507",
       "width": 16
@@ -224,7 +224,7 @@
         "v0": 0.1484375,
         "v1": 0.2734375
       },
-      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/block/iron_ore.png",
+      "source": "MC原版素材assets/minecraft/textures/block/iron_ore.png",
       "sourceBytes": 292,
       "sourceSha256": "af864e4f225fff7b54ea859225755ca9e597e40d531643e9945b121634fe6376",
       "width": 16
@@ -244,7 +244,7 @@
         "v0": 0.1484375,
         "v1": 0.2734375
       },
-      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/block/oak_door_bottom.png",
+      "source": "MC原版素材assets/minecraft/textures/block/oak_door_bottom.png",
       "sourceBytes": 240,
       "sourceSha256": "2f162e4f1b165986811cfdbee9434deb3cb512b3f210292a186f504b65d19fee",
       "width": 16
@@ -264,7 +264,7 @@
         "v0": 0.1484375,
         "v1": 0.2734375
       },
-      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/block/oak_door_top.png",
+      "source": "MC原版素材assets/minecraft/textures/block/oak_door_top.png",
       "sourceBytes": 234,
       "sourceSha256": "5a401cba3322770f653f129d8c1fa0c833baa09a35c2262de84955112f721112",
       "width": 16
@@ -284,7 +284,7 @@
         "v0": 0.1484375,
         "v1": 0.2734375
       },
-      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/block/oak_planks.png",
+      "source": "MC原版素材assets/minecraft/textures/block/oak_planks.png",
       "sourceBytes": 268,
       "sourceSha256": "3b00412fec87bd07b83825b86de49bcb6c186ca7799f41721a36b04e5d8ed161",
       "width": 16
@@ -304,7 +304,7 @@
         "v0": 0.1484375,
         "v1": 0.2734375
       },
-      "source": "MC╘¡░µ╦╪▓─assets/minecraft/textures/block/torch.png",
+      "source": "MC原版素材assets/minecraft/textures/block/torch.png",
       "sourceBytes": 138,
       "sourceSha256": "329db8f31720564ca9c6eeb3bafb98bb30a4d277e958e55806720cc01dbf296d",
       "width": 16
