@@ -14,7 +14,7 @@ export const ITEMS={
   'block:7':{name:'橡树树叶',stack:64,blockId:7,tile:8},
   'block:9':{name:'工作台',stack:64,blockId:9,tile:10},
   'block:10':{name:'圆石',stack:64,blockId:10,tile:13},
-  'block:20':textured('玻璃',64,'block.glass',{blockId:20,blockPreview:false}),
+  'block:20':textured('玻璃',64,'block.glass',{blockId:20,blockPreview:'source-texture'}),
   stick:textured('木棍',64,'item.stick'),
   wooden_pickaxe:textured('木镐',1,'item.wooden_pickaxe',{attackDamage:2,tool:{kind:'pickaxe',tier:'wood',speed:2,durability:59}}),
   stone_pickaxe:textured('石镐',1,'item.stone_pickaxe',{attackDamage:3,tool:{kind:'pickaxe',tier:'stone',speed:4,durability:131}}),
