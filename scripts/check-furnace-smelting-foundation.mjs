@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {FURNACE_FUELS,FURNACE_SLOT,SMELTING_RECIPES,createFurnaceState,furnaceCanInsert,furnaceFuelTicks,smeltingRecipeFor,tickFurnace} from '../src/smelting.js';
+import {FURNACE_FUELS,FURNACE_SLOT,SMELTING_RECIPES,createFurnaceState,furnaceCanInsert,furnaceFuelTicks,furnaceStackLimitFor,normalizeFurnaceStack,smeltingRecipeFor,tickFurnace} from '../src/smelting.js';
 import {ServerFurnaceContainerHub,ServerFurnaceContainerState} from '../server/furnace-container-state.mjs';
 
 assert.deepEqual(smeltingRecipeFor('raw_iron'),{input:'raw_iron',output:'iron_ingot',count:1,cookTicks:200,experience:.7});
@@ -11,11 +11,19 @@ assert.equal(furnaceFuelTicks('wooden_pickaxe'),200);
 assert.equal(furnaceFuelTicks('stone_pickaxe'),0);
 assert.equal(Object.isFrozen(SMELTING_RECIPES),true);
 assert.equal(Object.isFrozen(FURNACE_FUELS),true);
+assert.equal(furnaceStackLimitFor('wooden_pickaxe'),1);
+assert.equal(furnaceStackLimitFor('iron_ingot'),64);
 assert.equal(furnaceCanInsert(FURNACE_SLOT.INPUT,'raw_iron'),true);
-assert.equal(furnaceCanInsert(FURNACE_SLOT.INPUT,'stone_pickaxe'),true,'manual furnace input accepts non-smeltable items without cooking them');
+assert.equal(furnaceCanInsert(FURNACE_SLOT.INPUT,'stone_pickaxe'),true,'manual furnace input accepts known non-smeltable items without cooking them');
+assert.equal(furnaceCanInsert(FURNACE_SLOT.INPUT,'iron_ingot'),false,'declared furnace outputs cannot be reinserted into the input foundation');
+assert.equal(furnaceCanInsert(FURNACE_SLOT.INPUT,'not-a-real-item'),false);
 assert.equal(furnaceCanInsert(FURNACE_SLOT.FUEL,'block:5'),true);
 assert.equal(furnaceCanInsert(FURNACE_SLOT.FUEL,'stone_pickaxe'),false);
 assert.equal(furnaceCanInsert(FURNACE_SLOT.OUTPUT,'iron_ingot'),false);
+assert.throws(()=>normalizeFurnaceStack({id:'not-a-real-item',count:1}),/known item or declared smelting output/);
+assert.throws(()=>normalizeFurnaceStack({id:'wooden_pickaxe',count:2}),/integer from 1 to 1/);
+assert.throws(()=>createFurnaceState({slots:[null,{id:'stone_pickaxe',count:1},null]}),/fuel slot/);
+assert.throws(()=>createFurnaceState({slots:[null,null,{id:'raw_iron',count:1}]}),/output slot/);
 assert.throws(()=>createFurnaceState({burnRemaining:2,burnTotal:1}),/cannot exceed/);
 assert.throws(()=>createFurnaceState({cookProgress:2,cookTotal:1}),/cannot exceed/);
 
@@ -48,4 +56,12 @@ const broken=restored.break(cell);assert.equal(broken.changed,true);assert.deepE
 const fullOutput=new ServerFurnaceContainerState({x:0,y:64,z:0},{state:createFurnaceState({slots:[{id:'raw_iron',count:1},{id:'block:5',count:1},{id:'iron_ingot',count:64}]})});
 const noBurn=fullOutput.tick(400);assert.equal(noBurn.consumedFuel,0);assert.equal(noBurn.transactionMutations,0);assert.equal(noBurn.container.revision,0);
 
-console.log('authoritative furnace smelting foundation + stable transaction revision + world-cell persistence: PASS');
+const singleToolFuel=new ServerFurnaceContainerState({x:1,y:64,z:0});
+assert.equal(singleToolFuel.insert(FURNACE_SLOT.FUEL,{id:'wooden_pickaxe',count:1}).changed,true);
+assert.equal(singleToolFuel.insert(FURNACE_SLOT.FUEL,{id:'wooden_pickaxe',count:1},{expectedRevision:1}).reason,'slot-full','non-stackable fuel must never merge above its item stack limit');
+
+const splitXp=new ServerFurnaceContainerState({x:2,y:64,z:0},{state:createFurnaceState({slots:[null,null,{id:'iron_ingot',count:2}],storedExperience:1.4})});
+const firstIngot=splitXp.takeOutput(1,{expectedRevision:0});assert.equal(firstIngot.experience,.7);assert.equal(firstIngot.container.storedExperience,.7);assert.deepEqual(firstIngot.container.slots[FURNACE_SLOT.OUTPUT],{id:'iron_ingot',count:1});
+const secondIngot=splitXp.takeOutput(1,{expectedRevision:1});assert.equal(secondIngot.experience,.7);assert.equal(secondIngot.container.storedExperience,0);
+
+console.log('authoritative furnace smelting foundation + strict item stacks + stable transaction revision + world-cell persistence: PASS');
