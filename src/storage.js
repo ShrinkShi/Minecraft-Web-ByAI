@@ -24,6 +24,14 @@ function requestResult(request){
   });
 }
 
+function transactionDone(tx){
+  return new Promise((resolve,reject)=>{
+    tx.oncomplete=()=>resolve();
+    tx.onerror=()=>reject(tx.error);
+    tx.onabort=()=>reject(tx.error || new Error('IndexedDB transaction aborted'));
+  });
+}
+
 export function worldIdFor(name,seed){
   const source=`${name || '新的世界'}\u0000${seed || '0'}`;
   let hash=2166136261>>>0;
@@ -49,12 +57,15 @@ export class WorldStorage{
   async putWorld(record){
     const db=await this.db();
     const tx=db.transaction(WORLD_STORE,'readwrite');
-    const done=new Promise((resolve,reject)=>{
-      tx.oncomplete=()=>resolve();
-      tx.onerror=()=>reject(tx.error);
-      tx.onabort=()=>reject(tx.error || new Error('IndexedDB transaction aborted'));
-    });
+    const done=transactionDone(tx);
     tx.objectStore(WORLD_STORE).put(record);
+    await done;
+  }
+  async deleteWorld(id){
+    const db=await this.db();
+    const tx=db.transaction(WORLD_STORE,'readwrite');
+    const done=transactionDone(tx);
+    tx.objectStore(WORLD_STORE).delete(id);
     await done;
   }
   async listWorlds(){
