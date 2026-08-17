@@ -1,5 +1,5 @@
 import {nextNetworkSequence} from '../src/network-sequence.js';
-import {FURNACE_SLOT,FURNACE_STACK_LIMIT,createFurnaceState,furnaceCanInsert,normalizeFurnaceStack,tickFurnace} from '../src/smelting.js';
+import {FURNACE_SLOT,FURNACE_STACK_LIMIT,createFurnaceState,furnaceCanInsert,furnaceStackLimitFor,normalizeFurnaceStack,tickFurnace} from '../src/smelting.js';
 
 function cell(value){
   if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError('furnace cell must be an object');
@@ -24,15 +24,15 @@ export class ServerFurnaceContainerState{
     if(slot!==FURNACE_SLOT.INPUT&&slot!==FURNACE_SLOT.FUEL)throw new RangeError('furnace insert slot must be INPUT or FUEL');
     const incoming=normalizeFurnaceStack(value,{label:'furnace insert stack'});if(!furnaceCanInsert(slot,incoming.id))return Object.freeze({changed:false,reason:'slot-rejects-item',remaining:incoming.count,container:this.snapshot()});
     const slots=this.state.slots.map(stack=>stack?{...stack}:null),current=slots[slot];if(current&&current.id!==incoming.id)return Object.freeze({changed:false,reason:'slot-occupied',remaining:incoming.count,container:this.snapshot()});
-    const capacity=FURNACE_STACK_LIMIT-(current?.count||0),moved=Math.min(capacity,incoming.count);if(moved<=0)return Object.freeze({changed:false,reason:'slot-full',remaining:incoming.count,container:this.snapshot()});
+    const capacity=furnaceStackLimitFor(incoming.id)-(current?.count||0),moved=Math.min(capacity,incoming.count);if(moved<=0)return Object.freeze({changed:false,reason:'slot-full',remaining:incoming.count,container:this.snapshot()});
     slots[slot]=current?{id:current.id,count:current.count+moved}:{id:incoming.id,count:moved};this.state=createFurnaceState({...this.state,slots});this.advanceRevision();
     return Object.freeze({changed:true,reason:moved===incoming.count?'inserted':'inserted-partial',moved,remaining:incoming.count-moved,container:this.snapshot()});
   }
   takeOutput(amount=FURNACE_STACK_LIMIT,{expectedRevision=this.revision}={}){
     expectedRevision=revision(expectedRevision);if(expectedRevision!==this.revision)return Object.freeze({changed:false,reason:'revision-conflict',taken:null,container:this.snapshot()});
     amount=count(amount,'furnace output amount');const slots=this.state.slots.map(stack=>stack?{...stack}:null),output=slots[FURNACE_SLOT.OUTPUT];if(!output)return Object.freeze({changed:false,reason:'output-empty',taken:null,container:this.snapshot()});
-    const taken=Math.min(amount,output.count),stack=Object.freeze({id:output.id,count:taken});if(taken===output.count)slots[FURNACE_SLOT.OUTPUT]=null;else output.count-=taken;
-    const experience=slots[FURNACE_SLOT.OUTPUT]?0:this.state.storedExperience;this.state=createFurnaceState({...this.state,slots,storedExperience:experience?0:this.state.storedExperience});this.advanceRevision();
+    const previousCount=output.count,taken=Math.min(amount,previousCount),stack=Object.freeze({id:output.id,count:taken});if(taken===previousCount)slots[FURNACE_SLOT.OUTPUT]=null;else output.count-=taken;
+    const experience=this.state.storedExperience*(taken/previousCount),storedExperience=Math.max(0,this.state.storedExperience-experience);this.state=createFurnaceState({...this.state,slots,storedExperience});this.advanceRevision();
     return Object.freeze({changed:true,reason:'output-taken',taken:stack,experience,container:this.snapshot()});
   }
   tick(ticks=1){const result=tickFurnace(this.state,ticks);if(result.changed)this.state=result.state;if(result.transactionMutations>0)this.advanceRevision(result.transactionMutations);return Object.freeze({...result,container:this.snapshot()});}
