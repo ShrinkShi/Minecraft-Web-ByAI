@@ -37,7 +37,8 @@ function approach(value,target,amount){return value<target?Math.min(target,value
 export class PlayerModelFactory{
   constructor({assetKey='entity.player.steve'}={}){
     this.assetKey=assetKey;this.geometries=new Set();this.disposed=false;
-    this.texture=new THREE.TextureLoader().load(requireAssetUrl(assetKey));
+    let resolveReady,rejectReady;this.ready=new Promise((resolve,reject)=>{resolveReady=resolve;rejectReady=reject;});
+    this.texture=new THREE.TextureLoader().load(requireAssetUrl(assetKey),texture=>resolveReady(texture),undefined,error=>rejectReady(error instanceof Error?error:new Error(`unable to load ${assetKey}`)));
     this.texture.name=assetKey;this.texture.userData.assetKey=assetKey;this.texture.magFilter=THREE.NearestFilter;this.texture.minFilter=THREE.NearestFilter;this.texture.generateMipmaps=false;this.texture.colorSpace=THREE.SRGBColorSpace;
     this.material=new THREE.MeshLambertMaterial({map:this.texture,transparent:true,alphaTest:.01,side:THREE.FrontSide});
     this.template=this.makeTemplate();
