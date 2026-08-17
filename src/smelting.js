@@ -70,8 +70,9 @@ export function tickFurnace(value,ticks=1){
       if(duration>0){consumeOne(slots,FURNACE_SLOT.FUEL);burnRemaining=duration;burnTotal=duration;consumedFuel++;changed=true;}
     }
     recipe=canSmelt(slots);
-    if(burnRemaining>0){burnRemaining--;changed=true;}
-    if(recipe&&burnRemaining>=0&&burnTotal>0&&(burnRemaining>0||burnTotal===1)){
+    const burningThisTick=burnRemaining>0;
+    if(burningThisTick){burnRemaining--;changed=true;}
+    if(recipe&&burningThisTick){
       if(cookTotal!==recipe.cookTicks){cookTotal=recipe.cookTicks;changed=true;}
       cookProgress++;changed=true;
       if(cookProgress>=recipe.cookTicks){
