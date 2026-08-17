@@ -101,7 +101,7 @@ test('source-backed glass uses translucent Worker mesh, culls shared faces, and 
   await expect(page.locator('#inventory')).not.toHaveClass(/hidden/);
   const glassItem=page.locator('#inventory-grid [data-inv-index]').filter({has:page.locator('img[alt="玻璃"]')}).first();
   await expect(glassItem).toBeVisible();
-  await expect(glassItem.locator('img[alt="玻璃"]')).toHaveAttribute('src',/assets\/minecraft\/textures\/block\/glass\.png/);
+  await expect(glassItem.locator('img[alt="玻璃"]')).toHaveAttribute('src',/assets\/items\/glass\.png/);
   await glassItem.click({modifiers:['Shift']});
   await key(page,'Escape');
   await expect(page.locator('#inventory')).toHaveClass(/hidden/);
