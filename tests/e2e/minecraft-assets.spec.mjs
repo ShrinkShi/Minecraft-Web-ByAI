@@ -17,7 +17,7 @@ test('imported Minecraft runtime assets resolve and decode through the real HTTP
   expect(manifestResponse.headers()['content-type']).toContain('application/json');
   const manifest=await manifestResponse.json();
   expect(manifest.minecraftVersion).toBe('1.20.1');
-  expect(manifest.sourceArchiveSha256).toBe('b65a2211175af90664de9f41ea422f4869eee855f0da4bf6fe0715434ebe9c69');
+  expect(manifest).toMatchObject({sourceKind:'directory',sourceRoot:'MC原版素材assets'});
   expect(manifest.atlas.path).toBe('textures/atlas.png');
 
   const atlasResponse=await request.get('/assets/textures/atlas.png');
@@ -31,7 +31,7 @@ test('imported Minecraft runtime assets resolve and decode through the real HTTP
   const modelManifest=await modelManifestResponse.json();
   expect(modelManifest.format).toBe(1);
   expect(modelManifest.minecraftVersion).toBe('1.20.1');
-  expect(modelManifest.sourceArchiveSha256).toBe('b65a2211175af90664de9f41ea422f4869eee855f0da4bf6fe0715434ebe9c69');
+  expect(modelManifest).toMatchObject({sourceKind:'directory',sourceRoot:'MC原版素材assets'});
   expect(modelManifest.atlas).toMatchObject({
     path:'model-texture-atlas.png',
     width:128,
@@ -51,7 +51,8 @@ test('imported Minecraft runtime assets resolve and decode through the real HTTP
     '/assets/items/wooden_pickaxe.png',
     '/assets/items/leather_chestplate.png',
     '/assets/items/raw_beef.png',
-    '/assets/minecraft/textures/entity/bed/red.png'
+    '/assets/minecraft/textures/entity/bed/red.png',
+    '/assets/minecraft/textures/entity/player/wide/steve.png'
   ]){
     const response=await request.get(path);
     expect(response.ok(),`${path} must be served`).toBeTruthy();
@@ -71,7 +72,8 @@ test('imported Minecraft runtime assets resolve and decode through the real HTTP
     '/assets/minecraft/textures/entity/zombie/zombie.png':[64,64],
     '/assets/minecraft/textures/entity/skeleton/skeleton.png':[64,32],
     '/assets/minecraft/textures/entity/creeper/creeper.png':[64,32],
-    '/assets/minecraft/textures/entity/spider/spider.png':[64,32]
+    '/assets/minecraft/textures/entity/spider/spider.png':[64,32],
+    '/assets/minecraft/textures/entity/player/wide/steve.png':[64,64]
   };
   for(const [path,[width,height]] of Object.entries(entitySheets)){
     const response=await request.get(path);
