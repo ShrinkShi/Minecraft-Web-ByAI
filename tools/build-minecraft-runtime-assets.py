@@ -72,6 +72,7 @@ PASS_THROUGH = [
     "source-manifest.json",
     "models/item/stick.json",
     "models/item/wooden_pickaxe.json",
+    "textures/block/glass.png",
     "textures/entity/bed/red.png",
     "textures/entity/cow/cow.png",
     "textures/entity/sheep/sheep.png",
