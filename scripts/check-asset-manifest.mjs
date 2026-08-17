@@ -54,6 +54,9 @@ assert.equal(ITEMS['block:20'].blockPreview,'source-texture');
 assert.equal(ITEMS.white_wool.assetKey,'block.white_wool');
 assert.equal(ITEMS.white_wool.tile,15);
 assert.equal(ITEMS.bed.entityAssetKey,'entity.bed.red');
+assert.equal(ITEMS.bed.itemPreview,'bed-model');
+assert.equal(ITEMS.bed.texture,undefined,'bed item may not fall back to hand-drawn or third-party flat artwork');
+assert.equal(Object.values(ITEMS).some(item=>typeof item?.texture==='string'&&item.texture.startsWith('data:image/')),false,'runtime items may not embed hand-drawn data-URI artwork when original Minecraft source presentation exists');
 
 const snapshot=assetManifestSnapshot();
 assert.equal(Object.isFrozen(snapshot),true);assert.equal(Object.isFrozen(snapshot['item.stick']),true);
@@ -66,4 +69,4 @@ assert.equal(snapshot['item.stone_pickaxe'].source,ASSET_SOURCE.USER_SUPPLIED);
 assert.equal(snapshot['entity.spider'].source,ASSET_SOURCE.USER_SUPPLIED);
 assert.equal(snapshot['entity.player.steve'].source,ASSET_SOURCE.USER_SUPPLIED);
 
-console.log('logical asset manifest + original-Minecraft source-backed glass/runtime/entity/player/model-atlas bindings: PASS');
+console.log('logical asset manifest + original-Minecraft source-backed item/entity/player/model presentation bindings: PASS');
