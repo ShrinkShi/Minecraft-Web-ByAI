@@ -1,6 +1,6 @@
 import {BLOCKS,CHUNK_SIZE,WORLD_HEIGHT,ATLAS_COLS,ATLAS_ROWS,tileForFace} from './blocks.js';
 import {bedVisualDescriptor} from './bed-model-specs.js';
-import {buildMinecraftModelMeshBatches,minecraftModelBatchTransferables} from './minecraft-model-mesh-batch.js';
+import {buildMinecraftModelMeshBatches} from './minecraft-model-mesh-batch.js';
 import {createMinecraftModelAtlasResolver,createMinecraftModelTextureBinding} from './minecraft-model-texture-binding.js';
 import {assertMinecraftModelRuntime,instantiateMinecraftModelTemplate,minecraftModelLayerForTexture} from './minecraft-model-runtime.js';
 
@@ -141,14 +141,12 @@ function buildInterpretedModels(data,blockAt,cx,cz){
     resolveTint:modelTint,
     isCullFaceVisible:context=>modelCullFaceVisible(context,blockAt)
   });
-  return{
-    parts:{
-      opaque:serializeModelBatch(batches.opaque),
-      cutout:serializeModelBatch(batches.cutout),
-      translucent:serializeModelBatch(batches.translucent)
-    },
-    transferables:minecraftModelBatchTransferables(batches)
+  const parts={
+    opaque:serializeModelBatch(batches.opaque),
+    cutout:serializeModelBatch(batches.cutout),
+    translucent:serializeModelBatch(batches.translucent)
   };
+  return{parts,transferables:[...transferables(parts.opaque),...transferables(parts.cutout),...transferables(parts.translucent)]};
 }
 
 function transferables(mesh){return mesh.empty?[]:[mesh.positions,mesh.normals,mesh.uvs,mesh.colors,mesh.indices];}
