@@ -3,7 +3,7 @@ import {BLOCK,BLOCKS} from '../src/blocks.js';
 import {ITEMS,CREATIVE_START,itemForBlock} from '../src/items.js';
 import {ITEM_ALIASES} from '../src/commands.js';
 import {assetUrl} from '../src/asset-manifest.js';
-import {blockItemFaceTiles} from '../src/block-item-preview.js';
+import {blockItemFaceTextures,blockItemFaceTiles} from '../src/block-item-preview.js';
 import {minecraftModelBlockDescriptor} from '../src/minecraft-model-registry.js';
 import {HOTBAR_START} from '../src/inventory-layout.js';
 import {ServerPlayerInventoryHub} from '../server/player-inventory-state.mjs';
@@ -21,8 +21,9 @@ assert.equal(ITEMS['block:20'].stack,64);
 assert.equal(ITEMS['block:20'].blockId,BLOCK.GLASS);
 assert.equal(ITEMS['block:20'].assetKey,'block.glass');
 assert.equal(ITEMS['block:20'].texture,assetUrl('block.glass'));
-assert.equal(ITEMS['block:20'].blockPreview,false);
+assert.equal(ITEMS['block:20'].blockPreview,'source-texture');
 assert.equal(blockItemFaceTiles(ITEMS['block:20']),null,'glass item must not display the legacy stone fallback tile');
+assert.deepEqual(blockItemFaceTextures(ITEMS['block:20']),{top:assetUrl('block.glass'),left:assetUrl('block.glass'),right:assetUrl('block.glass')});
 assert.equal(itemForBlock(BLOCK.GLASS),'block:20');
 assert.equal(CREATIVE_START.at(-1),'block:20','new creative content must append without shifting historical starter slots');
 assert.equal(ITEM_ALIASES.glass,'block:20');
@@ -52,4 +53,4 @@ assert.equal(descriptor.renderLayer,'translucent');
   assert.equal(result?.breakResult?.changed,true,'glass must be breakable by hand');assert.equal(block,BLOCK.AIR);assert.equal(result.drop,null,'ordinary glass break must not drop itself without Silk Touch');assert.deepEqual(drops,[]);
 }
 
-console.log('source-backed glass gameplay + authoritative placement/break contract: PASS');
+console.log('source-backed glass gameplay + three-face item preview + authoritative placement/break contract: PASS');
