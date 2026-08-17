@@ -122,6 +122,28 @@ function normalizeClosure(raw){
   });
 }
 
+function normalizeSourceProvenance(raw){
+  const label='Minecraft model atlas manifest';
+  if(raw.sourceKind==='directory'){
+    const sourceRoot=nonEmptyString(raw.sourceRoot,`${label}.sourceRoot`);
+    if(raw.sourceArchive!==undefined||raw.sourceArchiveSha256!==undefined)throw new RangeError(`${label} directory provenance may not include archive fields`);
+    return Object.freeze({sourceKind:'directory',sourceRoot});
+  }
+  if(raw.sourceKind==='archive'){
+    const sourceArchive=nonEmptyString(raw.sourceArchive,`${label}.sourceArchive`);
+    const sourceArchiveSha256=sha256(raw.sourceArchiveSha256,`${label}.sourceArchiveSha256`);
+    if(raw.sourceRoot!==undefined)throw new RangeError(`${label} archive provenance may not include sourceRoot`);
+    return Object.freeze({sourceKind:'archive',sourceArchive,sourceArchiveSha256});
+  }
+  // Manifest format 1 originally predated sourceKind. Preserve read compatibility
+  // for already-published archive manifests while new generated manifests are
+  // required to state directory/archive provenance explicitly.
+  if(raw.sourceKind===undefined&&raw.sourceArchiveSha256!==undefined){
+    return Object.freeze({sourceKind:'archive',sourceArchive:typeof raw.sourceArchive==='string'&&raw.sourceArchive?raw.sourceArchive:null,sourceArchiveSha256:sha256(raw.sourceArchiveSha256,`${label}.sourceArchiveSha256`)});
+  }
+  throw new RangeError(`${label}.sourceKind must be directory or archive`);
+}
+
 export function normalizeMinecraftModelAtlasManifest(raw){
   object(raw,'Minecraft model atlas manifest');
   if(raw.format!==1)throw new RangeError('Minecraft model atlas manifest format must be 1');
@@ -142,7 +164,7 @@ export function normalizeMinecraftModelAtlasManifest(raw){
   if(atlas.packing!==ATLAS_PACKING)throw new RangeError(`Minecraft model atlas packing must be ${ATLAS_PACKING} for manifest format 1`);
 
   const closure=normalizeClosure(raw.closure);
-  const sourceArchiveSha256=sha256(raw.sourceArchiveSha256,'Minecraft model atlas manifest.sourceArchiveSha256');
+  const source=normalizeSourceProvenance(raw);
   const rawTextures=object(raw.textures,'Minecraft model atlas manifest.textures');
   const textures=Object.create(null);
   for(const [rawId,rawRecord] of Object.entries(rawTextures)){
@@ -157,7 +179,7 @@ export function normalizeMinecraftModelAtlasManifest(raw){
   return Object.freeze({
     format:1,
     minecraftVersion:'1.20.1',
-    sourceArchiveSha256,
+    ...source,
     closure,
     atlas,
     textures:Object.freeze(textures)

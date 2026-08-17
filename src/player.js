@@ -1,9 +1,10 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
 import {BLOCKS} from './blocks.js';
 import {applyDamage,knockbackDirection} from './combat.js';
-import {normalizeControlState} from './control-intents.js';
+import {normalizeControlState,registerControlActionInterceptor} from './control-intents.js';
 import {lookDirectionFromYawPitch} from './player-orientation-rules.js';
 import {planPlayerMotionStep} from './player-motion-rules.js';
+import {PlayerModelFactory} from './player-model-renderer.js';
 import {
   PLAYER_COLLISION_RADIUS,
   PLAYER_COLLISION_HEIGHT,
@@ -22,26 +23,27 @@ export class PlayerController{
     this.yaw=0;this.pitch=0;this.controlState=normalizeControlState();this.grounded=false;this.flying=false;this.viewMode=0;this.swimCoverage=0;
     this.mode='survival';this.hp=20;this.hunger=20;this.saturation=5;this.hurtUntil=-Infinity;
     this.eye=PLAYER_EYE_HEIGHT;this.height=PLAYER_COLLISION_HEIGHT;this.radius=PLAYER_COLLISION_RADIUS;this.walk=4.3;this.sprint=5.6;
-    this.avatar=this.createAvatar();
+    this.playerModelFactory=null;this.avatarVisual=null;this.visualDead=false;this.avatar=this.createAvatar();
+    this.releaseVisualActionInterceptor=registerControlActionInterceptor(intent=>{if(intent?.name==='secondary')this.triggerUseAnimation();});
   }
 
   createAvatar(){
     if(!this.scene)return null;
-    const group=new THREE.Group();group.userData.transient=true;
-    const skin=new THREE.MeshLambertMaterial({color:0xc58a63}),shirt=new THREE.MeshLambertMaterial({color:0x38a5a5}),pants=new THREE.MeshLambertMaterial({color:0x334b8c});
-    const part=(w,h,d,mat,x,y,z)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);group.add(m);return m;};
-    part(.5,.5,.5,skin,0,1.55,0);part(.55,.7,.28,shirt,0,1.0,0);part(.18,.68,.22,skin,-.38,1.0,0);part(.18,.68,.22,skin,.38,1.0,0);part(.22,.75,.24,pants,-.14,.3,0);part(.22,.75,.24,pants,.14,.3,0);
-    this.scene.add(group);group.visible=false;return group;
+    this.playerModelFactory=new PlayerModelFactory();this.avatarVisual=this.playerModelFactory.create();
+    const root=this.avatarVisual.root;root.userData.transient=true;root.userData.localPlayer=true;root.visible=false;this.scene.add(root);return root;
   }
 
-  setControlState(state){this.controlState=normalizeControlState(state);}
+  setControlState(state){const previousPrimary=this.controlState.primary;this.controlState=normalizeControlState(state);if(this.controlState.primary&&!previousPrimary)this.triggerPrimaryAnimation();}
   clearControlState(){this.controlState=normalizeControlState();}
   applyLookIntent(yawDelta,pitchDelta){if(!Number.isFinite(yawDelta)||!Number.isFinite(pitchDelta))return;this.setLook(this.yaw+yawDelta,this.pitch+pitchDelta);}
   setMode(mode){this.mode=mode;this.flying=mode==='creative'||mode==='spectator';if(this.flying)this.swimCoverage=0;}
   cycleView(){this.viewMode=(this.viewMode+1)%3;this.syncCamera();return this.viewMode;}
+  triggerPrimaryAnimation(){return this.playerModelFactory?.triggerPrimary(this.avatarVisual)??false;}
+  triggerUseAnimation(){return this.playerModelFactory?.triggerUse(this.avatarVisual)??false;}
+  setDeathVisual(value){this.visualDead=!!value;return this.visualDead;}
 
   spawn(x,z){const y=this.world.highestSolid(x,z)+1.001;this.position.set(x+.5,y,z+.5);this.velocity.set(0,0,0);this.swimCoverage=0;this.syncCamera();}
-  resetVitals(){this.hp=20;this.hunger=20;this.saturation=5;this.hurtUntil=-Infinity;}
+  resetVitals(){this.hp=20;this.hunger=20;this.saturation=5;this.hurtUntil=-Infinity;this.setDeathVisual(false);}
   respawn(x=0,z=0){this.resetVitals();this.spawn(x,z);}
   respawnAt(position){
     if(!position||![position.x,position.y,position.z].every(Number.isFinite))return false;const next=new THREE.Vector3(position.x,position.y,position.z);
@@ -51,7 +53,7 @@ export class PlayerController{
   restore(snapshot){
     if(!snapshot)return false;const p=snapshot.position;if(!p||![p.x,p.y,p.z].every(Number.isFinite))return false;
     this.position.set(p.x,p.y,p.z);this.velocity.set(0,0,0);this.swimCoverage=0;this.yaw=Number.isFinite(snapshot.yaw)?snapshot.yaw:0;this.pitch=Number.isFinite(snapshot.pitch)?snapshot.pitch:0;
-    this.hp=Number.isFinite(snapshot.hp)?Math.max(0,Math.min(20,snapshot.hp)):20;this.hunger=Number.isFinite(snapshot.hunger)?Math.max(0,Math.min(20,snapshot.hunger)):20;this.saturation=Number.isFinite(snapshot.saturation)?Math.max(0,Math.min(20,snapshot.saturation)):5;this.hurtUntil=-Infinity;
+    this.hp=Number.isFinite(snapshot.hp)?Math.max(0,Math.min(20,snapshot.hp)):20;this.hunger=Number.isFinite(snapshot.hunger)?Math.max(0,Math.min(20,snapshot.hunger)):20;this.saturation=Number.isFinite(snapshot.saturation)?Math.max(0,Math.min(20,snapshot.saturation)):5;this.hurtUntil=-Infinity;this.setDeathVisual(this.hp<=0);
     this.viewMode=Number.isInteger(snapshot.viewMode)?((snapshot.viewMode%3)+3)%3:0;if(this.collides(this.position)&&this.mode!=='spectator')return false;this.syncCamera();return true;
   }
 
@@ -61,6 +63,7 @@ export class PlayerController{
     if(this.mode==='creative'||this.mode==='spectator')return{applied:false,damage:0,hp:this.hp,dead:false};
     const result=applyDamage(this,amount,now,{maxHp:20});
     if(result.applied&&source&&Number.isFinite(source.x)&&Number.isFinite(source.z))this.knockbackFrom(source.x,source.z,.52,.24);
+    if(result.dead)this.setDeathVisual(true);
     return result;
   }
 
@@ -99,9 +102,16 @@ export class PlayerController{
       this.moveAxis('z',motion.displacement.z,{stepHeight:xMove?.stepped?0:waterExitStep});
       this.moveAxis('y',motion.displacement.y);
       this.velocity.x*=motion.horizontalDrag;this.velocity.z*=motion.horizontalDrag;
-      if(this.position.y<-10)this.hp=0;
+      if(this.position.y<-10){this.hp=0;this.setDeathVisual(true);}
     }
-    this.syncCamera();
+    this.syncCamera();this.updateVisual(dt);
+  }
+
+  updateVisual(dt){
+    if(!this.avatarVisual||!this.playerModelFactory)return false;
+    let speed=Math.hypot(this.velocity.x,this.velocity.z);if(this.flying&&speed<.01)speed=Math.hypot(this.controlState.side,this.controlState.forward)*(this.controlState.sprint?this.sprint:this.walk);
+    const sprinting=this.controlState.sprint&&this.controlState.forward>0&&speed>.1;
+    return this.playerModelFactory.animate(this.avatarVisual,dt,{speed,sprint:sprinting,primary:this.controlState.primary,dead:this.visualDead||this.hp<=0,headPitch:-this.pitch,headYaw:0});
   }
 
   isGroundedProbe(){return probePlayerGrounded(this.position,position=>this.collides(position));}
@@ -117,5 +127,5 @@ export class PlayerController{
     if(this.canvas)this.canvas.dataset.viewMode=String(this.viewMode);
   }
 
-  dispose(){if(this.canvas)delete this.canvas.dataset.viewMode;if(this.avatar){this.scene?.remove(this.avatar);for(const child of this.avatar.children){child.geometry?.dispose();child.material?.dispose();}}}
+  dispose(){if(this.canvas)delete this.canvas.dataset.viewMode;this.releaseVisualActionInterceptor?.();this.releaseVisualActionInterceptor=null;if(this.avatar)this.scene?.remove(this.avatar);this.avatar=null;this.avatarVisual=null;this.playerModelFactory?.dispose();this.playerModelFactory=null;}
 }

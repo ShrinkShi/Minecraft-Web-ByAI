@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Resolve deterministic Minecraft blockstate/model/texture dependency closures.
 
-The tracked source ZIP may have an arbitrary outer directory (the historical
-archive uses an outer folder ending in ``assets``).  Resources are therefore
-identified by their canonical ``assets/<namespace>/...`` suffix, then walked as
-blockstate -> model -> parent/direct-texture dependencies.
+The repository now tracks the original Java 1.20.1 asset tree directly under
+``MC原版素材assets/``. Runtime/source identity stays canonicalized as
+``assets/<namespace>/...`` so browser manifests do not depend on the display
+name of the tracked source directory.
 
-This module is deliberately independent from runtime atlas packing.  It produces
-an exact, source-provenance closure that later build stages can consume.
+Archive indexing remains available for synthetic regression fixtures and old
+one-off callers, but the extracted directory is the authoritative real source.
 """
 
 from __future__ import annotations
@@ -17,12 +17,13 @@ import hashlib
 import json
 import re
 import sys
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterable
+from typing import Any, Iterable, Iterator
 from zipfile import BadZipFile, ZipFile
 
-DEFAULT_ARCHIVE = "MC原版素材assets.zip"
+DEFAULT_SOURCE_ROOT = Path("MC原版素材assets")
 DEFAULT_NAMESPACE = "minecraft"
 RESOURCE_RE = re.compile(r"^[a-z0-9_.-]+:[a-z0-9_./-]+$")
 CANONICAL_RE = re.compile(r"^assets/([a-z0-9_.-]+)/(.+)$")
@@ -55,12 +56,7 @@ def safe_zip_name(name: str) -> bool:
 
 
 def canonical_asset_path(name: str) -> str | None:
-    """Return the canonical ``assets/...`` suffix from an arbitrary ZIP entry.
-
-    Use the last ``assets/`` occurrence.  This mirrors the proven legacy
-    importer and supports the supplied ``MC原版素材assets/...`` outer folder
-    without making that display name part of runtime identity.
-    """
+    """Return the canonical ``assets/...`` suffix from an arbitrary ZIP entry."""
     normalized = normalize_zip_name(name)
     index = normalized.lower().rfind("assets/")
     if index == -1:
@@ -117,7 +113,11 @@ class SourceRecord:
 
 
 class MinecraftArchiveIndex:
-    """Canonical read-only view over an arbitrary-layout source ZIP."""
+    """Canonical read-only view over an arbitrary-layout source ZIP.
+
+    This is retained primarily for synthetic regression fixtures. Real repository
+    builds should use :class:`MinecraftDirectoryIndex`.
+    """
 
     def __init__(self, archive: ZipFile):
         self.archive = archive
@@ -158,6 +158,89 @@ class MinecraftArchiveIndex:
             raise ClosureError(f"missing source resource: {canonical}")
         payload = self.archive.read(source)
         return SourceRecord(canonical, source, sha256_bytes(payload), len(payload))
+
+
+class MinecraftDirectoryIndex:
+    """Canonical read-only view over the tracked extracted ``assets`` directory."""
+
+    def __init__(self, root: str | Path):
+        self.root = Path(root)
+        if not self.root.is_dir():
+            raise ClosureError(f"Minecraft source directory is missing: {self.root}")
+        self._resolved_root = self.root.resolve()
+
+    def _relative(self, canonical: str) -> PurePosixPath:
+        if not isinstance(canonical, str) or not CANONICAL_RE.fullmatch(canonical):
+            raise ClosureError(f"invalid canonical asset path: {canonical!r}")
+        relative = PurePosixPath(canonical[len("assets/") :])
+        if relative.is_absolute() or any(part in {"", ".", ".."} for part in relative.parts):
+            raise ClosureError(f"unsafe canonical asset path: {canonical!r}")
+        return relative
+
+    def _path(self, canonical: str) -> Path:
+        relative = self._relative(canonical)
+        path = self.root.joinpath(*relative.parts)
+        resolved = path.resolve()
+        try:
+            resolved.relative_to(self._resolved_root)
+        except ValueError as exc:
+            raise ClosureError(f"asset path escapes source directory: {canonical}") from exc
+        return path
+
+    def _source_name(self, canonical: str) -> str:
+        relative = self._relative(canonical).as_posix()
+        return f"{self.root.name}/{relative}"
+
+    def has(self, canonical: str) -> bool:
+        try:
+            return self._path(canonical).is_file()
+        except ClosureError:
+            return False
+
+    def read(self, canonical: str) -> bytes:
+        path = self._path(canonical)
+        if not path.is_file():
+            raise ClosureError(f"missing source resource: {canonical}")
+        return path.read_bytes()
+
+    def json(self, canonical: str) -> Any:
+        payload = self.read(canonical)
+        try:
+            return json.loads(payload.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ClosureError(f"invalid JSON resource: {canonical}: {exc}") from exc
+
+    def record(self, canonical: str) -> SourceRecord:
+        payload = self.read(canonical)
+        return SourceRecord(canonical, self._source_name(canonical), sha256_bytes(payload), len(payload))
+
+
+MinecraftSourceIndex = MinecraftArchiveIndex | MinecraftDirectoryIndex
+
+
+@contextmanager
+def open_minecraft_source(source: str | Path) -> Iterator[MinecraftSourceIndex]:
+    """Open a directory-first Minecraft source with ZIP fallback for fixtures."""
+    path = Path(source)
+    if path.is_dir():
+        yield MinecraftDirectoryIndex(path)
+        return
+    if not path.exists():
+        raise ClosureError(f"Minecraft source is missing: {path}")
+    try:
+        with ZipFile(path) as archive:
+            yield MinecraftArchiveIndex(archive)
+    except BadZipFile as exc:
+        raise ClosureError(f"Minecraft source is neither a directory nor a valid ZIP: {path}") from exc
+
+
+def source_provenance(source: str | Path) -> dict[str, str]:
+    path = Path(source)
+    if path.is_dir():
+        return {"sourceKind": "directory", "sourceRoot": path.name}
+    if path.is_file():
+        return {"sourceKind": "archive", "sourceArchive": path.name, "sourceArchiveSha256": sha256_file(path)}
+    raise ClosureError(f"Minecraft source is missing: {path}")
 
 
 @dataclass(frozen=True)
@@ -228,13 +311,7 @@ def _direct_texture_reference(reference: Any, *, label: str) -> str | None:
 
 
 def model_dependencies(value: Any, *, canonical: str) -> tuple[str | None, tuple[str, ...]]:
-    """Return parent + every direct texture file referenced by this model.
-
-    Most vanilla faces use ``#variables`` backed by the top-level ``textures``
-    map, but direct face resource IDs are legal and are also understood by the
-    browser model resolver.  Scan both locations so source closure semantics
-    cannot diverge from runtime model semantics.
-    """
+    """Return parent + every direct texture file referenced by this model."""
     if not isinstance(value, dict):
         raise ClosureError(f"model must be an object: {canonical}")
 
@@ -280,7 +357,7 @@ def model_dependencies(value: Any, *, canonical: str) -> tuple[str | None, tuple
     return parent, tuple(sorted(textures))
 
 
-def resolve_block_model_closure(index: MinecraftArchiveIndex, block_ids: Iterable[str]) -> ClosureResult:
+def resolve_block_model_closure(index: MinecraftSourceIndex, block_ids: Iterable[str]) -> ClosureResult:
     roots = tuple(sorted({normalize_resource_id(block_id) for block_id in block_ids}))
     if not roots:
         raise ClosureError("at least one block root is required")
@@ -334,7 +411,7 @@ def resolve_block_model_closure(index: MinecraftArchiveIndex, block_ids: Iterabl
 
         for texture_id in texture_ids:
             tex_canonical = texture_path(texture_id)
-            index.read(tex_canonical)  # fail closed before admitting the file
+            index.read(tex_canonical)
             textures.add(tex_canonical)
             edges.add((canonical, "texture", tex_canonical))
             mcmeta = f"{tex_canonical}.mcmeta"
@@ -360,9 +437,10 @@ def resolve_block_model_closure(index: MinecraftArchiveIndex, block_ids: Iterabl
 
 
 def manifest_for(
-    index: MinecraftArchiveIndex,
+    index: MinecraftSourceIndex,
     result: ClosureResult,
     *,
+    source_path: str | Path | None = None,
     archive_path: str | Path | None = None,
 ) -> dict[str, Any]:
     records: dict[str, dict[str, Any]] = {}
@@ -394,13 +472,13 @@ def manifest_for(
         "edges": [list(edge) for edge in result.edges],
         "files": records,
     }
-    if archive_path is not None:
-        manifest["sourceArchive"] = str(archive_path)
-        manifest["sourceArchiveSha256"] = sha256_file(archive_path)
+    provenance_path = source_path if source_path is not None else archive_path
+    if provenance_path is not None:
+        manifest.update(source_provenance(provenance_path))
     return manifest
 
 
-def extract_closure(index: MinecraftArchiveIndex, result: ClosureResult, output: Path) -> None:
+def extract_closure(index: MinecraftSourceIndex, result: ClosureResult, output: Path) -> None:
     output.mkdir(parents=True, exist_ok=True)
     for canonical in result.files:
         target = output / canonical
@@ -410,7 +488,7 @@ def extract_closure(index: MinecraftArchiveIndex, result: ClosureResult, output:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("archive", nargs="?", default=DEFAULT_ARCHIVE)
+    parser.add_argument("source", nargs="?", type=Path, default=DEFAULT_SOURCE_ROOT)
     parser.add_argument(
         "--block",
         action="append",
@@ -423,14 +501,11 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        with ZipFile(args.archive) as archive:
-            index = MinecraftArchiveIndex(archive)
+        with open_minecraft_source(args.source) as index:
             result = resolve_block_model_closure(index, args.blocks)
-            manifest = manifest_for(index, result, archive_path=args.archive)
+            manifest = manifest_for(index, result, source_path=args.source)
             if args.extract:
                 extract_closure(index, result, Path(args.extract))
-    except (FileNotFoundError, BadZipFile) as exc:
-        raise SystemExit(f"model closure failed: {exc}") from exc
     except ClosureError as exc:
         raise SystemExit(f"model closure failed: {exc}") from exc
 

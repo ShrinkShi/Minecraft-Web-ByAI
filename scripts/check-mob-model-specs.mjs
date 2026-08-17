@@ -30,7 +30,13 @@ for(const type of MOB_MODEL_TYPES){
   assert.ok(boxCount>=5,`${type} must no longer collapse to a generic colored body/head proxy`);
 }
 
-assert.deepEqual(MOB_MODEL_SPECS.cow.parts.find(part=>part.name==='body').pivot,[0,13,2],'cow body must meet the top of its 12px legs instead of floating above them');
+const cowBody=MOB_MODEL_SPECS.cow.parts.find(part=>part.name==='body');
+assert.deepEqual(cowBody.pivot,[0,19,2],'cow rotated body pivot must be converted from Java y=5 into Y-up ground space');
+assert.deepEqual(cowBody.rotation,[-Math.PI/2,0,0],'cow X rotation must flip sign when converting Java Y-down model space to Three.js Y-up');
+assert.deepEqual(cowBody.boxes.find(box=>box.name==='body').offset,[-6,-8,-7]);
+const udder=cowBody.boxes.find(box=>box.name==='udder');
+assert.ok(udder,'cow must include the source-model udder cuboid instead of painting its belly onto the back');
+assert.deepEqual(udder.size,[4,6,1]);assert.deepEqual(udder.offset,[-2,-8,-8]);assert.deepEqual(udder.uv,[52,0]);
 assert.equal(MOB_MODEL_SPECS.creeper.parts.filter(part=>part.name.endsWith('Leg')).length,4);
 assert.equal(MOB_MODEL_SPECS.spider.parts.filter(part=>/Leg\d+$/.test(part.name)).length,8);
 assert.ok(MOB_MODEL_SPECS.sheep.materials.fur==='entity.sheep_fur');
@@ -38,4 +44,4 @@ assert.ok(MOB_MODEL_SPECS.sheep.parts.some(part=>part.boxes.some(box=>box.materi
 assert.equal(MOB_MODEL_SPECS.skeleton.parts.find(part=>part.name==='leftArm').boxes[0].size[0],2,'skeleton limbs must stay visually thinner than zombie limbs');
 assert.ok(MOB_MODEL_SPECS.chicken.parts.some(part=>part.name==='leftWing')&&MOB_MODEL_SPECS.chicken.parts.some(part=>part.name==='rightWing'));
 
-console.log('vanilla-compatible mob cuboids + corrected cow placement + articulated UV bounds: PASS');
+console.log('vanilla-compatible mob cuboids + Y-up cow body/udder conversion + articulated UV bounds: PASS');

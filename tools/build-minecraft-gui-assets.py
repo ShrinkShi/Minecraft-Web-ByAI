@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Build compact browser GUI sprites from the tracked Minecraft Java 1.20.1 ZIP.
+"""Build compact browser GUI sprites from tracked Minecraft Java 1.20.1 assets.
 
-GUI assets are intentionally separate from the terrain/item/model runtime subset:
-they have their own provenance manifest and byte-reproducibility gate. Only the
-pixels consumed by the current browser HUD/Inventory are emitted.
+The authoritative source is the repository-tracked ``MC原版素材assets/`` tree.
+Archive support lives only in the shared source-index layer for synthetic tests.
 """
 
 from __future__ import annotations
@@ -13,13 +12,12 @@ import json
 import shutil
 from io import BytesIO
 from pathlib import Path
-from zipfile import BadZipFile, ZipFile
 
 from PIL import Image, UnidentifiedImageError
 
-from minecraft_model_closure import ClosureError, MinecraftArchiveIndex, sha256_file
+from minecraft_model_closure import ClosureError, MinecraftSourceIndex, open_minecraft_source, source_provenance
 
-DEFAULT_ARCHIVE = Path("MC原版素材assets.zip")
+DEFAULT_SOURCE = Path("MC原版素材assets")
 DEFAULT_OUTPUT = Path("build/minecraft-gui-assets")
 MINECRAFT_VERSION = "1.20.1"
 ICONS = "assets/minecraft/textures/gui/icons.png"
@@ -48,7 +46,7 @@ class GuiAssetError(RuntimeError):
     """Raised when the supplied GUI source cannot satisfy the current contract."""
 
 
-def load_png(index: MinecraftArchiveIndex, canonical: str) -> Image.Image:
+def load_png(index: MinecraftSourceIndex, canonical: str) -> Image.Image:
     payload = index.read(canonical)
     try:
         with Image.open(BytesIO(payload)) as image:
@@ -63,12 +61,6 @@ def load_png(index: MinecraftArchiveIndex, canonical: str) -> Image.Image:
 
 
 def validate_hotbar_partition(widgets: Image.Image) -> None:
-    """Prove that emitted cap/slot crops exactly partition the source 182x22 hotbar.
-
-    Slots are deliberately not assumed identical. The tracked 1.20.1 sheet has
-    pixel differences between slot regions, so preserving all nine source crops
-    is the only byte-faithful contract.
-    """
     rebuilt = Image.new("RGBA", (182, 22), (0, 0, 0, 0))
     rebuilt.paste(widgets.crop((0, 0, 1, 22)), (0, 0))
     for index in range(9):
@@ -79,10 +71,9 @@ def validate_hotbar_partition(widgets: Image.Image) -> None:
         raise GuiAssetError("widgets.png hotbar partition does not reconstruct the exact 182x22 source region")
 
 
-def build_gui_assets(archive_path: Path, output: Path) -> dict[str, object]:
+def build_gui_assets(source_path: Path, output: Path) -> dict[str, object]:
     try:
-        with ZipFile(archive_path) as archive:
-            index = MinecraftArchiveIndex(archive)
+        with open_minecraft_source(source_path) as index:
             images = {canonical: load_png(index, canonical) for canonical in EXPECTED_SOURCE_SIZE}
             validate_hotbar_partition(images[WIDGETS])
 
@@ -108,16 +99,15 @@ def build_gui_assets(archive_path: Path, output: Path) -> dict[str, object]:
             sources: dict[str, dict[str, object]] = {}
             for canonical in sorted(EXPECTED_SOURCE_SIZE):
                 record = index.record(canonical)
-                sources[canonical] = {"sha256": record.sha256, "bytes": record.size}
-    except (FileNotFoundError, BadZipFile, ClosureError) as exc:
+                sources[canonical] = {"source": record.source, "sha256": record.sha256, "bytes": record.size}
+    except ClosureError as exc:
         raise GuiAssetError(f"cannot build Minecraft GUI assets: {exc}") from exc
 
     slot_names = [f"hotbar-slot-{index}.png" for index in range(9)]
     manifest: dict[str, object] = {
         "format": 1,
         "minecraftVersion": MINECRAFT_VERSION,
-        "sourceArchive": archive_path.name,
-        "sourceArchiveSha256": sha256_file(archive_path),
+        **source_provenance(source_path),
         "sources": sources,
         "sprites": sprites,
         "hotbar": {
@@ -142,11 +132,11 @@ def build_gui_assets(archive_path: Path, output: Path) -> dict[str, object]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("archive", nargs="?", type=Path, default=DEFAULT_ARCHIVE)
+    parser.add_argument("source", nargs="?", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args()
     try:
-        manifest = build_gui_assets(args.archive, args.output)
+        manifest = build_gui_assets(args.source, args.output)
     except GuiAssetError as exc:
         raise SystemExit(str(exc)) from exc
     print(f"built {len(manifest['sprites'])} deterministic Minecraft GUI sprites into {args.output}")

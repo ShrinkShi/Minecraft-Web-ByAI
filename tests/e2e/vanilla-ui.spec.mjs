@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 
-test('source-backed Java 1.20.1 HUD inventory and block item previews render in the live browser',async({page})=>{
+test('source-backed Java 1.20.1 HUD inventory block/bed icons and Steve preview render in the live browser',async({page})=>{
   const pageErrors=[],consoleErrors=[];
   page.on('pageerror',error=>pageErrors.push(error.message));
   page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
@@ -37,7 +37,11 @@ test('source-backed Java 1.20.1 HUD inventory and block item previews render in 
   expect(hotbarRect?.width).toBeCloseTo(364,0);
   const blockPreview=hotbar.locator('.block-item-icon').first();
   await expect(blockPreview).toBeVisible();
-  await expect(blockPreview.locator('.block-face')).toHaveCount(3);
+  const hotbarCanvas=blockPreview.locator('.block-item-canvas');
+  await expect(hotbarCanvas).toHaveCount(1);
+  await expect(hotbarCanvas).toHaveAttribute('data-render-state','ready');
+  const hotbarPixels=await hotbarCanvas.evaluate(canvas=>{const data=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;let opaque=0;for(let i=3;i<data.length;i+=4)if(data[i])opaque++;return opaque;});
+  expect(hotbarPixels).toBeGreaterThan(300);
   expect(await hotbar.locator(':scope > .hotbar-slot').first().evaluate(el=>getComputedStyle(el).backgroundImage)).toContain('hotbar-slot-0.png');
 
   await page.keyboard.press('e');
@@ -52,12 +56,30 @@ test('source-backed Java 1.20.1 HUD inventory and block item previews render in 
   await expect(page.locator('#inventory-grid .inv-slot')).toHaveCount(27);
   await expect(page.locator('#inventory-hotbar .inv-slot')).toHaveCount(9);
 
+  const playerPreview=inventory.locator('.player-preview');
+  await expect(playerPreview.locator('canvas.inventory-player-canvas')).toBeVisible();
+  const initialPreview=await page.evaluate(()=>globalThis.__minecraftE2E.inventoryPlayerPreview());
+  expect(initialPreview.textureKey).toBe('entity.player.steve');
+  expect(initialPreview.visible).toBeTruthy();
+  const previewRect=await playerPreview.boundingBox();
+  await page.mouse.move((panelRect?.x??0)+(panelRect?.width??0)-12,(previewRect?.y??0)+20);
+  await expect.poll(async()=>page.evaluate(()=>globalThis.__minecraftE2E.inventoryPlayerPreview().targetHeadYaw)).toBeGreaterThan(.25);
+  await expect.poll(async()=>page.evaluate(()=>globalThis.__minecraftE2E.inventoryPlayerPreview().headYaw)).toBeGreaterThan(.1);
+
   const firstInventorySlot=await page.locator('#inventory-grid .inv-slot').first().boundingBox();
   expect((firstInventorySlot?.x??0)-(panelRect?.x??0)).toBeCloseTo(16,0);
   expect((firstInventorySlot?.y??0)-(panelRect?.y??0)).toBeCloseTo(168,0);
+  const bedIcon=inventory.locator('.bed-item-icon-wrap[data-item-id="bed"]');
+  await expect(bedIcon).toHaveCount(1);
+  const bedCanvas=bedIcon.locator('canvas.bed-item-icon');
+  await expect(bedCanvas).toHaveAttribute('data-render-state','ready',{timeout:15_000});
+  const bedPixels=await bedCanvas.evaluate(canvas=>{const data=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;let opaque=0;for(let i=3;i<data.length;i+=4)if(data[i])opaque++;return opaque;});
+  expect(bedPixels).toBeGreaterThan(80);
   const inventoryBlock=inventory.locator('.block-item-icon').first();
   await expect(inventoryBlock).toBeVisible();
-  await expect(inventoryBlock.locator('.block-face')).toHaveCount(3);
+  const inventoryCanvas=inventoryBlock.locator('.block-item-canvas');
+  await expect(inventoryCanvas).toHaveCount(1);
+  await expect(inventoryCanvas).toHaveAttribute('data-render-state','ready');
 
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);

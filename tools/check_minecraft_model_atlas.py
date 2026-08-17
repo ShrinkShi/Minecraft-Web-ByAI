@@ -20,7 +20,7 @@ from minecraft_model_atlas import (
 )
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE_ARCHIVE = ROOT / "MC原版素材assets.zip"
+SOURCE_ROOT = ROOT / "MC原版素材assets"
 
 
 def png_bytes(width: int, height: int, pixels: list[tuple[int, int, int, int]]) -> bytes:
@@ -100,6 +100,7 @@ def assert_synthetic() -> None:
         assert (output_a / MANIFEST_FILE).read_bytes() == (output_b / MANIFEST_FILE).read_bytes()
         assert manifest_a == manifest_b
         assert manifest_a["roots"] == ["minecraft:demo"]
+        assert manifest_a["sourceKind"] == "archive"
         assert manifest_a["closure"] == {"blockstates": 1, "models": 1, "textures": 2, "metadata": 0}
         assert list(manifest_a["textures"]) == ["minecraft:block/large", "minecraft:block/small"]
 
@@ -153,13 +154,15 @@ def assert_synthetic() -> None:
 
 
 def assert_real_source() -> None:
-    if not SOURCE_ARCHIVE.exists():
-        raise AssertionError(f"tracked source archive is missing: {SOURCE_ARCHIVE}")
+    if not SOURCE_ROOT.is_dir():
+        raise AssertionError(f"tracked source directory is missing: {SOURCE_ROOT}")
     with tempfile.TemporaryDirectory() as temp:
         output = Path(temp) / "real"
-        manifest = build_model_texture_atlas(SOURCE_ARCHIVE, output, DEFAULT_BLOCKS)
+        manifest = build_model_texture_atlas(SOURCE_ROOT, output, DEFAULT_BLOCKS)
 
         assert manifest["roots"] == sorted(DEFAULT_BLOCKS)
+        assert manifest["sourceKind"] == "directory"
+        assert manifest["sourceRoot"] == "MC原版素材assets"
         closure = manifest["closure"]
         assert closure["blockstates"] == len(DEFAULT_BLOCKS)
         assert closure["models"] >= len(DEFAULT_BLOCKS)
@@ -179,7 +182,8 @@ def assert_real_source() -> None:
         for resource_id, record in manifest["textures"].items():
             assert resource_id.startswith("minecraft:")
             assert record["canonical"].startswith("assets/minecraft/textures/")
-            assert record["source"].replace("\\", "/").endswith(record["canonical"])
+            expected_suffix = record["canonical"][len("assets/") :]
+            assert record["source"].replace("\\", "/").endswith(expected_suffix)
             assert record["width"] == record["height"]
             assert record["width"] > 0
 

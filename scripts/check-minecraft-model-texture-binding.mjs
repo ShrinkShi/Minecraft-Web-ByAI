@@ -16,7 +16,9 @@ const resolver=createMinecraftModelAtlasResolver(raw);
 
 assert.equal(resolver.manifest.format,1);
 assert.equal(resolver.manifest.minecraftVersion,'1.20.1');
-assert.equal(resolver.manifest.sourceArchiveSha256,'b65a2211175af90664de9f41ea422f4869eee855f0da4bf6fe0715434ebe9c69');
+assert.equal(resolver.manifest.sourceKind,'directory');
+assert.equal(resolver.manifest.sourceRoot,'MC原版素材assets');
+assert.equal('sourceArchiveSha256' in resolver.manifest,false);
 assert.deepEqual(resolver.manifest.closure,{blockstates:9,models:42,textures:14,metadata:0});
 assert.equal(resolver.textureCount,14);
 assert.deepEqual(resolver.atlas,{
@@ -58,8 +60,6 @@ assert.deepEqual(glassBinding.region,resolver.requireRegion('minecraft:block/gla
 assert.deepEqual(calls,[['minecraft:block/glass','face',91]]);
 assert.equal(Object.isFrozen(glassBinding),true);
 
-// Exercise the exact adapter used by mesh-worker.js. createMinecraftModelTextureBinding
-// passes (texture, face, instance), while runtime layer semantics are instance-owned.
 const runtimeBinding=createMinecraftModelTextureBinding(resolver,{resolveLayer:minecraftModelTextureLayerResolver});
 assert.equal(runtimeBinding('block/glass',{tag:'face'},{blockId:20,renderLayer:'translucent',textureLayers:{}}).layer,'translucent');
 assert.equal(runtimeBinding('block/iron_ore',{tag:'face'},{blockId:19,renderLayer:'opaque',textureLayers:{}}).layer,'opaque');
@@ -144,8 +144,27 @@ const badPacking=structuredClone(raw);
 badPacking.atlas.packing='experimental';
 assert.throws(()=>normalizeMinecraftModelAtlasManifest(badPacking),/packing must be power-of-two-shelf-v1/);
 
-const badArchiveSha=structuredClone(raw);
+const badSourceKind=structuredClone(raw);
+badSourceKind.sourceKind='folder';
+assert.throws(()=>normalizeMinecraftModelAtlasManifest(badSourceKind),/sourceKind must be directory or archive/);
+
+const missingSourceRoot=structuredClone(raw);
+delete missingSourceRoot.sourceRoot;
+assert.throws(()=>normalizeMinecraftModelAtlasManifest(missingSourceRoot),/sourceRoot must be a non-empty string/);
+
+const mixedDirectoryArchive=structuredClone(raw);
+mixedDirectoryArchive.sourceArchiveSha256='b65a2211175af90664de9f41ea422f4869eee855f0da4bf6fe0715434ebe9c69';
+assert.throws(()=>normalizeMinecraftModelAtlasManifest(mixedDirectoryArchive),/directory provenance may not include archive fields/);
+
+const legacyArchive=structuredClone(raw);
+delete legacyArchive.sourceKind;delete legacyArchive.sourceRoot;
+legacyArchive.sourceArchiveSha256='b65a2211175af90664de9f41ea422f4869eee855f0da4bf6fe0715434ebe9c69';
+const normalizedLegacyArchive=normalizeMinecraftModelAtlasManifest(legacyArchive);
+assert.equal(normalizedLegacyArchive.sourceKind,'archive');
+assert.equal(normalizedLegacyArchive.sourceArchiveSha256,legacyArchive.sourceArchiveSha256);
+
+const badArchiveSha=structuredClone(legacyArchive);
 badArchiveSha.sourceArchiveSha256='not-a-sha';
 assert.throws(()=>normalizeMinecraftModelAtlasManifest(badArchiveSha),/sourceArchiveSha256 must be a lowercase SHA-256/);
 
-console.log('tracked Minecraft model atlas manifest + strict texture binding resolver: PASS');
+console.log('tracked Minecraft model atlas manifest + directory/archive provenance + strict texture binding resolver: PASS');

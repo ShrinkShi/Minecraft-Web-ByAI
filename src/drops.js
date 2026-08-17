@@ -2,11 +2,12 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.m
 import {ATLAS_COLS,ATLAS_ROWS,BLOCKS} from './blocks.js';
 import {ITEMS} from './items.js';
 import {normalizeItemStack} from './item-stack.js';
+import {BedModelRenderer} from './bed-model-renderer.js';
 
 export class DropSystem{
   constructor(scene,world,inventory,onInventoryChanged=()=>{}){
     this.scene=scene;this.world=world;this.inventory=inventory;this.onInventoryChanged=onInventoryChanged;
-    this.drops=[];this.authoritativeDrops=new Map();this.blockGeometries=new Map();this.itemMaterials=new Map();
+    this.drops=[];this.authoritativeDrops=new Map();this.blockGeometries=new Map();this.itemMaterials=new Map();this.bedRenderer=null;
   }
 
   geometryForTile(tile){
@@ -28,8 +29,13 @@ export class DropSystem{
     if(material)this.itemMaterials.set(itemId,material);return material;
   }
 
+  createBedVisual(){
+    this.bedRenderer??=new BedModelRenderer();const root=this.bedRenderer.createWhole();root.name='drop-bed';root.userData.sourceBackedItem='bed';root.scale.setScalar(.3);root.position.y=-.08;return root;
+  }
+
   createVisual(itemId){
     const def=ITEMS[itemId];
+    if(def?.itemPreview==='bed-model')return this.createBedVisual();
     if(def?.blockId){const mesh=new THREE.Mesh(this.geometryForTile(def.tile),this.world.material);mesh.castShadow=false;return mesh;}
     const material=this.materialForItem(itemId);if(!material)return null;
     const sprite=new THREE.Sprite(material);sprite.scale.set(.48,.48,.48);return sprite;
@@ -84,6 +90,7 @@ export class DropSystem{
     for(const drop of [...this.drops])this.remove(drop);
     for(const geometry of this.blockGeometries.values())geometry.dispose();
     for(const material of this.itemMaterials.values()){material.map?.dispose();material.dispose();}
+    this.bedRenderer?.dispose();this.bedRenderer=null;
     this.authoritativeDrops.clear();this.blockGeometries.clear();this.itemMaterials.clear();
   }
 }

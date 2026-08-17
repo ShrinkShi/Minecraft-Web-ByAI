@@ -4,18 +4,25 @@ import {minecraftEntityCuboidUvRects} from './minecraft-entity-cuboid-uv.js';
 export const BED_TEXTURE_SIZE=Object.freeze([64,64]);
 export const BED_MODEL_HEIGHT=9/16;
 
-const freezeFaceUv=faceUv=>Object.freeze(Object.fromEntries(Object.entries(faceUv||{}).map(([face,rect])=>[face,Object.freeze([...rect])])));
-const cuboid=(name,size,offset,uv,{faceUv={}}={})=>Object.freeze({name,size:Object.freeze(size),offset:Object.freeze(offset),uv:Object.freeze(uv),faceUv:freezeFaceUv(faceUv)});
+const vector=value=>Object.freeze([...(value||[0,0,0])]);
+const cuboid=(name,size,offset,uv,{position=[0,0,0],rotation=[0,0,0]}={})=>Object.freeze({name,size:Object.freeze(size),offset:Object.freeze(offset),uv:Object.freeze(uv),position:vector(position),rotation:vector(rotation)});
+
+// Java's bed entity sheet is authored around a 16x16x6 mattress cuboid which
+// is rotated +90 degrees around X into a horizontal 16x6x16 mattress. Keeping
+// that source-space box is important: its 64x64 sheet assigns the pillow/red
+// top, wooden underside and four side strips to the pre-rotation cube faces.
+// Replacing it with a 16x6x16 box changes the UV layout and cannot be repaired
+// by overriding only the top face.
+const mattress=(name,uv)=>cuboid(name,[16,16,6],[0,0,0],uv,{position:[0,9,0],rotation:[Math.PI/2,0,0]});
 
 // Canonical orientation points from foot -> head along local +Z. Each block
 // renders one half so chunk rebuild/unload remains authoritative even when a bed
-// crosses a chunk boundary. The supplied 64x64 bed entity sheet is not a block
-// atlas: the visually exposed mattress tops use dedicated sheet rectangles.
+// crosses a chunk boundary.
 export const BED_HALF_SPECS=Object.freeze({
   foot:Object.freeze({
     part:'foot',
     cuboids:Object.freeze([
-      cuboid('foot-mattress',[16,6,16],[0,3,0],[0,22],{faceUv:{top:[2,28,18,44]}}),
+      mattress('foot-mattress',[0,22]),
       cuboid('foot-left-leg',[3,3,3],[0,0,0],[50,0]),
       cuboid('foot-right-leg',[3,3,3],[13,0,0],[50,6])
     ])
@@ -23,7 +30,7 @@ export const BED_HALF_SPECS=Object.freeze({
   head:Object.freeze({
     part:'head',
     cuboids:Object.freeze([
-      cuboid('head-mattress',[16,6,16],[0,3,0],[0,0],{faceUv:{top:[10,6,26,22]}}),
+      mattress('head-mattress',[0,0]),
       cuboid('head-left-leg',[3,3,3],[0,0,13],[50,12]),
       cuboid('head-right-leg',[3,3,3],[13,0,13],[50,18])
     ])

@@ -11,20 +11,21 @@ from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Iterable
-from zipfile import BadZipFile, ZipFile
 
 from PIL import Image, UnidentifiedImageError
 
 from minecraft_model_acceptance import MINECRAFT_MODEL_ACCEPTANCE_BLOCKS
 from minecraft_model_closure import (
     ClosureError,
-    MinecraftArchiveIndex,
+    MinecraftSourceIndex,
     normalize_resource_id,
+    open_minecraft_source,
     resolve_block_model_closure,
     sha256_file,
+    source_provenance,
 )
 
-DEFAULT_ARCHIVE = Path("MC原版素材assets.zip")
+DEFAULT_SOURCE = Path("MC原版素材assets")
 DEFAULT_OUTPUT = Path("build/minecraft-model-atlas")
 DEFAULT_BLOCKS = MINECRAFT_MODEL_ACCEPTANCE_BLOCKS
 ATLAS_FILE = "model-texture-atlas.png"
@@ -85,7 +86,7 @@ def canonical_texture_resource_id(canonical: str) -> str:
         raise AtlasError(f"invalid canonical texture resource: {canonical}: {exc}") from exc
 
 
-def _decode_texture(index: MinecraftArchiveIndex, canonical: str) -> TextureSource:
+def _decode_texture(index: MinecraftSourceIndex, canonical: str) -> TextureSource:
     metadata = f"{canonical}.mcmeta"
     if index.has(metadata):
         raise AtlasError(
@@ -125,7 +126,7 @@ def _decode_texture(index: MinecraftArchiveIndex, canonical: str) -> TextureSour
     )
 
 
-def load_texture_sources(index: MinecraftArchiveIndex, canonical_paths: Iterable[str]) -> tuple[TextureSource, ...]:
+def load_texture_sources(index: MinecraftSourceIndex, canonical_paths: Iterable[str]) -> tuple[TextureSource, ...]:
     paths = tuple(sorted(set(canonical_paths)))
     if not paths:
         raise AtlasError("model texture closure is empty")
@@ -234,21 +235,18 @@ def _texture_manifest_record(placement: Placement, atlas_side: int) -> dict[str,
 
 
 def build_model_texture_atlas(
-    archive_path: str | Path,
+    source_path: str | Path,
     output: str | Path,
     block_ids: Iterable[str] = DEFAULT_BLOCKS,
 ) -> dict[str, Any]:
-    archive_path = Path(archive_path)
+    source_path = Path(source_path)
     output = Path(output)
     roots = tuple(sorted({normalize_resource_id(block_id) for block_id in block_ids}))
     if not roots:
         raise AtlasError("at least one block root is required")
-    if not archive_path.exists():
-        raise AtlasError(f"Minecraft source archive is missing: {archive_path}")
 
     try:
-        with ZipFile(archive_path) as archive:
-            index = MinecraftArchiveIndex(archive)
+        with open_minecraft_source(source_path) as index:
             closure = resolve_block_model_closure(index, roots)
             if closure.metadata:
                 raise AtlasError(
@@ -273,8 +271,7 @@ def build_model_texture_atlas(
                 "format": 1,
                 "minecraftVersion": "1.20.1",
                 "roots": list(closure.roots),
-                "sourceArchive": archive_path.name,
-                "sourceArchiveSha256": sha256_file(archive_path),
+                **source_provenance(source_path),
                 "closure": {
                     "blockstates": len(closure.blockstates),
                     "models": len(closure.models),
@@ -296,13 +293,13 @@ def build_model_texture_atlas(
                 encoding="utf-8",
             )
             return manifest
-    except (BadZipFile, ClosureError) as exc:
+    except ClosureError as exc:
         raise AtlasError(f"cannot build Minecraft model texture atlas: {exc}") from exc
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("archive", nargs="?", type=Path, default=DEFAULT_ARCHIVE)
+    parser.add_argument("source", nargs="?", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument(
         "--block",
@@ -312,7 +309,7 @@ def main() -> int:
     )
     args = parser.parse_args()
     try:
-        manifest = build_model_texture_atlas(args.archive, args.output, args.blocks or DEFAULT_BLOCKS)
+        manifest = build_model_texture_atlas(args.source, args.output, args.blocks or DEFAULT_BLOCKS)
     except AtlasError as exc:
         raise SystemExit(str(exc)) from exc
     atlas = manifest["atlas"]
@@ -323,3 +320,7 @@ def main() -> int:
         f"sha256={atlas['sha256']}",
     )
     return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

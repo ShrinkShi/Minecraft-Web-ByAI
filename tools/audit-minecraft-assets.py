@@ -1,21 +1,14 @@
 #!/usr/bin/env python3
-"""Inspect the user-supplied Minecraft 1.20.1 asset archive without extracting it.
-
-The report is intentionally deterministic so GitHub Actions can be used as a
-trusted inspection environment even when a development client cannot download
-binary repository blobs directly.
-"""
+"""Inspect the tracked Minecraft 1.20.1 asset directory deterministically."""
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 from collections import Counter
-from pathlib import PurePosixPath
-from zipfile import BadZipFile, ZipFile
+from pathlib import Path, PurePosixPath
 
-DEFAULT_ARCHIVE = "MC原版素材assets.zip"
+DEFAULT_SOURCE = Path("MC原版素材assets")
 
 FAMILIES = {
     "block_textures": "assets/minecraft/textures/block/",
@@ -27,8 +20,6 @@ FAMILIES = {
     "item_models": "assets/minecraft/models/item/",
     "blockstates": "assets/minecraft/blockstates/",
     "sounds": "assets/minecraft/sounds/",
-    "hash_indexes": "indexes/",
-    "hash_objects": "objects/",
 }
 
 PROBES = {
@@ -61,20 +52,16 @@ PROBES = {
     "entity_skeleton": "assets/minecraft/textures/entity/skeleton/skeleton.png",
     "entity_creeper": "assets/minecraft/textures/entity/creeper/creeper.png",
     "entity_spider": "assets/minecraft/textures/entity/spider/spider.png",
+    "player_steve": "assets/minecraft/textures/entity/player/wide/steve.png",
 }
 
 
-def sha256_file(path: str) -> str:
-    digest = hashlib.sha256()
-    with open(path, "rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def safe_name(name: str) -> bool:
-    path = PurePosixPath(name)
-    return not path.is_absolute() and ".." not in path.parts
+def canonical_name(source: Path, path: Path) -> str:
+    relative = path.relative_to(source).as_posix()
+    pure = PurePosixPath(relative)
+    if pure.is_absolute() or any(part in {"", ".", ".."} for part in pure.parts):
+        raise ValueError(f"unsafe source path: {relative}")
+    return f"assets/{relative}"
 
 
 def suffix_match(names: list[str], suffix: str) -> list[str]:
@@ -89,56 +76,39 @@ def family_matches(names: list[str], family: str) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("archive", nargs="?", default=DEFAULT_ARCHIVE)
+    parser.add_argument("source", nargs="?", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("--json-out", default=None)
     args = parser.parse_args()
 
-    try:
-        with ZipFile(args.archive) as archive:
-            infos = [info for info in archive.infolist() if not info.is_dir()]
-    except (FileNotFoundError, BadZipFile) as exc:
-        raise SystemExit(f"asset archive audit failed: {exc}") from exc
+    if not args.source.is_dir():
+        raise SystemExit(f"asset directory audit failed: source directory is missing: {args.source}")
 
-    names = [info.filename.replace("\\", "/") for info in infos]
-    unsafe = sorted(name for name in names if not safe_name(name))
-    if unsafe:
-        raise SystemExit(f"asset archive contains unsafe paths: {unsafe[:5]}")
+    paths = sorted(path for path in args.source.rglob("*") if path.is_file())
+    if not paths:
+        raise SystemExit("asset directory is empty")
+    names = [canonical_name(args.source, path) for path in paths]
+    sizes = {name: path.stat().st_size for name, path in zip(names, paths, strict=True)}
 
-    top_level = Counter(PurePosixPath(name).parts[0] for name in names if PurePosixPath(name).parts)
+    top_level = Counter(PurePosixPath(name[len("assets/") :]).parts[0] for name in names)
     extensions = Counter(PurePosixPath(name).suffix.lower() or "<none>" for name in names)
     bbmodels = suffix_match(names, ".bbmodel")
 
     families = {}
     for key, needle in FAMILIES.items():
         matches = family_matches(names, needle)
-        families[key] = {
-            "count": len(matches),
-            "samples": matches[:5],
-        }
+        families[key] = {"count": len(matches), "samples": matches[:5]}
 
     probes = {}
     for key, suffix in PROBES.items():
         matches = suffix_match(names, suffix)
         probes[key] = matches[0] if matches else None
 
-    has_jar_tree = any(value["count"] for key, value in families.items() if key not in {"hash_indexes", "hash_objects"})
-    has_hash_store = families["hash_indexes"]["count"] > 0 or families["hash_objects"]["count"] > 0
-    if has_jar_tree and has_hash_store:
-        classification = "combined"
-    elif has_jar_tree:
-        classification = "client-resource-tree"
-    elif has_hash_store:
-        classification = "minecraft-assets-hash-store"
-    else:
-        classification = "unknown"
-
     report = {
-        "archive": args.archive,
-        "sha256": sha256_file(args.archive),
-        "classification": classification,
-        "entry_count": len(infos),
-        "uncompressed_bytes": sum(info.file_size for info in infos),
-        "compressed_bytes": sum(info.compress_size for info in infos),
+        "sourceKind": "directory",
+        "sourceRoot": args.source.name,
+        "classification": "client-resource-tree",
+        "entry_count": len(paths),
+        "bytes": sum(sizes.values()),
         "top_level": dict(sorted(top_level.items())),
         "extensions": dict(sorted(extensions.items())),
         "families": families,
@@ -150,12 +120,7 @@ def main() -> int:
     payload = json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True)
     print(payload)
     if args.json_out:
-        with open(args.json_out, "w", encoding="utf-8", newline="\n") as output:
-            output.write(payload)
-            output.write("\n")
-
-    if not infos:
-        raise SystemExit("asset archive is empty")
+        Path(args.json_out).write_text(payload + "\n", encoding="utf-8")
     return 0
 
 

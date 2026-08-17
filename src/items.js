@@ -1,7 +1,6 @@
 import {BLOCKS} from './blocks.js';
 import {requireAssetUrl} from './asset-manifest.js';
 
-const bedIcon=()=>`data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Crect x='2' y='7' width='12' height='6' rx='1' fill='%23d85b5b' stroke='%235b2b2b'/%3E%3Crect x='2' y='6' width='4' height='4' rx='1' fill='%23f2eee6' stroke='%237a6f64'/%3E%3Crect x='2' y='13' width='2' height='2' fill='%237a4d2a'/%3E%3Crect x='12' y='13' width='2' height='2' fill='%237a4d2a'/%3E%3C/svg%3E`;
 const textured=(name,stack,assetKey,extra={})=>({name,stack,assetKey,texture:requireAssetUrl(assetKey),...extra});
 
 export const ITEMS={
@@ -19,7 +18,7 @@ export const ITEMS={
   wooden_pickaxe:textured('木镐',1,'item.wooden_pickaxe',{attackDamage:2,tool:{kind:'pickaxe',tier:'wood',speed:2,durability:59}}),
   stone_pickaxe:textured('石镐',1,'item.stone_pickaxe',{attackDamage:3,tool:{kind:'pickaxe',tier:'stone',speed:4,durability:131}}),
   raw_iron:textured('粗铁',64,'item.raw_iron'),
-  bed:{name:'床',stack:1,placeKind:'bed',texture:bedIcon(),entityAssetKey:'entity.bed.red'},
+  bed:{name:'床',stack:1,placeKind:'bed',itemPreview:'bed-model',entityAssetKey:'entity.bed.red'},
   leather_helmet:textured('皮革帽子',1,'item.leather_helmet',{armorSlot:'head',armorPoints:1}),
   leather_chestplate:textured('皮革外套',1,'item.leather_chestplate',{armorSlot:'chest',armorPoints:3}),
   leather_leggings:textured('皮革裤子',1,'item.leather_leggings',{armorSlot:'legs',armorPoints:2}),

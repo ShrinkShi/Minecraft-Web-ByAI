@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Regression checks for minecraft_model_closure.py.
 
-Covers a synthetic archive for exact dependency/error semantics and the tracked
-Minecraft Java 1.20.1 source archive for the approved first block-model
-acceptance set.
+Synthetic ZIP fixtures keep archive edge cases covered. The real-source check
+uses the repository-tracked extracted Minecraft Java 1.20.1 assets directory.
 """
 
 from __future__ import annotations
@@ -17,13 +16,14 @@ from minecraft_model_acceptance import MINECRAFT_MODEL_ACCEPTANCE_BLOCKS
 from minecraft_model_closure import (
     ClosureError,
     MinecraftArchiveIndex,
+    MinecraftDirectoryIndex,
     extract_closure,
     manifest_for,
     resolve_block_model_closure,
 )
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE_ARCHIVE = ROOT / "MC原版素材assets.zip"
+SOURCE_ROOT = ROOT / "MC原版素材assets"
 
 
 def write_json(archive: ZipFile, path: str, value: object) -> None:
@@ -102,7 +102,7 @@ def assert_synthetic() -> None:
                 "assets/minecraft/textures/block/overlay.png.mcmeta",
             ) in result.edges
 
-            manifest = manifest_for(index, result, archive_path=archive_path)
+            manifest = manifest_for(index, result, source_path=archive_path)
             assert manifest["format"] == 1
             assert manifest["counts"] == {
                 "blockstates": 1,
@@ -116,6 +116,7 @@ def assert_synthetic() -> None:
             assert manifest["files"]["assets/minecraft/textures/block/stone.png"]["source"].startswith(
                 "arbitrary-outer-folder/assets/minecraft/"
             )
+            assert manifest["sourceKind"] == "archive"
             assert len(manifest["sourceArchiveSha256"]) == 64
 
             output = temp_path / "closure"
@@ -165,50 +166,52 @@ def assert_synthetic() -> None:
 
 
 def assert_real_source() -> None:
-    if not SOURCE_ARCHIVE.exists():
-        raise AssertionError(f"tracked source archive is missing: {SOURCE_ARCHIVE}")
-    with ZipFile(SOURCE_ARCHIVE) as archive:
-        index = MinecraftArchiveIndex(archive)
-        result = resolve_block_model_closure(index, MINECRAFT_MODEL_ACCEPTANCE_BLOCKS)
-        manifest = manifest_for(index, result, archive_path=SOURCE_ARCHIVE)
+    if not SOURCE_ROOT.is_dir():
+        raise AssertionError(f"tracked source directory is missing: {SOURCE_ROOT}")
+    index = MinecraftDirectoryIndex(SOURCE_ROOT)
+    result = resolve_block_model_closure(index, MINECRAFT_MODEL_ACCEPTANCE_BLOCKS)
+    manifest = manifest_for(index, result, source_path=SOURCE_ROOT)
 
-        assert result.roots == tuple(sorted(MINECRAFT_MODEL_ACCEPTANCE_BLOCKS))
-        assert len(result.blockstates) == len(MINECRAFT_MODEL_ACCEPTANCE_BLOCKS)
-        assert len(result.models) > len(MINECRAFT_MODEL_ACCEPTANCE_BLOCKS), "stateful acceptance blocks must pull model dependencies"
-        assert len(result.textures) >= 8
-        assert len(result.files) == manifest["counts"]["files"]
+    assert result.roots == tuple(sorted(MINECRAFT_MODEL_ACCEPTANCE_BLOCKS))
+    assert len(result.blockstates) == len(MINECRAFT_MODEL_ACCEPTANCE_BLOCKS)
+    assert len(result.models) > len(MINECRAFT_MODEL_ACCEPTANCE_BLOCKS), "stateful acceptance blocks must pull model dependencies"
+    assert len(result.textures) >= 8
+    assert len(result.files) == manifest["counts"]["files"]
+    assert manifest["sourceKind"] == "directory"
+    assert manifest["sourceRoot"] == "MC原版素材assets"
 
-        for block in MINECRAFT_MODEL_ACCEPTANCE_BLOCKS:
-            name = block.split(":", 1)[1]
-            assert f"assets/minecraft/blockstates/{name}.json" in result.blockstates
+    for block in MINECRAFT_MODEL_ACCEPTANCE_BLOCKS:
+        name = block.split(":", 1)[1]
+        assert f"assets/minecraft/blockstates/{name}.json" in result.blockstates
 
-        required_closure_files = {
-            "assets/minecraft/models/block/cube.json",
-            "assets/minecraft/models/block/cube_all.json",
-            "assets/minecraft/textures/block/iron_ore.png",
-            "assets/minecraft/textures/block/glass.png",
-            "assets/minecraft/textures/block/oak_planks.png",
-            "assets/minecraft/textures/block/oak_door_bottom.png",
-            "assets/minecraft/textures/block/oak_door_top.png",
-            "assets/minecraft/textures/block/torch.png",
-        }
-        missing = required_closure_files.difference(result.files)
-        assert not missing, f"real 1.20.1 closure missed expected resources: {sorted(missing)}"
+    required_closure_files = {
+        "assets/minecraft/models/block/cube.json",
+        "assets/minecraft/models/block/cube_all.json",
+        "assets/minecraft/textures/block/iron_ore.png",
+        "assets/minecraft/textures/block/glass.png",
+        "assets/minecraft/textures/block/oak_planks.png",
+        "assets/minecraft/textures/block/oak_door_bottom.png",
+        "assets/minecraft/textures/block/oak_door_top.png",
+        "assets/minecraft/textures/block/torch.png",
+    }
+    missing = required_closure_files.difference(result.files)
+    assert not missing, f"real 1.20.1 closure missed expected resources: {sorted(missing)}"
 
-        for canonical in result.files:
-            record = manifest["files"][canonical]
-            assert len(record["sha256"]) == 64
-            assert record["bytes"] > 0
-            assert record["source"].replace("\\", "/").endswith(canonical)
+    for canonical in result.files:
+        record = manifest["files"][canonical]
+        assert len(record["sha256"]) == 64
+        assert record["bytes"] > 0
+        expected_suffix = canonical[len("assets/") :]
+        assert record["source"].replace("\\", "/").endswith(expected_suffix)
 
-        print(
-            "real acceptance closure:",
-            len(result.blockstates), "blockstates,",
-            len(result.models), "models,",
-            len(result.textures), "textures,",
-            len(result.metadata), "metadata files,",
-            len(result.files), "total files",
-        )
+    print(
+        "real acceptance closure:",
+        len(result.blockstates), "blockstates,",
+        len(result.models), "models,",
+        len(result.textures), "textures,",
+        len(result.metadata), "metadata files,",
+        len(result.files), "total files",
+    )
 
 
 def main() -> int:
