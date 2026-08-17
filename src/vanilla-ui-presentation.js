@@ -1,5 +1,5 @@
 import {requireAssetUrl} from './asset-manifest.js';
-import {blockItemAtlasStyle,blockItemFaceTiles} from './block-item-preview.js';
+import {blockItemAtlasStyle,blockItemFaceTextures,blockItemFaceTiles} from './block-item-preview.js';
 import {ITEMS} from './items.js';
 import {UI} from './ui.js';
 
@@ -96,8 +96,8 @@ ${hotbarSlotRules}
 
 function createBlockItemIcon(itemId){
   const definition=ITEMS[itemId];
-  const tiles=blockItemFaceTiles(definition);
-  if(!tiles||typeof document==='undefined')return null;
+  const tiles=blockItemFaceTiles(definition),textures=blockItemFaceTextures(definition);
+  if((!tiles&&!textures)||typeof document==='undefined')return null;
   const root=document.createElement('span');
   root.className='block-item-icon';
   root.dataset.itemId=String(itemId);
@@ -106,9 +106,15 @@ function createBlockItemIcon(itemId){
   for(const faceName of ['left','right','top']){
     const face=document.createElement('span');
     face.className=`block-face ${faceName}`;
-    const style=blockItemAtlasStyle(tiles[faceName],{facePixels:24});
-    face.style.backgroundSize=style.backgroundSize;
-    face.style.backgroundPosition=style.backgroundPosition;
+    if(textures){
+      face.style.backgroundImage=`url("${escapeCssUrl(textures[faceName])}")`;
+      face.style.backgroundSize='24px 24px';
+      face.style.backgroundPosition='0 0';
+    }else{
+      const style=blockItemAtlasStyle(tiles[faceName],{facePixels:24});
+      face.style.backgroundSize=style.backgroundSize;
+      face.style.backgroundPosition=style.backgroundPosition;
+    }
     root.append(face);
   }
   return root;
