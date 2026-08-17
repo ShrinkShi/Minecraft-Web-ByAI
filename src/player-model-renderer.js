@@ -68,7 +68,7 @@ export class PlayerModelFactory{
     const state=visual.state,pose=normalizePlayerVisualInput(input),parts=visual.parts;
     state.primaryPulse=Math.max(0,state.primaryPulse-dt);state.useRemaining=Math.max(0,state.useRemaining-dt);state.deathProgress=approach(state.deathProgress,pose.dead?1:0,dt*3.6);
     const moving=Math.min(1,pose.speed/(pose.sprint?5.6:4.3)),phaseSpeed=pose.sprint?13:Math.min(11,4+pose.speed*1.65);if(moving>.01)state.walkPhase=(state.walkPhase+dt*phaseSpeed)%(Math.PI*2);
-    const swing=Math.sin(state.walkPhase)*(pose.sprint?.82:.58)*moving;
+    const swing=Math.sin(state.walkPhase)*(pose.sprint ? .82 : .58)*moving;
     for(const part of Object.values(parts))part.rotation.set(0,0,0);
     parts.head.rotation.x=pose.headPitch;parts.head.rotation.y=pose.headYaw;
     parts.leftArm.rotation.x=-swing;parts.rightArm.rotation.x=swing;parts.leftLeg.rotation.x=swing;parts.rightLeg.rotation.x=-swing;
