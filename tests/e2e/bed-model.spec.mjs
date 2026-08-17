@@ -4,7 +4,7 @@ test('bed blocks leave cube mesh, preserve neighbor faces, and build source-spac
   await page.goto('/');
   const result=await page.evaluate(async()=>{
     const [{BED_IDS},{BedModelRenderer},{bedVisualDescriptor},{VoxelWorld},THREE]=await Promise.all([
-      import('/src/bed-rules.js'),import('/src/bed-model-renderer.js'),import('/src/bed-model-specs.js'),import('/src/world.js'),import('three')
+      import('/src/bed-rules.js'),import('/src/bed-model-renderer.js'),import('/src/bed-model-specs.js'),import('/src/world.js'),import('https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js')
     ]);
     const runWorker=data=>new Promise((resolve,reject)=>{
       const worker=new Worker('/src/mesh-worker.js',{type:'module'}),timer=setTimeout(()=>{worker.terminate();reject(new Error('mesh worker timeout'));},4000);
