@@ -8,6 +8,23 @@ export const ASSET_SOURCE=Object.freeze({
 
 const supplied=(kind,url,extra={})=>Object.freeze({kind,source:ASSET_SOURCE.USER_SUPPLIED,url,...extra});
 
+const GUI_FILES=Object.freeze({
+  'gui.crosshair':'crosshair.png',
+  'gui.hud_icons':'hud-icons.png',
+  'gui.xp_background':'xp-background.png',
+  'gui.xp_progress':'xp-progress.png',
+  'gui.hotbar_left_cap':'hotbar-left-cap.png',
+  'gui.hotbar_right_cap':'hotbar-right-cap.png',
+  'gui.hotbar_selector':'hotbar-selector.png',
+  'gui.inventory_panel':'inventory-panel.png',
+  'gui.inventory_slot':'inventory-slot.png',
+  ...Object.fromEntries(Array.from({length:9},(_,index)=>[`gui.hotbar_slot_${index}`,`hotbar-slot-${index}.png`]))
+});
+const GUI_RECORDS=Object.fromEntries(Object.entries(GUI_FILES).map(([key,file])=>[
+  key,
+  supplied('gui-sprite',`./assets/gui/${file}`,{minecraftVersion:'1.20.1'})
+]));
+
 const RECORDS=Object.freeze({
   'terrain.block_atlas':supplied('texture-atlas','./assets/textures/atlas.png',{minecraftVersion:'1.20.1'}),
   'block.model_atlas':supplied('texture-atlas','./assets/model-textures/model-texture-atlas.png',{minecraftVersion:'1.20.1'}),
@@ -44,8 +61,10 @@ const RECORDS=Object.freeze({
   'entity.skeleton':supplied('entity-texture','./assets/minecraft/textures/entity/skeleton/skeleton.png'),
   'entity.creeper':supplied('entity-texture','./assets/minecraft/textures/entity/creeper/creeper.png'),
   'entity.spider':supplied('entity-texture','./assets/minecraft/textures/entity/spider/spider.png'),
+  ...GUI_RECORDS,
   'metadata.minecraft_runtime':supplied('asset-metadata','./assets/minecraft/runtime-manifest.json'),
-  'metadata.minecraft_model_atlas':supplied('asset-metadata','./assets/model-textures/model-texture-atlas.json',{minecraftVersion:'1.20.1'})
+  'metadata.minecraft_model_atlas':supplied('asset-metadata','./assets/model-textures/model-texture-atlas.json',{minecraftVersion:'1.20.1'}),
+  'metadata.minecraft_gui':supplied('asset-metadata','./assets/gui/gui-manifest.json',{minecraftVersion:'1.20.1'})
 });
 
 export const ASSET_KEYS=Object.freeze(Object.keys(RECORDS));
