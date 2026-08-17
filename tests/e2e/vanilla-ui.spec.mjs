@@ -8,11 +8,13 @@ test('source-backed Java 1.20.1 HUD inventory and block item previews render in 
   await page.goto('/?e2e=1');
   await expect(page.locator('style[data-minecraft-vanilla-ui="1"]')).toHaveCount(1);
   await page.getByRole('button',{name:'单人游戏'}).click();
+  await expect(page.getByRole('heading',{name:'选择世界'})).toBeVisible();
+  await page.getByRole('button',{name:'创建新的世界'}).click();
   await page.locator('#world-name').fill('CI Vanilla UI');
   await page.locator('#world-seed').fill('ci-vanilla-ui-2026');
   await page.locator('#game-mode').selectOption('creative');
   await page.locator('#terrain-prompt').fill('平原');
-  await page.getByRole('button',{name:'创建 / 进入'}).click();
+  await page.getByRole('button',{name:'创建世界'}).click();
   await expect(page.locator('#loading')).toHaveClass(/hidden/,{timeout:60_000});
   await expect(page.locator('#hud')).not.toHaveClass(/hidden/);
 
