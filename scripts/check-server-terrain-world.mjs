@@ -4,6 +4,7 @@ import {ServerTerrainWorld,DEFAULT_SERVER_TERRAIN_CACHE_CHUNKS,MAX_SERVER_TERRAI
 import {ServerPlayerSimulation} from '../server/player-simulation.mjs';
 
 function fnv1a(bytes){let hash=2166136261>>>0;for(const byte of bytes){hash^=byte;hash=Math.imul(hash,16777619);}return hash>>>0;}
+function normalizeV1(bytes){const copy=bytes.slice();for(let i=0;i<copy.length;i++)if(copy[i]===BLOCK.IRON_ORE)copy[i]=BLOCK.STONE;return copy;}
 
 assert.equal(DEFAULT_SERVER_TERRAIN_CACHE_CHUNKS,256);assert.equal(MAX_SERVER_TERRAIN_CACHE_CHUNKS,4096);
 const world=new ServerTerrainWorld({seed:'golden-seed',prompt:'mountain forest',maxCacheChunks:8});assert.equal(world.cacheSize,0);assert.equal(Object.isFrozen(world.environment),true);
@@ -13,7 +14,7 @@ assert.equal(world.getBlock(0,16,0),BLOCK.SAND);assert.equal(world.getBlock(0,17
 assert.equal(world.getBlock(-1,16,-1),BLOCK.SAND,'negative world coordinates use floor-div/mod chunk addressing');assert.equal(world.getBlock(-1,17,-1),BLOCK.WATER);assert.equal(world.hasCachedChunk(-1,-1),true);
 assert.equal(world.getBlock(33,22,-17),BLOCK.GRASS);assert.equal(world.getBlock(33,21,-17),BLOCK.DIRT);assert.equal(world.getBlock(33,23,-17),BLOCK.AIR);assert.equal(world.highestSolid(33.9,-16.1),22,'highestSolid floors X/Z like browser VoxelWorld');
 
-const snapshot=world.getChunkSnapshot(2,-1),checksum=fnv1a(snapshot);assert.equal(checksum,3280513530,'server chunk snapshot matches shared terrain golden');const original=snapshot[0];snapshot[0]=255;assert.equal(fnv1a(world.getChunkSnapshot(2,-1)),checksum,'caller mutation of chunk snapshot cannot mutate authoritative cache');assert.notEqual(snapshot[0],original);
+const snapshot=world.getChunkSnapshot(2,-1),legacyChecksum=fnv1a(normalizeV1(snapshot));assert.equal(legacyChecksum,3280513530,'server v2 chunk keeps the shared legacy terrain bytes after iron->stone normalization');assert.ok(snapshot.includes(BLOCK.IRON_ORE),'authoritative terrain snapshot must expose generated iron ore');const original=snapshot[0];snapshot[0]=255;assert.equal(fnv1a(normalizeV1(world.getChunkSnapshot(2,-1))),legacyChecksum,'caller mutation of chunk snapshot cannot mutate authoritative cache');assert.notEqual(snapshot[0],original);
 
 const lru=new ServerTerrainWorld({seed:'golden-seed',prompt:'mountain forest',maxCacheChunks:2});lru.getChunkSnapshot(0,0);lru.getChunkSnapshot(1,0);assert.equal(lru.cacheSize,2);lru.getBlock(0,0,0);lru.getChunkSnapshot(2,0);assert.equal(lru.hasCachedChunk(0,0),true,'recently touched chunk remains in LRU cache');assert.equal(lru.hasCachedChunk(1,0),false,'least-recently-used chunk is evicted at cache bound');assert.equal(lru.hasCachedChunk(2,0),true);assert.equal(lru.cacheSize,2);const regenerated=fnv1a(lru.getChunkSnapshot(1,0));lru.clearCache();assert.equal(lru.cacheSize,0);assert.equal(fnv1a(lru.getChunkSnapshot(1,0)),regenerated,'evicted/cleared chunks deterministically regenerate');
 
@@ -24,4 +25,4 @@ const physicsWorld=new ServerTerrainWorld({seed:'golden-seed',prompt:'mountain f
 assert.throws(()=>new ServerTerrainWorld({maxCacheChunks:0}),/maxCacheChunks/);assert.throws(()=>new ServerTerrainWorld({maxCacheChunks:MAX_SERVER_TERRAIN_CACHE_CHUNKS+1}),/maxCacheChunks/);assert.throws(()=>world.getBlock(.5,0,0),/wx must be an integer/);assert.throws(()=>world.getBlock(0,1.5,0),/wy must be an integer/);assert.throws(()=>world.getChunkSnapshot(0.1,0),/cx must be an integer/);assert.throws(()=>world.prefetchAround(NaN,0,1),/worldX must be a finite number/);assert.throws(()=>world.prefetchAround(0,0,-1),/chunkRadius/);assert.throws(()=>world.prefetchAround(0,0,17),/chunkRadius/);
 assert.equal(CHUNK_SIZE,16);assert.equal(WORLD_HEIGHT,64);
 
-console.log('bounded deterministic server terrain world + authoritative physics environment integration: PASS');
+console.log('bounded deterministic server terrain v2 + authoritative physics environment integration: PASS');
