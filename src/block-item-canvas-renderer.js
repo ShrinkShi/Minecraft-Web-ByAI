@@ -3,7 +3,7 @@ import {blockItemFaceTextures,blockItemFaceTiles} from './block-item-preview.js'
 
 const imageCache=new Map();
 const FACE_POINTS=Object.freeze({
-  top:Object.freeze([[3,10],[16,3],[16,17],[29,10]]),
+  top:Object.freeze([[3,10],[16,3],[29,10],[16,17]]),
   left:Object.freeze([[3,10],[16,17],[16,31],[3,24]]),
   right:Object.freeze([[16,17],[29,10],[29,24],[16,31]])
 });
