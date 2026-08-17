@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Build browser-ready art from selectively imported Minecraft resources.
 
-The legacy 4x4 terrain atlas stays byte-compatible. Generic blockstate/model JSON
-is passed through from the deterministic runtime closure so browser loaders can
-resolve model parents without duplicating the dependency graph here. A tiny set
-of direct block-item textures is copied byte-for-byte from the tracked source ZIP
-when gameplay UI needs the original texture outside the legacy terrain atlas.
+The legacy terrain atlas stays byte-compatible while generic model JSON is
+passed through from the deterministic runtime closure. Direct block-item source
+files are copied byte-for-byte from the repository-tracked
+``MC原版素材assets/`` directory.
 """
 
 from __future__ import annotations
@@ -15,11 +14,10 @@ import hashlib
 import json
 import shutil
 from pathlib import Path
-from zipfile import ZipFile
 
 from PIL import Image
 
-DEFAULT_ARCHIVE = Path("MC原版素材assets.zip")
+DEFAULT_MINECRAFT_SOURCE = Path("MC原版素材assets")
 DEFAULT_SOURCE = Path("build/minecraft-runtime-source")
 DEFAULT_OUTPUT = Path("build/minecraft-runtime-assets")
 TILE_SIZE = 16
@@ -73,7 +71,7 @@ ITEM_FILES = {
 }
 
 DIRECT_BLOCK_ITEM_FILES = {
-    "glass.png": "assets/minecraft/textures/block/glass.png",
+    "glass.png": Path("minecraft/textures/block/glass.png"),
 }
 
 PASS_THROUGH = [
@@ -184,19 +182,16 @@ def build_items(source: Path, output: Path) -> dict[str, object]:
     return records
 
 
-def build_direct_block_item_files(archive_path: Path, output: Path) -> int:
+def build_direct_block_item_files(minecraft_source: Path, output: Path) -> int:
+    if not minecraft_source.is_dir():
+        raise FileNotFoundError(f"Minecraft source directory is missing: {minecraft_source}")
     target_dir = output / "items"
     target_dir.mkdir(parents=True, exist_ok=True)
-    with ZipFile(archive_path) as archive:
-        names = [info.filename.replace("\\", "/") for info in archive.infolist() if not info.is_dir()]
-        for destination, suffix in sorted(DIRECT_BLOCK_ITEM_FILES.items()):
-            needle = suffix.lower()
-            matches = sorted(name for name in names if name.lower().endswith(needle))
-            if not matches:
-                raise FileNotFoundError(f"missing direct block item source resource: {suffix}")
-            if len(matches) != 1:
-                raise RuntimeError(f"ambiguous direct block item source resource {suffix}: {matches[:5]}")
-            (target_dir / destination).write_bytes(archive.read(matches[0]))
+    for destination, relative in sorted(DIRECT_BLOCK_ITEM_FILES.items()):
+        source_path = minecraft_source / relative
+        if not source_path.is_file():
+            raise FileNotFoundError(f"missing direct block item source resource: {source_path}")
+        shutil.copyfile(source_path, target_dir / destination)
     return len(DIRECT_BLOCK_ITEM_FILES)
 
 
@@ -225,7 +220,7 @@ def copy_reference_files(source: Path, output: Path) -> dict[str, str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--archive", type=Path, default=DEFAULT_ARCHIVE)
+    parser.add_argument("--minecraft-source", type=Path, default=DEFAULT_MINECRAFT_SOURCE)
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args()
@@ -244,13 +239,14 @@ def main() -> int:
 
     atlas = build_atlas(args.source, args.output)
     items = build_items(args.source, args.output)
-    direct_block_items = build_direct_block_item_files(args.archive, args.output)
+    direct_block_items = build_direct_block_item_files(args.minecraft_source, args.output)
     reference_files = copy_reference_files(args.source, args.output)
 
+    source_provenance = {key: source_manifest[key] for key in ("sourceKind", "sourceRoot", "sourceArchive", "sourceArchiveSha256") if key in source_manifest}
     runtime_manifest = {
         "format": 1,
         "minecraftVersion": source_manifest["minecraftVersion"],
-        "sourceArchiveSha256": source_manifest["sourceArchiveSha256"],
+        **source_provenance,
         "modelRuntimeClosure": model_runtime_closure,
         "tintProfile": {
             "grass": PLAINS_GRASS,
