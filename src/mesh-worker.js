@@ -97,7 +97,10 @@ function modelCullFaceVisible(context,blockAt){
   if(!offset)throw new TypeError(`unknown Minecraft model cull direction: ${context.direction}`);
   const neighbor=blockAt(context.x+offset[0],context.y+offset[1],context.z+offset[2]);
   if(!neighbor)return true;
-  const block=BLOCKS[neighbor]||BLOCKS[0];
+  const current=BLOCKS[context.instance.blockId]||BLOCKS[0],block=BLOCKS[neighbor]||BLOCKS[0];
+  // Identical transparent full cubes such as glass must not render two hidden
+  // coplanar faces between them. Other transparent boundaries stay visible.
+  if(neighbor===context.instance.blockId&&current.solid&&current.transparent&&current.fullCube!==false)return false;
   return block.fullCube===false||!block.solid||!!block.transparent;
 }
 
