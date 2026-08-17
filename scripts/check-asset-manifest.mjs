@@ -48,7 +48,7 @@ for(const itemId of ['stick','wooden_pickaxe','leather_helmet','leather_chestpla
 }
 assert.equal(ITEMS['block:20'].assetKey,'block.glass');
 assert.equal(ITEMS['block:20'].texture,requireAssetUrl('block.glass'));
-assert.equal(ITEMS['block:20'].blockPreview,false);
+assert.equal(ITEMS['block:20'].blockPreview,'source-texture');
 assert.equal(ITEMS.white_wool.assetKey,'block.white_wool');
 assert.equal(ITEMS.white_wool.tile,15);
 assert.equal(ITEMS.bed.entityAssetKey,'entity.bed.red');
