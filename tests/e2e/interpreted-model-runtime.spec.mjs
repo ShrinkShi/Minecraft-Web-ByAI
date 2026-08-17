@@ -121,7 +121,7 @@ test('tracked Java 1.20.1 model runtime reaches mesh Worker and VoxelWorld with 
     return{directWorker,rendererState,childrenAfterChunkDispose,rendererDisposed,worldState,worldDisposed};
   });
 
-  expect(result.directWorker.readyBlockIds).toEqual([9]);
+  expect(result.directWorker.readyBlockIds).toEqual([9,19]);
   expect(result.directWorker.textureCount).toBeGreaterThan(0);
   expect(result.directWorker.legacyOpaqueEmpty).toBe(true);
   expect(result.directWorker.waterEmpty).toBe(true);
@@ -145,7 +145,7 @@ test('tracked Java 1.20.1 model runtime reaches mesh Worker and VoxelWorld with 
   expect(result.rendererDisposed).toEqual({geometryDisposeCount:1,textureDisposeCount:1,materialDisposeCount:1});
 
   expect(result.worldState.status).toBe('ready');
-  expect(result.worldState.blockIds).toEqual([9]);
+  expect(result.worldState.blockIds).toEqual([9,19]);
   expect(result.worldState.textureCount).toBeGreaterThan(0);
   expect(result.worldState.modelName).toBe('chunk-model-opaque:0,0');
   expect(result.worldState.indexCount).toBe(36);
