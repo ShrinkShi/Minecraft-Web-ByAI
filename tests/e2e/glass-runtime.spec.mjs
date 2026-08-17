@@ -14,6 +14,13 @@ async function lockPointer(page){
   await canvas.click({position:{x:8,y:8}});
   await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.id||null),{timeout:5_000}).toBe('game-canvas');
 }
+async function expectRenderedBlockItem(preview){
+  const canvas=preview.locator('canvas.block-item-canvas');
+  await expect(canvas).toHaveCount(1);
+  await expect(canvas).toHaveAttribute('data-render-state','ready');
+  const opaque=await canvas.evaluate(element=>{const data=element.getContext('2d').getImageData(0,0,element.width,element.height).data;let count=0;for(let index=3;index<data.length;index+=4)if(data[index])count++;return count;});
+  expect(opaque).toBeGreaterThan(40);
+}
 
 test('source-backed glass uses translucent Worker mesh, culls shared faces, and renders as a real gameplay item',async({page})=>{
   const pageErrors=[],consoleErrors=[];
@@ -22,11 +29,12 @@ test('source-backed glass uses translucent Worker mesh, culls shared faces, and 
   await page.goto('/?e2e=1');
 
   const renderState=await page.evaluate(async()=>{
-    const [runtimeModule,atlasModule,blocksModule,rendererModule]=await Promise.all([
+    const [runtimeModule,atlasModule,blocksModule,rendererModule,itemsModule]=await Promise.all([
       import('/src/minecraft-model-runtime.js'),
       import('/src/minecraft-model-texture-binding.js'),
       import('/src/blocks.js'),
-      import('/src/minecraft-model-world-renderer.js')
+      import('/src/minecraft-model-world-renderer.js'),
+      import('/src/items.js')
     ]);
     const {loadMinecraftModelRuntime}=runtimeModule;
     const {loadMinecraftModelAtlasResolver}=atlasModule;
@@ -72,7 +80,9 @@ test('source-backed glass uses translucent Worker mesh, culls shared faces, and 
       renderOrder:glassMesh?.renderOrder??null,
       sharedMaterial:glassMesh?.material===renderer.materials.translucent,
       assetKey:glassMesh?.material?.map?.userData?.assetKey||null,
-      childCount:scene.children.length
+      childCount:scene.children.length,
+      itemTexture:itemsModule.ITEMS['block:20']?.texture||null,
+      itemPreview:itemsModule.ITEMS['block:20']?.blockPreview||null
     };
     renderer.disposeChunkMeshes(meshes);state.childrenAfterChunkDispose=scene.children.length;renderer.dispose();
     return state;
@@ -94,6 +104,8 @@ test('source-backed glass uses translucent Worker mesh, culls shared faces, and 
   expect(renderState.assetKey).toBe('block.model_atlas');
   expect(renderState.childCount).toBe(1);
   expect(renderState.childrenAfterChunkDispose).toBe(0);
+  expect(renderState.itemTexture).toBe('./assets/items/glass.png');
+  expect(renderState.itemPreview).toBe('source-texture');
 
   await createSingleplayerWorld(page,{name:'CI Glass Runtime',seed:'ci-glass-runtime-2026',mode:'survival',prompt:'平原'});
   await runCommand(page,'/give glass 1');
@@ -103,8 +115,7 @@ test('source-backed glass uses translucent Worker mesh, culls shared faces, and 
   await expect(glassItem).toBeVisible();
   const inventoryPreview=glassItem.locator('.block-item-icon[data-item-id="block:20"]');
   await expect(inventoryPreview).toBeVisible();
-  await expect(inventoryPreview.locator('.block-face')).toHaveCount(3);
-  for(const faceName of ['left','right','top'])await expect(inventoryPreview.locator(`.block-face.${faceName}`)).toHaveCSS('background-image',/assets\/items\/glass\.png/);
+  await expectRenderedBlockItem(inventoryPreview);
   await glassItem.click({modifiers:['Shift']});
   await key(page,'Escape');
   await expect(page.locator('#inventory')).toHaveClass(/hidden/);
@@ -112,8 +123,7 @@ test('source-backed glass uses translucent Worker mesh, culls shared faces, and 
   await expect(selected).toHaveAttribute('title','玻璃');
   const hotbarPreview=selected.locator('.block-item-icon[data-item-id="block:20"]');
   await expect(hotbarPreview).toBeVisible();
-  await expect(hotbarPreview.locator('.block-face')).toHaveCount(3);
-  for(const faceName of ['left','right','top'])await expect(hotbarPreview.locator(`.block-face.${faceName}`)).toHaveCSS('background-image',/assets\/items\/glass\.png/);
+  await expectRenderedBlockItem(hotbarPreview);
 
   await lockPointer(page);
   const target=await page.evaluate(()=>globalThis.__minecraftE2E?.prepareSingleplayerMiningTarget?.(20)||null);
