@@ -1,0 +1,72 @@
+name: Unpack MC original assets
+
+on:
+  push:
+    branches:
+      - agent/unpack-mc-original-assets
+
+permissions:
+  contents: write
+
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate encoding and extract archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path, PurePosixPath
+          import zipfile
+
+          archive = Path("MC原版素材assets.zip")
+          if not archive.is_file():
+              raise SystemExit(f"Archive not found: {archive}")
+
+          # This archive stores legacy Chinese filenames without the ZIP UTF-8 flag.
+          # Decode those metadata bytes as GBK; entries explicitly marked UTF-8 remain UTF-8.
+          with zipfile.ZipFile(archive, metadata_encoding="gbk") as zf:
+              infos = zf.infolist()
+              files = [i for i in infos if not i.is_dir()]
+              total = sum(i.file_size for i in files)
+              top_levels = sorted({PurePosixPath(i.filename).parts[0] for i in infos if i.filename})
+              print(f"Archive entries: {len(infos)}; files: {len(files)}; uncompressed bytes: {total}")
+              print("Top-level archive paths:")
+              for name in top_levels:
+                  print(f"  {name}")
+
+              for info in infos:
+                  path = PurePosixPath(info.filename)
+                  if path.is_absolute() or ".." in path.parts:
+                      raise SystemExit(f"Unsafe archive path: {info.filename}")
+
+              zf.extractall(Path.cwd())
+          PY
+
+      - name: Replace archive with extracted directory tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f "MC原版素材assets.zip"
+          rm -f ".github/workflows/unpack-mc-original-assets.yml"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+
+          echo "Changed path summary:"
+          git status --short | head -200 || true
+
+          if git diff --cached --quiet; then
+            echo "No changes produced by extraction."
+            exit 1
+          fi
+
+          git commit -m "assets: unpack MC original asset archive"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
