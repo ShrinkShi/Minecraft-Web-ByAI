@@ -1,5 +1,6 @@
 import {requireAssetUrl} from './asset-manifest.js';
 import {createBlockItemCanvas} from './block-item-canvas-renderer.js';
+import {createBedItemIconCanvas} from './bed-item-preview.js';
 import {ITEMS} from './items.js';
 import {UI} from './ui.js';
 
@@ -60,7 +61,7 @@ ${hotbarSlotRules}
 #hotbar>.hotbar-slot.selected::after{content:"";position:absolute;z-index:5;left:-4px;top:-2px;width:48px;height:48px;background:url("${escapeCssUrl(HOTBAR_SELECTOR)}") 0 0/48px 48px no-repeat;image-rendering:pixelated;pointer-events:none}
 #hotbar .slot-key{display:none!important}
 .item-icon{image-rendering:pixelated!important}
-.hotbar-slot>.item-icon,.hotbar-slot>.block-item-icon{width:32px!important;height:32px!important;margin:2px auto 0!important}
+.hotbar-slot>.item-icon,.hotbar-slot>.block-item-icon,.hotbar-slot>.bed-item-icon-wrap{width:32px!important;height:32px!important;margin:2px auto 0!important}
 .inv-slot .slot-count,.hotbar-slot .slot-count{right:2px!important;bottom:1px!important;color:#fff!important;font:bold 15px/1 monospace!important;text-shadow:2px 2px #3f3f3f!important;z-index:7!important}
 #inventory .inventory-panel{position:relative!important;width:352px!important;height:332px!important;min-width:352px!important;max-width:352px!important;padding:0!important;margin:0!important;background:url("${escapeCssUrl(INVENTORY_PANEL)}") 0 0/352px 332px no-repeat!important;color:#3f3f3f!important;border:0!important;border-radius:0!important;box-shadow:none!important;image-rendering:pixelated!important;overflow:visible!important}
 #inventory .inventory-title{display:none!important}
@@ -83,19 +84,22 @@ ${hotbarSlotRules}
 #workbench .inventory-grid,#workbench .craft-grid,#workbench #workbench-hotbar{gap:0!important}
 #workbench .inv-slot,#workbench .craft-slot,#workbench .result-slot{width:36px!important;height:36px!important;min-width:36px!important;padding:2px!important;border:0!important;border-radius:0!important;background:url("${escapeCssUrl(INVENTORY_SLOT)}") 0 0/36px 36px no-repeat!important;box-shadow:none!important;image-rendering:pixelated!important}
 #workbench .inv-slot:hover,#workbench .craft-slot:hover,#workbench .result-slot:hover{filter:brightness(1.12)}
-#inventory .item-icon,#inventory .block-item-icon,#workbench .item-icon,#workbench .block-item-icon{width:32px!important;height:32px!important;margin:0 auto!important}
-.block-item-icon{position:relative;display:inline-block;width:32px;height:32px;overflow:visible;filter:drop-shadow(1px 2px 0 #0008);image-rendering:pixelated}
-.block-item-canvas{display:block;width:32px;height:32px;image-rendering:pixelated}
+#inventory .item-icon,#inventory .block-item-icon,#inventory .bed-item-icon-wrap,#workbench .item-icon,#workbench .block-item-icon,#workbench .bed-item-icon-wrap{width:32px!important;height:32px!important;margin:0 auto!important}
+.block-item-icon,.bed-item-icon-wrap{position:relative;display:inline-block;width:32px;height:32px;overflow:visible;filter:drop-shadow(1px 2px 0 #0008);image-rendering:pixelated}
+.block-item-canvas,.bed-item-icon{display:block;width:32px;height:32px;image-rendering:pixelated}
 #oxygen .oxygen-bubble{background-image:url("${escapeCssUrl(HUD_ICONS)}")!important;background-size:108px 72px!important;background-position:0 -36px!important;image-rendering:pixelated!important}
 #oxygen .oxygen-bubble.empty{visibility:hidden!important}
 @media(max-width:700px),(pointer:coarse){.status-stack{bottom:64px!important;transform:translateX(-50%) scale(.82)!important;transform-origin:bottom center!important}#inventory .inventory-panel{transform:scale(.78)!important;transform-origin:center center!important}}
 `;
 }
 
-function createBlockItemIcon(itemId){
+function createSourceBackedItemIcon(itemId){
   const definition=ITEMS[itemId];if(!definition||typeof document==='undefined')return null;
-  const canvas=createBlockItemCanvas(definition,{atlasUrl:TERRAIN_ATLAS});if(!canvas)return null;
-  const root=document.createElement('span');root.className='block-item-icon';root.dataset.itemId=String(itemId);root.setAttribute('aria-label',definition.name||String(itemId));root.title=definition.name||String(itemId);root.append(canvas);return root;
+  let canvas=null,className='block-item-icon';
+  if(definition.itemPreview==='bed-model'){canvas=createBedItemIconCanvas();className='bed-item-icon-wrap';}
+  else canvas=createBlockItemCanvas(definition,{atlasUrl:TERRAIN_ATLAS});
+  if(!canvas)return null;
+  const root=document.createElement('span');root.className=className;root.dataset.itemId=String(itemId);root.setAttribute('aria-label',definition.name||String(itemId));root.title=definition.name||String(itemId);root.append(canvas);return root;
 }
 
 function renderVanillaArmor(armorPoints=0){
@@ -132,7 +136,7 @@ export function installVanillaUiPresentation(){
   if(installed)return false;
   installed=true;
   originalMakeIcon=UI.prototype.makeIcon;
-  UI.prototype.makeIcon=function(itemId){return createBlockItemIcon(itemId)||originalMakeIcon.call(this,itemId);};
+  UI.prototype.makeIcon=function(itemId){return createSourceBackedItemIcon(itemId)||originalMakeIcon.call(this,itemId);};
   UI.prototype.renderArmor=renderVanillaArmor;
   UI.prototype.renderStatus=renderVanillaStatus;
   if(typeof document==='undefined'||!document.head)return true;
