@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 
-test('source-backed Java 1.20.1 HUD inventory block icons and Steve preview render in the live browser',async({page})=>{
+test('source-backed Java 1.20.1 HUD inventory block/bed icons and Steve preview render in the live browser',async({page})=>{
   const pageErrors=[],consoleErrors=[];
   page.on('pageerror',error=>pageErrors.push(error.message));
   page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
@@ -69,6 +69,12 @@ test('source-backed Java 1.20.1 HUD inventory block icons and Steve preview rend
   const firstInventorySlot=await page.locator('#inventory-grid .inv-slot').first().boundingBox();
   expect((firstInventorySlot?.x??0)-(panelRect?.x??0)).toBeCloseTo(16,0);
   expect((firstInventorySlot?.y??0)-(panelRect?.y??0)).toBeCloseTo(168,0);
+  const bedIcon=inventory.locator('.bed-item-icon-wrap[data-item-id="bed"]');
+  await expect(bedIcon).toHaveCount(1);
+  const bedCanvas=bedIcon.locator('canvas.bed-item-icon');
+  await expect(bedCanvas).toHaveAttribute('data-render-state','ready',{timeout:15_000});
+  const bedPixels=await bedCanvas.evaluate(canvas=>{const data=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;let opaque=0;for(let i=3;i<data.length;i+=4)if(data[i])opaque++;return opaque;});
+  expect(bedPixels).toBeGreaterThan(80);
   const inventoryBlock=inventory.locator('.block-item-icon').first();
   await expect(inventoryBlock).toBeVisible();
   const inventoryCanvas=inventoryBlock.locator('.block-item-canvas');
