@@ -10,6 +10,7 @@ import {decodeServerInventorySnapshot,SERVER_INVENTORY_SNAPSHOT_KIND} from '../s
 import {decodeServerEquipmentSnapshot,SERVER_EQUIPMENT_SNAPSHOT_KIND} from '../src/server-equipment-snapshot.js';
 import {decodeServerWorldInfo} from '../src/server-world-info.js';
 import {decodeServerPlayerSnapshot,SERVER_PLAYER_SNAPSHOT_KIND} from '../src/server-player-snapshot.js';
+import {TERRAIN_GENERATOR_VERSION} from '../src/terrain-generator.js';
 import {WorldEditSyncAssembler,authoritativeEditsToVoxelEdits} from '../src/world-edit-replication.js';
 import {createAuthoritativeServerRuntime} from '../server/runtime.mjs';
 import {normalizeRuntimeConfig,runtimeConfigFromEnv,DEFAULT_RUNTIME_PORT,DEFAULT_RUNTIME_WORLD_ID,DEFAULT_RUNTIME_WORLD_SEED,DEFAULT_RUNTIME_TERRAIN_PROMPT,DEFAULT_RUNTIME_MODE} from '../server/runtime-config.mjs';
@@ -40,7 +41,7 @@ try{
 
   socket=await openClient(`ws://127.0.0.1:${address.port}${runtime.server.path}`);const messages=messageQueue(socket);socket.send(JSON.stringify(encodeClientHello()));
   const welcome=await messages.next('runtime welcome');assert.equal(welcome.kind,'welcome');
-  const worldInfo=decodeServerWorldInfo(await messages.next('runtime world info'),{expectedSession:welcome.session});assert.deepEqual({worldId:worldInfo.worldId,terrainVersion:worldInfo.terrainVersion,seed:worldInfo.seed,prompt:worldInfo.prompt,tickRate:worldInfo.tickRate},{worldId:'runtime-world',terrainVersion:1,seed:'golden-seed',prompt:'mountain forest',tickRate:20});
+  const worldInfo=decodeServerWorldInfo(await messages.next('runtime world info'),{expectedSession:welcome.session});assert.deepEqual({worldId:worldInfo.worldId,terrainVersion:worldInfo.terrainVersion,seed:worldInfo.seed,prompt:worldInfo.prompt,tickRate:worldInfo.tickRate},{worldId:'runtime-world',terrainVersion:TERRAIN_GENERATOR_VERSION,seed:'golden-seed',prompt:'mountain forest',tickRate:20});
   const editAssembler=new WorldEditSyncAssembler({session:welcome.session,worldId:worldInfo.worldId});let editSnapshot=null;while(!editSnapshot){const step=editAssembler.accept(await messages.next('runtime world edit sync'));if(step.complete)editSnapshot=step.result;}
   assert.equal(editSnapshot.revision,1);assert.deepEqual(editSnapshot.edits,{[`${editX},${editY},${editZ}`]:editId});
   const voxelEdits=authoritativeEditsToVoxelEdits(editSnapshot.edits),localX=editX%CHUNK_SIZE,localZ=editZ%CHUNK_SIZE,localIndex=localX+CHUNK_SIZE*(localZ+CHUNK_SIZE*editY);assert.deepEqual(voxelEdits['6,6'],[[localIndex,editId]]);
@@ -57,4 +58,4 @@ try{
 }finally{if(runtime.state!=='stopped')await runtime.stop();if(socket&&socket.readyState===WebSocket.OPEN)socket.terminate();}
 
 assert.throws(()=>createAuthoritativeServerRuntime({config:null}),/runtime config/);assert.throws(()=>createAuthoritativeServerRuntime({onLog:null}),/onLog/);assert.throws(()=>createAuthoritativeServerRuntime({onError:null}),/onError/);
-console.log('production authoritative runtime + world edits + inventory + equipment bootstrap + tick lifecycle: PASS');
+console.log('production authoritative runtime + terrain v2 world info + edits + inventory + equipment bootstrap + tick lifecycle: PASS');
