@@ -7,6 +7,10 @@ function tile(value,label){
 
 export function blockItemFaceTiles(itemDefinition){
   if(!itemDefinition||typeof itemDefinition!=='object')return null;
+  // Some source-backed block textures are intentionally outside the legacy
+  // terrain atlas. Returning null lets UI.makeIcon use the declared source
+  // texture rather than rendering a false fallback terrain tile.
+  if(itemDefinition.blockPreview===false)return null;
   if(Number.isInteger(itemDefinition.blockId)){
     return Object.freeze({
       top:tile(tileForFace(itemDefinition.blockId,'top'),'top tile'),
