@@ -36,7 +36,7 @@ export function createTerrainGenerator({seed=DEFAULT_SEED,prompt=DEFAULT_PROMPT}
 
   const hash2=(x,z)=>{
     let hash=Math.imul(x,374761393)^Math.imul(z,668265263)^seedHash;
-    hash=Math.imul(hash^(hash>>>13),1274126177);
+    hash=(hash^(hash>>>13))*1274126177;
     return((hash^(hash>>>16))>>>0)/4294967295;
   };
   const hash3=(x,y,z,salt=0)=>{
