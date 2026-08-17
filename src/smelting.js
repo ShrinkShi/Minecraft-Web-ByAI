@@ -1,3 +1,5 @@
+import {ITEMS,maxStack} from './items.js';
+
 const recipe=(input,output,{cookTicks=200,experience=0}={})=>Object.freeze({input,output,count:1,cookTicks,experience});
 
 export const SMELTING_RECIPES=Object.freeze({
@@ -15,6 +17,9 @@ export const FURNACE_SLOT=Object.freeze({INPUT:0,FUEL:1,OUTPUT:2});
 export const FURNACE_SLOT_COUNT=3;
 export const FURNACE_STACK_LIMIT=64;
 
+const RECIPE_OUTPUT_IDS=Object.freeze([...new Set(Object.values(SMELTING_RECIPES).map(entry=>entry.output))]);
+const RECIPE_OUTPUT_SET=new Set(RECIPE_OUTPUT_IDS);
+
 const integer=(value,label,{min=0,max=Number.MAX_SAFE_INTEGER}={})=>{
   if(!Number.isInteger(value)||value<min||value>max)throw new RangeError(`${label} must be an integer from ${min} to ${max}`);
   return value;
@@ -23,37 +28,44 @@ const finite=(value,label,{min=0}={})=>{
   if(!Number.isFinite(value)||value<min)throw new RangeError(`${label} must be a finite number >= ${min}`);
   return value;
 };
+const knownFurnaceItemId=(value,label='furnace item id')=>{
+  if(typeof value!=='string'||(!ITEMS[value]&&!RECIPE_OUTPUT_SET.has(value)))throw new RangeError(`${label} must reference a known item or declared smelting output`);
+  return value;
+};
 
 export function smeltingRecipeFor(itemId){return typeof itemId==='string'?SMELTING_RECIPES[itemId]||null:null;}
 export function furnaceFuelTicks(itemId){return typeof itemId==='string'?FURNACE_FUELS[itemId]||0:0;}
 export function isSmeltable(itemId){return smeltingRecipeFor(itemId)!==null;}
 export function isFurnaceFuel(itemId){return furnaceFuelTicks(itemId)>0;}
+export function furnaceStackLimitFor(itemId){itemId=knownFurnaceItemId(itemId);return ITEMS[itemId]?maxStack(itemId):FURNACE_STACK_LIMIT;}
 
 export function normalizeFurnaceStack(value,{label='furnace stack'}={}){
   if(value===null||value===undefined)return null;
   if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError(`${label} must be an object or null`);
   const keys=Object.keys(value).sort();
   if(keys.length!==2||keys[0]!=='count'||keys[1]!=='id')throw new RangeError(`${label} must contain exactly id and count`);
-  if(typeof value.id!=='string'||!value.id)throw new TypeError(`${label} id must be a non-empty string`);
-  return Object.freeze({id:value.id,count:integer(value.count,`${label} count`,{min:1,max:FURNACE_STACK_LIMIT})});
+  const id=knownFurnaceItemId(value.id,`${label} id`),limit=furnaceStackLimitFor(id);
+  return Object.freeze({id,count:integer(value.count,`${label} count`,{min:1,max:limit})});
 }
 
 export function createFurnaceState(value={}){
   if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError('furnace state must be an object');
-  const slots=Array.isArray(value.slots)?value.slots:[null,null,null];
-  if(slots.length!==FURNACE_SLOT_COUNT)throw new RangeError(`furnace slots must contain ${FURNACE_SLOT_COUNT} entries`);
+  const sourceSlots=Array.isArray(value.slots)?value.slots:[null,null,null];
+  if(sourceSlots.length!==FURNACE_SLOT_COUNT)throw new RangeError(`furnace slots must contain ${FURNACE_SLOT_COUNT} entries`);
+  const slots=sourceSlots.map((stack,index)=>normalizeFurnaceStack(stack,{label:`furnace slot ${index}`}));
+  if(slots[FURNACE_SLOT.FUEL]&&!isFurnaceFuel(slots[FURNACE_SLOT.FUEL].id))throw new RangeError('furnace fuel slot must contain a declared fuel');
+  if(slots[FURNACE_SLOT.OUTPUT]&&!RECIPE_OUTPUT_SET.has(slots[FURNACE_SLOT.OUTPUT].id))throw new RangeError('furnace output slot must contain a declared smelting output');
   const burnRemaining=integer(value.burnRemaining??0,'burnRemaining'),burnTotal=integer(value.burnTotal??0,'burnTotal'),cookProgress=integer(value.cookProgress??0,'cookProgress'),cookTotal=integer(value.cookTotal??0,'cookTotal');
   if(burnRemaining>burnTotal)throw new RangeError('burnRemaining cannot exceed burnTotal');
   if(cookProgress>cookTotal)throw new RangeError('cookProgress cannot exceed cookTotal');
   return Object.freeze({
-    slots:Object.freeze(slots.map((stack,index)=>normalizeFurnaceStack(stack,{label:`furnace slot ${index}`}))),
-    burnRemaining,burnTotal,cookProgress,cookTotal,
+    slots:Object.freeze(slots),burnRemaining,burnTotal,cookProgress,cookTotal,
     storedExperience:finite(value.storedExperience??0,'storedExperience')
   });
 }
 
 function cloneSlots(slots){return slots.map(stack=>stack?{...stack}:null);}
-function outputAccepts(output,recipe){return !output||(output.id===recipe.output&&output.count+recipe.count<=FURNACE_STACK_LIMIT);}
+function outputAccepts(output,recipe){return !output||(output.id===recipe.output&&output.count+recipe.count<=furnaceStackLimitFor(recipe.output));}
 function canSmelt(slots){const input=slots[FURNACE_SLOT.INPUT],recipe=smeltingRecipeFor(input?.id);return recipe&&outputAccepts(slots[FURNACE_SLOT.OUTPUT],recipe)?recipe:null;}
 function consumeOne(slots,index){const stack=slots[index];if(!stack)return false;if(stack.count===1)slots[index]=null;else stack.count--;return true;}
 function produce(slots,recipe){const output=slots[FURNACE_SLOT.OUTPUT];if(output)output.count+=recipe.count;else slots[FURNACE_SLOT.OUTPUT]={id:recipe.output,count:recipe.count};}
@@ -90,8 +102,8 @@ export function tickFurnace(value,ticks=1){
 
 export function furnaceCanInsert(slot,itemId){
   integer(slot,'furnace slot',{min:0,max:FURNACE_SLOT_COUNT-1});
-  if(typeof itemId!=='string'||!itemId)return false;
-  if(slot===FURNACE_SLOT.INPUT)return true;
+  if(typeof itemId!=='string'||(!ITEMS[itemId]&&!RECIPE_OUTPUT_SET.has(itemId)))return false;
+  if(slot===FURNACE_SLOT.INPUT)return !RECIPE_OUTPUT_SET.has(itemId)||isSmeltable(itemId);
   if(slot===FURNACE_SLOT.FUEL)return isFurnaceFuel(itemId);
   return false;
 }
