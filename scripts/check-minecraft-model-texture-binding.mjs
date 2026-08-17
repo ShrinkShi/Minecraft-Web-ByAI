@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {buildMinecraftModelMeshBatches} from '../src/minecraft-model-mesh-batch.js';
+import {minecraftModelTextureLayerResolver} from '../src/minecraft-model-runtime.js';
 import {
   createMinecraftModelAtlasResolver,
   createMinecraftModelTextureBinding,
@@ -56,6 +57,13 @@ assert.equal(glassBinding.layer,'translucent');
 assert.deepEqual(glassBinding.region,resolver.requireRegion('minecraft:block/glass'));
 assert.deepEqual(calls,[['minecraft:block/glass','face',91]]);
 assert.equal(Object.isFrozen(glassBinding),true);
+
+// Exercise the exact adapter used by mesh-worker.js. createMinecraftModelTextureBinding
+// passes (texture, face, instance), while runtime layer semantics are instance-owned.
+const runtimeBinding=createMinecraftModelTextureBinding(resolver,{resolveLayer:minecraftModelTextureLayerResolver});
+assert.equal(runtimeBinding('block/glass',{tag:'face'},{blockId:20,renderLayer:'translucent',textureLayers:{}}).layer,'translucent');
+assert.equal(runtimeBinding('block/iron_ore',{tag:'face'},{blockId:19,renderLayer:'opaque',textureLayers:{}}).layer,'opaque');
+assert.equal(runtimeBinding('block/glass',{tag:'face'},{blockId:20,renderLayer:'opaque',textureLayers:{'minecraft:block/glass':'cutout'}}).layer,'cutout');
 
 const model={faces:[{
   direction:'north',

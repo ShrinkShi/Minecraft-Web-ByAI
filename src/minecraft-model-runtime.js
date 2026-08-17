@@ -265,3 +265,11 @@ export function minecraftModelLayerForTexture(texture,instance){
   if(overrides&&Object.hasOwn(overrides,resourceId))return renderLayer(overrides[resourceId],`texture layer override ${resourceId}`);
   return renderLayer(instance?.renderLayer??'opaque',`Minecraft model ${resourceId} render layer`);
 }
+
+// createMinecraftModelTextureBinding invokes layer resolvers as
+// (texture, face, instance). Keep the two-argument semantic helper above and
+// adapt that callback contract explicitly so face metadata can never be
+// mistaken for the model instance again.
+export function minecraftModelTextureLayerResolver(texture,_face,instance){
+  return minecraftModelLayerForTexture(texture,instance);
+}

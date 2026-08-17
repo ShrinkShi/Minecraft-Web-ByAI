@@ -11,7 +11,7 @@ export const BLOCK = Object.freeze({
   BED_SOUTH_FOOT:BED_IDS.south.foot,BED_SOUTH_HEAD:BED_IDS.south.head,
   BED_WEST_FOOT:BED_IDS.west.foot,BED_WEST_HEAD:BED_IDS.west.head,
   BED_EAST_FOOT:BED_IDS.east.foot,BED_EAST_HEAD:BED_IDS.east.head,
-  IRON_ORE:19
+  IRON_ORE:19,GLASS:20
 });
 
 export const BLOCKS = {
@@ -28,7 +28,10 @@ export const BLOCKS = {
   10:{name:'圆石',solid:true,hardness:2,tiles:[13,13,13],drops:'block:10',requires:'pickaxe',minToolTier:'wood'},
   // Normal rendering uses the source-backed Java 1.20.1 interpreted model.
   // Stone tiles are only a legacy fail-open fallback if model resources cannot initialize.
-  19:{name:'铁矿石',solid:true,hardness:3,tiles:[3,3,3],drops:'raw_iron',requires:'pickaxe',minToolTier:'stone'}
+  19:{name:'铁矿石',solid:true,hardness:3,tiles:[3,3,3],drops:'raw_iron',requires:'pickaxe',minToolTier:'stone'},
+  // Glass is a solid full-cube for collision but renders through the interpreted
+  // translucent model path. Stone is fail-open only; normal visuals never use it.
+  20:{name:'玻璃',solid:true,transparent:true,hardness:.3,tiles:[3,3,3],drops:null}
 };
 
 for(const id of BED_BLOCK_IDS){

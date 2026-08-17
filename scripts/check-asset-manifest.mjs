@@ -6,7 +6,7 @@ import {ITEMS} from '../src/items.js';
 
 assert.equal(ASSET_MANIFEST_VERSION,2);
 for(const key of [
-  'terrain.block_atlas','block.model_atlas','block.iron_ore','block.white_wool','item.stick','item.wooden_pickaxe','item.stone_pickaxe','item.raw_iron',
+  'terrain.block_atlas','block.model_atlas','block.iron_ore','block.white_wool','block.glass','item.stick','item.wooden_pickaxe','item.stone_pickaxe','item.raw_iron',
   'item.leather_helmet','item.leather_chestplate','item.leather_leggings','item.leather_boots','item.raw_beef','item.leather','item.raw_mutton',
   'item.raw_porkchop','item.raw_chicken','item.feather','item.rotten_flesh','item.bone','item.arrow','item.gunpowder','item.string',
   'entity.bed.red','entity.cow','entity.sheep','entity.sheep_fur','entity.pig','entity.chicken','entity.zombie','entity.skeleton','entity.creeper','entity.spider',
@@ -24,6 +24,7 @@ for(const key of ASSET_KEYS){
 assert.equal(assetUrl('terrain.block_atlas'),'./assets/textures/atlas.png');
 assert.equal(assetUrl('block.model_atlas'),'./assets/model-textures/model-texture-atlas.png');
 assert.equal(assetUrl('metadata.minecraft_model_atlas'),'./assets/model-textures/model-texture-atlas.json');
+assert.equal(assetUrl('block.glass'),'./assets/items/glass.png');
 assert.equal(assetUrl('item.stick'),'./assets/items/stick.png');
 assert.equal(assetUrl('item.wooden_pickaxe'),'./assets/items/wooden_pickaxe.png');
 assert.equal(assetUrl('item.stone_pickaxe'),'./assets/items/stone_pickaxe.png');
@@ -45,6 +46,9 @@ assert.throws(()=>assetRecord(''),TypeError);
 for(const itemId of ['stick','wooden_pickaxe','leather_helmet','leather_chestplate','leather_leggings','leather_boots','raw_beef','leather','raw_mutton','raw_porkchop','raw_chicken','feather','rotten_flesh','bone','arrow','gunpowder','string']){
   const item=ITEMS[itemId];assert.ok(item?.assetKey,`${itemId} must use a logical asset key`);assert.equal(item.texture,requireAssetUrl(item.assetKey),`${itemId} must resolve through asset manifest`);
 }
+assert.equal(ITEMS['block:20'].assetKey,'block.glass');
+assert.equal(ITEMS['block:20'].texture,requireAssetUrl('block.glass'));
+assert.equal(ITEMS['block:20'].blockPreview,'source-texture');
 assert.equal(ITEMS.white_wool.assetKey,'block.white_wool');
 assert.equal(ITEMS.white_wool.tile,15);
 assert.equal(ITEMS.bed.entityAssetKey,'entity.bed.red');
@@ -53,8 +57,9 @@ const snapshot=assetManifestSnapshot();
 assert.equal(Object.isFrozen(snapshot),true);assert.equal(Object.isFrozen(snapshot['item.stick']),true);
 assert.equal(snapshot['terrain.block_atlas'].source,ASSET_SOURCE.USER_SUPPLIED);
 assert.equal(snapshot['block.model_atlas'].source,ASSET_SOURCE.USER_SUPPLIED);
+assert.equal(snapshot['block.glass'].source,ASSET_SOURCE.USER_SUPPLIED);
 assert.equal(snapshot['metadata.minecraft_model_atlas'].source,ASSET_SOURCE.USER_SUPPLIED);
 assert.equal(snapshot['item.stone_pickaxe'].source,ASSET_SOURCE.USER_SUPPLIED);
 assert.equal(snapshot['entity.spider'].source,ASSET_SOURCE.USER_SUPPLIED);
 
-console.log('logical asset manifest + user-supplied Minecraft runtime/entity/model-atlas bindings: PASS');
+console.log('logical asset manifest + source-backed glass/runtime/entity/model-atlas bindings: PASS');

@@ -14,6 +14,7 @@ export const ITEMS={
   'block:7':{name:'橡树树叶',stack:64,blockId:7,tile:8},
   'block:9':{name:'工作台',stack:64,blockId:9,tile:10},
   'block:10':{name:'圆石',stack:64,blockId:10,tile:13},
+  'block:20':textured('玻璃',64,'block.glass',{blockId:20,blockPreview:'source-texture'}),
   stick:textured('木棍',64,'item.stick'),
   wooden_pickaxe:textured('木镐',1,'item.wooden_pickaxe',{attackDamage:2,tool:{kind:'pickaxe',tier:'wood',speed:2,durability:59}}),
   stone_pickaxe:textured('石镐',1,'item.stone_pickaxe',{attackDamage:3,tool:{kind:'pickaxe',tier:'stone',speed:4,durability:131}}),
@@ -39,6 +40,6 @@ export const ITEMS={
 
 // Preserve the historical starter slot order; new content is appended so
 // existing authoritative/bootstrap slot contracts do not silently shift.
-export const CREATIVE_START=['block:1','block:2','block:3','block:4','block:5','block:6','block:7','block:9','wooden_pickaxe','bed','stone_pickaxe'];
+export const CREATIVE_START=['block:1','block:2','block:3','block:4','block:5','block:6','block:7','block:9','wooden_pickaxe','bed','stone_pickaxe','block:20'];
 export const itemForBlock=blockId=>ITEMS[`block:${blockId}`]?`block:${blockId}`:BLOCKS[blockId]?.drops||null;
 export const maxStack=itemId=>ITEMS[itemId]?.stack||64;

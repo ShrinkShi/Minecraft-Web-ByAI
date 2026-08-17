@@ -3,7 +3,9 @@
 
 The legacy 4x4 terrain atlas stays byte-compatible. Generic blockstate/model JSON
 is passed through from the deterministic runtime closure so browser loaders can
-resolve model parents without duplicating the dependency graph here.
+resolve model parents without duplicating the dependency graph here. A tiny set
+of direct block-item textures is copied byte-for-byte from the tracked source ZIP
+when gameplay UI needs the original texture outside the legacy terrain atlas.
 """
 
 from __future__ import annotations
@@ -13,9 +15,11 @@ import hashlib
 import json
 import shutil
 from pathlib import Path
+from zipfile import ZipFile
 
 from PIL import Image
 
+DEFAULT_ARCHIVE = Path("MC原版素材assets.zip")
 DEFAULT_SOURCE = Path("build/minecraft-runtime-source")
 DEFAULT_OUTPUT = Path("build/minecraft-runtime-assets")
 TILE_SIZE = 16
@@ -66,6 +70,10 @@ ITEM_FILES = {
     "arrow.png": ("arrow.png", None),
     "gunpowder.png": ("gunpowder.png", None),
     "string.png": ("string.png", None),
+}
+
+DIRECT_BLOCK_ITEM_FILES = {
+    "glass.png": "assets/minecraft/textures/block/glass.png",
 }
 
 PASS_THROUGH = [
@@ -176,6 +184,22 @@ def build_items(source: Path, output: Path) -> dict[str, object]:
     return records
 
 
+def build_direct_block_item_files(archive_path: Path, output: Path) -> int:
+    target_dir = output / "items"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    with ZipFile(archive_path) as archive:
+        names = [info.filename.replace("\\", "/") for info in archive.infolist() if not info.is_dir()]
+        for destination, suffix in sorted(DIRECT_BLOCK_ITEM_FILES.items()):
+            needle = suffix.lower()
+            matches = sorted(name for name in names if name.lower().endswith(needle))
+            if not matches:
+                raise FileNotFoundError(f"missing direct block item source resource: {suffix}")
+            if len(matches) != 1:
+                raise RuntimeError(f"ambiguous direct block item source resource {suffix}: {matches[:5]}")
+            (target_dir / destination).write_bytes(archive.read(matches[0]))
+    return len(DIRECT_BLOCK_ITEM_FILES)
+
+
 def reference_file_list(source: Path) -> list[str]:
     relatives = set(PASS_THROUGH)
     for root_name in MODEL_REFERENCE_ROOTS:
@@ -201,6 +225,7 @@ def copy_reference_files(source: Path, output: Path) -> dict[str, str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--archive", type=Path, default=DEFAULT_ARCHIVE)
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args()
@@ -219,6 +244,7 @@ def main() -> int:
 
     atlas = build_atlas(args.source, args.output)
     items = build_items(args.source, args.output)
+    direct_block_items = build_direct_block_item_files(args.archive, args.output)
     reference_files = copy_reference_files(args.source, args.output)
 
     runtime_manifest = {
@@ -239,7 +265,7 @@ def main() -> int:
     manifest_path = args.output / "minecraft/runtime-manifest.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(runtime_manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"built terrain atlas + {len(items)} item icons from Minecraft source")
+    print(f"built terrain atlas + {len(items)} item icons + {direct_block_items} direct block item texture(s) from Minecraft source")
     print(f"runtime atlas sha256: {atlas['sha256']}")
     print(
         "runtime model JSON:",

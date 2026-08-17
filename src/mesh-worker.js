@@ -2,7 +2,7 @@ import {BLOCKS,CHUNK_SIZE,WORLD_HEIGHT,ATLAS_COLS,ATLAS_ROWS,tileForFace} from '
 import {bedVisualDescriptor} from './bed-model-specs.js';
 import {buildMinecraftModelMeshBatches} from './minecraft-model-mesh-batch.js';
 import {createMinecraftModelAtlasResolver,createMinecraftModelTextureBinding} from './minecraft-model-texture-binding.js';
-import {assertMinecraftModelRuntime,instantiateMinecraftModelTemplate,minecraftModelLayerForTexture} from './minecraft-model-runtime.js';
+import {assertMinecraftModelRuntime,instantiateMinecraftModelTemplate,minecraftModelTextureLayerResolver} from './minecraft-model-runtime.js';
 
 const FACES=[
   {n:[1,0,0],name:'east',v:[[1,0,0],[1,1,0],[1,1,1],[1,0,1]]},
@@ -97,7 +97,10 @@ function modelCullFaceVisible(context,blockAt){
   if(!offset)throw new TypeError(`unknown Minecraft model cull direction: ${context.direction}`);
   const neighbor=blockAt(context.x+offset[0],context.y+offset[1],context.z+offset[2]);
   if(!neighbor)return true;
-  const block=BLOCKS[neighbor]||BLOCKS[0];
+  const current=BLOCKS[context.instance.blockId]||BLOCKS[0],block=BLOCKS[neighbor]||BLOCKS[0];
+  // Identical transparent full cubes such as glass must not render two hidden
+  // coplanar faces between them. Other transparent boundaries stay visible.
+  if(neighbor===context.instance.blockId&&current.solid&&current.transparent&&current.fullCube!==false)return false;
   return block.fullCube===false||!block.solid||!!block.transparent;
 }
 
@@ -155,7 +158,7 @@ function initializeMinecraftModelRuntime(message){
   try{
     const runtime=assertMinecraftModelRuntime(message.runtime);
     const atlasResolver=createMinecraftModelAtlasResolver(message.atlasManifest);
-    const binding=createMinecraftModelTextureBinding(atlasResolver,{resolveLayer:minecraftModelLayerForTexture});
+    const binding=createMinecraftModelTextureBinding(atlasResolver,{resolveLayer:minecraftModelTextureLayerResolver});
     minecraftModelRuntime=runtime;
     minecraftModelTextureBinding=binding;
     self.postMessage({type:'minecraft-model-runtime-ready',blockIds:[...runtime.blockIds],textureCount:atlasResolver.textureCount});
