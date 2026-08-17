@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {createSingleplayerWorld} from './helpers/world-flow.mjs';
 
 const MOBILE_UA='Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0 Mobile Safari/537.36';
 test.use({viewport:{width:844,height:390},hasTouch:true,userAgent:MOBILE_UA});
@@ -32,9 +33,8 @@ test('mobile browser auto-detects, requests landscape, and exposes playable touc
   await expect(page.locator('body')).toHaveAttribute('data-orientation','landscape');
   await expect(page.locator('#rotate-device')).not.toBeVisible();
 
-  await page.getByRole('button',{name:'单人游戏'}).click();
-  await page.locator('#world-name').fill('CI Mobile Landscape');await page.locator('#world-seed').fill('ci-mobile-landscape-2026');await page.locator('#game-mode').selectOption('creative');await page.locator('#terrain-prompt').fill('平原');await page.getByRole('button',{name:'创建 / 进入'}).click();
-  await expect(page.locator('#loading')).toHaveClass(/hidden/,{timeout:60_000});await expect(page.locator('#hud')).not.toHaveClass(/hidden/);await expect(page.locator('#mobile-controls')).toBeVisible({timeout:5_000});
+  await createSingleplayerWorld(page,{name:'CI Mobile Landscape',seed:'ci-mobile-landscape-2026',mode:'creative',prompt:'平原'});
+  await expect(page.locator('#mobile-controls')).toBeVisible({timeout:5_000});
   expect(await page.evaluate(()=>document.pointerLockElement)).toBeNull();
 
   await page.locator('[data-mobile-action="inventory"]').click();await expect(page.locator('#inventory')).not.toHaveClass(/hidden/);await expect(page.locator('#mobile-controls')).not.toBeVisible();
