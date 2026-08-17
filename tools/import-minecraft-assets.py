@@ -47,7 +47,6 @@ RUNTIME_FILES = {
     "textures/block/crafting_table_side.png": "assets/minecraft/textures/block/crafting_table_side.png",
     "textures/block/cobblestone.png": "assets/minecraft/textures/block/cobblestone.png",
     "textures/block/iron_ore.png": "assets/minecraft/textures/block/iron_ore.png",
-    "textures/block/glass.png": "assets/minecraft/textures/block/glass.png",
     "textures/block/white_wool.png": "assets/minecraft/textures/block/white_wool.png",
 
     # Inventory / hotbar / drops already represented by gameplay definitions.
