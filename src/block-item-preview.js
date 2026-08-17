@@ -5,12 +5,18 @@ function tile(value,label){
   return value;
 }
 
+export function blockItemFaceTextures(itemDefinition){
+  if(!itemDefinition||typeof itemDefinition!=='object'||itemDefinition.blockPreview!=='source-texture')return null;
+  const texture=String(itemDefinition.texture||'').trim();
+  if(!texture)throw new TypeError('source-texture block preview requires itemDefinition.texture');
+  return Object.freeze({top:texture,left:texture,right:texture});
+}
+
 export function blockItemFaceTiles(itemDefinition){
   if(!itemDefinition||typeof itemDefinition!=='object')return null;
-  // Some source-backed block textures are intentionally outside the legacy
-  // terrain atlas. Returning null lets UI.makeIcon use the declared source
-  // texture rather than rendering a false fallback terrain tile.
-  if(itemDefinition.blockPreview===false)return null;
+  // Source-backed single-texture blocks render three faces from their declared
+  // texture instead of pretending the texture lives in the legacy terrain atlas.
+  if(itemDefinition.blockPreview==='source-texture'||itemDefinition.blockPreview===false)return null;
   if(Number.isInteger(itemDefinition.blockId)){
     return Object.freeze({
       top:tile(tileForFace(itemDefinition.blockId,'top'),'top tile'),
