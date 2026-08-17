@@ -11,19 +11,23 @@ assert.equal(BED_FACING_ROTATION.south,0);
 assert.equal(BED_FACING_ROTATION.north,Math.PI);
 assert.equal(BED_FACING_ROTATION.east,Math.PI/2);
 assert.equal(BED_FACING_ROTATION.west,-Math.PI/2);
-assert.deepEqual(BED_HALF_SPECS.head.cuboids[0].faceUv.top,[10,6,26,22],'head mattress top must sample the pillow/red region rather than the wooden bed-sheet area');
-assert.deepEqual(BED_HALF_SPECS.foot.cuboids[0].faceUv.top,[2,28,18,44],'foot mattress top must remain entirely on the red blanket region');
-assert.equal(Object.isFrozen(BED_HALF_SPECS.head.cuboids[0].faceUv.top),true);
+
+const headMattress=BED_HALF_SPECS.head.cuboids[0],footMattress=BED_HALF_SPECS.foot.cuboids[0];
+for(const mattress of[headMattress,footMattress]){
+  assert.deepEqual(mattress.size,[16,16,6],'bed entity sheet must retain its source-space 16x16x6 mattress cuboid');
+  assert.deepEqual(mattress.offset,[0,0,0]);assert.deepEqual(mattress.position,[0,9,0]);assert.deepEqual(mattress.rotation,[Math.PI/2,0,0]);
+}
+assert.deepEqual(headMattress.uv,[0,0]);assert.deepEqual(footMattress.uv,[0,22]);
+assert.deepEqual(minecraftCuboidUvRects(...headMattress.uv,...headMattress.size).front,[6,6,22,22],'source front face is the pillow/red head-mattress top after X rotation');
+assert.deepEqual(minecraftCuboidUvRects(...footMattress.uv,...footMattress.size).front,[6,28,22,44],'source front face is the red foot-mattress top after X rotation');
 
 for(const [part,spec] of Object.entries(BED_HALF_SPECS)){
   assert.equal(bedHalfSpec(part),spec);assert.equal(spec.cuboids.length,3,`${part} must have one mattress and two outer legs`);
-  let highest=0;
   for(const cuboid of spec.cuboids){
-    const [w,h,d]=cuboid.size,[x,y,z]=cuboid.offset;assert.ok(w>0&&h>0&&d>0);assert.ok(x>=0&&y>=0&&z>=0);assert.ok(x+w<=16&&z+d<=16);highest=Math.max(highest,y+h);
-    const rects={...minecraftCuboidUvRects(cuboid.uv[0],cuboid.uv[1],w,h,d),...cuboid.faceUv};
+    const [w,h,d]=cuboid.size;assert.ok(w>0&&h>0&&d>0);assert.equal(cuboid.offset.length,3);assert.equal(cuboid.position.length,3);assert.equal(cuboid.rotation.length,3);
+    const rects=minecraftCuboidUvRects(cuboid.uv[0],cuboid.uv[1],w,h,d);
     for(const [face,[u0,v0,u1,v1]] of Object.entries(rects)){assert.ok(u0>=0&&v0>=0&&u1<=64&&v1<=64,`${part}/${cuboid.name}/${face} UV must fit the 64x64 red-bed sheet`);assert.ok(u1>u0&&v1>v0);}
   }
-  assert.equal(highest,9,`${part} visual must remain 9/16 block high`);
 }
 assert.equal(bedHalfSpec('other'),null);
 
@@ -36,4 +40,4 @@ for(const id of BED_BLOCK_IDS){
 }
 assert.equal(bedVisualDescriptor(0,0,0,3),null);
 
-console.log('bed half cuboids + corrected mattress UV bounds + four-facing render descriptors: PASS');
+console.log('source-space bed mattress UV geometry + four-facing render descriptors: PASS');
