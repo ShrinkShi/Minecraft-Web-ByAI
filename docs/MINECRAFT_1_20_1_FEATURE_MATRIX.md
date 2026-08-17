@@ -49,8 +49,9 @@ This matrix is the roadmap authority. Percentages are planning estimates, not au
 | Local/pinned Three.js runtime | DONE | Historical runtime CDN dependency removed. |
 | Water transparent pass | PARTIAL | No vanilla fluid levels/flow/animation/refraction. |
 | Bed special model renderer | DONE | Red bed world visual uses imported entity texture; logical collision still simplified. |
-| General blockstate/model JSON interpreter | PARTIAL | Source-backed JSON preloads/compiles into the real Worker/VoxelWorld opt-in path; crafting table and iron ore are live gameplay roots, broad registry coverage is still missing. |
+| General blockstate/model JSON interpreter | PARTIAL | Source-backed JSON preloads/compiles into the real Worker/VoxelWorld opt-in path; crafting table, iron ore and glass are live gameplay roots, but broad registry coverage is still missing. |
 | General multipart/variant model support | PARTIAL | Weighted variants/multipart compile and execute in the runtime; generalized gameplay-state/neighbor-state mapping is not wired yet. |
+| Interpreted translucent block layer | PARTIAL | Glass now proves real translucent model-atlas rendering and same-type internal-face culling; broader transparent families, sorting edge cases and panes remain incomplete. |
 | Animated block/item textures | TODO | Water animation metadata retained but playback absent. |
 | Biome tint/color resolver | TODO | Current compatibility uses baked/default tint where required. |
 | Vanilla lighting model | TODO | Current lighting/day-night is simplified. |
@@ -62,7 +63,7 @@ This matrix is the roadmap authority. Percentages are planning estimates, not au
 
 ### Implemented gameplay block families
 
-`grass_block`, `dirt`, `stone`, `sand`, `oak_planks`, `oak_log`, `oak_leaves`, `water`, `crafting_table`, `cobblestone`, `red_bed`, `iron_ore`.
+`grass_block`, `dirt`, `stone`, `sand`, `oak_planks`, `oak_log`, `oak_leaves`, `water`, `crafting_table`, `cobblestone`, `red_bed`, `iron_ore`, `glass`.
 
 The bed uses multiple internal block-state IDs, but counts as one gameplay family.
 
@@ -71,13 +72,13 @@ The bed uses multiple internal block-state IDs, but counts as one gameplay famil
 | Basic full cubes | PARTIAL | Small hand-authored gameplay registry only. |
 | Directional full cubes | PARTIAL | Crafting table gameplay semantics exist and use the source-backed interpreted-model runtime. |
 | Beds | PARTIAL | Two-block state + rendering + sleep/respawn; full vanilla support/update/bounce/dimension rules incomplete. |
-| Ores | PARTIAL | Iron ore now has gameplay metadata, source-backed model, shared worldgen and stone-tier harvest; other ores and exact vanilla distribution are absent. |
+| Ores | PARTIAL | Iron ore has gameplay metadata, source-backed model, shared worldgen and stone-tier harvest; other ores and exact vanilla distribution are absent. |
 | Stone variants | TODO | Granite/diorite/andesite/deepslate/tuff/etc. |
 | Wood families | TODO | Only oak foundation is exposed. |
 | Logs/stripped wood | TODO | Registry/model/state expansion needed. |
 | Leaves/saplings | PARTIAL | Oak leaves exist; saplings/growth missing. |
 | Flowers/grass/plants | TODO | Requires crossed/non-cube model support. |
-| Glass/panes | TODO | Requires transparent model/state support. |
+| Glass/panes | PARTIAL | Source-backed normal glass is a solid translucent gameplay block with same-glass internal-face culling and ordinary no-drop breaking; stained glass and panes are absent. |
 | Slabs/stairs | TODO | Requires model/state collision shapes. |
 | Fences/walls/gates | TODO | Requires neighbor-driven multipart state. |
 | Doors/trapdoors | TODO | Requires paired/multipart state and collision shapes. |
@@ -94,7 +95,7 @@ The bed uses multiple internal block-state IDs, but counts as one gameplay famil
 
 ## 3. Items and crafting
 
-Current runtime item registry: 30 IDs at this delivery baseline.
+Current runtime item registry: 31 IDs at this delivery baseline.
 
 Current recipes: six.
 
@@ -108,6 +109,7 @@ Current recipes: six.
 | Stone pickaxe | DONE | Source-backed item, 3×3 cobblestone/stick recipe, stone-tier speed/harvest and 131 durability are wired. |
 | Iron/gold/diamond/netherite tools | FOUNDATION | Tier rules/assets may exist in part, but gameplay items/recipes/progression are not wired. |
 | Raw iron | PARTIAL | Source-backed item is produced by correctly harvested iron ore; smelting into iron ingot is not implemented. |
+| Glass block item | DONE | Source-identical Java 1.20.1 glass texture is deterministically generated from the tracked source ZIP and used by Inventory/hotbar without a false terrain-atlas fallback. |
 | Swords/axes/shovels/hoes | TODO | Full behaviour/recipes/durability missing. |
 | Armor materials beyond leather | TODO | Equipment architecture exists. |
 | Shields | TODO | Blocking/state/network rules required. |
@@ -212,8 +214,8 @@ Terrain v2 compatibility note: if generated `IRON_ORE` cells are normalized back
 | Authoritative movement/collision | DONE | 20 Hz server simulation. |
 | Remote player replication/rendering | DONE | Public player IDs and interpolation. |
 | Authoritative world edits | DONE | Bootstrap + live revisions. |
-| Authoritative mining | DONE | Survival timing/progress/crack feedback; shared stone-tier harvest rules also cover iron ore. |
-| Authoritative placement | DONE | Creative + Survival ordinary block placement. |
+| Authoritative mining | DONE | Survival timing/progress/crack feedback; shared harvest rules cover iron ore and ordinary glass breaking. |
+| Authoritative placement | DONE | Creative + Survival ordinary block placement; focused server-controller coverage includes glass consumption/mutation. |
 | Authoritative ground items | DONE | Drop/pickup lifecycle. |
 | Authoritative Inventory | DONE | Full slots + cursor transactions. |
 | Authoritative Equipment | DONE | Dual-revision Inventory/Equipment transactions. |
@@ -282,10 +284,10 @@ Terrain v2 compatibility note: if generated `IRON_ORE` cells are normalized back
 | Feature | Status | Notes |
 |---|---|---|
 | Deterministic imported block atlas subset | DONE | Runtime hashes/provenance tracked. |
-| Imported implemented item textures | DONE | Current item subset includes source-backed stone pickaxe and raw iron. |
+| Imported implemented item textures | DONE | Current subset includes source-backed stone pickaxe, raw iron and the direct glass block-item texture. |
 | Imported 8 current mob texture sheets | DONE | Texture-backed cuboid models. |
 | Imported red-bed entity texture | DONE | Used by world bed renderer. |
-| Full block/model resource interpretation | PARTIAL | Source-backed closure and model atlas feed live crafting-table and iron-ore Worker/VoxelWorld rendering; broad registry/state coverage remains missing. |
+| Full block/model resource interpretation | PARTIAL | Source-backed closure and model atlas feed live crafting-table, iron-ore and glass Worker/VoxelWorld rendering; broad registry/state coverage remains missing. |
 | Full item model interpretation | TODO | Current items mostly bind direct textures. |
 | Entity geometry exact model-layer parity | PARTIAL | Current models are compatible reconstructions. |
 | Player skin pipeline | TODO | None. |
@@ -315,11 +317,11 @@ Terrain v2 compatibility note: if generated `IRON_ORE` cells are normalized back
 
 | Feature | Status | Notes |
 |---|---|---|
-| Node syntax/logic regression gate | DONE | PR #109 functional candidate reaches **147 / 147** automatically discovered logic/server/Worker regressions. |
-| Chromium E2E | DONE | Sharded browser smoke reaches **36 / 36** on the #109 functional candidate, including live interpreted-model iron progression. |
-| Asset source reproducibility audit | DONE | Used for imported Minecraft source subset. |
+| Node syntax/logic regression gate | DONE | PR #110 functional candidate reaches **148 / 148** automatically discovered logic/server/Worker regressions. |
+| Chromium E2E | DONE | Sharded browser smoke reaches **37 / 37** on the #110 functional candidate, including live translucent glass Worker/renderer + Survival gameplay coverage. |
+| Asset source reproducibility audit | DONE | Selective Minecraft source/runtime outputs are reproducible; direct glass item texture is regenerated from the tracked Java 1.20.1 source ZIP and compared byte-for-byte. |
 | GitHub Pages deployment | DONE | Current public Web delivery path. |
-| Failure artifacts | DONE | Browser failures preserve diagnostics and exposed the first-frame mining clock bug fixed during #109. |
+| Failure artifacts | DONE | Browser failures preserve diagnostics; #110 exposed and fixed the real texture-layer resolver signature mismatch instead of weakening the translucent assertion. |
 | Real Android device coverage | TODO | Automated Chromium emulation exists, real device matrix does not. |
 | iOS Safari coverage | TODO | Not yet established. |
 | Load/performance budgets | FOUNDATION | Runtime is designed for bounded objects/workers; formal budgets/benchmarks need expansion. |
