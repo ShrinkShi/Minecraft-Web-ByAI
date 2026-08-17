@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Extract the browser runtime subset from the tracked Minecraft source ZIP.
+"""Copy the browser runtime subset from tracked Minecraft source assets.
 
 Legacy gameplay resources remain an explicit selective list. Generic block-model
-JSON is different: its blockstate/model parent closure is derived by the shared
-minecraft_model_closure resolver so the runtime cannot drift from the dependency
-set already proven by the atlas/source audits.
+JSON is derived by the shared model dependency closure. The authoritative real
+source is ``MC原版素材assets/``; ZIP support remains only through the shared
+source-index abstraction for synthetic/legacy callers.
 """
 
 from __future__ import annotations
@@ -13,21 +13,22 @@ import argparse
 import hashlib
 import json
 import shutil
-from pathlib import Path, PurePosixPath
-from zipfile import BadZipFile, ZipFile
+from pathlib import Path
 
 from minecraft_model_acceptance import MINECRAFT_MODEL_ACCEPTANCE_BLOCKS
-from minecraft_model_closure import ClosureError, MinecraftArchiveIndex, resolve_block_model_closure
+from minecraft_model_closure import (
+    ClosureError,
+    MinecraftSourceIndex,
+    open_minecraft_source,
+    resolve_block_model_closure,
+    source_provenance,
+)
 
-DEFAULT_ARCHIVE = "MC原版素材assets.zip"
-DEFAULT_OUTPUT = "build/minecraft-runtime-source"
+DEFAULT_SOURCE = Path("MC原版素材assets")
+DEFAULT_OUTPUT = Path("build/minecraft-runtime-source")
 MODEL_CANONICAL_PREFIX = "assets/minecraft/"
 
-# Destination relative to output -> canonical suffix inside a Minecraft client
-# resource tree. Generic blockstates/models are intentionally NOT hand-listed;
-# they are appended from the deterministic model dependency closure below.
 RUNTIME_FILES = {
-    # Core world textures / atlas inputs.
     "textures/block/grass_block_top.png": "assets/minecraft/textures/block/grass_block_top.png",
     "textures/block/grass_block_side.png": "assets/minecraft/textures/block/grass_block_side.png",
     "textures/block/grass_block_side_overlay.png": "assets/minecraft/textures/block/grass_block_side_overlay.png",
@@ -48,8 +49,6 @@ RUNTIME_FILES = {
     "textures/block/cobblestone.png": "assets/minecraft/textures/block/cobblestone.png",
     "textures/block/iron_ore.png": "assets/minecraft/textures/block/iron_ore.png",
     "textures/block/white_wool.png": "assets/minecraft/textures/block/white_wool.png",
-
-    # Inventory / hotbar / drops already represented by gameplay definitions.
     "textures/item/stick.png": "assets/minecraft/textures/item/stick.png",
     "textures/item/wooden_pickaxe.png": "assets/minecraft/textures/item/wooden_pickaxe.png",
     "textures/item/stone_pickaxe.png": "assets/minecraft/textures/item/stone_pickaxe.png",
@@ -69,8 +68,6 @@ RUNTIME_FILES = {
     "textures/item/arrow.png": "assets/minecraft/textures/item/arrow.png",
     "textures/item/gunpowder.png": "assets/minecraft/textures/item/gunpowder.png",
     "textures/item/string.png": "assets/minecraft/textures/item/string.png",
-
-    # Entity sheets for every mob type already implemented by gameplay.
     "textures/entity/cow/cow.png": "assets/minecraft/textures/entity/cow/cow.png",
     "textures/entity/sheep/sheep.png": "assets/minecraft/textures/entity/sheep/sheep.png",
     "textures/entity/sheep/sheep_fur.png": "assets/minecraft/textures/entity/sheep/sheep_fur.png",
@@ -80,12 +77,7 @@ RUNTIME_FILES = {
     "textures/entity/skeleton/skeleton.png": "assets/minecraft/textures/entity/skeleton/skeleton.png",
     "textures/entity/creeper/creeper.png": "assets/minecraft/textures/entity/creeper/creeper.png",
     "textures/entity/spider/spider.png": "assets/minecraft/textures/entity/spider/spider.png",
-
-    # Beds render from an entity sheet in vanilla; this archive does not expose
-    # a standalone textures/item/red_bed.png resource.
     "textures/entity/bed/red.png": "assets/minecraft/textures/entity/bed/red.png",
-
-    # Item JSON is still an explicit current-runtime subset.
     "models/item/stick.json": "assets/minecraft/models/item/stick.json",
     "models/item/wooden_pickaxe.json": "assets/minecraft/models/item/wooden_pickaxe.json",
 }
@@ -93,33 +85,6 @@ RUNTIME_FILES = {
 
 def sha256_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
-
-
-def sha256_file(path: str) -> str:
-    digest = hashlib.sha256()
-    with open(path, "rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def normalize_name(name: str) -> str:
-    return name.replace("\\", "/")
-
-
-def safe_name(name: str) -> bool:
-    path = PurePosixPath(name)
-    return not path.is_absolute() and ".." not in path.parts
-
-
-def resolve_unique(names: list[str], suffix: str) -> str:
-    needle = suffix.lower()
-    matches = sorted(name for name in names if name.lower().endswith(needle))
-    if not matches:
-        raise KeyError(f"missing source resource: {suffix}")
-    if len(matches) != 1:
-        raise KeyError(f"ambiguous source resource {suffix}: {matches[:5]}")
-    return matches[0]
 
 
 def runtime_model_destination(canonical: str) -> str:
@@ -144,49 +109,42 @@ def write_record(output: Path, records: dict[str, dict[str, object]], destinatio
     }
 
 
+def copy_canonical(index: MinecraftSourceIndex, output: Path, records: dict[str, dict[str, object]], destination: str, canonical: str) -> None:
+    record = index.record(canonical)
+    write_record(output, records, destination, record.source, index.read(canonical))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("archive", nargs="?", default=DEFAULT_ARCHIVE)
-    parser.add_argument("--output", default=DEFAULT_OUTPUT)
+    parser.add_argument("source", nargs="?", type=Path, default=DEFAULT_SOURCE)
+    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args()
 
-    output = Path(args.output)
+    output = args.output
     if output.exists():
         shutil.rmtree(output)
     output.mkdir(parents=True, exist_ok=True)
 
     try:
-        with ZipFile(args.archive) as archive:
-            names = [normalize_name(info.filename) for info in archive.infolist() if not info.is_dir()]
-            unsafe = [name for name in names if not safe_name(name)]
-            if unsafe:
-                raise ClosureError(f"asset archive contains unsafe paths: {unsafe[:5]}")
-
+        with open_minecraft_source(args.source) as index:
             records: dict[str, dict[str, object]] = {}
-            for destination, suffix in sorted(RUNTIME_FILES.items()):
-                source = resolve_unique(names, suffix)
-                write_record(output, records, destination, source, archive.read(source))
+            for destination, canonical in sorted(RUNTIME_FILES.items()):
+                copy_canonical(index, output, records, destination, canonical)
 
-            index = MinecraftArchiveIndex(archive)
             closure = resolve_block_model_closure(index, MINECRAFT_MODEL_ACCEPTANCE_BLOCKS)
             blockstates: list[str] = []
             models: list[str] = []
             for canonical in (*closure.blockstates, *closure.models):
                 destination = runtime_model_destination(canonical)
-                record = index.record(canonical)
-                write_record(output, records, destination, record.source, index.read(canonical))
+                copy_canonical(index, output, records, destination, canonical)
                 (blockstates if canonical in closure.blockstates else models).append(destination)
-    except (FileNotFoundError, BadZipFile) as exc:
+    except ClosureError as exc:
         raise SystemExit(f"asset import failed: {exc}") from exc
-    except (KeyError, ClosureError) as exc:
-        message = exc.args[0] if isinstance(exc, KeyError) else str(exc)
-        raise SystemExit(f"asset import failed: {message}") from exc
 
     manifest = {
         "format": 1,
         "minecraftVersion": "1.20.1",
-        "sourceArchive": args.archive,
-        "sourceArchiveSha256": sha256_file(args.archive),
+        **source_provenance(args.source),
         "files": records,
         "modelRuntimeClosure": {
             "roots": list(closure.roots),
@@ -200,8 +158,8 @@ def main() -> int:
     }
     manifest_path = output / "source-manifest.json"
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"imported {len(records)} Minecraft resources into {output}")
-    print(f"source archive sha256: {manifest['sourceArchiveSha256']}")
+    print(f"copied {len(records)} Minecraft resources into {output}")
+    print(f"source: {manifest.get('sourceRoot') or manifest.get('sourceArchive')}")
     print(f"model runtime closure: {len(blockstates)} blockstates, {len(models)} models")
     return 0
 
