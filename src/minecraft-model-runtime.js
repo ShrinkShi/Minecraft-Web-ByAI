@@ -8,7 +8,6 @@ import {MINECRAFT_MODEL_BLOCK_REGISTRY,MINECRAFT_MODEL_RUNTIME_VERSION} from './
 
 const LAYER_SET=new Set(MINECRAFT_MODEL_RENDER_LAYERS);
 const UINT8_MAX=255;
-const UINT32_MASK=0xffffffff;
 
 function object(value,label){
   if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError(`${label} must be an object`);
@@ -229,7 +228,7 @@ export function minecraftModelSelectionHash(x,y,z,blockIdValue,partIndex=0){
   const id=blockId(blockIdValue,'Minecraft model selection block id');
   let hash=0x811c9dc5;
   hash=mix32(hash,x);hash=mix32(hash,y);hash=mix32(hash,z);hash=mix32(hash,id);hash=mix32(hash,partIndex);
-  return hash&UINT32_MASK;
+  return hash>>>0;
 }
 
 export function minecraftModelTemplate(value,blockIdValue){
@@ -237,13 +236,16 @@ export function minecraftModelTemplate(value,blockIdValue){
   return runtime.blocks[id]||null;
 }
 
-export function instantiateMinecraftModelTemplate(template,x,y,z){
+export function instantiateMinecraftModelTemplate(template,x,y,z,{selectionX=x,selectionY=y,selectionZ=z}={}){
   object(template,'Minecraft model template');
   const id=blockId(template.blockId,'Minecraft model template.blockId');
   if(!Array.isArray(template.parts)||template.parts.length===0)throw new TypeError('Minecraft model template.parts must be a non-empty array');
+  for(const [value,label] of [[x,'x'],[y,'y'],[z,'z'],[selectionX,'selectionX'],[selectionY,'selectionY'],[selectionZ,'selectionZ']]){
+    if(!Number.isInteger(value))throw new TypeError(`Minecraft model instance ${label} must be an integer`);
+  }
   const instances=[];
   template.parts.forEach((part,partIndex)=>{
-    const selection=minecraftModelSelectionHash(x,y,z,id,partIndex);
+    const selection=minecraftModelSelectionHash(selectionX,selectionY,selectionZ,id,partIndex);
     const selected=selectMinecraftWeightedModel(part.alternatives,selection);
     instances.push(Object.freeze({
       x,y,z,
