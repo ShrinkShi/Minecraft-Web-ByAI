@@ -30,6 +30,7 @@ const RECORDS=Object.freeze({
   'block.model_atlas':supplied('texture-atlas','./assets/model-textures/model-texture-atlas.png',{minecraftVersion:'1.20.1'}),
   'block.iron_ore':supplied('atlas-tile','./assets/textures/atlas.png',{tile:14}),
   'block.white_wool':supplied('atlas-tile','./assets/textures/atlas.png',{tile:15}),
+  'block.glass':supplied('block-texture','./assets/minecraft/textures/block/glass.png',{minecraftVersion:'1.20.1'}),
 
   'item.stick':supplied('item-texture','./assets/items/stick.png'),
   'item.wooden_pickaxe':supplied('item-texture','./assets/items/wooden_pickaxe.png'),
