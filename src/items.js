@@ -16,6 +16,8 @@ export const ITEMS={
   'block:10':{name:'圆石',stack:64,blockId:10,tile:13},
   stick:textured('木棍',64,'item.stick'),
   wooden_pickaxe:textured('木镐',1,'item.wooden_pickaxe',{attackDamage:2,tool:{kind:'pickaxe',tier:'wood',speed:2,durability:59}}),
+  stone_pickaxe:textured('石镐',1,'item.stone_pickaxe',{attackDamage:3,tool:{kind:'pickaxe',tier:'stone',speed:4,durability:131}}),
+  raw_iron:textured('粗铁',64,'item.raw_iron'),
   bed:{name:'床',stack:1,placeKind:'bed',texture:bedIcon(),entityAssetKey:'entity.bed.red'},
   leather_helmet:textured('皮革帽子',1,'item.leather_helmet',{armorSlot:'head',armorPoints:1}),
   leather_chestplate:textured('皮革外套',1,'item.leather_chestplate',{armorSlot:'chest',armorPoints:3}),
@@ -35,6 +37,6 @@ export const ITEMS={
   string:textured('线',64,'item.string',{color:0xe3e1dc})
 };
 
-export const CREATIVE_START=['block:1','block:2','block:3','block:4','block:5','block:6','block:7','block:9','wooden_pickaxe','bed'];
+export const CREATIVE_START=['block:1','block:2','block:3','block:4','block:5','block:6','block:7','block:9','wooden_pickaxe','stone_pickaxe','bed'];
 export const itemForBlock=blockId=>ITEMS[`block:${blockId}`]?`block:${blockId}`:BLOCKS[blockId]?.drops||null;
 export const maxStack=itemId=>ITEMS[itemId]?.stack||64;
