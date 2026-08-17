@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import WebSocket from 'ws';
 import {Inventory} from '../src/inventory.js';
 import {CREATIVE_START} from '../src/items.js';
-import {HOTBAR_START,INVENTORY_SLOT_COUNT} from '../src/inventory-layout.js';
+import {HOTBAR_START,HOTBAR_SIZE,INVENTORY_SLOT_COUNT} from '../src/inventory-layout.js';
 import {encodeClientInputEnvelope} from '../src/client-input-envelope.js';
 import {encodePlayerActionFrame} from '../src/player-action-frame.js';
 import {MULTIPLAYER_SUBPROTOCOL,encodeClientHello} from '../src/multiplayer-handshake.js';
@@ -10,11 +10,12 @@ import {decodeServerInventorySnapshot,SERVER_INVENTORY_SNAPSHOT_KIND} from '../s
 import {ServerPlayerInventoryHub,ServerPlayerInventoryState} from '../server/player-inventory-state.mjs';
 import {createAuthoritativeServerRuntime} from '../server/runtime.mjs';
 
+const creativeMainSeedCount=Math.max(0,CREATIVE_START.length-HOTBAR_SIZE),firstEmptyCreativeMainSlot=creativeMainSeedCount;
 const creative=new Inventory('creative');
-assert.equal(creative.slots.length,INVENTORY_SLOT_COUNT,'creative client inventory must stay exactly 36 slots');assert.equal(creative.hotbar(0).id,CREATIVE_START[0]);assert.equal(creative.hotbar(8).id,CREATIVE_START[8]);assert.equal(creative.slots[0].id,CREATIVE_START[9]);assert.equal(creative.slots[36],undefined);
+assert.equal(creative.slots.length,INVENTORY_SLOT_COUNT,'creative client inventory must stay exactly 36 slots');assert.equal(creative.hotbar(0).id,CREATIVE_START[0]);assert.equal(creative.hotbar(8).id,CREATIVE_START[8]);assert.equal(creative.slots[0].id,CREATIVE_START[9]);assert.equal(creative.slots[firstEmptyCreativeMainSlot],null,'main inventory slot after all creative starter entries remains the first insertion target');assert.equal(creative.slots[36],undefined);
 const legacySlots=Array(37).fill(null);legacySlots[36]={id:'bed',count:1};const migrated=new Inventory('survival',{slots:legacySlots});assert.equal(migrated.slots.length,INVENTORY_SLOT_COUNT);assert.deepEqual(migrated.slots[0],{id:'bed',count:1});
 
-const state=new ServerPlayerInventoryState('s:inventory',{mode:'creative'});let snapshot=state.snapshot();assert.equal(snapshot.revision,0);assert.equal(snapshot.slots.length,INVENTORY_SLOT_COUNT);assert.equal(snapshot.slots[HOTBAR_START].id,CREATIVE_START[0]);assert.equal(snapshot.slots[0].id,CREATIVE_START[9]);assert.equal(state.selectedStack(8).id,'wooden_pickaxe');assert.equal(state.add('stick',65),0);assert.equal(state.snapshot().revision,1);assert.equal(state.remove(1,1).id,'stick');assert.equal(state.snapshot().revision,2);assert.equal(state.remove(26,1),null);assert.equal(state.snapshot().revision,2);assert.throws(()=>state.add('missing-item',1),/known item/);assert.throws(()=>state.selectedStack(9),/0 to 8/);
+const state=new ServerPlayerInventoryState('s:inventory',{mode:'creative'});let snapshot=state.snapshot();assert.equal(snapshot.revision,0);assert.equal(snapshot.slots.length,INVENTORY_SLOT_COUNT);assert.equal(snapshot.slots[HOTBAR_START].id,CREATIVE_START[0]);assert.equal(snapshot.slots[0].id,CREATIVE_START[9]);assert.equal(state.selectedStack(8).id,'wooden_pickaxe');assert.equal(state.add('stick',65),0);assert.equal(state.snapshot().revision,1);assert.equal(state.remove(firstEmptyCreativeMainSlot,1).id,'stick');assert.equal(state.snapshot().revision,2);assert.equal(state.remove(26,1),null);assert.equal(state.snapshot().revision,2);assert.throws(()=>state.add('missing-item',1),/known item/);assert.throws(()=>state.selectedStack(9),/0 to 8/);
 const survival=new ServerPlayerInventoryState('s:survival',{mode:'survival'});assert.equal(survival.snapshot().revision,0);assert.equal(survival.snapshot().slots.every(value=>value===null),true);
 const hub=new ServerPlayerInventoryHub();hub.join('s:hub',{mode:'creative'});assert.equal(hub.sessionCount,1);assert.equal(hub.selectedStack('s:hub',0).id,CREATIVE_START[0]);assert.equal(hub.leave('s:hub'),true);assert.equal(hub.sessionCount,0);assert.throws(()=>hub.snapshot('s:hub'),/unknown inventory session/);
 
@@ -31,11 +32,11 @@ try{
   await waitUntil(()=>runtime.inventories.sessionCount===1,'runtime inventory join');assert.equal(runtime.selectedStack(welcome.session).id,CREATIVE_START[0]);
 
   const removal=runtime.removeInventoryItem(welcome.session,HOTBAR_START,64);assert.equal(removal.changed,true);assert.equal(removal.replicated,true);assert.equal(removal.snapshot.revision,1);assert.equal(removal.snapshot.slots[HOTBAR_START],null);const removedWire=decodeServerInventorySnapshot(await nextKind(messages,SERVER_INVENTORY_SNAPSHOT_KIND,'live inventory removal'),{expectedSession:welcome.session});assert.equal(removedWire.revision,1);assert.equal(removedWire.slots[HOTBAR_START],null);
-  const addition=runtime.addInventoryItem(welcome.session,'stick',3);assert.equal(addition.changed,true);assert.equal(addition.replicated,true);assert.equal(addition.snapshot.revision,2);const addedWire=decodeServerInventorySnapshot(await nextKind(messages,SERVER_INVENTORY_SNAPSHOT_KIND,'live inventory addition'),{expectedSession:welcome.session});assert.equal(addedWire.revision,2);assert.deepEqual(addedWire.slots[1],{id:'stick',count:3});
+  const addition=runtime.addInventoryItem(welcome.session,'stick',3);assert.equal(addition.changed,true);assert.equal(addition.replicated,true);assert.equal(addition.snapshot.revision,2);const addedWire=decodeServerInventorySnapshot(await nextKind(messages,SERVER_INVENTORY_SNAPSHOT_KIND,'live inventory addition'),{expectedSession:welcome.session});assert.equal(addedWire.revision,2);assert.deepEqual(addedWire.slots[firstEmptyCreativeMainSlot],{id:'stick',count:3});
   const noOp=runtime.removeInventoryItem(welcome.session,26,1);assert.equal(noOp.changed,false);assert.equal(noOp.replicated,false);assert.equal(noOp.snapshot.revision,2);assert.deepEqual(errors,[]);
 
   const select=encodePlayerActionFrame({kind:'hotbar-select',slot:8},0);socket.send(JSON.stringify(encodeClientInputEnvelope({session:welcome.session,packetSeq:0,kind:'action',payload:select})));await waitUntil(()=>runtime.server.getSessionInputState(welcome.session)?.selectedSlot===8,'authoritative hotbar selection');assert.equal(runtime.selectedStack(welcome.session).id,'wooden_pickaxe');
   const closed=new Promise(resolve=>socket.once('close',resolve));socket.close(1000,'inventory test complete');await Promise.race([closed,timeout(2500,'inventory websocket close')]);await waitUntil(()=>runtime.inventories.sessionCount===0,'runtime inventory leave');
 }finally{if(runtime.state!=='stopped')await runtime.stop();if(socket&&socket.readyState===WebSocket.OPEN)socket.terminate();}
 
-console.log('36-slot inventory + live revisioned authoritative replication: PASS');
+console.log('36-slot inventory + dynamic creative seed layout + live revisioned authoritative replication: PASS');
