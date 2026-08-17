@@ -1,16 +1,10 @@
 import {test,expect} from '@playwright/test';
+import {createSingleplayerWorld} from './helpers/world-flow.mjs';
 
 test('desktop gameplay hides debug by default and keeps F3/F5 presentation in sync',async({page})=>{
   const pageErrors=[],consoleErrors=[];page.on('pageerror',error=>pageErrors.push(error.message));page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
   await page.goto('/');
-  await page.getByRole('button',{name:'单人游戏'}).click();
-  await page.locator('#world-name').fill('CI Immersive Desktop');
-  await page.locator('#world-seed').fill('ci-immersive-desktop-2026');
-  await page.locator('#game-mode').selectOption('creative');
-  await page.locator('#terrain-prompt').fill('平原');
-  await page.getByRole('button',{name:'创建 / 进入'}).click();
-  await expect(page.locator('#loading')).toHaveClass(/hidden/,{timeout:60_000});
-  await expect(page.locator('#hud')).not.toHaveClass(/hidden/);
+  await createSingleplayerWorld(page,{name:'CI Immersive Desktop',seed:'ci-immersive-desktop-2026',mode:'creative',prompt:'平原'});
 
   const debug=page.locator('#debug'),canvas=page.locator('#game-canvas'),held=page.locator('#first-person-held-overlay');
   await expect(debug).toHaveClass(/hidden/);

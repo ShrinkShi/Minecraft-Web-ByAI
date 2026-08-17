@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {createSingleplayerWorld} from './helpers/world-flow.mjs';
 
 async function savedWorlds(page){
   return page.evaluate(()=>new Promise((resolve,reject)=>{
@@ -54,17 +55,8 @@ test('boots, swims, switches precipitation, persists armor, then clears equipmen
   await page.goto('/');
   await expect(page.locator('#main-menu')).toHaveClass(/active/);
   await expect(page.getByRole('button',{name:'单人游戏'})).toBeVisible();
+  await createSingleplayerWorld(page,{name:'CI Browser Smoke',seed:'ci-browser-smoke-2026',mode:'survival',prompt:'海'});
 
-  await page.getByRole('button',{name:'单人游戏'}).click();
-  await expect(page.locator('#world-menu')).toHaveClass(/active/);
-  await page.locator('#world-name').fill('CI Browser Smoke');
-  await page.locator('#world-seed').fill('ci-browser-smoke-2026');
-  await page.locator('#game-mode').selectOption('survival');
-  await page.locator('#terrain-prompt').fill('海');
-  await page.getByRole('button',{name:'创建 / 进入'}).click();
-
-  await expect(page.locator('#loading')).toHaveClass(/hidden/,{timeout:60_000});
-  await expect(page.locator('#hud')).not.toHaveClass(/hidden/);
   const canvas=await page.locator('#game-canvas').evaluate(element=>({width:element.width,height:element.height,clientWidth:element.clientWidth,clientHeight:element.clientHeight}));
   expect(canvas.width).toBeGreaterThan(0);expect(canvas.height).toBeGreaterThan(0);expect(canvas.clientWidth).toBeGreaterThan(0);expect(canvas.clientHeight).toBeGreaterThan(0);
 
@@ -147,14 +139,7 @@ test('recoverable death drops and re-picks items after explicit respawn',async({
   page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
 
   await page.goto('/');
-  await page.getByRole('button',{name:'单人游戏'}).click();
-  await page.locator('#world-name').fill('CI Recoverable Death');
-  await page.locator('#world-seed').fill('ci-recoverable-death-2026');
-  await page.locator('#game-mode').selectOption('survival');
-  await page.locator('#terrain-prompt').fill('平原');
-  await page.getByRole('button',{name:'创建 / 进入'}).click();
-  await expect(page.locator('#loading')).toHaveClass(/hidden/,{timeout:60_000});
-  await expect(page.locator('#hud')).not.toHaveClass(/hidden/);
+  await createSingleplayerWorld(page,{name:'CI Recoverable Death',seed:'ci-recoverable-death-2026',mode:'survival',prompt:'平原'});
 
   await runCommand(page,'/tp 0 35 0');
   await runCommand(page,'/give oak_log 3');
@@ -189,8 +174,7 @@ test('recoverable death drops and re-picks items after explicit respawn',async({
 
 test('custom spawnpoint persists and explicit respawn returns to it',async({page})=>{
   const pageErrors=[],consoleErrors=[];page.on('pageerror',error=>pageErrors.push(error.message));page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
-  await page.goto('/');await page.getByRole('button',{name:'单人游戏'}).click();await page.locator('#world-name').fill('CI Custom Respawn');await page.locator('#world-seed').fill('ci-custom-respawn-2026');await page.locator('#game-mode').selectOption('survival');await page.locator('#terrain-prompt').fill('平原');await page.getByRole('button',{name:'创建 / 进入'}).click();
-  await expect(page.locator('#loading')).toHaveClass(/hidden/,{timeout:60_000});await expect(page.locator('#hud')).not.toHaveClass(/hidden/);
+  await page.goto('/');await createSingleplayerWorld(page,{name:'CI Custom Respawn',seed:'ci-custom-respawn-2026',mode:'survival',prompt:'平原'});
   const custom={x:7.5,y:25.01,z:7.5};await runCommand(page,`/spawnpoint ${custom.x} ${custom.y} ${custom.z}`);const saveStarted=await page.evaluate(()=>Date.now());await key(page,'Escape');await expect(page.locator('#pause-menu')).toHaveClass(/active/);
   await expect.poll(async()=>{const record=(await savedWorlds(page)).find(world=>world.name==='CI Custom Respawn');if(!record||Number(record.updatedAt)<saveStarted||!record.respawnPoint)return null;return{version:record.version,x:Number(record.respawnPoint.x.toFixed(2)),y:Number(record.respawnPoint.y.toFixed(2)),z:Number(record.respawnPoint.z.toFixed(2))};},{timeout:10_000,message:'spawnpoint should persist in a fresh v6 world snapshot'}).toEqual({version:6,...custom});
   await page.getByRole('button',{name:'返回游戏'}).click();await runCommand(page,'/tp -96 40 -96');await runCommand(page,'/kill');await expect(page.locator('#death-menu')).toHaveClass(/active/,{timeout:10_000});await page.getByRole('button',{name:'重生'}).click();await expect(page.locator('#death-menu')).not.toHaveClass(/active/,{timeout:15_000});
@@ -200,8 +184,7 @@ test('custom spawnpoint persists and explicit respawn returns to it',async({page
 
 test('bed placement persists respawn, sleeps, and blocks sleep near a real hostile',async({page})=>{
   const pageErrors=[],consoleErrors=[];page.on('pageerror',error=>pageErrors.push(error.message));page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
-  await page.goto('/?e2e=1');await page.getByRole('button',{name:'单人游戏'}).click();await page.locator('#world-name').fill('CI Bed Anchor');await page.locator('#world-seed').fill('ci-bed-anchor-2026');await page.locator('#game-mode').selectOption('survival');await page.locator('#terrain-prompt').fill('平原');await page.getByRole('button',{name:'创建 / 进入'}).click();
-  await expect(page.locator('#loading')).toHaveClass(/hidden/,{timeout:60_000});await expect(page.locator('#hud')).not.toHaveClass(/hidden/);
+  await page.goto('/?e2e=1');await createSingleplayerWorld(page,{name:'CI Bed Anchor',seed:'ci-bed-anchor-2026',mode:'survival',prompt:'平原'});
   await runCommand(page,'/tp 20 35 20');
   await expect.poll(async()=>{const a=await debugXYZ(page);await page.waitForTimeout(180);const b=await debugXYZ(page);return Math.abs(a.y-b.y)<.03&&b.y>0;},{timeout:10_000,message:'player should settle before bed placement search'}).toBe(true);
   await runCommand(page,'/give bed 1');
