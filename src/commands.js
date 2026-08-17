@@ -5,6 +5,7 @@ export const ITEM_ALIASES={
   dirt:'block:2','minecraft:dirt':'block:2',stone:'block:3','minecraft:stone':'block:3',
   sand:'block:4','minecraft:sand':'block:4',planks:'block:5',oak_planks:'block:5','minecraft:oak_planks':'block:5',
   log:'block:6',oak_log:'block:6','minecraft:oak_log':'block:6',crafting_table:'block:9','minecraft:crafting_table':'block:9',cobblestone:'block:10','minecraft:cobblestone':'block:10',
+  glass:'block:20','minecraft:glass':'block:20',
   stick:'stick','minecraft:stick':'stick',wooden_pickaxe:'wooden_pickaxe','minecraft:wooden_pickaxe':'wooden_pickaxe',
   leather_helmet:'leather_helmet','minecraft:leather_helmet':'leather_helmet',
   leather_chestplate:'leather_chestplate','minecraft:leather_chestplate':'leather_chestplate',
