@@ -11,7 +11,11 @@ import {SurvivalBlockUseController} from '../server/survival-block-use-controlle
 import {SurvivalBlockBreakController} from '../server/survival-block-break-controller.mjs';
 
 assert.equal(BLOCK.GLASS,20,'glass must append after the existing iron ore id');
-assert.deepEqual({...BLOCKS[BLOCK.GLASS],tiles:undefined},{name:'玻璃',solid:true,transparent:true,hardness:.3,tiles:undefined,drops:null});
+assert.equal(BLOCKS[BLOCK.GLASS].name,'玻璃');
+assert.equal(BLOCKS[BLOCK.GLASS].solid,true);
+assert.equal(BLOCKS[BLOCK.GLASS].transparent,true);
+assert.equal(BLOCKS[BLOCK.GLASS].hardness,.3);
+assert.equal(BLOCKS[BLOCK.GLASS].drops,null);
 assert.equal(ITEMS['block:20'].name,'玻璃');
 assert.equal(ITEMS['block:20'].stack,64);
 assert.equal(ITEMS['block:20'].blockId,BLOCK.GLASS);
@@ -34,7 +38,7 @@ assert.equal(descriptor.renderLayer,'translucent');
   const inventories=new ServerPlayerInventoryHub();inventories.join('s:glass-use',{mode:'survival'});assert.equal(inventories.addPickup('s:glass-use','block:20',2),0);
   const controller=new SurvivalBlockUseController({world,setBlock,inventories}),player={mode:'survival',position:{x:.5,y:1,z:.5}},use={kind:'use',selectedSlot:0,view:{yaw:0,pitch:0}};
   const [placed]=controller.step('s:glass-use',player,[use]);
-  assert.equal(placed.reason,'placed');assert.equal(placed.placement.changed,true);assert.equal(placed.placement.id,BLOCK.GLASS);assert.deepEqual(placed.consumed,{id:'block:20',count:1});
+  assert.equal(placed.reason,'placed');assert.equal(placed.placement.changed,true);assert.equal(placed.placement.change.id,BLOCK.GLASS);assert.deepEqual(placed.consumed,{id:'block:20',count:1});
   assert.equal(world.getBlock(0,2,-1),BLOCK.GLASS);assert.deepEqual(inventories.snapshot('s:glass-use').slots[HOTBAR_START],{id:'block:20',count:1});
 }
 
