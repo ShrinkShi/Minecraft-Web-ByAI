@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {createSingleplayerWorld} from './helpers/world-flow.mjs';
 
 async function runCommand(page,text){
   await page.evaluate(()=>window.dispatchEvent(new KeyboardEvent('keydown',{code:'Slash',bubbles:true})));
@@ -42,14 +43,7 @@ test('WASD movement follows the actual camera yaw instead of fixed world axes',a
   page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
 
   await page.goto('/?e2e=1');
-  await page.getByRole('button',{name:'单人游戏'}).click();
-  await page.locator('#world-name').fill('CI Camera Relative Movement');
-  await page.locator('#world-seed').fill('ci-camera-relative-2026');
-  await page.locator('#game-mode').selectOption('creative');
-  await page.locator('#terrain-prompt').fill('平原');
-  await page.getByRole('button',{name:'创建 / 进入'}).click();
-  await expect(page.locator('#loading')).toHaveClass(/hidden/,{timeout:60_000});
-  await expect(page.locator('#hud')).not.toHaveClass(/hidden/);
+  await createSingleplayerWorld(page,{name:'CI Camera Relative Movement',seed:'ci-camera-relative-2026',mode:'creative',prompt:'平原'});
 
   let start=await resetAtOrigin(page,0);
   await holdKey(page,'KeyW');
