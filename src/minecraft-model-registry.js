@@ -14,7 +14,8 @@ const descriptor=(blockstate,{state={},renderLayer='opaque',textureLayers={}}={}
 // collision/state rules in blocks.js.
 export const MINECRAFT_MODEL_BLOCK_REGISTRY=Object.freeze({
   [BLOCK.CRAFTING_TABLE]:descriptor('minecraft:crafting_table'),
-  [BLOCK.IRON_ORE]:descriptor('minecraft:iron_ore')
+  [BLOCK.IRON_ORE]:descriptor('minecraft:iron_ore'),
+  [BLOCK.GLASS]:descriptor('minecraft:glass',{renderLayer:'translucent'})
 });
 
 export function minecraftModelBlockDescriptor(blockId){
