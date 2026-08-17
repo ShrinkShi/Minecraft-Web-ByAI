@@ -8,159 +8,176 @@
 
 项目已经从“通用 blockstate/model 基础设施”进入 **Java 1.20.1 内容逐步接入真实 gameplay / Worker / authoritative multiplayer** 的阶段。
 
-严格按“完整 Java 1.20.1 复刻”衡量，整体完成度仍保守维持约 **35%**。#108 打通通用模型热路径，#109 落地石镐→铁矿→粗铁，#110 再证明同一模型管线能够承载真实 translucent 方块。熔炉、铁锭、完整工具链、洞穴/生物群系、绝大多数方块与系统仍未实现，因此不因单个内容包虚增整体百分比。
+严格按“完整 Java 1.20.1 复刻”衡量，整体完成度仍保守维持约 **35%**。#108 打通通用模型热路径，#109 落地石镐→铁矿→粗铁，#110 验证 source-backed translucent 方块；#111 开始补铁进程缺失的熔炉/烧炼权威基础。当前仍没有用户可交互的熔炉、铁锭物品、铁工具链、洞穴/生物群系和绝大多数方块/系统，因此不因基础设施进展虚增整体百分比。
 
-## 已合并并部署：#108 Interpreted model runtime integration
+## 当前 `main`
 
-PR #108 已 squash merge，建立：
+PR #110 已 squash merge。
 
-- source-backed blockstate/model JSON 启动期 preload/cache；
-- recursive parent/model geometry 预编译；
-- weighted variant / multipart template；
-- `mesh-worker.js` model-runtime init / ready / error barrier；
-- legacy terrain-atlas full-cube fast path；
-- interpreted block chunk-level `opaque/cutout/translucent` batching；
-- deterministic model atlas + 三层共享 Three.js material；
-- chunk unload / world dispose 生命周期；
-- 初始化失败时安全回退 legacy renderer。
+当前 `main`：
 
-## 已合并并部署：#109 Stone pickaxe → Iron ore → Raw iron
+`e4f9337e706c2dcb66e153f81496432accee7946`
 
-PR #109 已 squash merge，当前 `main` 基线：
+### #110 Source-backed translucent glass 已交付
 
-`2105a82d40f9d62f036b3668e897c1cf6d98c38b`
+- `BLOCK.GLASS=20`，不重排既有 ID；
+- source-backed `minecraft:glass` blockstate/model 进入 interpreted translucent chunk batch；
+- 相邻同类透明 full-cube 正确剔除内部面；
+- 普通破坏无掉落，放置/破坏保持单人和 authoritative gameplay 兼容；
+- 玻璃 Inventory / hotbar 不再退化为平面 PNG：source texture 通过现有三面 block-item preview 显示；
+- legacy 4×4 terrain atlas 保持字节兼容，没有为了玻璃/后续内容继续塞 tile；
+- exact-head asset audit、static/logic 和两路 Chromium 均通过后合并。
 
-完成第一条新增矿业进程：
+这意味着 generic model pipeline 已经证明至少能覆盖：普通 opaque full-cube、矿石、透明 full-cube，以及 source-backed block item preview 扩展。
 
-**木镐 / 圆石 → 工作台合成石镐 → 地下铁矿 → 石质及以上镐正确收获 → 粗铁。**
+## 当前进行中：#111 Authoritative furnace smelting foundation
 
-主要交付：
+PR：#111
 
-- source-backed 石镐，`pickaxe / stone / speed 4 / durability 131`；
-- `BLOCK.IRON_ORE=19`，石质收获门槛；
-- source-backed `raw_iron`；
-- terrain generator v2 的确定性地下铁矿；
-- 单机 / 权威多人共享收获规则；
-- 首帧 rAF / event clock skew 的 bounded re-anchor 修复；
-- `147 / 147` logic/server/Worker；
-- `36 / 36` Chromium；
-- Pages 部署成功。
+分支：`content/v0.4-furnace-smelting-foundation`
 
-粗铁仍是当前铁进程终点：**熔炉、燃料、烧炼、铁锭和铁工具尚未实现。**
+这一 PR **不是“熔炉功能完成”**。目标是先把容易造成单机/多人分叉的处理逻辑收敛成服务器可复用的权威状态机，再接方块、资产、GUI 和网络交互。
 
-## 当前进行中：#110 Source-backed translucent glass
+### 已实现的基础
 
-PR：#110
+1. Deterministic smelting rules
+   - `raw_iron → iron_ingot` 逻辑配方；
+   - 200 tick cooking；
+   - 当前燃料表覆盖 oak planks、oak log、stick、wooden pickaxe；
+   - 输出满时不消耗新燃料；
+   - 失去燃烧后，未完成 cook progress 按 2/tick 回退；
+   - 修复燃料最后一个 tick 不参与 cooking 的 off-by-one。
 
-分支：`content/v0.4-glass-translucent`
+2. Furnace state
+   - 固定三槽：input / fuel / output；
+   - `burnRemaining / burnTotal`；
+   - `cookProgress / cookTotal`；
+   - stored smelting experience；
+   - 状态创建时校验计时器边界和槽位合法性。
 
-目标不是“再加一个贴图方块”，而是验证 #108 的 interpreted-model runtime 能正确承载**真实透明 full-cube gameplay block**，同时保持碰撞、放置、采掘、物品 UI 和资源 provenance 一致。
+3. Item-state integrity
+   - 炉槽不接受任意伪造 item id；
+   - 只接受现有 `ITEMS` 或明确声明的 smelting output；
+   - 使用物品真实 `maxStack`，不会允许“64 把木镐”一类非法状态；
+   - fuel / output slot 在 restore/state construction 时也执行语义校验；
+   - 部分取出 output 时按取出比例结算已累计的 smelting experience，而不是强制等到输出槽清空。
 
-### 已实现
+4. World-cell authoritative container foundation
+   - 炉状态以世界整数坐标 `{x,y,z}` 为 identity；
+   - 重新打开同一坐标不会清空 input/fuel/output/timers；
+   - `serialize / restore` 提供未来 server save 接口；
+   - block break foundation 可 drain contents 并删除该 world-cell state。
 
-1. 玻璃 gameplay block
-   - 新内部 block ID `20`，不重排任何既有 ID；
-   - `solid=true`，仍参与玩家/服务器碰撞；
-   - `transparent=true`；
-   - `hardness=0.3`；
-   - 普通破坏无掉落；当前尚未实现 Silk Touch；
-   - `/give glass` / `/give minecraft:glass` 可用；
-   - creative starter 只在末尾追加，不改变历史 starter slot 顺序。
+5. Revision concurrency discipline
+   - input/fuel/output transaction 使用 expected revision 防 stale write；
+   - **纯 burn/cook timer 推进不会每 tick 增加 container revision**；
+   - 只有燃料真实被消耗、烧炼产物真实生成等 transaction mutation 才推进 revision；
+   - 这样未来 20 TPS server tick 不会让玩家 GUI 点击几乎必然 stale；
+   - 回归显式锁定“连续 198 个纯 progress tick revision 不变”。
 
-2. Source-backed interpreted model
-   - 直接使用已纳入 Java 1.20.1 model closure 的 `minecraft:glass` blockstate/model；
-   - model registry 显式声明 `renderLayer='translucent'`；
-   - 继续共享 `block.model_atlas`，没有创建 glass 专用 Three.js Mesh/material 系统；
-   - legacy stone tile 只用于 model-runtime 初始化失败时的 fail-open，不作为正常视觉素材。
+6. Regression coverage
+   - 新增自动发现 `check-furnace-smelting-foundation.mjs`；
+   - 覆盖 199/200 cook boundary、完整燃料 tick、cooldown、full output、非法 item/stack、revision conflict、world-cell reopen、serialize/restore、break drain、partial XP 等边界；
+   - 该检查成为 logic/server/Worker 自动发现集合中的第 149 个脚本。
 
-3. 相邻玻璃内部面剔除
-   - 两个同类、solid、transparent、full-cube interpreted 方块相邻时，不再生成两张重叠内部面；
-   - 两块相邻玻璃的真实 Worker 输出为 **10 个外表面 / 40 vertices / 60 indices**；
-   - 玻璃与空气、不同透明方块、非 full-cube 等边界仍按既有规则保留可见面；
-   - 该规则没有退化为“一切透明邻居都剔面”。
+### #111 明确未实现
 
-4. Render-layer callback 契约修复
-   - 新 Chromium 用例暴露了 #108 以来潜伏的接口适配问题：`createMinecraftModelTextureBinding()` 调用 layer resolver 的签名是 `(texture, face, instance)`，而旧 Worker 直接传入二参 `(texture, instance)` helper；
-   - 结果是 `face` 被误当成 instance，玻璃即使声明 translucent 也会静默回退 opaque；
-   - 现在 runtime 提供正式三参 `minecraftModelTextureLayerResolver()` 适配器；
-   - Worker 与逻辑回归都走该适配器；
-   - texture-specific layer override 仍优先于 instance 默认 layer。
+- 没有 `BLOCK.FURNACE`；
+- 没有 furnace blockstate/model runtime registration；
+- 没有 furnace item / `iron_ingot` gameplay item registration；
+- 没有 furnace 8-cobblestone crafting recipe；
+- 没有客户端 Furnace GUI；
+- 没有 WebSocket furnace snapshot/transaction channel；
+- 没有把 furnace hub 挂到 production server 20 Hz tick；
+- 没有把 block break/placement 与 furnace state 生命周期接起来；
+- 没有 durable server save backend，只提供 serialize/restore contract；
+- 没有动态 `facing` / `lit` voxel state；当前 world voxel contract 仍主要是 block ID；
+- 没有新增二进制 Minecraft 资产。
 
-5. Source-backed 玻璃物品图
-   - 玻璃没有伪装成 legacy terrain-atlas 石头预览；
-   - `assets/items/glass.png` 为原始 Java 1.20.1 `textures/block/glass.png` 的逐字节副本；
-   - SHA-256：`cb89c706dce86eac3123cef087d359b5f23098b658a468fb91662b4a9922bcd0`；
-   - 与现有 model-atlas provenance 中记录的 source hash 完全一致；
-   - `build-minecraft-runtime-assets.py` 直接从已跟踪原始素材 ZIP 确定性生成该文件；
-   - asset source audit 会把生成物与 tracked `assets/items/glass.png` 逐字节比较；
-   - `assets/minecraft/**` 既有 selective runtime closure 保持不变，没有为了 UI 图标污染模型闭包。
+因此 feature matrix 只把 Furnace / furnace recipes / persistent container 对应项提升到 **FOUNDATION**，没有标成 PARTIAL 或 DONE。
 
-6. Gameplay / authoritative compatibility
-   - 单人生存可 `/give glass`、在背包/快捷栏显示 source-backed 图标；
-   - Jade 可识别“玻璃”；
-   - 徒手可破坏且普通破坏不产生掉落；
-   - 权威 `SurvivalBlockUseController` 回归证明放置成功后只消费一个玻璃；
-   - 权威 `SurvivalBlockBreakController` 回归证明普通破坏 `drop=null`；
-   - 没有 worldgen 变化，因此 **不升级 terrain generator version**；
-   - 没有网络协议形状变化，因此 **不升级 multiplayer protocol version**。
+## 为什么 #111 不直接把完整熔炉都塞进一个 PR
 
-### #110 功能候选验证
+仓库现有 legacy terrain atlas 是固定 4×4 且 16 个 tile 已占满，并且构建脚本要求保持 byte-compatible。熔炉不能通过“再塞一个 tile”继续扩展，否则会破坏已经锁定的资源契约。
 
-功能候选 HEAD：
+正确路线是：
 
-`d5ac04774daa38800f89f80e7af7728dac4cd972`
+- 世界模型走现有 generic blockstate/model interpreted runtime；
+- item / GUI 所需 direct texture 继续从仓库已跟踪的 `MC原版素材assets.zip` 确定性生成；
+- persistent processing state 独立于 UI；
+- server authority、client presentation 和 source asset closure 分层交付。
 
-Minecraft asset source audit run：`32036939951` — **PASS**
+GitHub connector 能确认原始素材 ZIP 已跟踪，但不能直接把二进制 ZIP 当 UTF-8 文件解码。因此 #111 不通过复制外部/占位纹理绕过 provenance；二进制生成物留给下一次 source-asset closure 交付。
 
-Repository quality run：`32036939933` — **PASS**
+## #111 收口条件
 
-- JavaScript syntax：PASS；
-- 自动发现 logic/server/Worker：**148 / 148 PASS**；
-- Chromium shard 1：**19 / 19 PASS**；
-- Chromium shard 2：**18 / 18 PASS**；
-- Chromium total：**37 / 37 PASS**。
+- 最终 exact branch HEAD JavaScript syntax：PASS；
+- 自动发现 logic/server/Worker 全绿；
+- 两路 Chromium smoke 全绿，证明非 UI foundation 没有破坏现有浏览器路径；
+- 代码自审后不存在已知 item-state / timer / revision 边界错误；
+- `docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md` 与本文同步；
+- 只有以上条件同时满足才将 Draft 转 Ready 并 squash merge。
 
-新增真实 Chromium `glass-runtime.spec.mjs` 已证明：
+任何文档提交都会生成新的 branch HEAD，因此旧 head 的绿灯不能继承给最终提交。
 
-- 两块相邻玻璃不会进入 legacy opaque 或 interpreted opaque batch；
-- interpreted translucent batch 恰好为 10 faces / 40 vertices / 60 indices；
-- world renderer 使用共享 `chunk-model-translucent` material；
-- `transparent=true`、`opacity=1`、`depthWrite=false`、`renderOrder=2`；
-- 玻璃物品使用真实 source-backed PNG；
-- 生存背包/快捷栏、Jade、徒手采掘与无掉落路径可真实运行；
-- 页面和 console 无未处理错误。
+## #111 合并后的下一步
 
-**注意：**文档提交会产生新的 branch HEAD；上述绿灯只证明功能候选。最终合并仍只接受文档提交后的 exact-head asset audit + Repository quality。
+### 1. Furnace source assets + gameplay block
 
-## #110 合并后的下一步
+从已跟踪 Java 1.20.1 素材 ZIP 扩充确定性 source closure：
 
-生存进程优先级仍高于展示内容。
+- `minecraft:furnace` blockstate/model acceptance root；
+- furnace model atlas dependencies；
+- source-backed furnace item preview 所需 face textures；
+- source-backed `iron_ingot` item texture；
+- 保持 legacy terrain atlas 不变。
 
-1. **Furnace / smelting source closure + runtime foundation**
-   - 先从已跟踪的 Java 1.20.1 原始素材 ZIP 扩充 furnace / iron_ingot 所需 provenance closure；
-   - 熔炉方块与 persistent container；
-   - 输入 / 燃料 / 输出槽；
-   - tick-based cooking；
-   - fuel burn time；
-   - raw iron → iron ingot；
-   - singleplayer + authoritative multiplayer shared-container state；
-   - 不用占位纹理冒充原版。
+然后接入：
 
-2. Iron progression continuation
-   - iron ingot；
-   - iron pickaxe；
-   - 后续铁工具/铁甲；
-   - coal / copper / gold / redstone / lapis / diamond 等矿业链。
+- `BLOCK.FURNACE=21`（若合并时 21 仍为空闲）；
+- furnace block metadata / harvest / drop；
+- 8 cobblestone furnace recipe；
+- `iron_ingot` gameplay item；
+- `/give furnace` / `minecraft:furnace` 等 alias；
+- interpreted model world rendering。
 
-3. 继续批量验证 interpreted-model runtime
-   - `oak_slab`：state + partial collision；
-   - `oak_stairs`：state + multi-cuboid collision；
-   - `oak_door`：two-block paired state；
-   - `oak_fence`：neighbor-derived multipart state；
-   - `torch`：non-full/cutout + 后续 lighting；
-   - grass/foliage biome tint contract。
+当前 voxel state 只有 block ID，不能假装已经支持 Java furnace 的动态 `facing/lit`。第一版若只能静态 north/unlit visual，必须明确记录；之后再扩展 per-cell block state。
 
-**视觉模型与 gameplay collision/state 继续严格分离。** JSON model cuboid 不能自动当碰撞箱；透明材质、multipart renderer 也不能替代真实 block state/update 逻辑。
+### 2. Furnace UI + singleplayer/server runtime binding
+
+- source-backed Furnace GUI；
+- input/fuel/output slot transaction；
+- burn/cook progress rendering；
+- singleplayer 复用同一 furnace state engine；
+- server 20 Hz processing lifecycle；
+- block break 时 contents drop；
+- world close/save 的持久化挂接。
+
+### 3. Authoritative multiplayer furnace channel
+
+- strict snapshot wire contract；
+- revision-guarded click/shift transaction；
+- 多客户端打开同一 world-cell furnace；
+- stale transaction rejection + resync；
+- real two-client WebSocket regression。
+
+### 4. Iron progression continuation
+
+- iron ingot；
+- iron pickaxe；
+- 后续铁工具 / 铁甲；
+- coal / copper / gold / redstone / lapis / diamond 等矿业链。
+
+### 5. 继续验证 interpreted-model runtime
+
+- `oak_slab`：state + partial collision；
+- `oak_stairs`：state + multi-cuboid collision；
+- `oak_door`：two-block paired state；
+- `oak_fence`：neighbor-derived multipart state；
+- `torch`：non-full/cutout + 后续 lighting；
+- grass/foliage biome tint contract。
+
+**视觉模型与 gameplay collision/state 继续严格分离。** JSON model cuboid 不能自动当碰撞箱；renderer 支持某种状态也不等于 gameplay 已拥有对应 block-state/update 规则。
 
 ## 后续大阶段
 

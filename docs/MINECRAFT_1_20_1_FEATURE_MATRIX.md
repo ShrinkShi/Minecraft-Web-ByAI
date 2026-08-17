@@ -16,16 +16,16 @@ This matrix is the roadmap authority. Percentages are planning estimates, not au
 |---|---:|---|---|
 | Browser engine / chunk / rendering foundation | 85% | PARTIAL | lighting parity, generic non-cube gameplay breadth, advanced particles, broader performance work |
 | Desktop/mobile controls and core UI | 75% | PARTIAL | full settings/accessibility, polished mobile customization, broader browser/device matrix |
-| Singleplayer survival core | 55% | PARTIAL | smelting/iron continuation, hunger/food breadth, farming, full progression, effects/enchanting/brewing |
+| Singleplayer survival core | 55% | PARTIAL | user-facing furnace/iron continuation, hunger/food breadth, farming, full progression, effects/enchanting/brewing |
 | Blocks/items/recipes breadth | 15% | PARTIAL | most 1.20.1 registry content is not exposed |
 | World generation / biomes / caves / structures | 18% | PARTIAL | true biome pipeline, caves, broad ore distribution, features, structures, Nether/End |
 | Entities / PvE | 35% | PARTIAL | species breadth, pathfinding/spawn parity, breeding/taming/riding, server authority |
-| Multiplayer server foundation | 65% | PARTIAL | persistence, rooms/auth/operators, server PvE, shared persistent containers |
+| Multiplayer server foundation | 65% | PARTIAL | durable persistence, rooms/auth/operators, server PvE, furnace protocol/runtime integration and broader shared containers |
 | Full multiplayer Minecraft parity | 48% | PARTIAL | same as above plus prediction/reconciliation and wider gameplay coverage |
 | Original resource integration | 35% | PARTIAL | much wider registry use, item models, tint/animation, audio |
 | Audio/music | 0% | BLOCKED | supplied archive contains no sound object set or sounds.json |
 | Redstone | 3% | FOUNDATION | block state/update scheduler/power graph/components |
-| Farming/food/smelting | 8% | FOUNDATION | furnaces, food effects, crops, breeding, recipes |
+| Farming/food/smelting | 10% | FOUNDATION | authoritative furnace processing state now exists; user-facing furnace, food effects, crops, breeding and broad recipes remain |
 | Villagers/trading | 0% | TODO | entire system |
 | Enchanting/brewing/status effects | 0% | TODO | entire system |
 | Nether/End/portal progression | 0% | TODO | dimensions, portals, dimension worldgen, bosses |
@@ -85,8 +85,8 @@ The bed uses multiple internal block-state IDs, but counts as one gameplay famil
 | Buttons/levers/pressure plates | TODO | Redstone prerequisite. |
 | Ladders/vines | TODO | Non-full collision/placement. |
 | Torches/lanterns | TODO | Model + lighting integration. |
-| Chests/barrels | TODO | Persistent block entities/containers. |
-| Furnaces/smokers/blast furnaces | TODO | Persistent processing/container system. |
+| Chests/barrels | TODO | Persistent block entity and shared viewer concurrency needed. |
+| Furnaces/smokers/blast furnaces | FOUNDATION | PR #111 adds deterministic processing rules plus world-cell authoritative state/revision/serialization; no gameplay furnace block/model/UI/protocol binding yet. |
 | Signs/hanging signs | TODO | Block entities/text UI. |
 | Bookshelves/chiseled bookshelf | TODO | State/container interactions. |
 | Shulker boxes | TODO | End/content prerequisites. |
@@ -108,7 +108,7 @@ Current recipes: six.
 | Wooden pickaxe | DONE | Mining speed, harvest rules and durability supported. |
 | Stone pickaxe | DONE | Source-backed item, 3×3 cobblestone/stick recipe, stone-tier speed/harvest and 131 durability are wired. |
 | Iron/gold/diamond/netherite tools | FOUNDATION | Tier rules/assets may exist in part, but gameplay items/recipes/progression are not wired. |
-| Raw iron | PARTIAL | Source-backed item is produced by correctly harvested iron ore; smelting into iron ingot is not implemented. |
+| Raw iron | PARTIAL | Source-backed item is produced by correctly harvested iron ore; PR #111 can process it into a logical iron-ingot output server-side, but iron ingot is not yet a registered gameplay item and no furnace UI is exposed. |
 | Glass block item | DONE | Source-identical Java 1.20.1 glass texture is deterministically generated from the tracked source ZIP and used by Inventory/hotbar without a false terrain-atlas fallback. |
 | Swords/axes/shovels/hoes | TODO | Full behaviour/recipes/durability missing. |
 | Armor materials beyond leather | TODO | Equipment architecture exists. |
@@ -116,7 +116,7 @@ Current recipes: six.
 | Bow/crossbow player mechanics | TODO | Skeleton projectile foundation exists only. |
 | Buckets | TODO | Fluid/state interaction required. |
 | Food items and eating | TODO | Hunger/saturation system needs completion. |
-| Furnace recipes | TODO | Furnace subsystem absent. |
+| Furnace recipes | FOUNDATION | Deterministic raw iron → iron ingot recipe, fuel times, 200-tick cooking, cooldown and XP bookkeeping exist; registry/UI/runtime integration remains. |
 | Smithing | TODO | Netherite/template system absent. |
 | Stonecutter/loom/grindstone/etc. | TODO | Workstation/container systems absent. |
 | Recipe book | TODO | No full recipe discovery/UI. |
@@ -136,7 +136,7 @@ Current recipes: six.
 | Custom spawnpoint | DONE | Persistent singleplayer path. |
 | Bed sleep/respawn | PARTIAL | Night skip/safety implemented; occupancy/animation/full rules incomplete. |
 | Tool durability | PARTIAL | Wooden and stone pickaxes use item-instance durability; broad tool/armor durability coverage is not complete. |
-| Stone → iron mining progression | PARTIAL | Cobblestone can produce a stone pickaxe; iron ore requires stone tier and drops raw iron; furnace/iron-ingot continuation is absent. |
+| Stone → iron mining progression | PARTIAL | Stone-tier iron harvest → raw iron exists and the authoritative smelting foundation now models raw iron → iron ingot, but the furnace block/UI/protocol and registered iron-ingot/tool continuation are still absent. |
 | Armor durability | TODO | Equipment exists but armor wear does not. |
 | Hunger/exhaustion/saturation | TODO | Major survival gap. |
 | Eating/drinking | TODO | Major survival gap. |
@@ -226,7 +226,7 @@ Terrain v2 compatibility note: if generated `IRON_ORE` cells are normalized back
 | Authoritative PvP melee | DONE | HP, mitigation, knockback, death/drop/respawn. |
 | Authoritative PvE/mobs/projectiles/explosions | TODO | Next major multiplayer authority milestone. |
 | Persistent server world saves | TODO | Sparse edits are authoritative but not durable server storage. |
-| Persistent/shared containers | TODO | Chests/furnaces need concurrency + storage. |
+| Persistent/shared containers | FOUNDATION | Furnace state is now world-cell keyed with revision guards and serialize/restore contracts; no WebSocket binding or durable server storage is wired yet, and chests remain absent. |
 | Rooms/world list | TODO | Current server is a direct world endpoint. |
 | Accounts/authentication | TODO | Sessions are transport identity only. |
 | OP/whitelist/ban/mute | TODO | Current command enable flag is not operator auth. |
@@ -257,7 +257,7 @@ Terrain v2 compatibility note: if generated `IRON_ORE` cells are normalized back
 |---|---|---|
 | Workbench | DONE | Singleplayer + authoritative multiplayer transient container. |
 | Chest | TODO | Persistent block entity and shared viewer concurrency needed. |
-| Furnace | TODO | Processing tick + fuel + recipes + persistent inventory needed; this is the next required step to turn raw iron into iron ingots. |
+| Furnace | FOUNDATION | Deterministic 3-slot processing, fuel/cook timers, raw-iron recipe, proportional stored XP, stable transaction revisions, world-cell persistence and serialization exist; gameplay block, UI, server tick/protocol binding and durable storage remain. |
 | Hopper | TODO | Redstone/inventory automation prerequisite. |
 | Crop growth | TODO | Scheduled ticks/world rules needed. |
 | Farmland/hydration | TODO | None. |
@@ -317,9 +317,9 @@ Terrain v2 compatibility note: if generated `IRON_ORE` cells are normalized back
 
 | Feature | Status | Notes |
 |---|---|---|
-| Node syntax/logic regression gate | DONE | PR #110 functional candidate reaches **148 / 148** automatically discovered logic/server/Worker regressions. |
-| Chromium E2E | DONE | Sharded browser smoke reaches **37 / 37** on the #110 functional candidate, including live translucent glass Worker/renderer + Survival gameplay coverage. |
-| Asset source reproducibility audit | DONE | Selective Minecraft source/runtime outputs are reproducible; direct glass item texture is regenerated from the tracked Java 1.20.1 source ZIP and compared byte-for-byte. |
+| Node syntax/logic regression gate | DONE | PR #111 adds the **149th** automatically discovered logic/server/Worker regression, covering furnace processing, item-state integrity, transaction revisions and persistence. |
+| Chromium E2E | DONE | Existing sharded browser smoke remains **37 / 37**; PR #111 is a non-UI foundation and does not claim new user-facing furnace E2E coverage. |
+| Asset source reproducibility audit | DONE | Selective Minecraft source/runtime outputs are reproducible; direct glass item texture is regenerated from the tracked Java 1.20.1 source ZIP and compared byte-for-byte. Furnace source assets are deliberately deferred rather than replaced with placeholders. |
 | GitHub Pages deployment | DONE | Current public Web delivery path. |
 | Failure artifacts | DONE | Browser failures preserve diagnostics; #110 exposed and fixed the real texture-layer resolver signature mismatch instead of weakening the translucent assertion. |
 | Real Android device coverage | TODO | Automated Chromium emulation exists, real device matrix does not. |
