@@ -35,7 +35,8 @@ function cuboidGeometry(spec){
 
 export class BedModelRenderer{
   constructor(){
-    this.texture=new THREE.TextureLoader().load(requireAssetUrl(BED_TEXTURE_ASSET_KEY));
+    let resolveReady,rejectReady;this.ready=new Promise((resolve,reject)=>{resolveReady=resolve;rejectReady=reject;});
+    this.texture=new THREE.TextureLoader().load(requireAssetUrl(BED_TEXTURE_ASSET_KEY),texture=>resolveReady(texture),undefined,error=>rejectReady(error instanceof Error?error:new Error(`unable to load ${BED_TEXTURE_ASSET_KEY}`)));
     this.texture.name=BED_TEXTURE_ASSET_KEY;this.texture.userData.assetKey=BED_TEXTURE_ASSET_KEY;
     this.texture.magFilter=THREE.NearestFilter;this.texture.minFilter=THREE.NearestFilter;this.texture.generateMipmaps=false;this.texture.colorSpace=THREE.SRGBColorSpace;
     this.material=new THREE.MeshLambertMaterial({map:this.texture,transparent:true,alphaTest:.01});
@@ -62,6 +63,12 @@ export class BedModelRenderer{
       const center=new THREE.Vector3(.5,0,.5),rotated=center.clone().applyAxisAngle(new THREE.Vector3(0,1,0),group.rotation.y);group.position.x+=center.x-rotated.x;group.position.z+=center.z-rotated.z;
     }
     return group;
+  }
+
+  createWhole({x=0,y=0,z=0,rotationY=0}={}){
+    if(![x,y,z,rotationY].every(Number.isFinite))throw new TypeError('whole bed transform must be finite');
+    const root=new THREE.Group();root.name='bed-whole';root.userData.bedWhole=true;
+    const foot=this.create({part:'foot',x:x-.5,y,z:z-1,rotationY:0}),head=this.create({part:'head',x:x-.5,y,z,rotationY:0});root.add(foot,head);root.rotation.y=rotationY;return root;
   }
 
   dispose(){for(const geometry of this.geometries)geometry.dispose();this.geometries.clear();this.material.dispose();this.texture.dispose();this.templates.clear();}
