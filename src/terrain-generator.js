@@ -1,10 +1,17 @@
 import {BLOCK,CHUNK_SIZE,WORLD_HEIGHT} from './blocks.js';
 
-export const TERRAIN_GENERATOR_VERSION=1;
+export const TERRAIN_GENERATOR_VERSION=2;
 const DEFAULT_SEED='1';
 const DEFAULT_PROMPT='';
 const FNV_OFFSET=2166136261>>>0;
 const FNV_PRIME=16777619;
+const IRON_MIN_Y=4;
+const IRON_MAX_Y=48;
+const IRON_VEIN_CELL=3;
+const IRON_VEIN_CHANCE=.045;
+const IRON_FILL_CHANCE=.22;
+const IRON_VEIN_SALT=0x49a2;
+const IRON_FILL_SALT=0x1f2e;
 
 export function hashTerrainSeed(value=DEFAULT_SEED){
   const text=String(value||DEFAULT_SEED);let hash=FNV_OFFSET;
@@ -32,6 +39,11 @@ export function createTerrainGenerator({seed=DEFAULT_SEED,prompt=DEFAULT_PROMPT}
     hash=(hash^(hash>>>13))*1274126177;
     return((hash^(hash>>>16))>>>0)/4294967295;
   };
+  const hash3=(x,y,z,salt=0)=>{
+    let hash=seedHash^Math.imul(x,374761393)^Math.imul(y,668265263)^Math.imul(z,1274126177)^Math.imul(salt,1597334677);
+    hash=Math.imul(hash^(hash>>>13),1274126177);
+    return((hash^(hash>>>16))>>>0)/4294967295;
+  };
   const smooth=t=>t*t*(3-2*t);
   const valueNoise=(x,z)=>{
     const x0=Math.floor(x),z0=Math.floor(z),tx=smooth(x-x0),tz=smooth(z-z0),a=hash2(x0,z0),b=hash2(x0+1,z0),c=hash2(x0,z0+1),d=hash2(x0+1,z0+1),ab=a+(b-a)*tx,cd=c+(d-c)*tx;
@@ -45,6 +57,14 @@ export function createTerrainGenerator({seed=DEFAULT_SEED,prompt=DEFAULT_PROMPT}
   const heightAt=(x,z)=>{
     const continental=(fbm(x*.55,z*.55)-.5)*parameters.amp,detail=(fbm(x+731,z-271)-.5)*4;
     return Math.max(6,Math.min(WORLD_HEIGHT-10,Math.floor(25+continental+detail)));
+  };
+  const isIronOre=(x,y,z,top=IRON_MAX_Y+4)=>{
+    if(!Number.isInteger(x)||!Number.isInteger(y)||!Number.isInteger(z)||!Number.isInteger(top))throw new TypeError('iron ore coordinates and surface height must be integers');
+    const maxY=Math.min(IRON_MAX_Y,top-4);
+    if(y<IRON_MIN_Y||y>maxY)return false;
+    const vein=hash3(Math.floor(x/IRON_VEIN_CELL),Math.floor(y/IRON_VEIN_CELL),Math.floor(z/IRON_VEIN_CELL),IRON_VEIN_SALT);
+    if(vein>=IRON_VEIN_CHANCE)return false;
+    return hash3(x,y,z,IRON_FILL_SALT)<IRON_FILL_CHANCE;
   };
   const set=(chunk,x,y,z,id)=>{if(x>=0&&x<CHUNK_SIZE&&z>=0&&z<CHUNK_SIZE&&y>=0&&y<WORLD_HEIGHT)chunk[terrainChunkIndex(x,y,z)]=id;};
   const tree=(chunk,lx,base,lz)=>{
@@ -64,6 +84,7 @@ export function createTerrainGenerator({seed=DEFAULT_SEED,prompt=DEFAULT_PROMPT}
         let id=BLOCK.STONE;
         if(y===top)id=top<=parameters.sea+1||moisture<parameters.sand?BLOCK.SAND:BLOCK.GRASS;
         else if(y>=top-3)id=top<=parameters.sea+1||moisture<parameters.sand?BLOCK.SAND:BLOCK.DIRT;
+        else if(isIronOre(wx,y,wz,top))id=BLOCK.IRON_ORE;
         set(chunk,lx,y,lz,id);
       }
       for(let y=top+1;y<=parameters.sea;y++)set(chunk,lx,y,lz,BLOCK.WATER);
@@ -72,5 +93,5 @@ export function createTerrainGenerator({seed=DEFAULT_SEED,prompt=DEFAULT_PROMPT}
     return chunk;
   };
 
-  return Object.freeze({seedHash,parameters:Object.freeze({...parameters}),hash2,valueNoise,fbm,heightAt,generateChunk});
+  return Object.freeze({seedHash,parameters:Object.freeze({...parameters}),hash2,hash3,valueNoise,fbm,heightAt,isIronOre,generateChunk});
 }

@@ -5,13 +5,14 @@ import {encodeServerEquipmentSnapshot} from '../src/server-equipment-snapshot.js
 import {encodeServerPlayerCraftingSnapshot} from '../src/server-player-crafting-snapshot.js';
 import {encodeServerWorldInfo} from '../src/server-world-info.js';
 import {encodeServerPlayerSnapshot} from '../src/server-player-snapshot.js';
+import {TERRAIN_GENERATOR_VERSION} from '../src/terrain-generator.js';
 import {encodeWorldEditSync} from '../src/world-edit-replication.js';
 import {encodeRemotePlayerSpawn,encodeRemotePlayerSnapshot,encodeRemotePlayerDespawn} from '../src/remote-player-replication.js';
 import {MultiplayerWebSocketClient} from '../src/websocket-client.js';
 import {MultiplayerMovementSession} from '../src/multiplayer-movement-session.js';
 
 class FakeSocket{constructor(){this.protocol=MULTIPLAYER_SUBPROTOCOL;this.readyState=0;this.sent=[];this.closed=[];this.listeners=new Map();}addEventListener(type,listener){const list=this.listeners.get(type)||[];list.push(listener);this.listeners.set(type,list);}emit(type,event={}){for(const listener of this.listeners.get(type)||[])listener(event);}open(){this.readyState=1;this.emit('open',{});}message(value){this.emit('message',{data:JSON.stringify(value)});}send(value){this.sent.push(value);}close(code=1000,reason=''){this.closed.push({code,reason});this.readyState=3;this.emit('close',{code,reason});}}
-const info=session=>encodeServerWorldInfo({session,worldId:'remote-buffer-world',terrainVersion:1,seed:'seed',prompt:'平原',tickRate:20});
+const info=session=>encodeServerWorldInfo({session,worldId:'remote-buffer-world',terrainVersion:TERRAIN_GENERATOR_VERSION,seed:'seed',prompt:'平原',tickRate:20});
 const self=session=>encodeServerPlayerSnapshot({session,tick:0,position:{x:.5,y:25.001,z:.5},velocity:{x:0,y:0,z:0},yaw:0,pitch:0,mode:'survival',grounded:true,swimCoverage:0,voided:false});
 const inventory=session=>encodeServerInventorySnapshot({session,revision:0,mode:'survival',slots:Array(36).fill(null),cursor:null});
 const equipment=session=>encodeServerEquipmentSnapshot({session,revision:0,slots:{head:null,chest:null,legs:null,feet:null}});
@@ -26,4 +27,4 @@ const renderCalls=[],fakeSystem={states(){return[{playerId:'p:other',tick:1,posi
 movement.attachRemotePlayerSystem(fakeSystem);assert.deepEqual(renderCalls,[['spawn','p:other',1]]);socket.message(encodeRemotePlayerSnapshot(remote('p:other',2,2.5)));assert.deepEqual(renderCalls.at(-1),['snapshot','p:other',2]);movement.step(.025);assert.deepEqual(renderCalls.at(-1),['update',.025]);socket.message(encodeRemotePlayerDespawn('p:other'));assert.deepEqual(renderCalls.at(-1),['despawn','p:other']);movement.close();assert.deepEqual(renderCalls.at(-1),['dispose']);
 
 const socket2=new FakeSocket(),movement2=new MultiplayerMovementSession({bootstrapOptions:{clientFactory:options=>new MultiplayerWebSocketClient({...options,socketFactory:()=>socket2})}});movement2.connect('wss://example.test/ws');socket2.open();socket2.message(encodeServerWelcome('s:two'));socket2.message(info('s:two'));sync(socket2,'s:two');socket2.message(inventory('s:two'));socket2.message(equipment('s:two'));socket2.message(crafting('s:two'));socket2.message(self('s:two'));socket2.message(encodeRemotePlayerSpawn(remote('p:fail',0,1)));let disposed=false;const broken={states:()=>[],spawn:()=>{throw new Error('model construction failed');},snapshot:()=>{},despawn:()=>{},update:()=>{},dispose:()=>{disposed=true;}};assert.throws(()=>movement2.attachRemotePlayerSystem(broken),/model construction failed/);assert.equal(disposed,true);movement2.close();
-console.log('remote player buffering/renderer lifecycle remains valid behind world-edit + inventory + equipment + player crafting bootstrap barrier: PASS');
+console.log('remote player buffering/renderer lifecycle remains valid behind terrain-v2 world-edit + inventory + equipment + player crafting bootstrap barrier: PASS');

@@ -10,7 +10,8 @@ export const BLOCK = Object.freeze({
   BED_NORTH_FOOT:BED_IDS.north.foot,BED_NORTH_HEAD:BED_IDS.north.head,
   BED_SOUTH_FOOT:BED_IDS.south.foot,BED_SOUTH_HEAD:BED_IDS.south.head,
   BED_WEST_FOOT:BED_IDS.west.foot,BED_WEST_HEAD:BED_IDS.west.head,
-  BED_EAST_FOOT:BED_IDS.east.foot,BED_EAST_HEAD:BED_IDS.east.head
+  BED_EAST_FOOT:BED_IDS.east.foot,BED_EAST_HEAD:BED_IDS.east.head,
+  IRON_ORE:19
 });
 
 export const BLOCKS = {
@@ -24,7 +25,10 @@ export const BLOCKS = {
   7:{name:'橡树树叶',solid:true,transparent:true,hardness:.2,tiles:[8,8,8],drops:null},
   8:{name:'水',solid:false,liquid:true,transparent:true,hardness:100,tiles:[9,9,9],drops:null},
   9:{name:'工作台',solid:true,hardness:2.5,tiles:[10,5,11],faces:{top:10,bottom:5,east:11,north:12,south:11,west:12},drops:'block:9'},
-  10:{name:'圆石',solid:true,hardness:2,tiles:[13,13,13],drops:'block:10',requires:'pickaxe',minToolTier:'wood'}
+  10:{name:'圆石',solid:true,hardness:2,tiles:[13,13,13],drops:'block:10',requires:'pickaxe',minToolTier:'wood'},
+  // Normal rendering uses the source-backed Java 1.20.1 interpreted model.
+  // Stone tiles are only a legacy fail-open fallback if model resources cannot initialize.
+  19:{name:'铁矿石',solid:true,hardness:3,tiles:[3,3,3],drops:'raw_iron',requires:'pickaxe',minToolTier:'stone'}
 };
 
 for(const id of BED_BLOCK_IDS){

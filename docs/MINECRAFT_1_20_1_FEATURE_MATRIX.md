@@ -16,9 +16,9 @@ This matrix is the roadmap authority. Percentages are planning estimates, not au
 |---|---:|---|---|
 | Browser engine / chunk / rendering foundation | 85% | PARTIAL | lighting parity, generic non-cube gameplay breadth, advanced particles, broader performance work |
 | Desktop/mobile controls and core UI | 75% | PARTIAL | full settings/accessibility, polished mobile customization, broader browser/device matrix |
-| Singleplayer survival core | 55% | PARTIAL | hunger/food breadth, smelting, farming, full progression, effects/enchanting/brewing |
+| Singleplayer survival core | 55% | PARTIAL | smelting/iron continuation, hunger/food breadth, farming, full progression, effects/enchanting/brewing |
 | Blocks/items/recipes breadth | 15% | PARTIAL | most 1.20.1 registry content is not exposed |
-| World generation / biomes / caves / structures | 18% | PARTIAL | true biome pipeline, caves, ores, features, structures, Nether/End |
+| World generation / biomes / caves / structures | 18% | PARTIAL | true biome pipeline, caves, broad ore distribution, features, structures, Nether/End |
 | Entities / PvE | 35% | PARTIAL | species breadth, pathfinding/spawn parity, breeding/taming/riding, server authority |
 | Multiplayer server foundation | 65% | PARTIAL | persistence, rooms/auth/operators, server PvE, shared persistent containers |
 | Full multiplayer Minecraft parity | 48% | PARTIAL | same as above plus prediction/reconciliation and wider gameplay coverage |
@@ -49,7 +49,7 @@ This matrix is the roadmap authority. Percentages are planning estimates, not au
 | Local/pinned Three.js runtime | DONE | Historical runtime CDN dependency removed. |
 | Water transparent pass | PARTIAL | No vanilla fluid levels/flow/animation/refraction. |
 | Bed special model renderer | DONE | Red bed world visual uses imported entity texture; logical collision still simplified. |
-| General blockstate/model JSON interpreter | PARTIAL | Source-backed JSON now preloads/compiles into a real Worker/VoxelWorld opt-in path; only a tiny gameplay registry currently consumes it. |
+| General blockstate/model JSON interpreter | PARTIAL | Source-backed JSON preloads/compiles into the real Worker/VoxelWorld opt-in path; crafting table and iron ore are live gameplay roots, broad registry coverage is still missing. |
 | General multipart/variant model support | PARTIAL | Weighted variants/multipart compile and execute in the runtime; generalized gameplay-state/neighbor-state mapping is not wired yet. |
 | Animated block/item textures | TODO | Water animation metadata retained but playback absent. |
 | Biome tint/color resolver | TODO | Current compatibility uses baked/default tint where required. |
@@ -62,16 +62,16 @@ This matrix is the roadmap authority. Percentages are planning estimates, not au
 
 ### Implemented gameplay block families
 
-`grass_block`, `dirt`, `stone`, `sand`, `oak_planks`, `oak_log`, `oak_leaves`, `water`, `crafting_table`, `cobblestone`, `red_bed`.
+`grass_block`, `dirt`, `stone`, `sand`, `oak_planks`, `oak_log`, `oak_leaves`, `water`, `crafting_table`, `cobblestone`, `red_bed`, `iron_ore`.
 
 The bed uses multiple internal block-state IDs, but counts as one gameplay family.
 
 | Feature family | Status | Notes |
 |---|---|---|
-| Basic full cubes | PARTIAL | Small hand-authored registry only. |
-| Directional full cubes | PARTIAL | Crafting table gameplay semantics exist; its visual is the first live source-backed interpreted-model runtime proof. |
+| Basic full cubes | PARTIAL | Small hand-authored gameplay registry only. |
+| Directional full cubes | PARTIAL | Crafting table gameplay semantics exist and use the source-backed interpreted-model runtime. |
 | Beds | PARTIAL | Two-block state + rendering + sleep/respawn; full vanilla support/update/bounce/dimension rules incomplete. |
-| Ores | TODO | Iron ore source resources are tracked but gameplay registry/worldgen is not wired. |
+| Ores | PARTIAL | Iron ore now has gameplay metadata, source-backed model, shared worldgen and stone-tier harvest; other ores and exact vanilla distribution are absent. |
 | Stone variants | TODO | Granite/diorite/andesite/deepslate/tuff/etc. |
 | Wood families | TODO | Only oak foundation is exposed. |
 | Logs/stripped wood | TODO | Registry/model/state expansion needed. |
@@ -94,9 +94,9 @@ The bed uses multiple internal block-state IDs, but counts as one gameplay famil
 
 ## 3. Items and crafting
 
-Current runtime item registry: 28 IDs at this baseline.
+Current runtime item registry: 30 IDs at this delivery baseline.
 
-Current recipes: five.
+Current recipes: six.
 
 | Feature | Status | Notes |
 |---|---|---|
@@ -105,7 +105,9 @@ Current recipes: five.
 | 2×2 crafting | DONE | Small recipe set only. |
 | 3×3 workbench crafting | DONE | Small recipe set only; multiplayer authority exists. |
 | Wooden pickaxe | DONE | Mining speed, harvest rules and durability supported. |
-| Stone/iron/gold/diamond/netherite tools | FOUNDATION | Tier rules/assets partly prepared; gameplay content not wired. |
+| Stone pickaxe | DONE | Source-backed item, 3×3 cobblestone/stick recipe, stone-tier speed/harvest and 131 durability are wired. |
+| Iron/gold/diamond/netherite tools | FOUNDATION | Tier rules/assets may exist in part, but gameplay items/recipes/progression are not wired. |
+| Raw iron | PARTIAL | Source-backed item is produced by correctly harvested iron ore; smelting into iron ingot is not implemented. |
 | Swords/axes/shovels/hoes | TODO | Full behaviour/recipes/durability missing. |
 | Armor materials beyond leather | TODO | Equipment architecture exists. |
 | Shields | TODO | Blocking/state/network rules required. |
@@ -131,7 +133,8 @@ Current recipes: five.
 | Death drops/respawn | DONE | Recoverable singleplayer loop and authoritative PvP death drops exist. |
 | Custom spawnpoint | DONE | Persistent singleplayer path. |
 | Bed sleep/respawn | PARTIAL | Night skip/safety implemented; occupancy/animation/full rules incomplete. |
-| Tool durability | PARTIAL | Wooden pickaxe item-instance durability is implemented; broad item durability is not. |
+| Tool durability | PARTIAL | Wooden and stone pickaxes use item-instance durability; broad tool/armor durability coverage is not complete. |
+| Stone → iron mining progression | PARTIAL | Cobblestone can produce a stone pickaxe; iron ore requires stone tier and drops raw iron; furnace/iron-ingot continuation is absent. |
 | Armor durability | TODO | Equipment exists but armor wear does not. |
 | Hunger/exhaustion/saturation | TODO | Major survival gap. |
 | Eating/drinking | TODO | Major survival gap. |
@@ -166,7 +169,7 @@ Current recipes: five.
 
 | Feature | Status | Notes |
 |---|---|---|
-| Deterministic seed generation | DONE | Browser/server share generator. |
+| Deterministic seed generation | DONE | Browser/server share terrain generator v2 and terrain version participates in multiplayer compatibility. |
 | Heightmap terrain | DONE | Simplified fBm baseline. |
 | Sea/water fill | DONE | Simplified fixed sea parameter. |
 | Oak tree feature | DONE | Simple generation rule. |
@@ -175,13 +178,15 @@ Current recipes: five.
 | Climate/noise biome placement | TODO | None. |
 | Cave generation | TODO | None. |
 | Aquifers | TODO | None. |
-| Ore veins/distribution | TODO | None. |
+| Ore veins/distribution | PARTIAL | Terrain v2 injects deterministic underground iron ore with an independent 3D hash; exact Java 1.20.1 ore noise/height rules and other ores are absent. |
 | Surface rule breadth | TODO | Only basic stone/dirt/grass/sand. |
 | Vegetation/feature placement framework | FOUNDATION | Tree path exists; needs generic feature stages. |
 | Structures | TODO | Villages, mineshafts, dungeons, strongholds, monuments, etc. absent. |
 | Expanded Java-like vertical range | TODO | Current world height is 64. |
 | Nether worldgen | TODO | None. |
 | End worldgen | TODO | None. |
+
+Terrain v2 compatibility note: if generated `IRON_ORE` cells are normalized back to `STONE`, the locked v1 golden surface/terrain/tree byte sequences remain unchanged. The generator version was still bumped because ore contents change the deterministic world and the version is a multiplayer compatibility boundary.
 
 ## 7. Fluids, weather and environment
 
@@ -207,7 +212,7 @@ Current recipes: five.
 | Authoritative movement/collision | DONE | 20 Hz server simulation. |
 | Remote player replication/rendering | DONE | Public player IDs and interpolation. |
 | Authoritative world edits | DONE | Bootstrap + live revisions. |
-| Authoritative mining | DONE | Survival timing/progress/crack feedback. |
+| Authoritative mining | DONE | Survival timing/progress/crack feedback; shared stone-tier harvest rules also cover iron ore. |
 | Authoritative placement | DONE | Creative + Survival ordinary block placement. |
 | Authoritative ground items | DONE | Drop/pickup lifecycle. |
 | Authoritative Inventory | DONE | Full slots + cursor transactions. |
@@ -250,7 +255,7 @@ Current recipes: five.
 |---|---|---|
 | Workbench | DONE | Singleplayer + authoritative multiplayer transient container. |
 | Chest | TODO | Persistent block entity and shared viewer concurrency needed. |
-| Furnace | TODO | Processing tick + fuel + recipes + persistent inventory needed. |
+| Furnace | TODO | Processing tick + fuel + recipes + persistent inventory needed; this is the next required step to turn raw iron into iron ingots. |
 | Hopper | TODO | Redstone/inventory automation prerequisite. |
 | Crop growth | TODO | Scheduled ticks/world rules needed. |
 | Farmland/hydration | TODO | None. |
@@ -277,10 +282,10 @@ Current recipes: five.
 | Feature | Status | Notes |
 |---|---|---|
 | Deterministic imported block atlas subset | DONE | Runtime hashes/provenance tracked. |
-| Imported implemented item textures | DONE | Current item subset. |
+| Imported implemented item textures | DONE | Current item subset includes source-backed stone pickaxe and raw iron. |
 | Imported 8 current mob texture sheets | DONE | Texture-backed cuboid models. |
 | Imported red-bed entity texture | DONE | Used by world bed renderer. |
-| Full block/model resource interpretation | PARTIAL | Source-backed closure and model atlas now feed a live opt-in Worker/VoxelWorld runtime; broad registry/state coverage remains missing. |
+| Full block/model resource interpretation | PARTIAL | Source-backed closure and model atlas feed live crafting-table and iron-ore Worker/VoxelWorld rendering; broad registry/state coverage remains missing. |
 | Full item model interpretation | TODO | Current items mostly bind direct textures. |
 | Entity geometry exact model-layer parity | PARTIAL | Current models are compatible reconstructions. |
 | Player skin pipeline | TODO | None. |
@@ -310,11 +315,11 @@ Current recipes: five.
 
 | Feature | Status | Notes |
 |---|---|---|
-| Node syntax/logic regression gate | DONE | PR #108 delivery candidate reaches 146 automatically discovered logic/server/Worker regressions. |
-| Chromium E2E | DONE | Sharded browser smoke; PR #108 candidate covers 35 tests including real interpreted-model Worker/VoxelWorld integration. |
+| Node syntax/logic regression gate | DONE | PR #109 functional candidate reaches **147 / 147** automatically discovered logic/server/Worker regressions. |
+| Chromium E2E | DONE | Sharded browser smoke reaches **36 / 36** on the #109 functional candidate, including live interpreted-model iron progression. |
 | Asset source reproducibility audit | DONE | Used for imported Minecraft source subset. |
 | GitHub Pages deployment | DONE | Current public Web delivery path. |
-| Failure artifacts | DONE | Browser failures preserve diagnostics. |
+| Failure artifacts | DONE | Browser failures preserve diagnostics and exposed the first-frame mining clock bug fixed during #109. |
 | Real Android device coverage | TODO | Automated Chromium emulation exists, real device matrix does not. |
 | iOS Safari coverage | TODO | Not yet established. |
 | Load/performance budgets | FOUNDATION | Runtime is designed for bounded objects/workers; formal budgets/benchmarks need expansion. |

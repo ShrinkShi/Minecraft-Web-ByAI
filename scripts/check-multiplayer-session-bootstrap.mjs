@@ -6,6 +6,7 @@ import {encodeServerPlayerCraftingSnapshot} from '../src/server-player-crafting-
 import {encodeServerWorldInfo} from '../src/server-world-info.js';
 import {encodeServerPlayerSnapshot} from '../src/server-player-snapshot.js';
 import {encodeWorldEditSync} from '../src/world-edit-replication.js';
+import {TERRAIN_GENERATOR_VERSION} from '../src/terrain-generator.js';
 import {MultiplayerWebSocketClient} from '../src/websocket-client.js';
 import {MultiplayerSessionBootstrap,WORLD_SYNC_TIMEOUT_CLOSE_CODE} from '../src/multiplayer-session-bootstrap.js';
 
@@ -18,7 +19,7 @@ class FakeSocket{
   send(value){this.sent.push(value);}
   close(code=1000,reason=''){this.closed.push({code,reason});this.readyState=3;this.emit('close',{code,reason});}
 }
-const info=session=>encodeServerWorldInfo({session,worldId:'world-main',terrainVersion:1,seed:'seed-1',prompt:'平原',tickRate:20});
+const info=session=>encodeServerWorldInfo({session,worldId:'world-main',terrainVersion:TERRAIN_GENERATOR_VERSION,seed:'seed-1',prompt:'平原',tickRate:20});
 const player=(session,tick=0,mode='survival')=>encodeServerPlayerSnapshot({session,tick,position:{x:.5,y:25.001,z:.5},velocity:{x:0,y:0,z:0},yaw:0,pitch:0,mode,grounded:true,swimCoverage:0,voided:false});
 const inventory=(session,{revision=0,mode='survival',slots=Array(36).fill(null),cursor=null}={})=>encodeServerInventorySnapshot({session,revision,mode,slots,cursor});
 const equipment=(session,{revision=0,slots={head:null,chest:null,legs:null,feet:null}}={})=>encodeServerEquipmentSnapshot({session,revision,slots});
@@ -50,4 +51,4 @@ const rejectedSocket=new FakeSocket(),rejectedErrors=[];const rejected=new Multi
 const handlerSocket=new FakeSocket(),handlerErrors=[];const handler=new MultiplayerSessionBootstrap({clientFactory:factory(handlerSocket),onReady:()=>{throw new Error('ready setup failed');},onError:error=>handlerErrors.push(error.message)});handler.connect('wss://example.test/ws');handlerSocket.open();handlerSocket.message(encodeServerWelcome('s:handler'));handlerSocket.message(info('s:handler'));edits(handlerSocket,'s:handler');handlerSocket.message(inventory('s:handler'));handlerSocket.message(equipment('s:handler'));handlerSocket.message(crafting('s:handler'));handlerSocket.message(player('s:handler'));assert.equal(handler.state,'failed');assert.equal(handlerSocket.closed.at(-1).code,1011);assert.match(handlerErrors.at(-1),/ready setup failed/);
 
 assert.equal(typeof timeoutCallback,'function');assert.throws(()=>new MultiplayerSessionBootstrap({worldSyncTimeoutMs:999}),/1000 to 60000/);assert.throws(()=>new MultiplayerSessionBootstrap({onReady:null}),/onReady/);
-console.log('multiplayer bootstrap requires world-info + initial edits + inventory + equipment + player crafting + authoritative player snapshot: PASS');
+console.log('multiplayer bootstrap requires terrain-v2 world-info + initial edits + inventory + equipment + player crafting + authoritative player snapshot: PASS');

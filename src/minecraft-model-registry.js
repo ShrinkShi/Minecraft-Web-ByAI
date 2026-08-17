@@ -13,7 +13,8 @@ const descriptor=(blockstate,{state={},renderLayer='opaque',textureLayers={}}={}
 // atlas fast path. Keep visual-model registration separate from gameplay
 // collision/state rules in blocks.js.
 export const MINECRAFT_MODEL_BLOCK_REGISTRY=Object.freeze({
-  [BLOCK.CRAFTING_TABLE]:descriptor('minecraft:crafting_table')
+  [BLOCK.CRAFTING_TABLE]:descriptor('minecraft:crafting_table'),
+  [BLOCK.IRON_ORE]:descriptor('minecraft:iron_ore')
 });
 
 export function minecraftModelBlockDescriptor(blockId){

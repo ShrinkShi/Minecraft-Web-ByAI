@@ -94,14 +94,16 @@ test('tracked Java 1.20.1 model runtime reaches mesh Worker and VoxelWorld with 
     if(world.minecraftModelRenderer.status!=='ready')throw new Error(`VoxelWorld fell back from interpreted models: ${world.minecraftModelRenderer.error}`);
     const chunk=await waitFor(()=>world.chunks.get('0,0'),{label:'center chunk'});
     const target={x:2,y:60,z:2};
-    const neighbors=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+    // Terrain v2 now legitimately contains interpreted iron ore. This is an
+    // isolated crafting-table rendering contract, so remove natural content
+    // before asserting one block = six faces / 36 indices.
+    chunk.fill(BLOCK.AIR);
     chunk[world.index(target.x,target.y,target.z)]=BLOCK.CRAFTING_TABLE;
-    for(const [dx,dy,dz] of neighbors)chunk[world.index(target.x+dx,target.y+dy,target.z+dz)]=0;
     world.requestMesh(0,0);
     const worldRecord=await waitFor(()=>{
       const record=world.meshes.get('0,0');
       return record?.interpreted?.opaque?.geometry?.index?.count===36?record:null;
-    },{timeout:15_000,label:'VoxelWorld interpreted crafting-table mesh'});
+    },{timeout:15_000,label:'VoxelWorld isolated interpreted crafting-table mesh'});
     let worldModelGeometryDisposed=0,worldModelTextureDisposed=0;
     worldRecord.interpreted.opaque.geometry.addEventListener('dispose',()=>worldModelGeometryDisposed++);
     world.minecraftModelRenderer.atlasTexture.addEventListener('dispose',()=>worldModelTextureDisposed++);
@@ -121,7 +123,7 @@ test('tracked Java 1.20.1 model runtime reaches mesh Worker and VoxelWorld with 
     return{directWorker,rendererState,childrenAfterChunkDispose,rendererDisposed,worldState,worldDisposed};
   });
 
-  expect(result.directWorker.readyBlockIds).toEqual([9]);
+  expect(result.directWorker.readyBlockIds).toEqual([9,19]);
   expect(result.directWorker.textureCount).toBeGreaterThan(0);
   expect(result.directWorker.legacyOpaqueEmpty).toBe(true);
   expect(result.directWorker.waterEmpty).toBe(true);
@@ -145,13 +147,13 @@ test('tracked Java 1.20.1 model runtime reaches mesh Worker and VoxelWorld with 
   expect(result.rendererDisposed).toEqual({geometryDisposeCount:1,textureDisposeCount:1,materialDisposeCount:1});
 
   expect(result.worldState.status).toBe('ready');
-  expect(result.worldState.blockIds).toEqual([9]);
+  expect(result.worldState.blockIds).toEqual([9,19]);
   expect(result.worldState.textureCount).toBeGreaterThan(0);
   expect(result.worldState.modelName).toBe('chunk-model-opaque:0,0');
   expect(result.worldState.indexCount).toBe(36);
   expect(result.worldState.sharedMaterial).toBe(true);
   expect(result.worldState.assetKey).toBe('block.model_atlas');
-  expect(result.worldState.hasLegacyTerrain).toBe(true);
+  expect(result.worldState.hasLegacyTerrain).toBe(false);
   expect(result.worldDisposed).toEqual({children:0,worldModelGeometryDisposed:1,worldModelTextureDisposed:1});
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);

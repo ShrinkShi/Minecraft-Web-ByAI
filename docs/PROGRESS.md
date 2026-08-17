@@ -6,149 +6,144 @@
 
 ## 当前主线
 
-项目当前处于 **Minecraft Java 1.20.1 通用 blockstate/model 内容管线从基础设施进入真实世界运行时**的阶段。
+项目已经从“通用 blockstate/model 基础设施”进入 **Java 1.20.1 生存内容逐步接入真实 runtime / worldgen** 的阶段。
 
-严格按“完整 Java 1.20.1 复刻”衡量，整体完成度仍约 **35%**。#95–#108 主要是在修建可批量扩内容的底座；在矿物、玻璃、台阶、楼梯、门、栅栏、火把、完整工具链和 worldgen 真正扩张前，不因为渲染基础设施完成就虚增整体百分比。
+严格按“完整 Java 1.20.1 复刻”衡量，整体完成度仍保守维持约 **35%**。#108 打通模型热路径，#109 只是把第一条真实矿业进程落地；熔炉、铁锭、铁工具、其它矿物、完整洞穴/生物群系与大量方块仍未实现，因此不因新增一条进程链虚增整体百分比。
 
-## 已合并：通用 Minecraft model 资源链
+## 已合并并部署：#108 Interpreted model runtime integration
 
-### #95–#100：解释与批处理基础
+PR #108 已 squash merge 到 `main`，合并后基线：
 
-已建立：
+`a8354ec16c8368622b02e8e6665723f58c460892`
 
-- Minecraft resource ID 规范化；
-- model parent inheritance 与 texture alias resolution；
-- blockstate `variants`、weighted alternatives、`multipart`；
-- element geometry、rotation/rescale、face UV；
-- blockstate x/y transform 与 `uvlock`；
-- generic interpreted faces → chunk-level `opaque` / `cutout` / `translucent` typed-array batches；
-- cullface、tint、atlas region 与 Worker-transferable buffer contract。
+已完成：
 
-### #101–#104：可复现 source closure / model atlas / runtime JSON
+- source-backed blockstate/model JSON 启动期 preload/cache；
+- recursive parent/model geometry 预编译；
+- weighted variant / multipart template 保留；
+- `mesh-worker.js` model-runtime init / ready / error barrier；
+- legacy terrain-atlas full-cube fast path 保留；
+- opt-in interpreted block chunk-level `opaque/cutout/translucent` batching；
+- shared deterministic model atlas + 三层共享 Three.js material；
+- chunk unload / world dispose 生命周期；
+- 初始化失败时安全回退 legacy renderer；
+- 首个 live proof：`crafting_table`。
 
-从用户提供的 Java 1.20.1 source ZIP 建立第一批 acceptance roots 的可复现闭包：
+#108 exact-head Repository quality：**146 / 146 logic + 35 / 35 Chromium PASS**，随后 Pages 部署成功。
 
-- 9 blockstates；
-- 42 models；
-- 14 textures；
-- 65 source files total；
-- per-file SHA-256 / provenance；
-- deterministic model texture atlas；
-- tracked blockstate/model runtime JSON closure。
+## 当前进行中：#109 Stone pickaxe → Iron ore → Raw iron
 
-第一批 source roots 包括：`iron_ore`、`glass`、`oak_slab`、`oak_stairs`、`oak_door`、`oak_fence`、`torch`、`grass_block`、`crafting_table`。
+分支：`content/v0.4-stone-pickaxe-iron-ore`
 
-### #103：Model texture binding
+目标不是“展示一个铁矿方块”，而是补出第一条真正的新生存进程：
 
-已把 model texture atlas 转成严格 runtime contract：
+**木镐 / 圆石 → 工作台合成石镐 → 地下找到铁矿 → 石质及以上镐正确收获 → 粗铁进入背包。**
 
-- `block.model_atlas` / `metadata.minecraft_model_atlas` logical asset keys；
-- canonical texture ID → atlas record/UV region；
-- manifest format / dimensions / packing / closure consistency validation；
-- caller-owned `opaque/cutout/translucent` layer policy；
-- injected-fetch browser loader；
-- Node + Chromium source-backed regressions。
+### 已实现
 
-### #106：Java 1.20.1 HUD / Inventory presentation
+1. 石镐
+   - 使用已导入的 source-backed `item.stone_pickaxe` 资源；
+   - 3×3 工作台配方：3 圆石 + 2 木棍；
+   - `pickaxe / stone / speed 4 / durability 131`；
+   - 纳入现有 item-instance durability 生命周期；
+   - 创造模式 starter 只追加，不改变历史 starter slot 顺序。
 
-已把 source-backed GUI 资源用于真实 HUD / Inventory / hotbar，并补齐 block-item 三面预览和 first-person held 同步。该 PR 已合并并部署。
+2. 铁矿石
+   - 新内部 block ID `19`，不重排既有 block / bed-state ID；
+   - `hardness=3`；
+   - 要求 `pickaxe`；
+   - 最低收获等级 `stone`；
+   - 木镐可以破坏，但不会产出粗铁；
+   - 石镐及更高等级通过共享 `canHarvestBlock()` 后掉落 `raw_iron`；
+   - source-backed Java 1.20.1 `iron_ore` blockstate/model 通过 #108 interpreted-model runtime 进入真实 Worker/VoxelWorld 热路径；
+   - legacy stone tile 仅作为 model-runtime 初始化失败时的 fail-open fallback。
 
-### #107：单人世界选择流程
+3. 粗铁
+   - 使用已导入 source-backed `item.raw_iron` 资源；
+   - 当前是采矿产物；
+   - **尚未实现熔炉、燃料、烧炼、铁锭，因此不能宣称铁器时代完成。**
 
-已把旧的“创建 / 进入世界”混合表单替换为真正的本地世界列表：
+4. Terrain generator v2
+   - `TERRAIN_GENERATOR_VERSION` 从 1 升到 2；
+   - 原因：铁矿改变共享 deterministic world contents，而 terrain version 是多人兼容协议的一部分；
+   - 浏览器和权威服务器继续共用同一 generator；
+   - 铁矿采用独立 3D coordinate hash 注入地下石层；
+   - 当前 64 高度世界中仅做简化 deterministic distribution，不声称复刻 Java 1.20.1 原版矿脉噪声与高度分布；
+   - 铁矿范围限制在地下并避免贴近地表；
+   - 将 `IRON_ORE` 归一化回 `STONE` 后，旧 v1 四组 golden terrain/surface/tree byte checksum 保持不变，说明新增矿物没有洗牌原有山形、海岸线和树木序列。
 
-- IndexedDB 世界列表；
-- 单击选择 / 双击进入；
-- 独立创建页；
-- 编辑、重命名、模式修改；
-- rename 时安全迁移 deterministic world id；
-- seed / terrain prompt 对已有世界锁定，避免生成身份断裂。
+5. 单机 / 权威多人收获一致性
+   - 单机和服务器继续共享 block harvest metadata + `canHarvestBlock()`；
+   - 新回归直接实例化真实 `server/survival-block-break-controller.mjs`；
+   - 木镐破坏铁矿：`drop=null`；
+   - 石镐破坏铁矿：权威掉落 exactly one `raw_iron`。
 
-该 PR 已合并并部署。
+6. 单机采矿时间基准修复
+   - 新真实 Chromium 用例暴露了历史问题：输入事件中的 `performance.now()` 可能略晚于同一刷新周期的 rAF timestamp，导致首次 `step()` 被误判为时间倒退；
+   - `SingleplayerMiningController` 现在只允许第一次 frame 在 `<=50ms` 的同源时钟偏差内重锚；
+   - 重锚不奖励负数/幽灵挖掘进度；
+   - 第一次之后的任何倒退仍报错；
+   - 大幅跨时钟域倒退仍报错。
 
-## 当前进行中：#108 Interpreted model runtime integration
+### #109 功能候选验证
 
-分支：`render/v0.4-interpreted-model-runtime`
+功能候选 HEAD：
 
-目标是把 #96–#104 已经存在的 resolver / geometry / batcher / tracked JSON / model atlas **真正接进 `mesh-worker.js` 和 `VoxelWorld` 热路径**，同时保留原有 full-cube terrain-atlas 快路径。
+`8b13b00feb0bf369a0f51495a0cb38832f0d6a57`
 
-当前实现：
-
-1. `src/minecraft-model-registry.js`
-   - 显式 opt-in visual registry；
-   - 未注册方块继续走旧 terrain-atlas fast path；
-   - 首个 live proof 使用现有 `crafting_table`，不借机声称新增 gameplay block parity。
-
-2. `src/minecraft-model-runtime.js`
-   - 启动阶段一次性加载/cache blockstate + recursive model parents；
-   - 预编译 geometry/model-instance templates；
-   - 保留 weighted variant / multipart alternatives；
-   - Worker chunk rebuild 不递归重新 fetch/解释 JSON；
-   - local mesh 坐标与 global deterministic weighted-selection 坐标分离。
-
-3. `src/mesh-worker.js`
-   - 新增显式 `minecraft-model-runtime-init` / ready / error handshake；
-   - 初始化失败时 fail-open 到原有 legacy terrain mesh，避免已存在方块变空气；
-   - opt-in block 从 legacy opaque batch 排除；
-   - interpreted model 通过已有 #100 batcher 输出独立 `opaque/cutout/translucent` buffers；
-   - cullface 使用当前块/邻区数据；
-   - 只 transfer 实际挂在消息上的 buffers。
-
-4. `src/minecraft-model-world-renderer.js`
-   - `VoxelWorld` 外独立管理 model-atlas Texture；
-   - 三层共享 material，不创建 per-block Mesh/material；
-   - chunk-level geometry attach/dispose；
-   - world dispose 时释放 model materials + atlas texture。
-
-5. `src/world.js`
-   - mesh queue 增加 model-runtime init barrier；
-   - ready 后才开始 mesh 请求；fallback 后安全恢复 legacy path；
-   - interpreted chunk meshes 纳入现有 chunk unload/world dispose lifecycle。
-
-### #108 第一轮真实验证
-
-候选 HEAD：`b77d413adee9f8b516e7d1bed091c54f779fd02e`
-
-Repository quality run `31997813513`：
+Repository quality run：`32001540747`
 
 - JavaScript syntax：PASS；
-- 自动发现 logic/server/Worker：**146 / 146 PASS**；
+- 自动发现 logic/server/Worker：**147 / 147 PASS**；
 - Chromium shard 1：**18 / 18 PASS**；
-- Chromium shard 2：**17 / 17 PASS**；
-- 新增真实 Worker + `VoxelWorld` interpreted-model E2E：PASS。
+- Chromium shard 2：**18 / 18 PASS**；
+- Chromium total：**36 / 36 PASS**。
 
-真实浏览器回归证明：
+新增真实浏览器 `iron-progression.spec.mjs` 已证明：
 
-- source-backed `crafting_table` 不再进入旧 terrain opaque batch；
-- interpreted opaque batch 为 6 faces / 24 vertices / 36 indices；
-- model atlas 使用共享 `block.model_atlas` material；
-- real `VoxelWorld` 中 chunk mesh 走新通路；
-- chunk geometry / shared material / model atlas texture 的 dispose lifecycle 可验证；
-- 原有 multiplayer、singleplayer durability、survival/death/bed、HUD、world-selection 浏览器回归无退化。
+- 生存世界能获得并显示 source-backed 石镐；
+- Jade 正确显示“铁矿石 / 最低石质”；
+- 玩家真实按住左键可用石镐挖掉铁矿；
+- 石镐 durability 从 131 减到 130；
+- 粗铁通过现有掉落物系统被拾取，并遵守 hotbar-first pickup；
+- source-backed 粗铁图标在真实 hotbar 中显示；
+- 页面与 console 无未处理错误。
 
-文档提交后仍只接受新的 **exact branch HEAD** CI；上面的第一轮绿灯不会继承给后续文档 HEAD。
+**注意：**本文档提交会产生新的 branch HEAD；上面的功能候选绿灯只证明功能实现，不能继承为最终合并证据。最终合并只接受文档提交后的 exact-head Repository quality。
 
-## #108 合并后的内容扩张顺序
+## #109 合并后的下一步
 
-下一步不再继续造抽象层，开始用这条真实 runtime pipeline 扩 gameplay registry / worldgen：
+优先把当前粗铁死路继续打通，而不是马上跳到低关联展示内容：
 
-1. `iron_ore`：普通 full cube + registry + mining/harvest + worldgen proof；
-2. `glass`：transparent full cube + translucent/culling contract；
-3. `oak_slab`：block state + partial collision + model；
-4. `oak_stairs`：state + multi-cuboid model + collision；
-5. `oak_door`：two-block paired state；
-6. `oak_fence`：neighbor-derived multipart state；
-7. `torch`：non-full/cutout model + 后续 lighting；
-8. grass/foliage biome tint contract；
-9. 再批量扩石材、木材、矿物、玻璃、门/活板门、楼梯/台阶、栅栏/墙、花草等。
+1. **Furnace / smelting foundation**
+   - 熔炉方块与 persistent container；
+   - 输入 / 燃料 / 输出槽；
+   - tick-based cooking；
+   - fuel burn time；
+   - raw iron → iron ingot；
+   - singleplayer + authoritative multiplayer shared-container state；
+   - source-backed furnace / iron ingot assets 若仓库闭包完整则直接使用，若资源不完整先补 provenance closure，不用占位素材冒充原版。
 
-**视觉模型与 gameplay collision 继续严格分离。** JSON model cuboid 不能自动当作碰撞箱。
+2. Iron progression continuation
+   - iron ingot；
+   - iron pickaxe；
+   - 后续铁工具/铁甲；
+   - 再逐步加入 coal / copper / gold / redstone / lapis / diamond 等矿业链。
+
+3. 继续使用 #108 模型 runtime 扩方块内容
+   - `glass`：translucent/culling；
+   - `oak_slab`：state + partial collision；
+   - `oak_stairs`：state + multi-cuboid collision；
+   - `oak_door`：two-block paired state；
+   - `oak_fence`：neighbor-derived multipart state；
+   - `torch`：non-full/cutout + 后续 lighting；
+   - grass/foliage biome tint contract。
+
+**视觉模型与 gameplay collision/state 继续严格分离。** JSON model cuboid 不能自动当碰撞箱，multipart renderer 也不能替代门、栅栏、红石等真实 gameplay state/update 逻辑。
 
 ## 后续大阶段
 
-通用模型/registry 扩张之后仍依次推进：
-
-- survival progression：石/铁/金/钻石/下界合金工具链、矿物、熔炉、食物、饥饿/饱和度、农业、繁殖；
+- 完整工具/矿业/熔炼/食物/饥饿/农业/繁殖生存进程；
 - worldgen pipeline：biome、caves、ores、features、structures；
 - server-authoritative PvE/projectiles/explosions；
 - persistent shared containers；
@@ -164,4 +159,5 @@ Repository quality run `31997813513`：
 - source-backed assets 必须可重建、可校验 provenance；
 - `main` 上已有 full-cube、UI、save、authoritative multiplayer 能力不得为了内容扩张退化；
 - 新内容优先通过 registry/model pipeline 批量扩展，不回到“一种方块一个手写 Three.js 模型”；
-- 基础设施完成不等于内容 parity 完成，功能矩阵状态与整体百分比必须保守。
+- generator semantics 变化必须升级 compatibility version，不静默改旧版本世界；
+- 基础设施完成或单条 progression 完成不等于 Java 1.20.1 全内容 parity 完成，功能矩阵状态与整体百分比必须保守。
