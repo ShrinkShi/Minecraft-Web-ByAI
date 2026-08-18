@@ -1,6 +1,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
 import {requireAssetUrl} from './asset-manifest.js';
 import {PLAYER_MODEL_SCALE,PLAYER_MODEL_SPEC,normalizePlayerVisualInput,playerModelUvRects} from './player-model-specs.js';
+import {playerAttackArmPitch,playerUseArmPitch} from './player-presentation-rules.js';
 
 const PIXEL=1/16;
 const FACE_ORDER=['right','left','top','bottom','front','back'];
@@ -74,8 +75,8 @@ export class PlayerModelFactory{
     parts.head.rotation.x=pose.headPitch;parts.head.rotation.y=pose.headYaw;
     parts.leftArm.rotation.x=-swing;parts.rightArm.rotation.x=swing;parts.leftLeg.rotation.x=swing;parts.rightLeg.rotation.x=-swing;
     const attacking=pose.primary||state.primaryPulse>0;if(attacking)state.actionPhase=(state.actionPhase+dt*14)%(Math.PI*2);else state.actionPhase=0;
-    if(attacking){const attack=Math.abs(Math.sin(state.actionPhase));parts.rightArm.rotation.x=-.65-attack*1.25;parts.rightArm.rotation.z=-.08;}
-    if(state.useRemaining>0){const t=Math.min(1,state.useRemaining/.34);parts.rightArm.rotation.x=-1.05-Math.sin((1-t)*Math.PI)*.22;parts.rightArm.rotation.y=-.28;parts.rightArm.rotation.z=-.12;}
+    if(attacking){parts.rightArm.rotation.x=playerAttackArmPitch(state.actionPhase);parts.rightArm.rotation.z=-.08;}
+    if(state.useRemaining>0){parts.rightArm.rotation.x=playerUseArmPitch(state.useRemaining);parts.rightArm.rotation.y=-.28;parts.rightArm.rotation.z=-.12;}
     visual.modelRoot.rotation.x=pose.sprint&&moving>.15?-.12:0;
     const death=easeOutCubic(state.deathProgress);visual.poseRoot.rotation.set(0,0,-Math.PI/2*death);visual.poseRoot.position.set(0,.08*death,0);
     visual.root.userData.animation=Object.freeze({speed:pose.speed,sprint:pose.sprint,primary:attacking,use:state.useRemaining>0,dead:pose.dead,deathProgress:state.deathProgress,headYaw:pose.headYaw,headPitch:pose.headPitch});

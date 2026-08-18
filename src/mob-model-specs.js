@@ -34,12 +34,16 @@ export const MOB_MODEL_SPECS=Object.freeze({
     part('backRightLeg',[-2,6,2],[box('backRightLeg',[4,6,4],[-2,-6,-2],[0,16])],{walk:'leg-left'})
   ]),
   pig:model([64,32],22,{base:'entity.pig'},[
-    part('body',[0,12,1],[box('body',[10,16,8],[-5,-8,-8],[28,8])],{rotation:[Math.PI/2,0,0]}),
-    part('head',[0,14,-7],[box('head',[8,8,8],[-4,-2,-8],[0,0]),box('snout',[4,3,1],[-2,-1,-9],[16,16])]),
-    part('frontLeftLeg',[3,6,-4],[box('frontLeftLeg',[4,6,4],[-2,-6,-2],[0,16])],{walk:'leg-left'}),
-    part('frontRightLeg',[-3,6,-4],[box('frontRightLeg',[4,6,4],[-2,-6,-2],[0,16])],{walk:'leg-right'}),
-    part('backLeftLeg',[3,6,5],[box('backLeftLeg',[4,6,4],[-2,-6,-2],[0,16])],{walk:'leg-right'}),
-    part('backRightLeg',[-3,6,5],[box('backRightLeg',[4,6,4],[-2,-6,-2],[0,16])],{walk:'leg-left'})
+    // Vanilla PigModel is authored in Mojang's Y-down model space. Convert
+    // the pivot/local-Y and X rotation once, matching the already-correct cow
+    // conversion below. The previous positive rotation stretched the torso
+    // above detached legs and produced the malformed manual-play silhouette.
+    part('body',[0,13,2],[box('body',[10,16,8],[-5,-6,-7],[28,8])],{rotation:[-Math.PI/2,0,0]}),
+    part('head',[0,12,-6],[box('head',[8,8,8],[-4,-4,-8],[0,0]),box('snout',[4,3,1],[-2,-3,-9],[16,16])]),
+    part('frontLeftLeg',[3,6,-5],[box('frontLeftLeg',[4,6,4],[-2,-6,-2],[0,16])],{walk:'leg-left'}),
+    part('frontRightLeg',[-3,6,-5],[box('frontRightLeg',[4,6,4],[-2,-6,-2],[0,16])],{walk:'leg-right'}),
+    part('backLeftLeg',[3,6,4],[box('backLeftLeg',[4,6,4],[-2,-6,-2],[0,16])],{walk:'leg-right'}),
+    part('backRightLeg',[-3,6,4],[box('backRightLeg',[4,6,4],[-2,-6,-2],[0,16])],{walk:'leg-left'})
   ]),
   cow:model([64,32],28,{base:'entity.cow'},[
     // Minecraft's cow body is authored in Y-down model space at pivot y=5

@@ -1,5 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
 import {PlayerModelFactory} from './player-model-renderer.js';
+import {inventoryPreviewPointerPose} from './player-presentation-rules.js';
 
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,Number(value)||0));
 const damp=(current,target,dt,speed=12)=>current+(target-current)*(1-Math.exp(-speed*dt));
@@ -35,8 +36,8 @@ export class InventoryPlayerPreview{
 
   trackPointer(clientX,clientY){
     if(this.disposed||!Number.isFinite(clientX)||!Number.isFinite(clientY))return false;const rect=this.container.getBoundingClientRect(),panelRect=this.panel?.getBoundingClientRect?.()||rect,cx=rect.left+rect.width/2,cy=rect.top+rect.height*.48;
-    const horizontal=clamp((clientX-cx)/Math.max(40,panelRect.width*.42),-1,1),vertical=clamp((clientY-cy)/Math.max(55,panelRect.height*.42),-1,1);
-    this.targetBodyYaw=horizontal*.42;this.targetHeadYaw=horizontal*.8;this.targetHeadPitch=vertical*.48;this.container.dataset.pointerPose=`${this.targetHeadYaw.toFixed(3)},${this.targetHeadPitch.toFixed(3)}`;return true;
+    const horizontal=clamp((clientX-cx)/Math.max(40,panelRect.width*.42),-1,1),vertical=clamp((clientY-cy)/Math.max(55,panelRect.height*.42),-1,1),pose=inventoryPreviewPointerPose(horizontal,vertical);
+    this.targetBodyYaw=pose.bodyYaw;this.targetHeadYaw=pose.headYaw;this.targetHeadPitch=pose.headPitch;this.container.dataset.pointerPose=`${this.targetHeadYaw.toFixed(3)},${this.targetHeadPitch.toFixed(3)}`;return true;
   }
 
   resetPointer(){this.targetBodyYaw=0;this.targetHeadYaw=0;this.targetHeadPitch=0;}

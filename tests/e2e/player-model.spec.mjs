@@ -23,8 +23,8 @@ test('source-backed wide Steve builds textured articulated geometry and all requ
   expect(Math.abs(result.walk.leftArm-result.idle.leftArm)).toBeGreaterThan(.05);expect(Math.abs(result.walk.leftLeg-result.idle.leftLeg)).toBeGreaterThan(.05);
   expect(Math.sign(result.walk.leftArm)).toBe(-Math.sign(result.walk.rightArm));expect(Math.sign(result.walk.leftLeg)).toBe(-Math.sign(result.walk.rightLeg));
   expect(result.sprint.lean).toBeLessThan(-.05);expect(Math.abs(result.sprint.leftArm)).toBeGreaterThan(.1);
-  expect(result.attack.active).toBeTruthy();expect(result.attack.armX).toBeLessThan(-.6);
-  expect(result.use.active).toBeTruthy();expect(result.use.armX).toBeLessThan(-1);expect(result.use.armY).toBeLessThan(-.1);
+  expect(result.attack.active).toBeTruthy();expect(result.attack.armX).toBeGreaterThan(.6);
+  expect(result.use.active).toBeTruthy();expect(result.use.armX).toBeGreaterThan(1);expect(result.use.armY).toBeLessThan(-.1);
   expect(result.head.yaw).toBeCloseTo(.7,5);expect(result.head.pitch).toBeCloseTo(-.4,5);
   expect(result.death.progress).toBeGreaterThan(.9);expect(result.death.rotationZ).toBeLessThan(-1);
   expect(result.disposed).toEqual({geometries:0,disposed:true});
