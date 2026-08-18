@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {BLOCK,BLOCKS} from '../src/blocks.js';
 import {ITEMS,CREATIVE_START} from '../src/items.js';
+import {ITEM_ALIASES} from '../src/commands.js';
 import {blockItemFaceTextures,blockItemFaceTiles} from '../src/block-item-preview.js';
 import {minecraftModelBlockDescriptor,MINECRAFT_MODEL_BLOCK_REGISTRY,MINECRAFT_MODEL_RUNTIME_VERSION} from '../src/minecraft-model-registry.js';
 import {CraftingGrid} from '../src/recipes.js';
@@ -23,7 +24,9 @@ assert.deepEqual(furnace.blockPreviewFaces,{
 });
 assert.deepEqual(blockItemFaceTextures(furnace),furnace.blockPreviewFaces);assert.equal(blockItemFaceTiles(furnace),null);
 assert.equal(CREATIVE_START.at(-1),'block:21');
+assert.equal(ITEM_ALIASES.furnace,'block:21');assert.equal(ITEM_ALIASES['minecraft:furnace'],'block:21');
 assert.equal(ITEMS.iron_ingot.name,'铁锭');assert.equal(ITEMS.iron_ingot.assetKey,'item.iron_ingot');assert.equal(ITEMS.iron_ingot.texture,'./assets/items/iron_ingot.png');
+assert.equal(ITEM_ALIASES.iron_ingot,'iron_ingot');assert.equal(ITEM_ALIASES['minecraft:iron_ingot'],'iron_ingot');assert.equal(ITEM_ALIASES.raw_iron,'raw_iron');
 assert.equal(SMELTING_RECIPES.raw_iron.output,'iron_ingot');assert.equal(smeltingRecipeFor('raw_iron').output,'iron_ingot');
 
 const grid=new CraftingGrid(3);grid.slots=[
