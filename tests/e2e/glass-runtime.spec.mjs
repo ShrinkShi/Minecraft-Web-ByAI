@@ -88,7 +88,7 @@ test('source-backed glass uses translucent Worker mesh, culls shared faces, and 
     return state;
   });
 
-  expect(renderState.readyBlockIds).toEqual([9,19,20]);
+  expect(renderState.readyBlockIds).toEqual([9,19,20,21]);
   expect(renderState.legacyOpaqueEmpty).toBe(true);
   expect(renderState.interpretedOpaqueEmpty).toBe(true);
   expect(renderState.cutoutEmpty).toBe(true);
