@@ -16,7 +16,8 @@ test('imported Minecraft runtime assets resolve and decode through the real HTTP
   expect(manifestResponse.ok()).toBeTruthy();
   expect(manifestResponse.headers()['content-type']).toContain('application/json');
   const manifest=await manifestResponse.json();
-  expect(manifest.minecraftVersion).toBe('1.20.1');
+  expect(manifest).toMatchObject({format:1,minecraftVersion:'1.20.1',sourceKind:'directory',sourceRoot:'MC原版素材assets'});
+  expect(manifest.sourceArchive).toBeUndefined();expect(manifest.sourceArchiveSha256).toBeUndefined();
   expect(manifest.atlas.path).toBe('textures/atlas.png');
 
   const playerManifestResponse=await request.get('/assets/minecraft/player-assets-manifest.json');
@@ -42,16 +43,19 @@ test('imported Minecraft runtime assets resolve and decode through the real HTTP
   const modelManifest=await modelManifestResponse.json();
   expect(modelManifest.format).toBe(1);
   expect(modelManifest.minecraftVersion).toBe('1.20.1');
-  expect(modelManifest).toMatchObject({sourceKind:'directory',sourceRoot:'MC原版素材assets'});
+  expect(modelManifest).toMatchObject({sourceKind:'directory',sourceRoot:'MC原版素材assets',closure:{blockstates:10,models:46,textures:18,metadata:0}});
   expect(modelManifest.atlas).toMatchObject({
     path:'model-texture-atlas.png',
     width:128,
     height:128,
     gutterPx:1,
-    sha256:'865966f994cf36e1ae0f11fe2c3dd0d5962ab9290c92429eeacb0fcd2bed6ad9'
+    sha256:'9b9d2837806b361e9f03454e1ca8ff25c5ce24e7784c8737e42be93b2c805ead'
   });
-  expect(Object.keys(modelManifest.textures)).toHaveLength(14);
+  expect(Object.keys(modelManifest.textures)).toHaveLength(18);
   expect(modelManifest.textures['minecraft:block/glass']).toBeTruthy();
+  for(const key of ['minecraft:block/furnace_front','minecraft:block/furnace_front_on','minecraft:block/furnace_side','minecraft:block/furnace_top']){
+    expect(modelManifest.textures[key]?.source).toContain('MC原版素材assets/minecraft/textures/block/');
+  }
 
   const modelAtlasResponse=await request.get('/assets/model-textures/model-texture-atlas.png');
   expect(modelAtlasResponse.ok()).toBeTruthy();
@@ -62,6 +66,10 @@ test('imported Minecraft runtime assets resolve and decode through the real HTTP
     '/assets/items/wooden_pickaxe.png',
     '/assets/items/leather_chestplate.png',
     '/assets/items/raw_beef.png',
+    '/assets/items/iron_ingot.png',
+    '/assets/items/furnace_top.png',
+    '/assets/items/furnace_side.png',
+    '/assets/items/furnace_front.png',
     '/assets/minecraft/textures/entity/bed/red.png',
     '/assets/minecraft/textures/entity/player/wide/steve.png'
   ]){
