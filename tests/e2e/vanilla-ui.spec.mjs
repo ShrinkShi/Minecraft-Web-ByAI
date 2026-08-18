@@ -62,9 +62,15 @@ test('source-backed Java 1.20.1 HUD inventory block/bed icons and Steve preview 
   expect(initialPreview.textureKey).toBe('entity.player.steve');
   expect(initialPreview.visible).toBeTruthy();
   const previewRect=await playerPreview.boundingBox();
-  await page.mouse.move((panelRect?.x??0)+(panelRect?.width??0)-12,(previewRect?.y??0)+20);
+  const previewX=(previewRect?.x??0)+(previewRect?.width??0)*.82;
+  await page.mouse.move(previewX,(previewRect?.y??0)+16);
   await expect.poll(async()=>page.evaluate(()=>globalThis.__minecraftE2E.inventoryPlayerPreview().targetHeadYaw)).toBeGreaterThan(.25);
   await expect.poll(async()=>page.evaluate(()=>globalThis.__minecraftE2E.inventoryPlayerPreview().headYaw)).toBeGreaterThan(.1);
+  await expect.poll(async()=>page.evaluate(()=>globalThis.__minecraftE2E.inventoryPlayerPreview().targetHeadPitch)).toBeGreaterThan(.12);
+  await expect.poll(async()=>page.evaluate(()=>globalThis.__minecraftE2E.inventoryPlayerPreview().headPitch)).toBeGreaterThan(.05);
+  await page.mouse.move(previewX,(previewRect?.y??0)+(previewRect?.height??0)-12);
+  await expect.poll(async()=>page.evaluate(()=>globalThis.__minecraftE2E.inventoryPlayerPreview().targetHeadPitch)).toBeLessThan(-.12);
+  await expect.poll(async()=>page.evaluate(()=>globalThis.__minecraftE2E.inventoryPlayerPreview().headPitch)).toBeLessThan(-.05);
 
   const firstInventorySlot=await page.locator('#inventory-grid .inv-slot').first().boundingBox();
   expect((firstInventorySlot?.x??0)-(panelRect?.x??0)).toBeCloseTo(16,0);
