@@ -10,4 +10,5 @@ MINECRAFT_MODEL_ACCEPTANCE_BLOCKS = (
     "minecraft:torch",
     "minecraft:grass_block",
     "minecraft:crafting_table",
+    "minecraft:furnace",
 )

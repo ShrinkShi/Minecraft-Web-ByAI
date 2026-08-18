@@ -53,6 +53,7 @@ RUNTIME_FILES = {
     "textures/item/wooden_pickaxe.png": "assets/minecraft/textures/item/wooden_pickaxe.png",
     "textures/item/stone_pickaxe.png": "assets/minecraft/textures/item/stone_pickaxe.png",
     "textures/item/raw_iron.png": "assets/minecraft/textures/item/raw_iron.png",
+    "textures/item/iron_ingot.png": "assets/minecraft/textures/item/iron_ingot.png",
     "textures/item/leather_helmet.png": "assets/minecraft/textures/item/leather_helmet.png",
     "textures/item/leather_chestplate.png": "assets/minecraft/textures/item/leather_chestplate.png",
     "textures/item/leather_leggings.png": "assets/minecraft/textures/item/leather_leggings.png",

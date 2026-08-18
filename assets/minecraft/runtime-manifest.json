@@ -91,6 +91,11 @@
       "source": "textures/item/gunpowder.png",
       "treatment": null
     },
+    "iron_ingot.png": {
+      "sha256": "4625aa2c32c74bd6796c7ba8e7ee6300db8d2f24fb38c9d9324a63b262a44391",
+      "source": "textures/item/iron_ingot.png",
+      "treatment": null
+    },
     "leather.png": {
       "sha256": "d3ee371b5dfc67d2ef11c2e2acc4a1f7f069af2fb4fd9b2d73b815e911fcdbe7",
       "source": "textures/item/leather.png",
@@ -171,6 +176,7 @@
   "modelRuntimeClosure": {
     "blockstates": [
       "blockstates/crafting_table.json",
+      "blockstates/furnace.json",
       "blockstates/glass.json",
       "blockstates/grass_block.json",
       "blockstates/iron_ore.json",
@@ -181,8 +187,8 @@
       "blockstates/torch.json"
     ],
     "counts": {
-      "blockstates": 9,
-      "models": 42
+      "blockstates": 10,
+      "models": 46
     },
     "models": [
       "models/block/block.json",
@@ -200,6 +206,8 @@
       "models/block/door_top_right_open.json",
       "models/block/fence_post.json",
       "models/block/fence_side.json",
+      "models/block/furnace.json",
+      "models/block/furnace_on.json",
       "models/block/glass.json",
       "models/block/grass_block.json",
       "models/block/grass_block_snow.json",
@@ -221,6 +229,8 @@
       "models/block/oak_stairs.json",
       "models/block/oak_stairs_inner.json",
       "models/block/oak_stairs_outer.json",
+      "models/block/orientable.json",
+      "models/block/orientable_with_bottom.json",
       "models/block/outer_stairs.json",
       "models/block/slab.json",
       "models/block/slab_top.json",
@@ -230,6 +240,7 @@
     ],
     "roots": [
       "minecraft:crafting_table",
+      "minecraft:furnace",
       "minecraft:glass",
       "minecraft:grass_block",
       "minecraft:iron_ore",
@@ -242,6 +253,7 @@
   },
   "referenceFiles": {
     "minecraft/blockstates/crafting_table.json": "bd75337fe8f663e3c88e5f2490a7217d60925ff7f0001f98656b037441ecdb98",
+    "minecraft/blockstates/furnace.json": "aedb43571027a5dea15ba9cbfc05f0327af3048de70b72c3cd67c851839bb284",
     "minecraft/blockstates/glass.json": "1dbff97d8ac074c330024db2f2acc93eea26ffad0cd33e2f0442ca6e5145e9d5",
     "minecraft/blockstates/grass_block.json": "f428a88833a320ceae681bd4ce88dee75307b2517864c4b1a72e5f995071d1cb",
     "minecraft/blockstates/iron_ore.json": "252ffc2fbd790eb52ea3c54bcb5a35e4bf3c08ed022bd65f4de5c0fa00d0514a",
@@ -265,6 +277,8 @@
     "minecraft/models/block/door_top_right_open.json": "f2c1ee24bda1b102b1f669c133a8ad22b505c231908e93849cebd111ab589e6b",
     "minecraft/models/block/fence_post.json": "f445d1cf4f8d81dffc8cddc6e237031d6e064e80a916b396e3d16aab73e7fe6b",
     "minecraft/models/block/fence_side.json": "da3a9c2ea79551badf65c4d2da9f7bc26650534cda39a98c4ceda19b367c3f85",
+    "minecraft/models/block/furnace.json": "f1005df7892e96ab8bc3bc513bba9e0aa1930ff901423ea726e3bad1f49614c9",
+    "minecraft/models/block/furnace_on.json": "c6cc3c51295082082a41c17fef84742207d2d8a5913b72260bb1dcda27063f72",
     "minecraft/models/block/glass.json": "7ed800415aa94222ad48aabe11c0effe5874414b724f7ceea06a3fb7fbad6f7e",
     "minecraft/models/block/grass_block.json": "fdea6afda5fa7d47241f181b56879e6807efc2b18a119133e3a871c411bf661a",
     "minecraft/models/block/grass_block_snow.json": "d73991d47c6de8d0f81cf7c071022a6c8e460c0c30151e8979c72b723dd54dbc",
@@ -286,6 +300,8 @@
     "minecraft/models/block/oak_stairs.json": "14f2486304fa974b9f0dd4eb87de5d06a868d3548fa7133ed10da1eef739bd42",
     "minecraft/models/block/oak_stairs_inner.json": "8bd0b0dae998b873d1a1e36eb142c5c50c008fd3ea9ee97f412ed47e7bdff6b2",
     "minecraft/models/block/oak_stairs_outer.json": "37f6124fbeea619c38fe35eda84bde9fbc00362d2cb3ffe5ea7f5d0a4c3b96f2",
+    "minecraft/models/block/orientable.json": "f3da11f14343fd2cb38fe196dc775d1f4c21284b0dfcf09314659da8f4b6fc79",
+    "minecraft/models/block/orientable_with_bottom.json": "8da2928f84a31c6986dc31a916b8be736e5b0afdce7b3fbe651ec42771dd7255",
     "minecraft/models/block/outer_stairs.json": "39142eb37d9e9d9ff2404404af460d85b3109bf0c59898c21c676719c3e16ef8",
     "minecraft/models/block/slab.json": "bd869ebe3ba380d46349e5c6e988b9b1ccf1ab25212ab1de66e2fdcc067edc1d",
     "minecraft/models/block/slab_top.json": "c02e81cd0b59698040db7a682d32d08ddeb0de64756e309d62ecfbda4af804f9",
@@ -294,7 +310,7 @@
     "minecraft/models/block/torch.json": "834b8a24a98d2a2c3505de5a33a734fb327cd036086abd2f9f8141c2d309ba89",
     "minecraft/models/item/stick.json": "04048187b6c11f1152546cbb7b29db9877a73b6d2f152e1941d575c9460be8cc",
     "minecraft/models/item/wooden_pickaxe.json": "483480c2c21a395196ca8255e933a5db3fd6f995be3dacc3c423e971ef964553",
-    "minecraft/source-manifest.json": "75dc607f69393366bbb6f64eeb7b0d76f554f65fc325d5b8cc6491f018d3bc1f",
+    "minecraft/source-manifest.json": "c242f53ef8e0db679bd7f127dae899677eef136f611809d6daac6a3712d5f12b",
     "minecraft/textures/block/water_flow.png.mcmeta": "802acdb8f55f30146d5ed18414b21ba35650d4e550f81825ea104131c12dc4fc",
     "minecraft/textures/block/water_still.png.mcmeta": "e9b8025fde1b09b0a4d2a38427b04f98f28a593045be6d177eb2b29164c872b0",
     "minecraft/textures/entity/bed/red.png": "73022232cafa0c0c5260e48cb5305a8bcc7f6e09d22f8d1bb51e87a1a84146b2",
@@ -308,7 +324,8 @@
     "minecraft/textures/entity/spider/spider.png": "9d7655c3c25840f96cde37e7ab840c1b158b0fd9e73fbf949c12a81aa8c02b19",
     "minecraft/textures/entity/zombie/zombie.png": "08a223eca3451abcb170c12661b4a70acfe967c437dc0b5fd99413d8b74b53b3"
   },
-  "sourceArchiveSha256": "b65a2211175af90664de9f41ea422f4869eee855f0da4bf6fe0715434ebe9c69",
+  "sourceKind": "directory",
+  "sourceRoot": "MC原版素材assets",
   "tintProfile": {
     "foliage": [
       119,

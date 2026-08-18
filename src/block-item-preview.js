@@ -5,18 +5,35 @@ function tile(value,label){
   return value;
 }
 
+function sourceFace(value,label){
+  const texture=String(value||'').trim();
+  if(!texture)throw new TypeError(`${label} must be a non-empty source texture URL`);
+  return texture;
+}
+
 export function blockItemFaceTextures(itemDefinition){
-  if(!itemDefinition||typeof itemDefinition!=='object'||itemDefinition.blockPreview!=='source-texture')return null;
-  const texture=String(itemDefinition.texture||'').trim();
-  if(!texture)throw new TypeError('source-texture block preview requires itemDefinition.texture');
-  return Object.freeze({top:texture,left:texture,right:texture});
+  if(!itemDefinition||typeof itemDefinition!=='object')return null;
+  if(itemDefinition.blockPreview==='source-texture'){
+    const texture=String(itemDefinition.texture||'').trim();
+    if(!texture)throw new TypeError('source-texture block preview requires itemDefinition.texture');
+    return Object.freeze({top:texture,left:texture,right:texture});
+  }
+  if(itemDefinition.blockPreview==='source-faces'){
+    const faces=itemDefinition.blockPreviewFaces;
+    if(!faces||typeof faces!=='object'||Array.isArray(faces))throw new TypeError('source-faces block preview requires blockPreviewFaces');
+    return Object.freeze({
+      top:sourceFace(faces.top,'source-faces top texture'),
+      left:sourceFace(faces.left,'source-faces left texture'),
+      right:sourceFace(faces.right,'source-faces right texture')
+    });
+  }
+  return null;
 }
 
 export function blockItemFaceTiles(itemDefinition){
   if(!itemDefinition||typeof itemDefinition!=='object')return null;
-  // Source-backed single-texture blocks render three faces from their declared
-  // texture instead of pretending the texture lives in the legacy terrain atlas.
-  if(itemDefinition.blockPreview==='source-texture'||itemDefinition.blockPreview===false)return null;
+  // Source-backed block previews bypass the legacy terrain atlas entirely.
+  if(itemDefinition.blockPreview==='source-texture'||itemDefinition.blockPreview==='source-faces'||itemDefinition.blockPreview===false)return null;
   if(Number.isInteger(itemDefinition.blockId)){
     return Object.freeze({
       top:tile(tileForFace(itemDefinition.blockId,'top'),'top tile'),
