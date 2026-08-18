@@ -1,0 +1,62 @@
+name: Rebuild furnace derived assets
+
+on:
+  push:
+    branches: [content/v0.4-furnace-source-assets]
+    paths:
+      - '.github/workflows/rebuild-furnace-derived-assets.yml'
+      - 'tools/minecraft_model_acceptance.py'
+      - 'tools/import-minecraft-assets.py'
+      - 'tools/build-minecraft-runtime-assets.py'
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install asset build dependency
+        run: python -m pip install -r tools/requirements-assets.txt
+      - name: Regenerate furnace source-backed outputs
+        run: |
+          set -euo pipefail
+          python tools/build-minecraft-model-atlas.py
+          python tools/import-minecraft-assets.py
+          python tools/build-minecraft-runtime-assets.py
+
+          cp build/minecraft-model-atlas/model-texture-atlas.png assets/model-textures/model-texture-atlas.png
+          cp build/minecraft-model-atlas/model-texture-atlas.json assets/model-textures/model-texture-atlas.json
+
+          cp build/minecraft-runtime-assets/items/iron_ingot.png assets/items/iron_ingot.png
+          cp build/minecraft-runtime-assets/items/furnace_top.png assets/items/furnace_top.png
+          cp build/minecraft-runtime-assets/items/furnace_side.png assets/items/furnace_side.png
+          cp build/minecraft-runtime-assets/items/furnace_front.png assets/items/furnace_front.png
+
+          mkdir -p assets/minecraft/blockstates assets/minecraft/models/block
+          cp build/minecraft-runtime-assets/minecraft/blockstates/furnace.json assets/minecraft/blockstates/furnace.json
+          cp build/minecraft-runtime-assets/minecraft/models/block/furnace.json assets/minecraft/models/block/furnace.json
+          cp build/minecraft-runtime-assets/minecraft/models/block/furnace_on.json assets/minecraft/models/block/furnace_on.json
+          cp build/minecraft-runtime-assets/minecraft/models/block/orientable.json assets/minecraft/models/block/orientable.json
+          cp build/minecraft-runtime-assets/minecraft/models/block/orientable_with_bottom.json assets/minecraft/models/block/orientable_with_bottom.json
+          cp build/minecraft-runtime-source/source-manifest.json assets/minecraft/source-manifest.json
+          cp build/minecraft-runtime-assets/minecraft/runtime-manifest.json assets/minecraft/runtime-manifest.json
+      - name: Commit deterministic generated assets
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add assets/items/iron_ingot.png assets/items/furnace_top.png assets/items/furnace_side.png assets/items/furnace_front.png
+          git add assets/model-textures/model-texture-atlas.png assets/model-textures/model-texture-atlas.json
+          git add assets/minecraft/blockstates/furnace.json assets/minecraft/models/block/furnace.json assets/minecraft/models/block/furnace_on.json assets/minecraft/models/block/orientable.json assets/minecraft/models/block/orientable_with_bottom.json
+          git add assets/minecraft/source-manifest.json assets/minecraft/runtime-manifest.json
+          if git diff --cached --quiet; then
+            echo 'No generated changes.'
+            exit 0
+          fi
+          git commit -m 'assets: regenerate source-backed furnace outputs'
+          git push origin HEAD:${GITHUB_REF_NAME}
