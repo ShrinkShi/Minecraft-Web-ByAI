@@ -19,11 +19,11 @@ assert.equal(resolver.manifest.minecraftVersion,'1.20.1');
 assert.equal(resolver.manifest.sourceKind,'directory');
 assert.equal(resolver.manifest.sourceRoot,'MC原版素材assets');
 assert.equal('sourceArchiveSha256' in resolver.manifest,false);
-assert.deepEqual(resolver.manifest.closure,{blockstates:9,models:42,textures:14,metadata:0});
-assert.equal(resolver.textureCount,14);
+assert.deepEqual(resolver.manifest.closure,{blockstates:10,models:46,textures:18,metadata:0});
+assert.equal(resolver.textureCount,18);
 assert.deepEqual(resolver.atlas,{
   path:'model-texture-atlas.png',
-  sha256:'865966f994cf36e1ae0f11fe2c3dd0d5962ab9290c92429eeacb0fcd2bed6ad9',
+  sha256:'9b9d2837806b361e9f03454e1ca8ff25c5ce24e7784c8737e42be93b2c805ead',
   width:128,
   height:128,
   gutterPx:1,
@@ -36,13 +36,25 @@ assert.equal(Object.isFrozen(resolver.requireRegion('block/glass')),true);
 
 assert.equal(resolver.hasTexture('block/glass'),true);
 assert.equal(resolver.hasTexture('minecraft:block/iron_ore'),true);
+assert.equal(resolver.hasTexture('minecraft:block/furnace_front'),true);
+assert.equal(resolver.hasTexture('minecraft:block/furnace_front_on'),true);
+assert.equal(resolver.hasTexture('minecraft:block/furnace_side'),true);
+assert.equal(resolver.hasTexture('minecraft:block/furnace_top'),true);
 assert.equal(resolver.hasTexture('minecraft:block/not_imported'),false);
 assert.deepEqual(resolver.requireRegion('block/glass'),{
+  u0:0.1484375,
+  v0:0.1484375,
+  u1:0.2734375,
+  v1:0.2734375
+});
+assert.deepEqual(resolver.requireRegion('block/furnace_front'),{
   u0:0.5703125,
   v0:0.0078125,
   u1:0.6953125,
   v1:0.1328125
 });
+assert.equal(resolver.requireTextureRecord('block/furnace_front').canonical,'assets/minecraft/textures/block/furnace_front.png');
+assert.equal(resolver.requireTextureRecord('block/furnace_front').source,'MC原版素材assets/minecraft/textures/block/furnace_front.png');
 assert.equal(resolver.requireTextureRecord('block/torch').canonical,'assets/minecraft/textures/block/torch.png');
 assert.throws(()=>resolver.requireRegion('block/not_imported'),/not present in the tracked atlas/);
 assert.throws(()=>resolver.hasTexture('../glass'),/resource path/);
@@ -63,6 +75,7 @@ assert.equal(Object.isFrozen(glassBinding),true);
 const runtimeBinding=createMinecraftModelTextureBinding(resolver,{resolveLayer:minecraftModelTextureLayerResolver});
 assert.equal(runtimeBinding('block/glass',{tag:'face'},{blockId:20,renderLayer:'translucent',textureLayers:{}}).layer,'translucent');
 assert.equal(runtimeBinding('block/iron_ore',{tag:'face'},{blockId:19,renderLayer:'opaque',textureLayers:{}}).layer,'opaque');
+assert.equal(runtimeBinding('block/furnace_front',{tag:'face'},{blockId:21,renderLayer:'opaque',textureLayers:{}}).layer,'opaque');
 assert.equal(runtimeBinding('block/glass',{tag:'face'},{blockId:20,renderLayer:'opaque',textureLayers:{'minecraft:block/glass':'cutout'}}).layer,'cutout');
 
 const model={faces:[{
@@ -93,7 +106,7 @@ const loaded=await loadMinecraftModelAtlasResolver({
   }
 });
 assert.equal(requestedUrl,'./assets/model-textures/model-texture-atlas.json');
-assert.equal(loaded.textureCount,14);
+assert.equal(loaded.textureCount,18);
 assert.deepEqual(loaded.requireRegion('block/iron_ore'),resolver.requireRegion('block/iron_ore'));
 await assert.rejects(
   ()=>loadMinecraftModelAtlasResolver({fetchImpl:async()=>({ok:false,status:404,json:async()=>({})})}),
@@ -129,7 +142,7 @@ badSource.textures['minecraft:block/glass'].source='elsewhere/glass.png';
 assert.throws(()=>normalizeMinecraftModelAtlasManifest(badSource),/source must end with its canonical path/);
 
 const badClosureCount=structuredClone(raw);
-badClosureCount.closure.textures=13;
+badClosureCount.closure.textures=17;
 assert.throws(()=>normalizeMinecraftModelAtlasManifest(badClosureCount),/closure texture count must match/);
 
 const badAtlasWidth=structuredClone(raw);
@@ -167,4 +180,4 @@ const badArchiveSha=structuredClone(legacyArchive);
 badArchiveSha.sourceArchiveSha256='not-a-sha';
 assert.throws(()=>normalizeMinecraftModelAtlasManifest(badArchiveSha),/sourceArchiveSha256 must be a lowercase SHA-256/);
 
-console.log('tracked Minecraft model atlas manifest + directory/archive provenance + strict texture binding resolver: PASS');
+console.log('tracked Minecraft model atlas manifest + furnace directory provenance + strict texture binding resolver: PASS');
