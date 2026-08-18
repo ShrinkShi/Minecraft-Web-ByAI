@@ -14,8 +14,12 @@ assert.equal(runtime.format,1);
 assert.equal(runtime.minecraftVersion,'1.20.1');
 assert.equal(source.format,1);
 assert.equal(source.minecraftVersion,'1.20.1');
-assert.equal(runtime.sourceArchiveSha256,'b65a2211175af90664de9f41ea422f4869eee855f0da4bf6fe0715434ebe9c69');
-assert.equal(source.sourceArchiveSha256,runtime.sourceArchiveSha256);
+for(const manifest of [runtime,source]){
+  assert.equal(manifest.sourceKind,'directory');
+  assert.equal(manifest.sourceRoot,'MC原版素材assets');
+  assert.equal('sourceArchive' in manifest,false);
+  assert.equal('sourceArchiveSha256' in manifest,false);
+}
 
 const atlasPath=resolve(root,'assets',runtime.atlas.path);
 assert.equal(sha256(atlasPath),runtime.atlas.sha256,'tracked atlas must match generated runtime manifest checksum');
@@ -32,6 +36,17 @@ for(const [name,record] of Object.entries(runtime.items)){
   const path=resolve(root,'assets/items',name);
   assert.equal(sha256(path),record.sha256,`${name} must match the generated runtime checksum`);
   assert.ok(source.files[record.source],`${name} must retain an exact source-manifest record`);
+}
+assert.equal(runtime.items['iron_ingot.png'].source,'textures/item/iron_ingot.png');
+
+// Block-item preview textures are copied byte-for-byte from the canonical
+// extracted source directory. Lock equality directly so these cannot silently
+// become hand-authored lookalikes even though they are not part of runtime.items.
+for(const name of ['glass','furnace_top','furnace_side','furnace_front']){
+  const tracked=resolve(root,'assets/items',`${name}.png`);
+  const canonical=resolve(root,'MC原版素材assets/minecraft/textures/block',`${name}.png`);
+  assert.equal(sha256(tracked),sha256(canonical),`${name}.png must remain byte-identical to the canonical extracted Minecraft texture`);
+  assert.deepEqual(pngSize(tracked),[16,16],`${name}.png must retain the original 16x16 source dimensions`);
 }
 
 for(const [relative,checksum] of Object.entries(runtime.referenceFiles)){
@@ -50,7 +65,7 @@ const entityDimensions={
   'textures/entity/spider/spider.png':[64,32]
 };
 for(const [relative,size] of Object.entries(entityDimensions)){
-  assert.ok(source.files[relative],`${relative} must be traceable to the source ZIP`);
+  assert.ok(source.files[relative],`${relative} must be traceable to the canonical extracted source directory`);
   const runtimeRelative=`minecraft/${relative}`;
   assert.ok(runtime.referenceFiles[runtimeRelative],`${relative} must be carried into runtime resources`);
   assert.deepEqual(pngSize(resolve(root,'assets',runtimeRelative)),size,`${relative} dimensions must match the model UV contract`);
@@ -59,13 +74,14 @@ for(const [relative,size] of Object.entries(entityDimensions)){
 for(const required of [
   'textures/block/grass_block_top.png','textures/block/grass_block_side.png','textures/block/grass_block_side_overlay.png',
   'textures/block/crafting_table_front.png','textures/block/iron_ore.png','textures/block/white_wool.png',
-  'textures/item/stick.png','textures/item/wooden_pickaxe.png','textures/item/stone_pickaxe.png','textures/item/raw_iron.png',
-  'textures/entity/bed/red.png','models/block/grass_block.json','models/block/crafting_table.json'
-])assert.ok(source.files[required],`${required} must be traceable to the source ZIP`);
+  'textures/item/stick.png','textures/item/wooden_pickaxe.png','textures/item/stone_pickaxe.png','textures/item/raw_iron.png','textures/item/iron_ingot.png',
+  'textures/entity/bed/red.png','models/block/grass_block.json','models/block/crafting_table.json',
+  'blockstates/furnace.json','models/block/furnace.json','models/block/furnace_on.json','models/block/orientable.json','models/block/orientable_with_bottom.json'
+])assert.ok(source.files[required],`${required} must be traceable to the canonical extracted source directory`);
 
 assert.deepEqual(runtime.tintProfile.grass,[145,189,89]);
 assert.deepEqual(runtime.tintProfile.foliage,[119,171,47]);
 assert.deepEqual(runtime.tintProfile.water,[63,118,228]);
 assert.deepEqual(runtime.tintProfile.leather,[160,101,64]);
 
-console.log('Minecraft 1.20.1 generated runtime assets + entity dimensions + checksum provenance: PASS');
+console.log('Minecraft 1.20.1 directory-backed runtime assets + furnace/ingot provenance + entity dimensions/checksums: PASS');
