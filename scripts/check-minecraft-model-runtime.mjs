@@ -29,7 +29,7 @@ const runtime=await compileMinecraftModelRuntime({
 });
 
 assert.equal(assertMinecraftModelRuntime(runtime),runtime);
-assert.deepEqual(runtime.blockIds,[BLOCK.CRAFTING_TABLE,BLOCK.IRON_ORE,BLOCK.GLASS]);
+assert.deepEqual(runtime.blockIds,[BLOCK.CRAFTING_TABLE,BLOCK.IRON_ORE,BLOCK.GLASS,BLOCK.FURNACE]);
 const crafting=minecraftModelTemplate(runtime,BLOCK.CRAFTING_TABLE);
 assert.equal(crafting.blockstate,'minecraft:crafting_table');
 assert.equal(crafting.renderLayer,'opaque');
@@ -68,6 +68,20 @@ assert.equal(blockstateReads.get('minecraft:glass'),1);
 assert.equal(modelReads.get('minecraft:block/glass'),1);
 assert.equal(modelReads.get('minecraft:block/cube_all'),1,'cube_all must remain cached across iron ore and glass');
 
+const furnace=minecraftModelTemplate(runtime,BLOCK.FURNACE);
+assert.equal(furnace.blockstate,'minecraft:furnace');
+assert.equal(furnace.renderLayer,'opaque');
+assert.equal(furnace.parts.length,1);
+assert.equal(furnace.parts[0].kind,'variant');
+assert.equal(furnace.parts[0].alternatives.models.length,1);
+assert.equal(furnace.parts[0].alternatives.models[0].modelId,'minecraft:block/furnace');
+assert.equal(furnace.parts[0].alternatives.models[0].model.faces.length,6);
+assert.equal(blockstateReads.get('minecraft:furnace'),1);
+assert.equal(modelReads.get('minecraft:block/furnace'),1);
+assert.equal(modelReads.get('minecraft:block/orientable'),1);
+assert.equal(modelReads.get('minecraft:block/orientable_with_bottom'),1);
+assert.equal(modelReads.get('minecraft:block/block'),1,'shared base model must remain cached after furnace parent resolution');
+
 const first=instantiateMinecraftModelTemplate(crafting,3,40,-2);
 const second=instantiateMinecraftModelTemplate(crafting,3,40,-2);
 assert.equal(first.length,1);
@@ -78,6 +92,7 @@ assert.equal(first[0].renderLayer,'opaque');
 assert.equal(minecraftModelLayerForTexture('minecraft:block/crafting_table_top',first[0]),'opaque');
 const ironInstance=instantiateMinecraftModelTemplate(iron,5,12,7)[0];assert.equal(ironInstance.modelId,'minecraft:block/iron_ore');assert.equal(minecraftModelLayerForTexture('minecraft:block/iron_ore',ironInstance),'opaque');
 const glassInstance=instantiateMinecraftModelTemplate(glass,6,13,8)[0];assert.equal(glassInstance.modelId,'minecraft:block/glass');assert.equal(minecraftModelLayerForTexture('minecraft:block/glass',glassInstance),'translucent');
+const furnaceInstance=instantiateMinecraftModelTemplate(furnace,7,14,9)[0];assert.equal(furnaceInstance.modelId,'minecraft:block/furnace');assert.equal(minecraftModelLayerForTexture('minecraft:block/furnace_front',furnaceInstance),'opaque');
 
 for(const position of [[0,0,0],[1,2,3],[-1,63,-9],[2147483647,1,-2147483648]]){
   const hash=minecraftModelSelectionHash(...position,BLOCK.CRAFTING_TABLE,0);
@@ -112,4 +127,4 @@ assert.equal(minecraftModelLayerForTexture('minecraft:block/stone',instantiateMi
 assert.throws(()=>assertMinecraftModelRuntime({...runtime,format:99}),/format must be/);
 assert.rejects(()=>compileMinecraftModelRuntime({loadBlockstate:async()=>null,loadModel:async()=>null}),/missing Minecraft blockstate/);
 
-console.log('Minecraft interpreted-model preload/cache/template selection runtime + iron ore/glass roots: PASS');
+console.log('Minecraft interpreted-model preload/cache/template selection runtime + iron ore/glass/furnace roots: PASS');
