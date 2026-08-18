@@ -4,19 +4,20 @@
     "height": 128,
     "packing": "power-of-two-shelf-v1",
     "path": "model-texture-atlas.png",
-    "sha256": "865966f994cf36e1ae0f11fe2c3dd0d5962ab9290c92429eeacb0fcd2bed6ad9",
+    "sha256": "9b9d2837806b361e9f03454e1ca8ff25c5ce24e7784c8737e42be93b2c805ead",
     "width": 128
   },
   "closure": {
-    "blockstates": 9,
+    "blockstates": 10,
     "metadata": 0,
-    "models": 42,
-    "textures": 14
+    "models": 46,
+    "textures": 18
   },
   "format": 1,
   "minecraftVersion": "1.20.1",
   "roots": [
     "minecraft:crafting_table",
+    "minecraft:furnace",
     "minecraft:glass",
     "minecraft:grass_block",
     "minecraft:iron_ore",
@@ -109,8 +110,8 @@
       "sourceSha256": "fb0450253248276e0b8d653d5a4d21c59763cbf775c0e048469ff500afaaef68",
       "width": 16
     },
-    "minecraft:block/glass": {
-      "canonical": "assets/minecraft/textures/block/glass.png",
+    "minecraft:block/furnace_front": {
+      "canonical": "assets/minecraft/textures/block/furnace_front.png",
       "height": 16,
       "pixelRegion": {
         "height": 16,
@@ -124,13 +125,13 @@
         "v0": 0.0078125,
         "v1": 0.1328125
       },
-      "source": "MC原版素材assets/minecraft/textures/block/glass.png",
-      "sourceBytes": 147,
-      "sourceSha256": "cb89c706dce86eac3123cef087d359b5f23098b658a468fb91662b4a9922bcd0",
+      "source": "MC原版素材assets/minecraft/textures/block/furnace_front.png",
+      "sourceBytes": 294,
+      "sourceSha256": "5b8915d5ce6a02e44f39cc64d19c22138e9ec7f53dc163913018a3d95d3c1b7f",
       "width": 16
     },
-    "minecraft:block/grass_block_side": {
-      "canonical": "assets/minecraft/textures/block/grass_block_side.png",
+    "minecraft:block/furnace_front_on": {
+      "canonical": "assets/minecraft/textures/block/furnace_front_on.png",
       "height": 16,
       "pixelRegion": {
         "height": 16,
@@ -144,13 +145,13 @@
         "v0": 0.0078125,
         "v1": 0.1328125
       },
-      "source": "MC原版素材assets/minecraft/textures/block/grass_block_side.png",
-      "sourceBytes": 408,
-      "sourceSha256": "dedaa0171af63df63a6cf7e3e6c7078d4d5830fd93923f3005302ed0f02104c5",
+      "source": "MC原版素材assets/minecraft/textures/block/furnace_front_on.png",
+      "sourceBytes": 322,
+      "sourceSha256": "c9cb46d068a002db47660ff4c97eabfd330f60500afdc21d081012cacf60272c",
       "width": 16
     },
-    "minecraft:block/grass_block_side_overlay": {
-      "canonical": "assets/minecraft/textures/block/grass_block_side_overlay.png",
+    "minecraft:block/furnace_side": {
+      "canonical": "assets/minecraft/textures/block/furnace_side.png",
       "height": 16,
       "pixelRegion": {
         "height": 16,
@@ -164,6 +165,86 @@
         "v0": 0.0078125,
         "v1": 0.1328125
       },
+      "source": "MC原版素材assets/minecraft/textures/block/furnace_side.png",
+      "sourceBytes": 280,
+      "sourceSha256": "565969ff712498ca1ab1e77230f3f304e25eca63bdca0f480ec26d8b44368d3d",
+      "width": 16
+    },
+    "minecraft:block/furnace_top": {
+      "canonical": "assets/minecraft/textures/block/furnace_top.png",
+      "height": 16,
+      "pixelRegion": {
+        "height": 16,
+        "width": 16,
+        "x": 1,
+        "y": 19
+      },
+      "region": {
+        "u0": 0.0078125,
+        "u1": 0.1328125,
+        "v0": 0.1484375,
+        "v1": 0.2734375
+      },
+      "source": "MC原版素材assets/minecraft/textures/block/furnace_top.png",
+      "sourceBytes": 273,
+      "sourceSha256": "7694f519b9067f00d1a9de8a3465c2986f0a895e5797a1b69b71a66c40ac36be",
+      "width": 16
+    },
+    "minecraft:block/glass": {
+      "canonical": "assets/minecraft/textures/block/glass.png",
+      "height": 16,
+      "pixelRegion": {
+        "height": 16,
+        "width": 16,
+        "x": 19,
+        "y": 19
+      },
+      "region": {
+        "u0": 0.1484375,
+        "u1": 0.2734375,
+        "v0": 0.1484375,
+        "v1": 0.2734375
+      },
+      "source": "MC原版素材assets/minecraft/textures/block/glass.png",
+      "sourceBytes": 147,
+      "sourceSha256": "cb89c706dce86eac3123cef087d359b5f23098b658a468fb91662b4a9922bcd0",
+      "width": 16
+    },
+    "minecraft:block/grass_block_side": {
+      "canonical": "assets/minecraft/textures/block/grass_block_side.png",
+      "height": 16,
+      "pixelRegion": {
+        "height": 16,
+        "width": 16,
+        "x": 37,
+        "y": 19
+      },
+      "region": {
+        "u0": 0.2890625,
+        "u1": 0.4140625,
+        "v0": 0.1484375,
+        "v1": 0.2734375
+      },
+      "source": "MC原版素材assets/minecraft/textures/block/grass_block_side.png",
+      "sourceBytes": 408,
+      "sourceSha256": "dedaa0171af63df63a6cf7e3e6c7078d4d5830fd93923f3005302ed0f02104c5",
+      "width": 16
+    },
+    "minecraft:block/grass_block_side_overlay": {
+      "canonical": "assets/minecraft/textures/block/grass_block_side_overlay.png",
+      "height": 16,
+      "pixelRegion": {
+        "height": 16,
+        "width": 16,
+        "x": 55,
+        "y": 19
+      },
+      "region": {
+        "u0": 0.4296875,
+        "u1": 0.5546875,
+        "v0": 0.1484375,
+        "v1": 0.2734375
+      },
       "source": "MC原版素材assets/minecraft/textures/block/grass_block_side_overlay.png",
       "sourceBytes": 177,
       "sourceSha256": "43d98318407d9d122b83468cf183d18722e548c2144f9c2ffe2021b5c3e770e0",
@@ -175,12 +256,12 @@
       "pixelRegion": {
         "height": 16,
         "width": 16,
-        "x": 1,
+        "x": 73,
         "y": 19
       },
       "region": {
-        "u0": 0.0078125,
-        "u1": 0.1328125,
+        "u0": 0.5703125,
+        "u1": 0.6953125,
         "v0": 0.1484375,
         "v1": 0.2734375
       },
@@ -195,12 +276,12 @@
       "pixelRegion": {
         "height": 16,
         "width": 16,
-        "x": 19,
+        "x": 91,
         "y": 19
       },
       "region": {
-        "u0": 0.1484375,
-        "u1": 0.2734375,
+        "u0": 0.7109375,
+        "u1": 0.8359375,
         "v0": 0.1484375,
         "v1": 0.2734375
       },
@@ -215,12 +296,12 @@
       "pixelRegion": {
         "height": 16,
         "width": 16,
-        "x": 37,
+        "x": 109,
         "y": 19
       },
       "region": {
-        "u0": 0.2890625,
-        "u1": 0.4140625,
+        "u0": 0.8515625,
+        "u1": 0.9765625,
         "v0": 0.1484375,
         "v1": 0.2734375
       },
@@ -235,14 +316,14 @@
       "pixelRegion": {
         "height": 16,
         "width": 16,
-        "x": 55,
-        "y": 19
+        "x": 1,
+        "y": 37
       },
       "region": {
-        "u0": 0.4296875,
-        "u1": 0.5546875,
-        "v0": 0.1484375,
-        "v1": 0.2734375
+        "u0": 0.0078125,
+        "u1": 0.1328125,
+        "v0": 0.2890625,
+        "v1": 0.4140625
       },
       "source": "MC原版素材assets/minecraft/textures/block/oak_door_bottom.png",
       "sourceBytes": 240,
@@ -255,14 +336,14 @@
       "pixelRegion": {
         "height": 16,
         "width": 16,
-        "x": 73,
-        "y": 19
+        "x": 19,
+        "y": 37
       },
       "region": {
-        "u0": 0.5703125,
-        "u1": 0.6953125,
-        "v0": 0.1484375,
-        "v1": 0.2734375
+        "u0": 0.1484375,
+        "u1": 0.2734375,
+        "v0": 0.2890625,
+        "v1": 0.4140625
       },
       "source": "MC原版素材assets/minecraft/textures/block/oak_door_top.png",
       "sourceBytes": 234,
@@ -275,14 +356,14 @@
       "pixelRegion": {
         "height": 16,
         "width": 16,
-        "x": 91,
-        "y": 19
+        "x": 37,
+        "y": 37
       },
       "region": {
-        "u0": 0.7109375,
-        "u1": 0.8359375,
-        "v0": 0.1484375,
-        "v1": 0.2734375
+        "u0": 0.2890625,
+        "u1": 0.4140625,
+        "v0": 0.2890625,
+        "v1": 0.4140625
       },
       "source": "MC原版素材assets/minecraft/textures/block/oak_planks.png",
       "sourceBytes": 268,
@@ -295,14 +376,14 @@
       "pixelRegion": {
         "height": 16,
         "width": 16,
-        "x": 109,
-        "y": 19
+        "x": 55,
+        "y": 37
       },
       "region": {
-        "u0": 0.8515625,
-        "u1": 0.9765625,
-        "v0": 0.1484375,
-        "v1": 0.2734375
+        "u0": 0.4296875,
+        "u1": 0.5546875,
+        "v0": 0.2890625,
+        "v1": 0.4140625
       },
       "source": "MC原版素材assets/minecraft/textures/block/torch.png",
       "sourceBytes": 138,
