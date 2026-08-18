@@ -62,7 +62,7 @@ test('source-backed Java 1.20.1 HUD inventory block/bed icons and Steve preview 
   expect(initialPreview.textureKey).toBe('entity.player.steve');
   expect(initialPreview.visible).toBeTruthy();
   const previewRect=await playerPreview.boundingBox();
-  const previewX=(previewRect?.x??0)+(previewRect?.width??0)*.82;
+  const previewX=(panelRect?.x??0)+(panelRect?.width??0)-12;
   await page.mouse.move(previewX,(previewRect?.y??0)+16);
   await expect.poll(async()=>page.evaluate(()=>globalThis.__minecraftE2E.inventoryPlayerPreview().targetHeadYaw)).toBeGreaterThan(.25);
   await expect.poll(async()=>page.evaluate(()=>globalThis.__minecraftE2E.inventoryPlayerPreview().headYaw)).toBeGreaterThan(.1);
