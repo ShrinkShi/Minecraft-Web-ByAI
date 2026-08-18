@@ -11,7 +11,7 @@ export const BLOCK = Object.freeze({
   BED_SOUTH_FOOT:BED_IDS.south.foot,BED_SOUTH_HEAD:BED_IDS.south.head,
   BED_WEST_FOOT:BED_IDS.west.foot,BED_WEST_HEAD:BED_IDS.west.head,
   BED_EAST_FOOT:BED_IDS.east.foot,BED_EAST_HEAD:BED_IDS.east.head,
-  IRON_ORE:19,GLASS:20
+  IRON_ORE:19,GLASS:20,FURNACE:21
 });
 
 export const BLOCKS = {
@@ -31,7 +31,11 @@ export const BLOCKS = {
   19:{name:'铁矿石',solid:true,hardness:3,tiles:[3,3,3],drops:'raw_iron',requires:'pickaxe',minToolTier:'stone'},
   // Glass is a solid full-cube for collision but renders through the interpreted
   // translucent model path. Stone is fail-open only; normal visuals never use it.
-  20:{name:'玻璃',solid:true,transparent:true,hardness:.3,tiles:[3,3,3],drops:null}
+  20:{name:'玻璃',solid:true,transparent:true,hardness:.3,tiles:[3,3,3],drops:null},
+  // Furnace interaction/state already lives in the authoritative furnace container
+  // runtime. This registration makes the block a real placeable/minable world node;
+  // normal visuals come from the source-backed interpreted Java model.
+  21:{name:'熔炉',solid:true,hardness:3.5,tiles:[3,3,3],drops:'block:21',requires:'pickaxe',minToolTier:'wood',interactive:true,interactionKind:'furnace'}
 };
 
 for(const id of BED_BLOCK_IDS){
