@@ -2,6 +2,7 @@ import {BLOCKS} from './blocks.js';
 import {requireAssetUrl} from './asset-manifest.js';
 
 const textured=(name,stack,assetKey,extra={})=>({name,stack,assetKey,texture:requireAssetUrl(assetKey),...extra});
+const sourceFaces=(top,left,right)=>Object.freeze({top:requireAssetUrl(top),left:requireAssetUrl(left),right:requireAssetUrl(right)});
 
 export const ITEMS={
   'block:1':{name:'草方块',stack:64,blockId:1,tile:0},
@@ -14,10 +15,12 @@ export const ITEMS={
   'block:9':{name:'工作台',stack:64,blockId:9,tile:10},
   'block:10':{name:'圆石',stack:64,blockId:10,tile:13},
   'block:20':textured('玻璃',64,'block.glass',{blockId:20,blockPreview:'source-texture'}),
+  'block:21':{name:'熔炉',stack:64,blockId:21,blockPreview:'source-faces',blockPreviewFaces:sourceFaces('block.furnace_top','block.furnace_side','block.furnace_front')},
   stick:textured('木棍',64,'item.stick'),
   wooden_pickaxe:textured('木镐',1,'item.wooden_pickaxe',{attackDamage:2,tool:{kind:'pickaxe',tier:'wood',speed:2,durability:59}}),
   stone_pickaxe:textured('石镐',1,'item.stone_pickaxe',{attackDamage:3,tool:{kind:'pickaxe',tier:'stone',speed:4,durability:131}}),
   raw_iron:textured('粗铁',64,'item.raw_iron'),
+  iron_ingot:textured('铁锭',64,'item.iron_ingot'),
   bed:{name:'床',stack:1,placeKind:'bed',itemPreview:'bed-model',entityAssetKey:'entity.bed.red'},
   leather_helmet:textured('皮革帽子',1,'item.leather_helmet',{armorSlot:'head',armorPoints:1}),
   leather_chestplate:textured('皮革外套',1,'item.leather_chestplate',{armorSlot:'chest',armorPoints:3}),
@@ -39,6 +42,6 @@ export const ITEMS={
 
 // Preserve the historical starter slot order; new content is appended so
 // existing authoritative/bootstrap slot contracts do not silently shift.
-export const CREATIVE_START=['block:1','block:2','block:3','block:4','block:5','block:6','block:7','block:9','wooden_pickaxe','bed','stone_pickaxe','block:20'];
+export const CREATIVE_START=['block:1','block:2','block:3','block:4','block:5','block:6','block:7','block:9','wooden_pickaxe','bed','stone_pickaxe','block:20','block:21'];
 export const itemForBlock=blockId=>ITEMS[`block:${blockId}`]?`block:${blockId}`:BLOCKS[blockId]?.drops||null;
 export const maxStack=itemId=>ITEMS[itemId]?.stack||64;
