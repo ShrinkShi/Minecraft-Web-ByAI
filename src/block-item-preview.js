@@ -14,7 +14,8 @@ function sourceFace(value,label){
 export function blockItemFaceTextures(itemDefinition){
   if(!itemDefinition||typeof itemDefinition!=='object')return null;
   if(itemDefinition.blockPreview==='source-texture'){
-    const texture=sourceFace(itemDefinition.texture,'source-texture block preview texture');
+    const texture=String(itemDefinition.texture||'').trim();
+    if(!texture)throw new TypeError('source-texture block preview requires itemDefinition.texture');
     return Object.freeze({top:texture,left:texture,right:texture});
   }
   if(itemDefinition.blockPreview==='source-faces'){
