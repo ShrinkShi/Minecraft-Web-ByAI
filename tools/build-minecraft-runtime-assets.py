@@ -53,6 +53,7 @@ ITEM_FILES = {
     "wooden_pickaxe.png": ("wooden_pickaxe.png", None),
     "stone_pickaxe.png": ("stone_pickaxe.png", None),
     "raw_iron.png": ("raw_iron.png", None),
+    "iron_ingot.png": ("iron_ingot.png", None),
     "leather_helmet.png": ("leather_helmet.png", "leather"),
     "leather_chestplate.png": ("leather_chestplate.png", "leather"),
     "leather_leggings.png": ("leather_leggings.png", "leather"),
@@ -72,6 +73,9 @@ ITEM_FILES = {
 
 DIRECT_BLOCK_ITEM_FILES = {
     "glass.png": Path("minecraft/textures/block/glass.png"),
+    "furnace_top.png": Path("minecraft/textures/block/furnace_top.png"),
+    "furnace_side.png": Path("minecraft/textures/block/furnace_side.png"),
+    "furnace_front.png": Path("minecraft/textures/block/furnace_front.png"),
 }
 
 PASS_THROUGH = [
