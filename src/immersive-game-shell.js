@@ -1,3 +1,6 @@
+import {requireAssetUrl} from './asset-manifest.js';
+import {STEVE_RIGHT_ARM_BASE_FRONT,STEVE_RIGHT_ARM_SLEEVE_FRONT,minecraftSkinCropCss} from './first-person-player-presentation.js';
+
 export const GAMEPLAY_KEY_LOCK_CODES=Object.freeze([
   'KeyW','KeyA','KeyS','KeyD','KeyE','KeyQ','KeyR','KeyT','Slash','Space','Tab','F3','F5',
   'ShiftLeft','ShiftRight','Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9'
@@ -15,11 +18,16 @@ export function shouldSuppressBrowserShortcut(event,{gameplayActive=true}={}){
   return !!(event.ctrlKey||event.metaKey)&&event.code==='KeyW';
 }
 
+const STEVE_SKIN=requireAssetUrl('entity.player.steve');
+const ARM_BASE=minecraftSkinCropCss(STEVE_RIGHT_ARM_BASE_FRONT);
+const ARM_SLEEVE=minecraftSkinCropCss(STEVE_RIGHT_ARM_SLEEVE_FRONT);
+
 function styleText(){return `
 #first-person-held-overlay{position:absolute;right:7vw;bottom:-24px;width:300px;height:230px;pointer-events:none;z-index:4;transform-origin:100% 100%;filter:drop-shadow(0 7px 4px #0007)}
 #first-person-held-overlay.hidden{display:none!important}
-#first-person-held-overlay .fp-arm{position:absolute;right:8px;bottom:-38px;width:92px;height:205px;background:linear-gradient(90deg,#9e6649 0 12%,#c98961 12% 36%,#d79b73 36% 68%,#b97956 68% 88%,#89543f 88%);border:6px solid #6f4938;box-shadow:inset 10px 0 #e0a47c,inset -10px 0 #8d5a43;transform:rotate(-28deg) skewY(-4deg);image-rendering:pixelated}
-#first-person-held-overlay .fp-item{position:absolute;right:106px;bottom:58px;width:96px;height:96px;display:grid;place-items:center;transform:rotate(-18deg) scale(1.08);transform-origin:50% 80%;filter:drop-shadow(4px 5px 1px #0009)}
+#first-person-held-overlay .fp-arm{position:absolute;right:18px;bottom:-38px;width:${ARM_BASE.width};height:${ARM_BASE.height};background-image:url("${STEVE_SKIN}");background-size:${ARM_BASE.backgroundSize};background-position:${ARM_BASE.backgroundPosition};background-repeat:no-repeat;transform:rotate(-25deg);transform-origin:50% 88%;image-rendering:pixelated;filter:drop-shadow(3px 4px 0 #0007)}
+#first-person-held-overlay .fp-arm::after{content:"";position:absolute;inset:0;background-image:url("${STEVE_SKIN}");background-size:${ARM_SLEEVE.backgroundSize};background-position:${ARM_SLEEVE.backgroundPosition};background-repeat:no-repeat;transform:scale(1.045);transform-origin:50% 50%;image-rendering:pixelated;pointer-events:none}
+#first-person-held-overlay .fp-item{position:absolute;right:94px;bottom:58px;width:96px;height:96px;display:grid;place-items:center;transform:rotate(-18deg) scale(1.08);transform-origin:50% 80%;filter:drop-shadow(4px 5px 1px #0009)}
 #first-person-held-overlay .fp-item>.item-icon{width:32px;height:32px;transform:scale(2.6);image-rendering:pixelated}
 #first-person-held-overlay .fp-item>.slot-swatch{width:30px;height:30px;transform:scale(2.65);image-rendering:pixelated}
 #first-person-held-overlay .fp-item>.block-item-icon{width:32px!important;height:32px!important;transform:scale(2.6);transform-origin:50% 50%;image-rendering:pixelated}
@@ -43,7 +51,7 @@ export function installImmersiveGameShell(canvas){
   let debugVisible=false,lastItemSignature='';
 
   const overlay=document.createElement('div');overlay.id='first-person-held-overlay';overlay.className='hidden';overlay.setAttribute('aria-hidden','true');
-  const arm=document.createElement('div');arm.className='fp-arm';const item=document.createElement('div');item.className='fp-item';overlay.append(arm,item);hud.append(overlay);
+  const arm=document.createElement('div');arm.className='fp-arm';arm.dataset.assetKey='entity.player.steve';const item=document.createElement('div');item.className='fp-item';overlay.append(arm,item);hud.append(overlay);
 
   const panels=()=>[...document.querySelectorAll('.screen,.inventory,#chat-input-wrap')];
   const gameFocused=()=>!hud.classList.contains('hidden')&&!document.querySelector('.screen.active')&&!document.querySelector('.inventory:not(.hidden)')&&document.querySelector('#chat-input-wrap')?.classList.contains('hidden')!==false;
