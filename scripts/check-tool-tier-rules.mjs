@@ -15,12 +15,16 @@ assert.throws(()=>toolTierRank('copper'),/unsupported tool tier/);
 assert.throws(()=>toolTierLabel('copper'),/unsupported tool tier/);
 
 const free={drops:'block:2'};
-const woodPickaxeBlock={requires:'pickaxe'};
-const stonePickaxeBlock={requires:'pickaxe',minToolTier:'stone'};
+const effectiveOnly={drops:'block:5',effectiveTool:'axe'};
+const woodPickaxeBlock={requires:'pickaxe',effectiveTool:'pickaxe'};
+const stonePickaxeBlock={requires:'pickaxe',effectiveTool:'pickaxe',minToolTier:'stone'};
 assert.equal(minimumToolTier(free),null);
+assert.equal(minimumToolTier(effectiveOnly),null,'effective tools do not create a harvest tier requirement');
 assert.equal(minimumToolTier(woodPickaxeBlock),'wood','tool-requiring blocks default to wood when no explicit tier is declared');
 assert.equal(minimumToolTier(stonePickaxeBlock),'stone');
 assert.equal(toolMeetsBlockRequirement(null,free),true);
+assert.equal(toolMeetsBlockRequirement(null,effectiveOnly),true,'effective-tool-only blocks remain hand harvestable');
+assert.equal(toolMeetsBlockRequirement({kind:'shovel',tier:'wood'},effectiveOnly),true,'wrong effective tool still does not gate drops when requires is absent');
 assert.equal(toolMeetsBlockRequirement(null,woodPickaxeBlock),false);
 assert.equal(toolMeetsBlockRequirement({kind:'axe',tier:'diamond'},stonePickaxeBlock),false,'tier never bypasses the required tool kind');
 assert.equal(toolMeetsBlockRequirement({kind:'pickaxe',tier:'wood'},stonePickaxeBlock),false);
@@ -30,4 +34,4 @@ assert.equal(toolMeetsBlockRequirement({kind:'pickaxe',tier:'iron'},stonePickaxe
 assert.equal(toolMeetsBlockRequirement({kind:'pickaxe'},woodPickaxeBlock),true,'legacy tools without an explicit tier remain wood-tier compatible');
 assert.throws(()=>minimumToolTier({requires:'pickaxe',minToolTier:'copper'}),/unsupported tool tier/);
 
-console.log('shared tool kind + harvest tier ordering: PASS');
+console.log('shared tool harvest requirement + tier ordering remains independent from mining effectiveness: PASS');
