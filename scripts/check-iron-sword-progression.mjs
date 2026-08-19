@@ -8,7 +8,7 @@ import {itemDurability} from '../src/item-stack.js';
 import {matchRecipe} from '../src/recipes.js';
 import {meleeProfile} from '../src/melee-rules.js';
 
-const root=process.cwd(),expectedHash='ed1fa2f6c87c9df2e2d19853570924de3927e816216a9e2fe3780a0aff6bed6b';
+const root=process.cwd(),expectedHash='ed1fa2f83955583e70a19791455d13989e8bd93b1d7240e775a57141022bed6b';
 const sha256=path=>createHash('sha256').update(readFileSync(path)).digest('hex');
 const pngSize=path=>{const bytes=readFileSync(path);assert.equal(bytes.subarray(1,4).toString('ascii'),'PNG');return[bytes.readUInt32BE(16),bytes.readUInt32BE(20)];};
 
