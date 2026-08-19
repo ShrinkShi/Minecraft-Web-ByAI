@@ -12,7 +12,7 @@ import {SurvivalBlockBreakController} from '../server/survival-block-break-contr
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 
 assert.equal(BLOCK.IRON_ORE,19,'new block must use the free id after existing bed states');
-assert.deepEqual({...BLOCKS[BLOCK.IRON_ORE],tiles:undefined},{name:'铁矿石',solid:true,hardness:3,tiles:undefined,drops:'raw_iron',requires:'pickaxe',minToolTier:'stone'});
+assert.deepEqual({...BLOCKS[BLOCK.IRON_ORE],tiles:undefined},{name:'铁矿石',solid:true,hardness:3,tiles:undefined,drops:'raw_iron',requires:'pickaxe',effectiveTool:'pickaxe',minToolTier:'stone'});
 assert.equal(ITEMS.stone_pickaxe.name,'石镐');assert.equal(ITEMS.stone_pickaxe.stack,1);assert.equal(ITEMS.stone_pickaxe.assetKey,'item.stone_pickaxe');assert.deepEqual(ITEMS.stone_pickaxe.tool,{kind:'pickaxe',tier:'stone',speed:4,durability:131});
 assert.equal(ITEMS.raw_iron.name,'粗铁');assert.equal(ITEMS.raw_iron.stack,64);assert.equal(ITEMS.raw_iron.assetKey,'item.raw_iron');
 assert.equal(ITEMS.iron_ingot.name,'铁锭');assert.equal(ITEMS.iron_ingot.stack,64);assert.equal(ITEMS.iron_ingot.assetKey,'item.iron_ingot');
