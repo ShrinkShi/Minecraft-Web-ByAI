@@ -12,6 +12,9 @@ function count(value,label,{min=1,max=FURNACE_STACK_LIMIT}={}){if(!Number.isInte
 function cloneStack(value){return value?Object.freeze({...normalizeFurnaceStack(value)}):null;}
 function cloneState(value){return createFurnaceState(value);}
 function conflict(state){return Object.freeze({changed:false,reason:'revision-conflict',container:state.snapshot()});}
+function mutableSlot(value){if(value!==FURNACE_SLOT.INPUT&&value!==FURNACE_SLOT.FUEL)throw new RangeError('furnace mutable slot must be INPUT or FUEL');return value;}
+function sameStack(a,b){return a===b||(!a&&!b)||!!(a&&b&&a.id===b.id&&a.count===b.count&&(a.damage??0)===(b.damage??0));}
+function sameStackIdentity(a,b){return !!(a&&b&&a.id===b.id&&(a.damage??0)===(b.damage??0));}
 
 export class ServerFurnaceContainerState{
   constructor(target,{state=null,revision:initialRevision=0}={}){
@@ -19,13 +22,19 @@ export class ServerFurnaceContainerState{
   }
   advanceRevision(steps=1){steps=count(steps,'furnace revision steps',{max:1_000_000});for(let i=0;i<steps;i++)this.revision=nextNetworkSequence(this.revision);return this.revision;}
   snapshot(){const state=cloneState(this.state);return Object.freeze({target:this.target,revision:this.revision,slots:state.slots,burnRemaining:state.burnRemaining,burnTotal:state.burnTotal,cookProgress:state.cookProgress,cookTotal:state.cookTotal,storedExperience:state.storedExperience,lit:state.burnRemaining>0});}
+  replaceSlot(slot,value,{expectedRevision=this.revision}={}){
+    expectedRevision=revision(expectedRevision);if(expectedRevision!==this.revision)return conflict(this);slot=mutableSlot(slot);
+    const next=value===null||value===undefined?null:normalizeFurnaceStack(value,{label:'furnace replacement stack'});if(next&&!furnaceCanInsert(slot,next.id))return Object.freeze({changed:false,reason:'slot-rejects-item',previous:cloneStack(this.state.slots[slot]),container:this.snapshot()});
+    const previous=cloneStack(this.state.slots[slot]);if(sameStack(previous,next))return Object.freeze({changed:false,reason:'no-change',previous,container:this.snapshot()});
+    const slots=this.state.slots.map(stack=>stack?{...stack}:null);slots[slot]=next?{...next}:null;this.state=createFurnaceState({...this.state,slots});this.advanceRevision();return Object.freeze({changed:true,reason:'slot-updated',previous,container:this.snapshot()});
+  }
   insert(slot,value,{expectedRevision=this.revision}={}){
     expectedRevision=revision(expectedRevision);if(expectedRevision!==this.revision)return conflict(this);
     if(slot!==FURNACE_SLOT.INPUT&&slot!==FURNACE_SLOT.FUEL)throw new RangeError('furnace insert slot must be INPUT or FUEL');
     const incoming=normalizeFurnaceStack(value,{label:'furnace insert stack'});if(!furnaceCanInsert(slot,incoming.id))return Object.freeze({changed:false,reason:'slot-rejects-item',remaining:incoming.count,container:this.snapshot()});
-    const slots=this.state.slots.map(stack=>stack?{...stack}:null),current=slots[slot];if(current&&current.id!==incoming.id)return Object.freeze({changed:false,reason:'slot-occupied',remaining:incoming.count,container:this.snapshot()});
+    const slots=this.state.slots.map(stack=>stack?{...stack}:null),current=slots[slot];if(current&&!sameStackIdentity(current,incoming))return Object.freeze({changed:false,reason:'slot-occupied',remaining:incoming.count,container:this.snapshot()});
     const capacity=furnaceStackLimitFor(incoming.id)-(current?.count||0),moved=Math.min(capacity,incoming.count);if(moved<=0)return Object.freeze({changed:false,reason:'slot-full',remaining:incoming.count,container:this.snapshot()});
-    slots[slot]=current?{id:current.id,count:current.count+moved}:{id:incoming.id,count:moved};this.state=createFurnaceState({...this.state,slots});this.advanceRevision();
+    slots[slot]=current?{...current,count:current.count+moved}:{...incoming,count:moved};this.state=createFurnaceState({...this.state,slots});this.advanceRevision();
     return Object.freeze({changed:true,reason:moved===incoming.count?'inserted':'inserted-partial',moved,remaining:incoming.count-moved,container:this.snapshot()});
   }
   takeOutput(amount=FURNACE_STACK_LIMIT,{expectedRevision=this.revision}={}){
@@ -47,7 +56,8 @@ export class ServerFurnaceContainerHub{
   open(target){const id=key(target);let state=this.states.get(id);if(!state){state=new ServerFurnaceContainerState(target);this.states.set(id,state);}return state.snapshot();}
   state(target){const id=key(target),state=this.states.get(id);if(!state)throw new Error(`no furnace state for cell: ${id}`);return state;}
   snapshot(target){return this.state(target).snapshot();}
-  tickAll(ticks=1){let changed=0,transactionMutations=0,smelted=0;for(const state of this.states.values()){const result=state.tick(ticks);if(result.changed)changed++;transactionMutations+=result.transactionMutations;smelted+=result.smelted;}return Object.freeze({changed,transactionMutations,smelted,furnaces:this.furnaceCount});}
+  entries(){return Object.freeze([...this.states.values()].map(state=>state.snapshot()));}
+  tickAll(ticks=1){let changed=0,transactionMutations=0,smelted=0;const updates=[];for(const state of this.states.values()){const result=state.tick(ticks);if(result.changed){changed++;updates.push(Object.freeze({target:state.target,result}));}transactionMutations+=result.transactionMutations;smelted+=result.smelted;}return Object.freeze({changed,transactionMutations,smelted,furnaces:this.furnaceCount,updates:Object.freeze(updates)});}
   break(target){const id=key(target),state=this.states.get(id);if(!state)return Object.freeze({changed:false,contents:Object.freeze([]),experience:0});const drained=state.drain();this.states.delete(id);return Object.freeze({changed:true,contents:drained.contents,experience:drained.experience});}
   restore(record){if(!record||typeof record!=='object'||Array.isArray(record))throw new TypeError('furnace restore record must be an object');const id=key(record.target);if(this.states.has(id))throw new Error(`furnace state already exists for cell: ${id}`);const state=new ServerFurnaceContainerState(record.target,{state:record.state,revision:record.revision});this.states.set(id,state);return state.snapshot();}
   serialize(){return Object.freeze([...this.states.values()].map(state=>state.serialize()));}

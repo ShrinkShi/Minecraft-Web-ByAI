@@ -1,4 +1,5 @@
 import {ITEMS,maxStack} from './items.js';
+import {normalizeItemStack} from './item-stack.js';
 
 const recipe=(input,output,{cookTicks=200,experience=0}={})=>Object.freeze({input,output,count:1,cookTicks,experience});
 
@@ -42,10 +43,11 @@ export function furnaceStackLimitFor(itemId){itemId=knownFurnaceItemId(itemId);r
 export function normalizeFurnaceStack(value,{label='furnace stack'}={}){
   if(value===null||value===undefined)return null;
   if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError(`${label} must be an object or null`);
+  const id=knownFurnaceItemId(value.id,`${label} id`);
+  if(ITEMS[id])return Object.freeze(normalizeItemStack(value,{label}));
   const keys=Object.keys(value).sort();
-  if(keys.length!==2||keys[0]!=='count'||keys[1]!=='id')throw new RangeError(`${label} must contain exactly id and count`);
-  const id=knownFurnaceItemId(value.id,`${label} id`),limit=furnaceStackLimitFor(id);
-  return Object.freeze({id,count:integer(value.count,`${label} count`,{min:1,max:limit})});
+  if(keys.length!==2||keys[0]!=='count'||keys[1]!=='id')throw new RangeError(`${label} declared output must contain exactly id and count`);
+  return Object.freeze({id,count:integer(value.count,`${label} count`,{min:1,max:FURNACE_STACK_LIMIT})});
 }
 
 export function createFurnaceState(value={}){

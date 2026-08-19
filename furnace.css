@@ -1,0 +1,22 @@
+#furnace.inventory{z-index:32}
+#furnace .furnace-panel{position:relative;width:352px;height:332px;max-width:calc(100vw - 24px);max-height:calc(100vh - 24px);padding:0;border:0;background-image:url('./MC原版素材assets/minecraft/textures/gui/container/furnace.png');background-repeat:no-repeat;background-size:512px 512px;image-rendering:pixelated;box-shadow:0 8px 28px rgba(0,0,0,.55);transform-origin:center center}
+#furnace .furnace-title,#furnace .furnace-inventory-title{position:absolute;left:16px;color:#3f3f3f;text-shadow:none;font-size:18px;line-height:20px;pointer-events:none;z-index:3}
+#furnace .furnace-title{top:12px}
+#furnace .furnace-inventory-title{top:146px}
+#furnace .furnace-slot{position:absolute;width:36px;height:36px;padding:2px;border:0;background:transparent;box-shadow:none;z-index:4}
+#furnace .furnace-slot:hover{outline:2px solid rgba(255,255,255,.7);outline-offset:-2px;background:rgba(255,255,255,.16)}
+#furnace .furnace-input{left:112px;top:34px}
+#furnace .furnace-fuel{left:112px;top:106px}
+#furnace .furnace-output{left:232px;top:70px}
+#furnace .furnace-main-grid,#furnace .furnace-hotbar-grid{position:absolute;left:16px;display:grid;grid-template-columns:repeat(9,36px);grid-auto-rows:36px;gap:0;width:324px;z-index:4}
+#furnace .furnace-main-grid{top:168px;height:108px}
+#furnace .furnace-hotbar-grid{top:284px;height:36px}
+#furnace .furnace-main-grid .inv-slot,#furnace .furnace-hotbar-grid .inv-slot{width:36px;height:36px;min-width:36px;padding:2px;border:0;background:transparent;box-shadow:none}
+#furnace .furnace-main-grid .inv-slot:hover,#furnace .furnace-hotbar-grid .inv-slot:hover{outline:2px solid rgba(255,255,255,.7);outline-offset:-2px;background:rgba(255,255,255,.16)}
+#furnace .furnace-burn-clip{position:absolute;left:112px;top:72px;width:28px;height:28px;overflow:hidden;z-index:2}
+#furnace .furnace-burn-fill{position:absolute;left:0;bottom:0;width:28px;height:28px;background-image:url('./MC原版素材assets/minecraft/textures/gui/container/furnace.png');background-size:512px 512px;background-position:-352px 0;image-rendering:pixelated}
+#furnace .furnace-cook-clip{position:absolute;left:158px;top:68px;width:48px;height:34px;overflow:hidden;z-index:2}
+#furnace .furnace-cook-fill{width:48px;height:34px;background-image:url('./MC原版素材assets/minecraft/textures/gui/container/furnace.png');background-size:512px 512px;background-position:-352px -28px;image-rendering:pixelated}
+#furnace .furnace-status{position:absolute;left:16px;right:16px;bottom:4px;height:18px;overflow:hidden;color:#404040;font-size:12px;line-height:18px;text-align:right;pointer-events:none}
+#furnace .furnace-close{position:absolute;right:4px;top:4px;z-index:8}
+@media(max-width:700px),(max-height:500px){#furnace .furnace-panel{transform:scale(.82)}}
