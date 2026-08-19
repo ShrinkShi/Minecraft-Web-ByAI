@@ -39,8 +39,8 @@ export class Inventory{
   notify(source='inventory'){for(const listener of [...this.listeners]){try{listener({source,inventory:this});}catch{}}}
 
   seedCreative(){CREATIVE_START.forEach((id,i)=>{this.slots[creativeSeedSlot(i)]={id,count:maxStack(id)};});}
-  snapshot(){return{slots:this.slots.map(cloneStack)};}
-  persistenceSnapshot(){return{slots:this.slots.map(cloneStack),cursor:cloneStack(this.cursor)};}
+  snapshot(){return{slots:this.slots.map(cloneStack),cursor:cloneStack(this.cursor)};}
+  persistenceSnapshot(){return this.snapshot();}
 
   restore(snapshot){
     const restored=snapshotSlots(snapshot),cursor=snapshotCursor(snapshot);if(!restored)return false;this.slots=restored;this.cursor=cursor;
