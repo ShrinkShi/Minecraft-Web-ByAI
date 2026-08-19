@@ -13,6 +13,13 @@ async function expectRenderedBlockItem(preview){
   const opaque=await canvas.evaluate(element=>{const data=element.getContext('2d').getImageData(0,0,element.width,element.height).data;let count=0;for(let index=3;index<data.length;index+=4)if(data[index])count++;return count;});
   expect(opaque).toBeGreaterThan(100);
 }
+async function leaveSingleplayerWorld(page){
+  await key(page,'Escape');
+  await expect(page.locator('#pause-menu')).toHaveClass(/active/);
+  await page.locator('#return-main-button').click();
+  await expect(page.locator('#main-menu')).toHaveClass(/active/,{timeout:10_000});
+  await expect(page.locator('#hud')).toHaveClass(/hidden/);
+}
 
 test('furnace uses interpreted original model art and source-backed inventory presentation',async({page})=>{
   const pageErrors=[],consoleErrors=[];page.on('pageerror',error=>pageErrors.push(error.message));page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
@@ -49,6 +56,12 @@ test('authoritative furnace UI uses vanilla texture and accepts same-revision pr
   const pageErrors=[],consoleErrors=[];page.on('pageerror',error=>pageErrors.push(error.message));page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
   await page.goto('/?e2e=1');
   await createSingleplayerWorld(page,{name:'CI Furnace UI',seed:'ci-furnace-ui-2026',mode:'survival',prompt:'平原'});
+
+  // #117 gives every live singleplayer world a real local Furnace authority.
+  // This test intentionally replaces it with a recording sender, so leave the
+  // world through the production lifecycle first instead of weakening the
+  // one-authority invariant in furnace-channel.js.
+  await leaveSingleplayerWorld(page);
 
   await page.evaluate(async()=>{
     const channel=await import('/src/multiplayer-furnace-channel.js');

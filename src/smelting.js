@@ -39,6 +39,9 @@ export function furnaceFuelTicks(itemId){return typeof itemId==='string'?FURNACE
 export function isSmeltable(itemId){return smeltingRecipeFor(itemId)!==null;}
 export function isFurnaceFuel(itemId){return furnaceFuelTicks(itemId)>0;}
 export function furnaceStackLimitFor(itemId){itemId=knownFurnaceItemId(itemId);return ITEMS[itemId]?maxStack(itemId):FURNACE_STACK_LIMIT;}
+export function materializeSmeltingExperience(value,random=Math.random){
+  value=finite(value,'smelting experience');if(typeof random!=='function')throw new TypeError('smelting experience random source must be a function');const whole=Math.floor(value),fraction=value-whole;if(fraction<=0)return whole;const roll=random();if(!Number.isFinite(roll)||roll<0||roll>=1)throw new RangeError('smelting experience random source must return a finite number in [0,1)');return whole+(roll<fraction?1:0);
+}
 
 export function normalizeFurnaceStack(value,{label='furnace stack'}={}){
   if(value===null||value===undefined)return null;
