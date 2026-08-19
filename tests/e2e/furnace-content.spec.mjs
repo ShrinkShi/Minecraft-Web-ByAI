@@ -67,7 +67,7 @@ test('authoritative furnace UI uses vanilla texture and accepts same-revision pr
   await expect(furnace.locator('.furnace-status')).toContainText('50%');await expect(furnace.locator('.furnace-input')).toHaveAttribute('data-timer-identity','preserve-me');
 
   await furnace.locator('.furnace-input').dispatchEvent('pointerdown',{button:0,shiftKey:false});await furnace.locator('.furnace-output').dispatchEvent('pointerdown',{button:2,shiftKey:true});
-  await furnace.locator('.furnace-close').click();await expect(furnace).toHaveClass(/hidden/);
+  await key(page,'Escape');await expect(furnace).toHaveClass(/hidden/);
   let actions=await page.evaluate(()=>window.__furnaceUiActions);expect(actions).toEqual([{type:'slot-click',slot:0,button:0,shift:false},{type:'take-output',button:2,shift:true},{type:'close'}]);
 
   await page.evaluate(async()=>{const channel=await import('/src/multiplayer-furnace-channel.js');channel.publishMultiplayerFurnaceSnapshot({version:1,kind:'furnace-container-snapshot',session:'s:ui-test',target:{x:1,y:64,z:2},revision:7,slots:[{id:'raw_iron',count:2},{id:'block:5',count:1},null],burnRemaining:148,burnTotal:300,cookProgress:101,cookTotal:200,storedExperience:0,lit:true});});
