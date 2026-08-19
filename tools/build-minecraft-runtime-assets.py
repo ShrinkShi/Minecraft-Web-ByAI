@@ -77,6 +77,8 @@ DIRECT_ITEM_FILES = {
     "furnace_side.png": Path("minecraft/textures/block/furnace_side.png"),
     "furnace_front.png": Path("minecraft/textures/block/furnace_front.png"),
     "iron_pickaxe.png": Path("minecraft/textures/item/iron_pickaxe.png"),
+    "iron_axe.png": Path("minecraft/textures/item/iron_axe.png"),
+    "iron_shovel.png": Path("minecraft/textures/item/iron_shovel.png"),
 }
 
 PASS_THROUGH = [
