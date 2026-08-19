@@ -11,6 +11,7 @@ import {createOxygenState,stepOxygen,usesOxygen,MAX_AIR_SECONDS,DROWN_DAMAGE} fr
 import {WorldStorage,worldIdFor} from './storage.js';
 import {executeCommand} from './commands.js';
 import {canAttack} from './combat.js';
+import {meleeProfile} from './melee-rules.js';
 import {experienceState} from './experience.js';
 import {rollMobLoot,rollMobXp} from './mobs.js';
 import {deathLossPlan} from './death-rules.js';
@@ -216,7 +217,6 @@ async function handleAction(action){
   else if(action==='realms')ui.showToast('Realms 服务将在后续阶段接入');
   else if(action==='quit')ui.showToast('浏览器页面不能由网页强制关闭');
 }
-
 document.addEventListener('click',e=>{const button=e.target.closest('[data-action]');if(button)handleAction(button.dataset.action);});window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight,false);});document.addEventListener('pointerlockchange',syncControlAdapters);
 function multiplayerUnsupported(message){ui.showToast(message);return false;}
 function sendMultiplayerHotbar(){if(sessionKind==='multiplayer'&&multiplayerMovement?.ready)multiplayerMovement.sendHotbarSelect(ui.selected);}
@@ -236,7 +236,7 @@ ui.chatInput.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Esca
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 function primaryActionStart(){
   if(sessionKind==='multiplayer'){ui.showToast('联机方块/战斗权威尚未接入');return;}if(!canControl()||!player||player.mode==='spectator')return;const entityHit=aimEntity(),blockHit=aim();
-  if(entityHit&&(!blockHit||entityHit.distance<=blockHit.distance)){const now=performance.now();singleplayerMining.cancel();selectedTarget=null;if(player.mode!=='creative'&&!canAttack(lastAttackAt,now))return;lastAttackAt=now;const selected=ui.selectedItem(),damage=player.mode==='creative'?100:(ITEMS[selected?.id]?.attackDamage||1);entityHit.system.hurt(entityHit.entity,damage,player.position,now);return;}
+  if(entityHit&&(!blockHit||entityHit.distance<=blockHit.distance)){const now=performance.now(),selected=ui.selectedItem(),profile=meleeProfile(selected?.id||null);singleplayerMining.cancel();selectedTarget=null;if(player.mode!=='creative'&&!canAttack(lastAttackAt,now,profile.attackIntervalMs))return;lastAttackAt=now;const damage=player.mode==='creative'?100:profile.damage,result=entityHit.system.hurt(entityHit.entity,damage,player.position,now);if(result?.applied&&player.mode!=='creative'&&selected&&profile.durabilityCost>0){const wear=inventory?.damageAt(HOTBAR_START+ui.selected,selected.id,profile.durabilityCost);if(wear?.changed){markSaveDirty();if(wear.broken)ui.showToast(`${ITEMS[selected.id]?.name||selected.id} 已损坏`);}}return;}
   if(player.mode!=='adventure')singleplayerMining.start(performance.now());
 }
 function primaryActionEnd(){singleplayerMining.cancel();selectedTarget=null;}
