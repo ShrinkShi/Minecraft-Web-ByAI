@@ -5,6 +5,7 @@ const RECIPES=[
   {id:'bed',kind:'shaped',pattern:[['white_wool','white_wool','white_wool'],['block:5','block:5','block:5']],result:{id:'bed',count:1},minSize:3},
   {id:'wooden_pickaxe',kind:'shaped',pattern:[['block:5','block:5','block:5'],[null,'stick',null],[null,'stick',null]],result:{id:'wooden_pickaxe',count:1},minSize:3},
   {id:'stone_pickaxe',kind:'shaped',pattern:[['block:10','block:10','block:10'],[null,'stick',null],[null,'stick',null]],result:{id:'stone_pickaxe',count:1},minSize:3},
+  {id:'iron_pickaxe',kind:'shaped',pattern:[['iron_ingot','iron_ingot','iron_ingot'],[null,'stick',null],[null,'stick',null]],result:{id:'iron_pickaxe',count:1},minSize:3},
   {id:'furnace',kind:'shaped',pattern:[['block:10','block:10','block:10'],['block:10',null,'block:10'],['block:10','block:10','block:10']],result:{id:'block:21',count:1},minSize:3}
 ];
 

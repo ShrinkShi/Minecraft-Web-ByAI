@@ -38,6 +38,7 @@ const RECORDS=Object.freeze({
   'item.stick':supplied('item-texture','./assets/items/stick.png'),
   'item.wooden_pickaxe':supplied('item-texture','./assets/items/wooden_pickaxe.png'),
   'item.stone_pickaxe':supplied('item-texture','./assets/items/stone_pickaxe.png'),
+  'item.iron_pickaxe':supplied('item-texture','./assets/items/iron_pickaxe.png',{minecraftVersion:'1.20.1',sha256:'67305d8bd14e1d60633258f52055fce5aeaea7837c10e62d436fc16f163be627'}),
   'item.raw_iron':supplied('item-texture','./assets/items/raw_iron.png'),
   'item.iron_ingot':supplied('item-texture','./assets/items/iron_ingot.png'),
   'item.leather_helmet':supplied('item-texture','./assets/items/leather_helmet.png'),

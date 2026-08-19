@@ -39,15 +39,20 @@ for(const [name,record] of Object.entries(runtime.items)){
 }
 assert.equal(runtime.items['iron_ingot.png'].source,'textures/item/iron_ingot.png');
 
-// Block-item preview textures are copied byte-for-byte from the canonical
-// extracted source directory. Lock equality directly so these cannot silently
-// become hand-authored lookalikes even though they are not part of runtime.items.
+// Direct item textures are copied byte-for-byte from the canonical extracted
+// source directory. Lock equality directly so these cannot silently become
+// hand-authored lookalikes even though they are not part of runtime.items.
 for(const name of ['glass','furnace_top','furnace_side','furnace_front']){
   const tracked=resolve(root,'assets/items',`${name}.png`);
   const canonical=resolve(root,'MC原版素材assets/minecraft/textures/block',`${name}.png`);
   assert.equal(sha256(tracked),sha256(canonical),`${name}.png must remain byte-identical to the canonical extracted Minecraft texture`);
   assert.deepEqual(pngSize(tracked),[16,16],`${name}.png must retain the original 16x16 source dimensions`);
 }
+const ironPickaxeRuntime=resolve(root,'assets/items/iron_pickaxe.png');
+const ironPickaxeCanonical=resolve(root,'MC原版素材assets/minecraft/textures/item/iron_pickaxe.png');
+assert.equal(sha256(ironPickaxeRuntime),sha256(ironPickaxeCanonical),'iron_pickaxe.png must remain byte-identical to the canonical extracted Minecraft item texture');
+assert.equal(sha256(ironPickaxeRuntime),'67305d8bd14e1d60633258f52055fce5aeaea7837c10e62d436fc16f163be627');
+assert.deepEqual(pngSize(ironPickaxeRuntime),[16,16],'iron_pickaxe.png must retain the original 16x16 source dimensions');
 
 for(const [relative,checksum] of Object.entries(runtime.referenceFiles)){
   assert.equal(sha256(resolve(root,'assets',relative)),checksum,`${relative} must match runtime manifest checksum`);
@@ -84,4 +89,4 @@ assert.deepEqual(runtime.tintProfile.foliage,[119,171,47]);
 assert.deepEqual(runtime.tintProfile.water,[63,118,228]);
 assert.deepEqual(runtime.tintProfile.leather,[160,101,64]);
 
-console.log('Minecraft 1.20.1 directory-backed runtime assets + furnace/ingot provenance + entity dimensions/checksums: PASS');
+console.log('Minecraft 1.20.1 directory-backed runtime assets + furnace/ingot/iron-pickaxe provenance + entity dimensions/checksums: PASS');
