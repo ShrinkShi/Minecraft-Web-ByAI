@@ -24,6 +24,19 @@ async function saveToTitle(page){
   await expect(page.locator('#main-menu')).toHaveClass(/active/,{timeout:10_000});
   await expect(page.locator('#hud')).toHaveClass(/hidden/);
 }
+async function savedWorld(page,name){
+  return page.evaluate(worldName=>new Promise((resolve,reject)=>{
+    const request=indexedDB.open('minecraft-web-by-ai',1);
+    request.onerror=()=>reject(request.error);
+    request.onsuccess=()=>{
+      const db=request.result;
+      if(!db.objectStoreNames.contains('worlds')){db.close();resolve(null);return;}
+      const tx=db.transaction('worlds','readonly'),getAll=tx.objectStore('worlds').getAll();
+      getAll.onerror=()=>reject(getAll.error);
+      getAll.onsuccess=()=>{const record=getAll.result.find(world=>world.name===worldName)||null;db.close();resolve(record);};
+    };
+  }),name);
+}
 
 const snapshot=page=>page.evaluate(()=>globalThis.__minecraftE2E?.singleplayerFurnace?.()||null);
 
@@ -100,9 +113,15 @@ test('singleplayer furnace right-clicks through gameplay, persists across reload
   await expect(page.locator('#cursor-stack')).toContainText('2');
   await expect(page.locator('#cursor-stack img[alt="铁锭"]')).toBeVisible();
 
-  // Closing a Furnace must settle its transient cursor before the world record
-  // is serialized. Otherwise output can look correct in-session yet disappear
-  // after save/reload because local Inventory snapshots intentionally omit cursor.
+  // Autosave runs while the Furnace panel remains open. The world record must
+  // therefore include the transient cursor as part of the same durable state as
+  // Furnace slots; otherwise a crash between autosave and panel close loses output.
+  await expect.poll(async()=>{
+    const record=await savedWorld(page,name);
+    return record?.inventory?.cursor||null;
+  },{timeout:10_000,message:'world autosave should persist the live Furnace cursor instead of writing a partial Inventory snapshot'}).toEqual({id:'iron_ingot',count:2});
+
+  // Explicit close still settles the transient cursor back into normal slots.
   await page.keyboard.press('Escape');
   await expect(furnace).toHaveClass(/hidden/);
   await expect(page.locator('#cursor-stack')).toHaveClass(/hidden/);
