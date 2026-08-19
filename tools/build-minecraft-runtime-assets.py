@@ -2,8 +2,8 @@
 """Build browser-ready art from selectively imported Minecraft resources.
 
 The legacy terrain atlas stays byte-compatible while generic model JSON is
-passed through from the deterministic runtime closure. Direct block-item source
-files are copied byte-for-byte from the repository-tracked
+passed through from the deterministic runtime closure. Direct runtime item
+source files are copied byte-for-byte from the repository-tracked
 ``MC原版素材assets/`` directory.
 """
 
@@ -71,11 +71,12 @@ ITEM_FILES = {
     "string.png": ("string.png", None),
 }
 
-DIRECT_BLOCK_ITEM_FILES = {
+DIRECT_ITEM_FILES = {
     "glass.png": Path("minecraft/textures/block/glass.png"),
     "furnace_top.png": Path("minecraft/textures/block/furnace_top.png"),
     "furnace_side.png": Path("minecraft/textures/block/furnace_side.png"),
     "furnace_front.png": Path("minecraft/textures/block/furnace_front.png"),
+    "iron_pickaxe.png": Path("minecraft/textures/item/iron_pickaxe.png"),
 }
 
 PASS_THROUGH = [
@@ -186,17 +187,17 @@ def build_items(source: Path, output: Path) -> dict[str, object]:
     return records
 
 
-def build_direct_block_item_files(minecraft_source: Path, output: Path) -> int:
+def build_direct_item_files(minecraft_source: Path, output: Path) -> int:
     if not minecraft_source.is_dir():
         raise FileNotFoundError(f"Minecraft source directory is missing: {minecraft_source}")
     target_dir = output / "items"
     target_dir.mkdir(parents=True, exist_ok=True)
-    for destination, relative in sorted(DIRECT_BLOCK_ITEM_FILES.items()):
+    for destination, relative in sorted(DIRECT_ITEM_FILES.items()):
         source_path = minecraft_source / relative
         if not source_path.is_file():
-            raise FileNotFoundError(f"missing direct block item source resource: {source_path}")
+            raise FileNotFoundError(f"missing direct item source resource: {source_path}")
         shutil.copyfile(source_path, target_dir / destination)
-    return len(DIRECT_BLOCK_ITEM_FILES)
+    return len(DIRECT_ITEM_FILES)
 
 
 def reference_file_list(source: Path) -> list[str]:
@@ -243,7 +244,7 @@ def main() -> int:
 
     atlas = build_atlas(args.source, args.output)
     items = build_items(args.source, args.output)
-    direct_block_items = build_direct_block_item_files(args.minecraft_source, args.output)
+    direct_items = build_direct_item_files(args.minecraft_source, args.output)
     reference_files = copy_reference_files(args.source, args.output)
 
     source_provenance = {key: source_manifest[key] for key in ("sourceKind", "sourceRoot", "sourceArchive", "sourceArchiveSha256") if key in source_manifest}
@@ -265,7 +266,7 @@ def main() -> int:
     manifest_path = args.output / "minecraft/runtime-manifest.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(runtime_manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"built terrain atlas + {len(items)} item icons + {direct_block_items} direct block item texture(s) from Minecraft source")
+    print(f"built terrain atlas + {len(items)} item icons + {direct_items} direct item texture(s) from Minecraft source")
     print(f"runtime atlas sha256: {atlas['sha256']}")
     print(
         "runtime model JSON:",

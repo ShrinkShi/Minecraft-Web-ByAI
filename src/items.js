@@ -19,6 +19,7 @@ export const ITEMS={
   stick:textured('木棍',64,'item.stick'),
   wooden_pickaxe:textured('木镐',1,'item.wooden_pickaxe',{attackDamage:2,tool:{kind:'pickaxe',tier:'wood',speed:2,durability:59}}),
   stone_pickaxe:textured('石镐',1,'item.stone_pickaxe',{attackDamage:3,tool:{kind:'pickaxe',tier:'stone',speed:4,durability:131}}),
+  iron_pickaxe:textured('铁镐',1,'item.iron_pickaxe',{attackDamage:4,tool:{kind:'pickaxe',tier:'iron',speed:6,durability:250}}),
   raw_iron:textured('粗铁',64,'item.raw_iron'),
   iron_ingot:textured('铁锭',64,'item.iron_ingot'),
   bed:{name:'床',stack:1,placeKind:'bed',itemPreview:'bed-model',entityAssetKey:'entity.bed.red'},
