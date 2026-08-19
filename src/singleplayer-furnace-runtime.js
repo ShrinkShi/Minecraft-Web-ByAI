@@ -5,6 +5,8 @@ import {itemStacksCanMerge} from './item-stack.js';
 import {maxStack} from './items.js';
 import {FURNACE_SLOT,furnaceCanInsert,furnaceStackLimitFor,materializeSmeltingExperience,normalizeFurnaceStack} from './smelting.js';
 
+const MAX_ACTIVE_FRAME_GAP_SECONDS=.5;
+const defaultClock=()=>globalThis.performance?.now?.()??Date.now();
 function callback(value,label){if(typeof value!=='function')throw new TypeError(`${label} must be a function`);return value;}
 function cell(value){if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError('singleplayer furnace target must be an object');const result={};for(const axis of ['x','y','z']){if(!Number.isInteger(value[axis]))throw new RangeError(`singleplayer furnace target.${axis} must be an integer`);result[axis]=value[axis];}return Object.freeze(result);}
 function sameCell(a,b){return !!a&&!!b&&a.x===b.x&&a.y===b.y&&a.z===b.z;}
@@ -17,8 +19,8 @@ function inventoryLike(value){if(!value||typeof value!=='object'||!Array.isArray
 function worldLike(value){if(!value||typeof value!=='object'||typeof value.getBlock!=='function')throw new TypeError('singleplayer furnace world must expose getBlock');return value;}
 
 export class SingleplayerFurnaceRuntime{
-  constructor({world,inventory,getMode=()=> 'survival',onChanged=()=>{},onExperience=()=>{},onDrop=()=>{},random=Math.random}={}){
-    this.world=worldLike(world);this.inventory=inventoryLike(inventory);this.getMode=callback(getMode,'singleplayer furnace getMode');this.onChanged=callback(onChanged,'singleplayer furnace onChanged');this.onExperience=callback(onExperience,'singleplayer furnace onExperience');this.onDrop=callback(onDrop,'singleplayer furnace onDrop');this.random=callback(random,'singleplayer furnace random');this.hub=new FurnaceContainerHub();this.openTarget=null;this.tickCarry=0;this.disposed=false;this.releaseSender=attachFurnaceSender(action=>this.handle(action));
+  constructor({world,inventory,getMode=()=> 'survival',onChanged=()=>{},onExperience=()=>{},onDrop=()=>{},random=Math.random,clock=defaultClock}={}){
+    this.world=worldLike(world);this.inventory=inventoryLike(inventory);this.getMode=callback(getMode,'singleplayer furnace getMode');this.onChanged=callback(onChanged,'singleplayer furnace onChanged');this.onExperience=callback(onExperience,'singleplayer furnace onExperience');this.onDrop=callback(onDrop,'singleplayer furnace onDrop');this.random=callback(random,'singleplayer furnace random');this.clock=callback(clock,'singleplayer furnace clock');this.lastClockMs=null;this.hub=new FurnaceContainerHub();this.openTarget=null;this.tickCarry=0;this.disposed=false;this.releaseSender=attachFurnaceSender(action=>this.handle(action));
   }
   snapshot(target=this.openTarget){return target&&this.hub.has(target)?this.hub.snapshot(target):null;}
   serialize(){return this.hub.serialize();}
@@ -41,6 +43,9 @@ export class SingleplayerFurnaceRuntime{
   }
   validateOpen(){if(!this.openTarget)return true;if(!interactiveMode(this.getMode())){this.close('mode-invalid');return false;}if(this.world.getBlock(this.openTarget.x,this.openTarget.y,this.openTarget.z)!==BLOCK.FURNACE){this.close('block-removed');return false;}return true;}
   touchInventory(){this.inventory.notify?.('singleplayer-furnace');}
+  activeElapsed(dt){
+    const now=this.clock();if(!Number.isFinite(now))throw new RangeError('singleplayer furnace clock must return a finite millisecond timestamp');let elapsed=dt;if(this.lastClockMs!==null){const wall=(now-this.lastClockMs)/1000;if(Number.isFinite(wall)&&wall>0&&wall<=MAX_ACTIVE_FRAME_GAP_SECONDS)elapsed=Math.max(elapsed,wall);}this.lastClockMs=now;return elapsed;
+  }
   clickSlot(state,slot,button,shift){
     slot=inputSlot(slot);button=mouseButton(button);if(typeof shift!=='boolean')throw new TypeError('singleplayer furnace shift must be boolean');const current=state.snapshot().slots[slot],expectedRevision=state.revision;
     if(shift){if(!current)return Object.freeze({changed:false,reason:'no-change'});const incoming={...current},remaining=this.inventory.returnExistingStack(incoming),moved=incoming.count-remaining;if(moved<=0)return Object.freeze({changed:false,reason:'inventory-full'});const replacement=remaining?{...incoming,count:remaining}:null,outcome=state.replaceSlot(slot,replacement,{expectedRevision});if(!outcome.changed)throw new Error('singleplayer furnace inventory/state shift transaction diverged');this.touchInventory();return Object.freeze({changed:true,reason:remaining?'shift-moved-partial':'shift-moved'});}
@@ -70,7 +75,7 @@ export class SingleplayerFurnaceRuntime{
     if(outcome.changed){this.onChanged({source:'furnace-transaction',target:state.target,outcome});this.publish(state.target);}return this.result(true,outcome.reason||'no-change',{experience:outcome.experience??0,awardedExperience:outcome.awardedExperience??0});
   }
   update(dt){
-    if(this.disposed||!Number.isFinite(dt)||dt<=0)return Object.freeze({ticks:0,changed:0,smelted:0});this.validateOpen();this.tickCarry+=dt*20;const ticks=Math.floor(this.tickCarry);if(ticks<1)return Object.freeze({ticks:0,changed:0,smelted:0});this.tickCarry-=ticks;const result=this.hub.tickAll(ticks);if(result.changed){this.onChanged({source:'furnace-tick',ticks,result});if(this.openTarget&&this.hub.has(this.openTarget))this.publish(this.openTarget);}return Object.freeze({ticks,changed:result.changed,smelted:result.smelted});
+    if(this.disposed||!Number.isFinite(dt)||dt<=0)return Object.freeze({ticks:0,changed:0,smelted:0});this.validateOpen();this.tickCarry+=this.activeElapsed(dt)*20;const ticks=Math.floor(this.tickCarry);if(ticks<1)return Object.freeze({ticks:0,changed:0,smelted:0});this.tickCarry-=ticks;const result=this.hub.tickAll(ticks);if(result.changed){this.onChanged({source:'furnace-tick',ticks,result});if(this.openTarget&&this.hub.has(this.openTarget))this.publish(this.openTarget);}return Object.freeze({ticks,changed:result.changed,smelted:result.smelted});
   }
   break(target){
     target=cell(target);const wasOpen=sameCell(this.openTarget,target);const result=this.hub.break(target);if(wasOpen)this.close('block-removed');if(!result.changed)return result;for(const stack of result.contents)this.onDrop({...stack},target);this.onChanged({source:'furnace-break',target,result});return result;
