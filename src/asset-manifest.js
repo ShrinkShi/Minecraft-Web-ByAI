@@ -41,6 +41,7 @@ const RECORDS=Object.freeze({
   'item.iron_pickaxe':supplied('item-texture','./assets/items/iron_pickaxe.png',{minecraftVersion:'1.20.1',sha256:'67305d8bd14e1d60633258f52055fce5aeaea7837c10e62d436fc16f163be627'}),
   'item.iron_axe':supplied('item-texture','./assets/items/iron_axe.png',{minecraftVersion:'1.20.1',sha256:'8dea40bac06c6f14bb0ad9e8b47de63250f6d6a46ae9439b85ddd1377f1edb49'}),
   'item.iron_shovel':supplied('item-texture','./assets/items/iron_shovel.png',{minecraftVersion:'1.20.1',sha256:'c9d36d59ec53ebc631bd24930f62087c316eef39bd237d8bb69cb2bb629dfae5'}),
+  'item.iron_sword':supplied('item-texture','./assets/items/iron_sword.png',{minecraftVersion:'1.20.1',sha256:'ed1fa2f6c87c9df2e2d19853570924de3927e816216a9e2fe3780a0aff6bed6b'}),
   'item.raw_iron':supplied('item-texture','./assets/items/raw_iron.png'),
   'item.iron_ingot':supplied('item-texture','./assets/items/iron_ingot.png'),
   'item.leather_helmet':supplied('item-texture','./assets/items/leather_helmet.png'),
