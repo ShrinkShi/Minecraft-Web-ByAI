@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {BLOCK} from '../src/blocks.js';
+import {FURNACE_SLOT} from '../src/smelting.js';
 import {ServerPlayerInventoryHub} from '../server/player-inventory-state.mjs';
 import {FurnaceRuntimeController} from '../server/furnace-runtime-controller.mjs';
 
@@ -21,6 +22,9 @@ inventoryRevision=inventories.snapshot(session).revision;controller.handleTransa
 controller.handleTransaction({session,transaction:tx(5,inventoryRevision,4,{type:'take-output',button:0,shift:false})});assert.equal(results.at(-1).message.code,'output-taken');assert.deepEqual(inventories.snapshot(session).cursor,{id:'iron_ingot',count:1});assert.equal(controller.hub.snapshot(target).slots[2],null);assert.equal(experience.length,1);assert.equal(experience[0].id,session);assert.equal(experience[0].amount,.7);
 
 controller.open(second,players.get(second),target);const beforeBroadcast=snapshots.filter(entry=>entry.to===second).length;controller.tick(1);assert.ok(snapshots.filter(entry=>entry.to===second).length>beforeBroadcast,'open viewers receive timer progress snapshots');controller.closeCurrent(second,'client-closed');assert.equal(controller.hub.furnaceCount,1,'closing the last viewer keeps the world furnace alive');
-const breakOutcome=controller.handleBlockRemoved(target);assert.equal(breakOutcome.changed,true);assert.equal(controller.hub.furnaceCount,0);assert.equal(closes.some(entry=>entry.message.reason==='client-closed'),true);
+
+const damaged='s:furnace-damaged';inventories.join(damaged,{mode:'survival'});players.set(damaged,{mode:'survival',position:{x:0,y:62.4,z:0}});inventories.addStack(damaged,{id:'wooden_pickaxe',count:1,damage:17});inventories.click(damaged,0,0,false);controller.open(damaged,players.get(damaged),target);const damagedOutcome=controller.clickSlot(damaged,controller.stateForSession(damaged),FURNACE_SLOT.FUEL,0,false);assert.equal(damagedOutcome.changed,true);assert.deepEqual(controller.hub.snapshot(target).slots[FURNACE_SLOT.FUEL],{id:'wooden_pickaxe',count:1,damage:17},'furnace cursor placement must preserve tool durability metadata');assert.equal(inventories.snapshot(damaged).cursor,null);controller.closeCurrent(damaged,'client-closed');inventories.leave(damaged);players.delete(damaged);
+
+const breakOutcome=controller.handleBlockRemoved(target);assert.equal(breakOutcome.changed,true);assert.equal(controller.hub.furnaceCount,0);assert.equal(closes.some(entry=>entry.message.reason==='client-closed'),true);assert.equal(breakOutcome.contents.some(stack=>stack.id==='wooden_pickaxe'&&stack.damage===17),true,'breaking a furnace must preserve damaged tool metadata in dropped contents');
 controller.close();inventories.close();
-console.log('authoritative furnace close persistence + stable revision + server tick + output ownership + viewer replication: PASS');
+console.log('authoritative furnace close persistence + item metadata + stable revision + server tick + output ownership + viewer replication: PASS');
