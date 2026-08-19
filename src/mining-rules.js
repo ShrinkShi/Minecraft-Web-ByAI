@@ -8,9 +8,10 @@ export const BASE_HARDNESS_DURATION_MS=900;
 
 function blockDef(blockId){const block=BLOCKS[blockId];if(!block)throw new RangeError('mining block id must reference a known block');return block;}
 function toolFor(itemId){return typeof itemId==='string'?ITEMS[itemId]?.tool||null:null;}
+function effectiveToolKind(block){return block.effectiveTool||block.requires||null;}
 
 export function miningToolMultiplier(blockId,itemId=null){
-  const block=blockDef(blockId),tool=toolFor(itemId);if(!tool)return 1;if(block.requires===tool.kind)return 2.5*tool.speed;return 1.2;
+  const block=blockDef(blockId),tool=toolFor(itemId);if(!tool)return 1;if(effectiveToolKind(block)===tool.kind)return 2.5*tool.speed;return 1.2;
 }
 
 export function canHarvestBlock(blockId,itemId=null){return toolMeetsBlockRequirement(toolFor(itemId),blockDef(blockId));}
