@@ -9,7 +9,7 @@ assert.equal(materializeSmeltingExperience(.7,()=>.7),0);
 assert.equal(materializeSmeltingExperience(2.1,()=>.05),3);
 assert.equal(materializeSmeltingExperience(2.1,()=>.5),2);
 
-const target={x:3,y:64,z:-2};
+const target={x:3,y:32,z:-2};
 let blockId=BLOCK.FURNACE,xp=0,dirty=0;
 const dropped=[];
 const world={getBlock:(x,y,z)=>x===target.x&&y===target.y&&z===target.z?blockId:0};
@@ -34,8 +34,15 @@ assert.equal(halfway.cookProgress,100);
 const saved=runtime.serialize();
 runtime.close();runtime.dispose();
 
+// VoxelWorld#getBlock returns 0 for an unloaded chunk. Restore must validate
+// serialized Furnace data itself instead of interpreting that unknown 0 as
+// proof that the saved Furnace block was removed.
+blockId=0;
 runtime=createRuntime();
 assert.deepEqual(runtime.restore(saved),{restored:1,discarded:0});
+assert.equal(runtime.snapshot(target).cookProgress,100);
+assert.deepEqual(runtime.restore([{target:{x:'bad',y:0,z:0}}]),{restored:0,discarded:1});
+blockId=BLOCK.FURNACE;
 assert.equal(runtime.open(target).opened,true);
 assert.equal(runtime.snapshot().cookProgress,100);
 runtime.update(5);
@@ -62,4 +69,4 @@ assert.deepEqual(dropped[0].cell,target);
 assert.ok(dirty>0);
 runtime.dispose();
 
-console.log('singleplayer furnace runtime persistence, smelting, XP, close/reopen and break drain: PASS');
+console.log('singleplayer furnace runtime persistence, unloaded-chunk restore, smelting, XP, close/reopen and break drain: PASS');
