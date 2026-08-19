@@ -13,7 +13,8 @@ function cloneStack(value){return value?Object.freeze({...normalizeFurnaceStack(
 function cloneState(value){return createFurnaceState(value);}
 function conflict(state){return Object.freeze({changed:false,reason:'revision-conflict',container:state.snapshot()});}
 function mutableSlot(value){if(value!==FURNACE_SLOT.INPUT&&value!==FURNACE_SLOT.FUEL)throw new RangeError('furnace mutable slot must be INPUT or FUEL');return value;}
-function sameStack(a,b){return a===b||(!a&&!b)||!!(a&&b&&a.id===b.id&&a.count===b.count);}
+function sameStack(a,b){return a===b||(!a&&!b)||!!(a&&b&&a.id===b.id&&a.count===b.count&&(a.damage??0)===(b.damage??0));}
+function sameStackIdentity(a,b){return !!(a&&b&&a.id===b.id&&(a.damage??0)===(b.damage??0));}
 
 export class ServerFurnaceContainerState{
   constructor(target,{state=null,revision:initialRevision=0}={}){
@@ -31,9 +32,9 @@ export class ServerFurnaceContainerState{
     expectedRevision=revision(expectedRevision);if(expectedRevision!==this.revision)return conflict(this);
     if(slot!==FURNACE_SLOT.INPUT&&slot!==FURNACE_SLOT.FUEL)throw new RangeError('furnace insert slot must be INPUT or FUEL');
     const incoming=normalizeFurnaceStack(value,{label:'furnace insert stack'});if(!furnaceCanInsert(slot,incoming.id))return Object.freeze({changed:false,reason:'slot-rejects-item',remaining:incoming.count,container:this.snapshot()});
-    const slots=this.state.slots.map(stack=>stack?{...stack}:null),current=slots[slot];if(current&&current.id!==incoming.id)return Object.freeze({changed:false,reason:'slot-occupied',remaining:incoming.count,container:this.snapshot()});
+    const slots=this.state.slots.map(stack=>stack?{...stack}:null),current=slots[slot];if(current&&!sameStackIdentity(current,incoming))return Object.freeze({changed:false,reason:'slot-occupied',remaining:incoming.count,container:this.snapshot()});
     const capacity=furnaceStackLimitFor(incoming.id)-(current?.count||0),moved=Math.min(capacity,incoming.count);if(moved<=0)return Object.freeze({changed:false,reason:'slot-full',remaining:incoming.count,container:this.snapshot()});
-    slots[slot]=current?{id:current.id,count:current.count+moved}:{id:incoming.id,count:moved};this.state=createFurnaceState({...this.state,slots});this.advanceRevision();
+    slots[slot]=current?{...current,count:current.count+moved}:{...incoming,count:moved};this.state=createFurnaceState({...this.state,slots});this.advanceRevision();
     return Object.freeze({changed:true,reason:moved===incoming.count?'inserted':'inserted-partial',moved,remaining:incoming.count-moved,container:this.snapshot()});
   }
   takeOutput(amount=FURNACE_STACK_LIMIT,{expectedRevision=this.revision}={}){
