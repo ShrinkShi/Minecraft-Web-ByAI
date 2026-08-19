@@ -22,6 +22,7 @@ assert.equal(furnaceCanInsert(FURNACE_SLOT.FUEL,'stone_pickaxe'),false);
 assert.equal(furnaceCanInsert(FURNACE_SLOT.OUTPUT,'iron_ingot'),false);
 assert.throws(()=>normalizeFurnaceStack({id:'not-a-real-item',count:1}),/known item or declared smelting output/);
 assert.throws(()=>normalizeFurnaceStack({id:'wooden_pickaxe',count:2}),/integer from 1 to 1/);
+assert.deepEqual(normalizeFurnaceStack({id:'wooden_pickaxe',count:1,damage:17}),{id:'wooden_pickaxe',count:1,damage:17},'furnace stacks must preserve legal item-instance durability');
 assert.throws(()=>createFurnaceState({slots:[null,{id:'stone_pickaxe',count:1},null]}),/fuel slot/);
 assert.throws(()=>createFurnaceState({slots:[null,null,{id:'raw_iron',count:1}]}),/output slot/);
 assert.throws(()=>createFurnaceState({burnRemaining:2,burnTotal:1}),/cannot exceed/);
@@ -60,8 +61,12 @@ const singleToolFuel=new ServerFurnaceContainerState({x:1,y:64,z:0});
 assert.equal(singleToolFuel.insert(FURNACE_SLOT.FUEL,{id:'wooden_pickaxe',count:1}).changed,true);
 assert.equal(singleToolFuel.insert(FURNACE_SLOT.FUEL,{id:'wooden_pickaxe',count:1},{expectedRevision:1}).reason,'slot-full','non-stackable fuel must never merge above its item stack limit');
 
+const damagedToolFuel=new ServerFurnaceContainerState({x:1,y:64,z:1},{state:createFurnaceState({slots:[{id:'raw_iron',count:1},{id:'wooden_pickaxe',count:1,damage:17},null]})});
+assert.deepEqual(damagedToolFuel.snapshot().slots[FURNACE_SLOT.FUEL],{id:'wooden_pickaxe',count:1,damage:17});
+const damagedIgnite=damagedToolFuel.tick(1);assert.equal(damagedIgnite.consumedFuel,1);assert.equal(damagedIgnite.container.burnRemaining,199);assert.equal(damagedIgnite.container.slots[FURNACE_SLOT.FUEL],null,'damaged wooden tools must remain valid fuel and be consumed atomically');
+
 const splitXp=new ServerFurnaceContainerState({x:2,y:64,z:0},{state:createFurnaceState({slots:[null,null,{id:'iron_ingot',count:2}],storedExperience:1.4})});
 const firstIngot=splitXp.takeOutput(1,{expectedRevision:0});assert.equal(firstIngot.experience,.7);assert.equal(firstIngot.container.storedExperience,.7);assert.deepEqual(firstIngot.container.slots[FURNACE_SLOT.OUTPUT],{id:'iron_ingot',count:1});
 const secondIngot=splitXp.takeOutput(1,{expectedRevision:1});assert.equal(secondIngot.experience,.7);assert.equal(secondIngot.container.storedExperience,0);
 
-console.log('authoritative furnace smelting foundation + strict item stacks + stable transaction revision + world-cell persistence: PASS');
+console.log('authoritative furnace smelting foundation + item metadata + stable transaction revision + world-cell persistence: PASS');
