@@ -57,6 +57,8 @@ assert.equal(xp,1,'0.7 furnace XP should materialize to one point for random=0.5
 assert.equal(runtime.snapshot().storedExperience,0);
 
 runtime.close();
+assert.equal(inventory.cursor,null,'closing Furnace must settle the transient cursor before a world save');
+assert.equal(inventory.slots.some(stack=>stack?.id==='iron_ingot'&&stack.count===1),true,'settled Furnace cursor item must return to Inventory');
 assert.equal(runtime.open(target).opened,true,'closing the GUI must not delete world-cell state');
 assert.equal(runtime.snapshot().slots[FURNACE_SLOT.INPUT].count,1);
 blockId=0;
@@ -69,4 +71,4 @@ assert.deepEqual(dropped[0].cell,target);
 assert.ok(dirty>0);
 runtime.dispose();
 
-console.log('singleplayer furnace runtime persistence, unloaded-chunk restore, smelting, XP, close/reopen and break drain: PASS');
+console.log('singleplayer furnace runtime persistence, unloaded-chunk restore, cursor settlement, smelting, XP, close/reopen and break drain: PASS');
