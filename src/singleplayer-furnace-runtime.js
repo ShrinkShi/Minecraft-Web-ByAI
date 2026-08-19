@@ -13,7 +13,7 @@ function inputSlot(value){if(value!==FURNACE_SLOT.INPUT&&value!==FURNACE_SLOT.FU
 function mouseButton(value){if(value!==0&&value!==2)throw new RangeError('singleplayer furnace mouse button must be 0 or 2');return value;}
 function wireSnapshot(snapshot){return Object.freeze({version:1,kind:'furnace-container-snapshot',session:'singleplayer',...snapshot});}
 function validCursorStack(value){try{return normalizeFurnaceStack(value,{label:'singleplayer furnace cursor'});}catch{return null;}}
-function inventoryLike(value){if(!value||typeof value!=='object'||!Array.isArray(value.slots)||typeof value.returnExistingStack!=='function'||typeof value.addStack!=='function')throw new TypeError('singleplayer furnace inventory is invalid');return value;}
+function inventoryLike(value){if(!value||typeof value!=='object'||!Array.isArray(value.slots)||typeof value.returnExistingStack!=='function'||typeof value.addStack!=='function'||typeof value.returnCursor!=='function')throw new TypeError('singleplayer furnace inventory is invalid');return value;}
 function worldLike(value){if(!value||typeof value!=='object'||typeof value.getBlock!=='function')throw new TypeError('singleplayer furnace world must expose getBlock');return value;}
 
 export class SingleplayerFurnaceRuntime{
@@ -33,8 +33,11 @@ export class SingleplayerFurnaceRuntime{
     if(this.disposed)return Object.freeze({opened:false,reason:'disposed'});target=cell(target);if(!interactiveMode(this.getMode()))return Object.freeze({opened:false,reason:'mode-invalid'});if(this.world.getBlock(target.x,target.y,target.z)!==BLOCK.FURNACE)return Object.freeze({opened:false,reason:'not-furnace'});
     if(this.openTarget&&!sameCell(this.openTarget,target))this.close('switched-container');const snapshot=this.hub.open(target);this.openTarget=target;publishFurnaceSnapshot(wireSnapshot(snapshot));return Object.freeze({opened:true,reason:'furnace-opened',target:snapshot.target,revision:snapshot.revision});
   }
+  settleCursor(target){
+    if(!this.inventory.cursor)return Object.freeze({changed:false,overflow:null});const overflow=this.inventory.returnCursor();this.touchInventory();if(overflow)this.onDrop({...overflow},target);this.onChanged({source:'furnace-close-cursor',target,overflow});return Object.freeze({changed:true,overflow:overflow?Object.freeze({...overflow}):null});
+  }
   close(reason='client-closed'){
-    if(!this.openTarget)return null;const target=this.openTarget;this.openTarget=null;publishFurnaceClose(Object.freeze({version:1,kind:'furnace-container-close',session:'singleplayer',target,reason}));return Object.freeze({target,reason});
+    if(!this.openTarget)return null;const target=this.openTarget;const cursor=this.settleCursor(target);this.openTarget=null;publishFurnaceClose(Object.freeze({version:1,kind:'furnace-container-close',session:'singleplayer',target,reason}));return Object.freeze({target,reason,cursor});
   }
   validateOpen(){if(!this.openTarget)return true;if(!interactiveMode(this.getMode())){this.close('mode-invalid');return false;}if(this.world.getBlock(this.openTarget.x,this.openTarget.y,this.openTarget.z)!==BLOCK.FURNACE){this.close('block-removed');return false;}return true;}
   touchInventory(){this.inventory.notify?.('singleplayer-furnace');}
@@ -72,5 +75,5 @@ export class SingleplayerFurnaceRuntime{
   break(target){
     target=cell(target);const wasOpen=sameCell(this.openTarget,target);const result=this.hub.break(target);if(wasOpen)this.close('block-removed');if(!result.changed)return result;for(const stack of result.contents)this.onDrop({...stack},target);this.onChanged({source:'furnace-break',target,result});return result;
   }
-  dispose(){if(this.disposed)return false;this.disposed=true;this.openTarget=null;this.releaseSender?.();this.releaseSender=null;this.hub.clear();return true;}
+  dispose(){if(this.disposed)return false;if(this.openTarget)this.close('disposed');this.disposed=true;this.releaseSender?.();this.releaseSender=null;this.hub.clear();return true;}
 }
