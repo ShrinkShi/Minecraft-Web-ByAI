@@ -9,7 +9,7 @@ import {SMELTING_RECIPES,smeltingRecipeFor} from '../src/smelting.js';
 
 assert.equal(BLOCK.FURNACE,21);
 assert.deepEqual(BLOCKS[BLOCK.FURNACE],{
-  name:'熔炉',solid:true,hardness:3.5,tiles:[3,3,3],drops:'block:21',requires:'pickaxe',minToolTier:'wood',interactive:true,interactionKind:'furnace'
+  name:'熔炉',solid:true,hardness:3.5,tiles:[3,3,3],drops:'block:21',requires:'pickaxe',effectiveTool:'pickaxe',minToolTier:'wood',interactive:true,interactionKind:'furnace'
 });
 assert.equal(MINECRAFT_MODEL_RUNTIME_VERSION,1);
 assert.equal(MINECRAFT_MODEL_BLOCK_REGISTRY[BLOCK.FURNACE],minecraftModelBlockDescriptor(BLOCK.FURNACE));

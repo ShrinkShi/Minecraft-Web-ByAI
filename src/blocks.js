@@ -16,26 +16,26 @@ export const BLOCK = Object.freeze({
 
 export const BLOCKS = {
   0:{name:'空气',solid:false,transparent:true,hardness:0,tiles:[0,0,0],drops:null},
-  1:{name:'草方块',solid:true,hardness:.6,tiles:[0,2,1],drops:'block:2'},
-  2:{name:'泥土',solid:true,hardness:.5,tiles:[2,2,2],drops:'block:2'},
-  3:{name:'石头',solid:true,hardness:1.5,tiles:[3,3,3],drops:'block:10',requires:'pickaxe',minToolTier:'wood'},
-  4:{name:'沙子',solid:true,hardness:.5,tiles:[4,4,4],drops:'block:4'},
-  5:{name:'橡木木板',solid:true,hardness:2,tiles:[5,5,5],drops:'block:5'},
-  6:{name:'橡木原木',solid:true,hardness:2,tiles:[7,7,6],drops:'block:6'},
+  1:{name:'草方块',solid:true,hardness:.6,tiles:[0,2,1],drops:'block:2',effectiveTool:'shovel'},
+  2:{name:'泥土',solid:true,hardness:.5,tiles:[2,2,2],drops:'block:2',effectiveTool:'shovel'},
+  3:{name:'石头',solid:true,hardness:1.5,tiles:[3,3,3],drops:'block:10',requires:'pickaxe',effectiveTool:'pickaxe',minToolTier:'wood'},
+  4:{name:'沙子',solid:true,hardness:.5,tiles:[4,4,4],drops:'block:4',effectiveTool:'shovel'},
+  5:{name:'橡木木板',solid:true,hardness:2,tiles:[5,5,5],drops:'block:5',effectiveTool:'axe'},
+  6:{name:'橡木原木',solid:true,hardness:2,tiles:[7,7,6],drops:'block:6',effectiveTool:'axe'},
   7:{name:'橡树树叶',solid:true,transparent:true,hardness:.2,tiles:[8,8,8],drops:null},
   8:{name:'水',solid:false,liquid:true,transparent:true,hardness:100,tiles:[9,9,9],drops:null},
-  9:{name:'工作台',solid:true,hardness:2.5,tiles:[10,5,11],faces:{top:10,bottom:5,east:11,north:12,south:11,west:12},drops:'block:9'},
-  10:{name:'圆石',solid:true,hardness:2,tiles:[13,13,13],drops:'block:10',requires:'pickaxe',minToolTier:'wood'},
+  9:{name:'工作台',solid:true,hardness:2.5,tiles:[10,5,11],faces:{top:10,bottom:5,east:11,north:12,south:11,west:12},drops:'block:9',effectiveTool:'axe'},
+  10:{name:'圆石',solid:true,hardness:2,tiles:[13,13,13],drops:'block:10',requires:'pickaxe',effectiveTool:'pickaxe',minToolTier:'wood'},
   // Normal rendering uses the source-backed Java 1.20.1 interpreted model.
   // Stone tiles are only a legacy fail-open fallback if model resources cannot initialize.
-  19:{name:'铁矿石',solid:true,hardness:3,tiles:[3,3,3],drops:'raw_iron',requires:'pickaxe',minToolTier:'stone'},
+  19:{name:'铁矿石',solid:true,hardness:3,tiles:[3,3,3],drops:'raw_iron',requires:'pickaxe',effectiveTool:'pickaxe',minToolTier:'stone'},
   // Glass is a solid full-cube for collision but renders through the interpreted
   // translucent model path. Stone is fail-open only; normal visuals never use it.
   20:{name:'玻璃',solid:true,transparent:true,hardness:.3,tiles:[3,3,3],drops:null},
   // Furnace interaction/state already lives in the authoritative furnace container
   // runtime. This registration makes the block a real placeable/minable world node;
   // normal visuals come from the source-backed interpreted Java model.
-  21:{name:'熔炉',solid:true,hardness:3.5,tiles:[3,3,3],drops:'block:21',requires:'pickaxe',minToolTier:'wood',interactive:true,interactionKind:'furnace'}
+  21:{name:'熔炉',solid:true,hardness:3.5,tiles:[3,3,3],drops:'block:21',requires:'pickaxe',effectiveTool:'pickaxe',minToolTier:'wood',interactive:true,interactionKind:'furnace'}
 };
 
 for(const id of BED_BLOCK_IDS){
