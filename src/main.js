@@ -1,7 +1,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
 import {UI} from './ui.js';
 import {DeathScreen} from './death-screen.js';
-import {BLOCKS,WORLD_HEIGHT} from './blocks.js';
+import {BLOCK,BLOCKS,WORLD_HEIGHT} from './blocks.js';
 import {normalizeRespawnPoint,resolveRespawnPosition} from './respawn-rules.js';
 import {bedPlacement,bedPartner,bedRespawnAnchor,isBedBlock} from './bed-rules.js';
 import {resolveSleep} from './sleep-rules.js';
@@ -23,6 +23,7 @@ import {MultiplayerMovementSession} from './multiplayer-movement-session.js';
 import {createAuthoritativeMultiplayerGameplay,applyAuthoritativePlayerState} from './multiplayer-gameplay-adapter.js';
 import {HOTBAR_START} from './inventory-layout.js';
 import {SingleplayerMiningController} from './singleplayer-mining-controller.js';
+import {SingleplayerFurnaceRuntime} from './singleplayer-furnace-runtime.js';
 
 const canvas=document.querySelector('#game-canvas');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:false,powerPreference:'high-performance'});
@@ -39,7 +40,7 @@ const sun=new THREE.DirectionalLight(0xfff1c2,2.1);sun.position.set(80,120,60);s
 
 const ui=new UI(),storage=new WorldStorage(),deathScreen=new DeathScreen();
 const e2eEnabled=new URLSearchParams(location.search).get('e2e')==='1';
-let deviceProfile=detectDeviceProfile(),desktopControls=null,mobileControls=null,gameplayRuntime=null;
+let deviceProfile=detectDeviceProfile(),desktopControls=null,mobileControls=null,gameplayRuntime=null,singleplayerFurnace=null;
 let world=null,player=null,inventory=null,equipment=null,drops=null,experienceOrbs=null,projectiles=null,explosions=null,passiveMobs=null,hostileMobs=null,weatherSystem=null;
 let running=false,paused=false,last=performance.now(),selectedTarget=null,lastSecond=0,frames=0,fps=0,worldInfo=null,lastAttackAt=-Infinity;
 let saveDirty=false,saveInFlight=null,lastSaveAt=0,lastSavedPosition=null,gameTime=6000,weather='clear',totalXp=0;
@@ -55,7 +56,7 @@ const singleplayerMining=new SingleplayerMiningController({
   aim:()=>aim(),
   getMode:()=>player?.mode||'spectator',
   getSelectedStack:()=>ui.selectedItem(),
-  breakTarget:broken=>isBedBlock(broken.id)?breakBed(broken):!!world?.setBlock(broken.x,broken.y,broken.z,0),
+  breakTarget:broken=>breakSingleplayerBlock(broken),
   spawnDrop:(stack,broken)=>drops?.spawnStack(stack,new THREE.Vector3(broken.x+.5,broken.y+.6,broken.z+.5)),
   damageSelected:(expectedId,amount)=>{const result=inventory?.damageAt(HOTBAR_START+ui.selected,expectedId,amount)||{changed:false,broken:false,reason:'inventory-unavailable'};if(result.changed){markSaveDirty();if(result.broken)ui.showToast(`${ITEMS[expectedId]?.name||expectedId} 已损坏`);}return result;},
   onProgress:value=>ui.setBreak(value),
@@ -72,7 +73,7 @@ function setPlayerLook(yaw,pitch){if(!player)return false;player.setLook(yaw,pit
 function clearPlayerInput(){controlBus.resetAll();player?.clearControlState?.();if(sessionKind==='multiplayer'){multiplayerMovement?.setControl(controlBus.snapshot());multiplayerMovement?.flush();}}
 function syncControlAdapters(){const active=controlActive();desktopControls?.setGameplayEnabled(active&&!deviceProfile.mobile&&document.pointerLockElement===canvas);mobileControls?.setGameplayEnabled(active&&deviceProfile.mobile);}
 function prepareSingleplayerMiningTarget(blockId=3){if(!e2eEnabled||sessionKind!=='singleplayer'||!world||!player||!BLOCKS[blockId])return null;player.spawn(Math.floor(player.position.x),Math.floor(player.position.z));player.setLook(0,0);const origin=player.eyePosition(new THREE.Vector3()),x=Math.floor(origin.x),y=Math.floor(origin.y),baseZ=Math.floor(origin.z);for(let offset=1;offset<=6;offset++)world.setBlock(x,y,baseZ-offset,0);const z=baseZ-1;if(!world.setBlock(x,y,z,blockId))return null;selectedTarget=null;singleplayerMining.cancel();return{x,y,z,id:blockId};}
-if(e2eEnabled)Object.defineProperty(globalThis,'__minecraftE2E',{value:{setLook:setPlayerLook,prepareSingleplayerMiningTarget,multiplayer:()=>({sessionKind,state:multiplayerMovement?.state||null,ready:multiplayerMovement?.ready||false,worldId:worldInfo?.id||null,tick:multiplayerMovement?.current()?.tick??null})},configurable:true});
+if(e2eEnabled)Object.defineProperty(globalThis,'__minecraftE2E',{value:{setLook:setPlayerLook,prepareSingleplayerMiningTarget,multiplayer:()=>({sessionKind,state:multiplayerMovement?.state||null,ready:multiplayerMovement?.ready||false,worldId:worldInfo?.id||null,tick:multiplayerMovement?.current()?.tick??null}),singleplayerFurnace:()=>{const snapshot=singleplayerFurnace?.snapshot();return snapshot?{target:{...snapshot.target},revision:snapshot.revision,slots:snapshot.slots.map(stack=>stack?{...stack}:null),burnRemaining:snapshot.burnRemaining,burnTotal:snapshot.burnTotal,cookProgress:snapshot.cookProgress,cookTotal:snapshot.cookTotal,storedExperience:snapshot.storedExperience,lit:snapshot.lit}:null;},singleplayerFurnaceRecords:()=>singleplayerFurnace?.serialize().map(record=>structuredClone(record))||[],experienceTotal:()=>totalXp},configurable:true});
 function setRespawnPoint(value){const point=normalizeRespawnPoint(value);if(!point)return false;respawnPoint=point;markSaveDirty();return true;}
 function renderPlayerStatus(){if(!player)return;const xp=experienceState(totalXp);ui.renderStatus(player.hp,player.hunger,xp.progress*100,xp.level,equipment?.armorPoints()||0);}
 function resetOxygen(){oxygenState=createOxygenState();headSubmerged=false;ui.renderOxygen(MAX_AIR_SECONDS,MAX_AIR_SECONDS,false);}
@@ -86,7 +87,7 @@ async function respawnAtPreferredPoint(){
 }
 
 function disposeWorld(){
-  running=false;clearPlayerInput();const movement=multiplayerMovement;multiplayerMovement=null;multiplayerStarting=false;sessionKind=null;try{movement?.close(1000,'leaving multiplayer world');}catch(error){console.warn('关闭多人连接失败',error);}deathState=null;deathScreen.hide();document.exitPointerLock?.();ui.closeChat();ui.inventory.classList.add('hidden');ui.workbench.classList.add('hidden');resetOxygen();ui.setBreak(0);
+  running=false;clearPlayerInput();const movement=multiplayerMovement;multiplayerMovement=null;multiplayerStarting=false;singleplayerFurnace?.dispose();singleplayerFurnace=null;sessionKind=null;try{movement?.close(1000,'leaving multiplayer world');}catch(error){console.warn('关闭多人连接失败',error);}deathState=null;deathScreen.hide();document.exitPointerLock?.();ui.closeChat();ui.inventory.classList.add('hidden');ui.workbench.classList.add('hidden');resetOxygen();ui.setBreak(0);
   gameplayRuntime?.dispose();gameplayRuntime=null;
   weatherSystem=null;explosions=null;projectiles=null;hostileMobs=null;passiveMobs=null;experienceOrbs=null;drops=null;player=null;world=null;inventory=null;equipment=null;worldInfo=null;respawnPoint=null;saveDirty=false;lastSavedPosition=null;lastAttackAt=-Infinity;totalXp=0;ui.setReturnMainLabel(false);
 }
@@ -96,7 +97,7 @@ async function persistWorld(force=false){
   if(force)saveDirty=true;if(saveInFlight)return saveInFlight;if(!saveDirty)return;
   const drain=(async()=>{try{
     while(sessionKind==='singleplayer'&&world&&player&&worldInfo&&inventory&&equipment&&saveDirty){
-      const record={id:worldInfo.id,name:worldInfo.name,seed:worldInfo.seed,prompt:worldInfo.prompt,mode:player.mode,updatedAt:Date.now(),player:player.snapshot(),inventory:inventory.snapshot(),equipment:equipment.snapshot(),edits:world.exportEdits(),gameTime,weather,totalXp,respawnPoint:respawnPoint?{...respawnPoint}:null,version:6};
+      const record={id:worldInfo.id,name:worldInfo.name,seed:worldInfo.seed,prompt:worldInfo.prompt,mode:player.mode,updatedAt:Date.now(),player:player.snapshot(),inventory:inventory.snapshot(),equipment:equipment.snapshot(),edits:world.exportEdits(),furnaces:singleplayerFurnace?.serialize()||[],gameTime,weather,totalXp,respawnPoint:respawnPoint?{...respawnPoint}:null,version:7};
       saveDirty=false;
       try{await storage.putWorld(record);lastSaveAt=performance.now();lastSavedPosition=player?.position.clone()||null;}
       catch(error){saveDirty=true;console.error('世界存档失败',error);ui.showToast('世界存档失败：IndexedDB 不可用');break;}
@@ -108,7 +109,7 @@ async function persistWorld(force=false){
 function spawnOverflow(stacks){if(!drops||!player)return;const origin=player.position.clone().add(new THREE.Vector3(0,1,0));for(const stack of stacks)drops.spawnStack(stack,origin.clone());}
 
 function drainDeathStacks(){
-  if(!inventory)return[];const stacks=[...ui.craft2.drain(),...ui.craft3.drain(),...(equipment?.drain()||[]),...inventory.drain()];ui.inventory.classList.add('hidden');ui.workbench.classList.add('hidden');ui.closeChat();ui.refreshInventory();return stacks;
+  if(!inventory)return[];singleplayerFurnace?.close('player-dead');const stacks=[...ui.craft2.drain(),...ui.craft3.drain(),...(equipment?.drain()||[]),...inventory.drain()];ui.inventory.classList.add('hidden');ui.workbench.classList.add('hidden');ui.closeChat();ui.refreshInventory();return stacks;
 }
 
 function beginPlayerDeath(reason='你死了'){
@@ -166,7 +167,8 @@ async function startWorld(){
   gameplayRuntime=await createClientGameplayRuntime({scene,camera,canvas,seed:worldInfo.seed,prompt:worldInfo.prompt,renderDistance:3,savedEdits:saved?.edits||{},centerX,centerZ,mode,inventoryState:saved?.inventory||null,equipmentState:saved?.equipment||null,controlState:controlBus.snapshot(),weather,onWorldEdit:markSaveDirty,onWorldProgress:(done,total)=>ui.showLoading(true,`生成区块 ${done}/${total}`,total?Math.round(done/total*100):100),onInventoryPickup:()=>{ui.refreshInventory();markSaveDirty();},onExperience:addExperience,onPlayerHit:handlePlayerHit,onPlayerBlast:handlePlayerBlast,onMobDeath:handleMobDeath,onHostileProjectile:handleHostileProjectile,onHostileExplosion:handleHostileExplosion});
   ({world,player,inventory,equipment,drops,experienceOrbs,projectiles,explosions,passiveMobs,hostileMobs,weatherSystem}=gameplayRuntime);
   const restored=!savedDead&&saved?.player?player.restore(saved.player):false;if(!restored)player.spawn(centerX,centerZ);if(savedDead)await respawnAtPreferredPoint();resetOxygen();
-  ui.bindInventory(inventory,{equipment,onChanged:()=>{markSaveDirty();renderPlayerStatus();},onOverflow:spawnOverflow});running=true;paused=false;saveDirty=!saved;lastSavedPosition=player.position.clone();lastAttackAt=-Infinity;ui.hud.classList.remove('hidden');ui.showLoading(false);renderPlayerStatus();applySky();ui.chatMessage('夜间敌对池包括僵尸、骷髅、苦力怕和蜘蛛；水下会消耗氧气；天气指令会切换降雨粒子。');ui.showToast(saved?'已从浏览器存档恢复世界':mode==='creative'?'创造模式':'生存模式');pointer();
+  singleplayerFurnace=new SingleplayerFurnaceRuntime({world,inventory,getMode:()=>player?.mode||'spectator',onChanged:markSaveDirty,onExperience:addExperience,onDrop:(stack,target)=>drops?.spawnStack(stack,new THREE.Vector3(target.x+.5,target.y+.6,target.z+.5))});const furnaceRestore=singleplayerFurnace.restore(saved?.furnaces);
+  ui.bindInventory(inventory,{equipment,onChanged:()=>{markSaveDirty();renderPlayerStatus();},onOverflow:spawnOverflow});running=true;paused=false;saveDirty=!saved||furnaceRestore.discarded>0;lastSavedPosition=player.position.clone();lastAttackAt=-Infinity;ui.hud.classList.remove('hidden');ui.showLoading(false);renderPlayerStatus();applySky();ui.chatMessage('夜间敌对池包括僵尸、骷髅、苦力怕和蜘蛛；水下会消耗氧气；天气指令会切换降雨粒子。');ui.showToast(saved?'已从浏览器存档恢复世界':mode==='creative'?'创造模式':'生存模式');pointer();
 }
 
 function multiplayerStateText(state,detail){
@@ -194,6 +196,7 @@ function pauseGame(){if(!running||deathState)return;paused=true;clearPlayerInput
 function resume(){if(deathState)return;paused=false;modeScreen(null);pointer();}
 function toggleInventory(){if(!running||paused||deathState||ui.isChatOpen())return;if(ui.hasOpenPanel()){ui.closePanels();pointer();}else{clearPlayerInput();document.exitPointerLock?.();ui.openInventory();}}
 function openWorkbench(){if(sessionKind==='multiplayer'){ui.showToast('联机工作台权威尚未接入');return;}if(!running||paused||deathState)return;clearPlayerInput();document.exitPointerLock?.();ui.openWorkbench();}
+function openFurnace(target){if(sessionKind!=='singleplayer'||!running||paused||deathState||!singleplayerFurnace)return false;clearPlayerInput();document.exitPointerLock?.();const result=singleplayerFurnace.open(target);if(!result.opened){ui.showToast(result.reason==='mode-invalid'?'当前模式无法使用熔炉':'熔炉已失效');pointer();return false;}return true;}
 function cycleViewMode(){if(!running||!player)return;const view=player.cycleView();ui.showToast(['第一人称','第三人称背面','第三人称正面'][view]);markSaveDirty();}
 function openChatInput(prefix=''){if(!running||paused||deathState||ui.hasOpenPanel())return;clearPlayerInput();document.exitPointerLock?.();ui.openChat(prefix);}
 
@@ -238,7 +241,7 @@ function primaryActionStart(){
 }
 function primaryActionEnd(){singleplayerMining.cancel();selectedTarget=null;}
 function secondaryAction(){
-  if(sessionKind==='multiplayer'){ui.showToast('联机放置/使用权威尚未接入');return;}if(!canControl()||!player)return;const hit=aim();if(hit&&isBedBlock(hit.id)){if(player.mode!=='spectator')activateBed(hit);return;}if(hit?.id===9){openWorkbench();return;}if(player.mode==='spectator'||player.mode==='adventure'||!hit)return;const selected=ui.selectedItem(),def=ITEMS[selected?.id];if(def?.placeKind==='bed'){const plan=placeBed(hit.previous);if(!plan){ui.showToast('这里无法放置床');return;}if(player.mode!=='creative')ui.consumeSelected(1);ui.showToast(`放置 ${def.name}`);markSaveDirty();return;}if(!def?.blockId||def.blockId===8)return;const p=hit.previous;if(playerOccupies(p.x,p.y,p.z))return;if(world.setBlock(p.x,p.y,p.z,def.blockId)){if(player.mode!=='creative')ui.consumeSelected(1);ui.showToast(`放置 ${def.name}`);markSaveDirty();}
+  if(sessionKind==='multiplayer'){ui.showToast('联机放置/使用权威尚未接入');return;}if(!canControl()||!player)return;const hit=aim();if(hit&&isBedBlock(hit.id)){if(player.mode!=='spectator')activateBed(hit);return;}if(hit?.id===9){openWorkbench();return;}if(hit?.id===BLOCK.FURNACE){openFurnace(hit);return;}if(player.mode==='spectator'||player.mode==='adventure'||!hit)return;const selected=ui.selectedItem(),def=ITEMS[selected?.id];if(def?.placeKind==='bed'){const plan=placeBed(hit.previous);if(!plan){ui.showToast('这里无法放置床');return;}if(player.mode!=='creative')ui.consumeSelected(1);ui.showToast(`放置 ${def.name}`);markSaveDirty();return;}if(!def?.blockId||def.blockId===8)return;const p=hit.previous;if(playerOccupies(p.x,p.y,p.z))return;if(world.setBlock(p.x,p.y,p.z,def.blockId)){if(player.mode!=='creative')ui.consumeSelected(1);ui.showToast(`放置 ${def.name}`);markSaveDirty();}
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden){clearPlayerInput();persistWorld();}});window.addEventListener('beforeunload',()=>{try{multiplayerMovement?.close(1000,'page unload');}catch{}persistWorld();});
 
@@ -262,6 +265,8 @@ function breakBed(broken){
   const partner=bedPartner(broken,broken?.id);if(!world.setBlock(broken.x,broken.y,broken.z,0))return false;
   if(partner&&world.getBlock(partner.x,partner.y,partner.z)===partner.id)world.setBlock(partner.x,partner.y,partner.z,0);return true;
 }
+function breakFurnace(broken){if(!world?.setBlock(broken.x,broken.y,broken.z,0))return false;singleplayerFurnace?.break(broken);return true;}
+function breakSingleplayerBlock(broken){if(isBedBlock(broken?.id))return breakBed(broken);if(broken?.id===BLOCK.FURNACE)return breakFurnace(broken);return !!world?.setBlock(broken.x,broken.y,broken.z,0);}
 function aim(){if(!player)return null;const dir=player.lookDirection(new THREE.Vector3()),origin=player.eyePosition(new THREE.Vector3());return world?.raycast(origin,dir,6);}
 function aimEntity(){if(!player)return null;const dir=player.lookDirection(new THREE.Vector3()),origin=player.eyePosition(new THREE.Vector3()),hits=[];if(passiveMobs){const hit=passiveMobs.raycast(origin,dir,4.5);if(hit)hits.push({...hit,system:passiveMobs});}if(hostileMobs){const hit=hostileMobs.raycast(origin,dir,4.5);if(hit)hits.push({...hit,system:hostileMobs});}hits.sort((a,b)=>a.distance-b.distance);return hits[0]||null;}
 
@@ -293,7 +298,7 @@ function animate(now){
       if(player.hp<=0)beginPlayerDeath(player.position.y<-10?'你掉入了虚空':'你死了');
       if(!deathState){
         world.ensureAround(player.position.x,player.position.z);interaction(now);updateSurvival(dt);updateOxygen(dt,now);
-        if(!deathState){drops?.update(dt,player);experienceOrbs?.update(dt,player);passiveMobs?.update(dt,player);hostileMobs?.update(dt,player,gameTime);projectiles?.update(dt,player);explosions?.update(dt);weatherSystem?.update(dt,player);updateAutosave(now);gameTime=(gameTime+dt*20)%24000;applySky();}
+        if(!deathState){singleplayerFurnace?.update(dt);drops?.update(dt,player);experienceOrbs?.update(dt,player);passiveMobs?.update(dt,player);hostileMobs?.update(dt,player,gameTime);projectiles?.update(dt,player);explosions?.update(dt);weatherSystem?.update(dt,player);updateAutosave(now);gameTime=(gameTime+dt*20)%24000;applySky();}
         const p=player.position,xp=experienceState(totalXp),armor=equipment?.armorPoints()||0,air=oxygenState.air,weatherFx=weatherSystem?.activeCount||0,aimText=selectedTarget?`Aim ${selectedTarget.x}/${selectedTarget.y}/${selectedTarget.z} -> ${selectedTarget.previous.x}/${selectedTarget.previous.y}/${selectedTarget.previous.z}`:'Aim -';ui.debug.textContent=`Minecraft Web By AI v0.4-dev\nFPS ${fps} · WebGL ${renderer.capabilities.isWebGL2?'2':'1'}\nXYZ ${p.x.toFixed(1)} / ${p.y.toFixed(1)} / ${p.z.toFixed(1)}\nChunks ${world.chunks.size} · Meshes ${world.meshes.size} · MeshQ ${world.meshQueue.size}\nPassive ${passiveMobs?.size||0} · Hostile ${hostileMobs?.size||0} · Projectiles ${projectiles?.size||0} · FX ${explosions?.size||0}\nWeatherFX ${weatherSystem?.type||weather}:${weatherFx}\n${aimText}\nDrops ${drops?.drops.length||0} · XPOrbs ${experienceOrbs?.size||0} · XP ${xp.total} / Lv.${xp.level}\nHP ${player.hp.toFixed(1)} · Armor ${armor} · Air ${air.toFixed(1)} · ${headSubmerged?'Submerged':'Dry'}\nTime ${Math.floor(gameTime)} · ${weather}\n模式 ${player.mode} · Seed ${worldInfo?.seed}`;
       }
     }
