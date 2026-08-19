@@ -17,10 +17,17 @@ async function useTarget(page){
   await page.mouse.down({button:'right'});
   await page.mouse.up({button:'right'});
 }
+async function saveToTitle(page){
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#pause-menu')).toHaveClass(/active/);
+  await page.locator('#return-main-button').click();
+  await expect(page.locator('#main-menu')).toHaveClass(/active/,{timeout:10_000});
+  await expect(page.locator('#hud')).toHaveClass(/hidden/);
+}
 
 const snapshot=page=>page.evaluate(()=>globalThis.__minecraftE2E?.singleplayerFurnace?.()||null);
 
-test('singleplayer furnace right-clicks through gameplay, persists across reload, smelts and awards XP',async({page})=>{
+test('singleplayer furnace right-clicks through gameplay, persists across reload, smelts, settles cursor and awards XP',async({page})=>{
   const pageErrors=[],consoleErrors=[];
   page.on('pageerror',error=>pageErrors.push(error.message));
   page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
@@ -57,11 +64,7 @@ test('singleplayer furnace right-clicks through gameplay, persists across reload
 
   await page.keyboard.press('Escape');
   await expect(furnace).toHaveClass(/hidden/);
-  await page.keyboard.press('Escape');
-  await expect(page.locator('#pause-menu')).toHaveClass(/active/);
-  await page.locator('#return-main-button').click();
-  await expect(page.locator('#main-menu')).toHaveClass(/active/,{timeout:10_000});
-  await expect(page.locator('#hud')).toHaveClass(/hidden/);
+  await saveToTitle(page);
 
   await enterExistingWorld(page,name);
   const restoredRecords=await page.evaluate(()=>globalThis.__minecraftE2E?.singleplayerFurnaceRecords?.()||[]);
@@ -84,6 +87,22 @@ test('singleplayer furnace right-clicks through gameplay, persists across reload
   await expect.poll(()=>snapshot(page)).toMatchObject({slots:[null,null,null],storedExperience:0});
   await expect(page.locator('#cursor-stack')).toContainText('2');
   await expect(page.locator('#cursor-stack img[alt="铁锭"]')).toBeVisible();
+
+  // Closing a Furnace must settle its transient cursor before the world record
+  // is serialized. Otherwise output can look correct in-session yet disappear
+  // after save/reload because local Inventory snapshots intentionally omit cursor.
+  await page.keyboard.press('Escape');
+  await expect(furnace).toHaveClass(/hidden/);
+  await expect(page.locator('#cursor-stack')).toHaveClass(/hidden/);
+  await saveToTitle(page);
+  await enterExistingWorld(page,name);
+  expect(await page.evaluate(()=>globalThis.__minecraftE2E?.experienceTotal?.()??-1)).toBeGreaterThanOrEqual(1);
+  await lockPointer(page);
+  await page.keyboard.press('e');
+  await expect(page.locator('#inventory')).not.toHaveClass(/hidden/);
+  const ingot=page.locator('#inventory [data-inv-index][title="铁锭"]').first();
+  await expect(ingot).toBeVisible();
+  await expect(ingot.locator('.slot-count')).toHaveText('2');
 
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
