@@ -45,7 +45,7 @@ PR：#117
    - 本地 Inventory cursor 与 input/fuel/output 事务相连；
    - item-instance metadata 使用共享 item-stack 规则，不因进入 Furnace 丢耐久等实例字段；
    - 20 Hz 单人世界 tick 推进所有已记录 Furnace；
-   - GUI close 不删除 world-cell Furnace state；
+   - GUI close 不删除 world-cell Furnace state，并在关闭前把 transient Inventory cursor 归还背包；背包满时溢出物进入真实掉落物链，避免保存退出吞物品；
    - Furnace 方块被破坏时 drain 剩余物品进入现有单人掉落物链；
    - 取出产物时把 stored smelting XP 通过 Java 风格 fractional materialization 接入现有 `totalXp` / level 系统。
 
@@ -53,14 +53,16 @@ PR：#117
    - 单人 world record 从 version 6 升到 version 7；
    - 新增 `furnaces` world-cell state 数组；
    - world load 后恢复 Furnace slots/timers/revision/stored XP；
-   - 无效记录或已经不是 Furnace block 的记录会被丢弃并重新标记存档 dirty；
+   - restore 严格校验 Furnace record 自身结构，但不会把未加载 chunk 的 `getBlock()==0` 当作“方块已经不存在”的证据，避免误删远处合法 Furnace 状态；
+   - 正常 Furnace 方块破坏通过 runtime 的 `break` 生命周期删除对应状态；结构损坏或重复的 Furnace record 会被丢弃并使存档重新标记 dirty；
    - close/save/re-enter 不依赖 GUI 是否保持打开。
 
 5. Validation
-   - `check-singleplayer-furnace-runtime.mjs` 已进入自动发现的 logic suite，覆盖 persistence、smelting、fractional XP、close/reopen 和 block-break drain；
+   - `check-singleplayer-furnace-runtime.mjs` 已进入自动发现的 logic suite，覆盖 persistence、未加载 chunk 恢复、transient cursor 收尾、smelting、fractional XP、close/reopen 和 block-break drain；
    - `3ef6a33823b96313abab3000e5abb68ef63db019` 的 Repository quality static gate 已确认 **161 scripts passed**，同时保留 #116 全部 authoritative Furnace 回归；
    - 新增 `singleplayer-furnace.spec.mjs`，走真实 `DesktopControls → secondaryAction → raycast → Furnace UI`，在燃烧途中保存返回标题、重新进入 IndexedDB 世界、继续完成 2 个粗铁→2 个铁锭，并验证总 stored XP 1.4 至少实际增加 1 点单人经验；
-   - 最终合并仍只认加入该 E2E 与文档后的 exact head CI，旧 head 绿灯不继承。
+   - 同一浏览器 E2E 继续验证“产物挂在 cursor → 关闭 Furnace → 保存 → 重进世界”后 2 个铁锭仍存在于 Inventory，锁住 local Inventory snapshot 不保存 cursor 导致的潜在吞物品回归；
+   - 最终合并仍只认加入上述 E2E、边界修复和文档后的 exact head CI，旧 head 绿灯不继承。
 
 ## #117 仍然不是“完整 Minecraft 熔炉”
 
@@ -80,12 +82,13 @@ PR：#117
 
 1. 单人右键必须走真实输入/targeting 路径，不使用测试专用直接-open 后门；
 2. 单人 Furnace 使用与 server 相同的 shared state/smelting rules；
-3. IndexedDB save/reload 必须保留 world-cell slots/timers/stored XP；
+3. IndexedDB save/reload 必须保留 world-cell slots/timers/stored XP，并且不能因 chunk 尚未加载而误删合法记录；
 4. output XP 必须进入现有单人 XP 系统，不能把 0.7 直接 `Math.floor()` 成 0；
 5. block break 必须 drain Furnace contents，不能复制或吞物品；
-6. exact branch HEAD JavaScript syntax + 完整 logic/server/Worker 全绿；
-7. exact branch HEAD 两路 Chromium jobs 全绿，新增 persistent singleplayer Furnace E2E 必须实际执行；
-8. feature matrix 与本文同步真实 parity，不把 remaining boundaries 写成已完成。
+6. Furnace close/save 必须 settle transient cursor，不能因 Inventory snapshot 不保存 cursor 而吞产物或燃料；
+7. exact branch HEAD JavaScript syntax + 完整 logic/server/Worker 全绿；
+8. exact branch HEAD 两路 Chromium jobs 全绿，新增 persistent singleplayer Furnace E2E 必须实际执行；
+9. feature matrix 与本文同步真实 parity，不把 remaining boundaries 写成已完成。
 
 ## #117 合并后的下一步
 
@@ -126,7 +129,7 @@ PR：#117
 - hunger / food / crops / breeding；
 - server-authoritative PvE / projectiles / explosions；
 - Nether / End；
-- audio source 可用后再建设声音与音乐系统。
+- audio source可用后再建设声音与音乐系统。
 
 ## 工程规则
 
