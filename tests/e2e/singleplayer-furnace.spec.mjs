@@ -62,6 +62,15 @@ test('singleplayer furnace right-clicks through gameplay, persists across reload
   await expect.poll(async()=>Math.floor((await snapshot(page))?.cookProgress||0),{timeout:8_000}).toBeGreaterThan(20);
   const beforeSave=await snapshot(page);
 
+  // Local Furnace authority responds synchronously. Closing and immediately
+  // reopening the same target must not leave a stale "closing" target key in
+  // the shared UI and suppress the fresh snapshot.
+  await page.keyboard.press('Escape');
+  await expect(furnace).toHaveClass(/hidden/);
+  await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.id||null),{timeout:5_000}).toBe('game-canvas');
+  await useTarget(page);
+  await expect(furnace).not.toHaveClass(/hidden/);
+  await expect.poll(()=>snapshot(page)).toMatchObject({target:{x:target.x,y:target.y,z:target.z}});
   await page.keyboard.press('Escape');
   await expect(furnace).toHaveClass(/hidden/);
   await saveToTitle(page);
