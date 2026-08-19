@@ -17,7 +17,17 @@ async function useTarget(page){
   await page.mouse.down({button:'right'});
   await page.mouse.up({button:'right'});
 }
-async function placeFromInventory(page,workbench,title,indices){
+async function openPreparedWorkbench(page){
+  await lockPointer(page);
+  const table=await page.evaluate(()=>globalThis.__minecraftE2E?.prepareSingleplayerMiningTarget?.(9)||null);
+  expect(table).not.toBeNull();
+  await useTarget(page);
+  const workbench=page.locator('#workbench');
+  await expect(workbench).not.toHaveClass(/hidden/);
+  await expect.poll(()=>page.evaluate(()=>document.pointerLockElement===null),{timeout:5_000}).toBe(true);
+  return workbench;
+}
+async function placeFromInventory(workbench,title,indices){
   const item=workbench.locator(`[data-inv-index][title="${title}"]`).first();
   await expect(item).toBeVisible();
   await item.click();
@@ -32,7 +42,10 @@ async function takeResultToHotbar(page,workbench,title,hotbarInventoryIndex){
   await workbench.locator(`[data-inv-index="${hotbarInventoryIndex}"]`).click();
   await expect(page.locator('#cursor-stack')).toHaveClass(/hidden/);
 }
-
+async function closeWorkbench(page,workbench){
+  await page.keyboard.press('e');
+  await expect(workbench).toHaveClass(/hidden/);
+}
 async function minePreparedTarget(page,blockId,hotbarIndex,toolTitle,expectedDropTitle){
   await lockPointer(page);
   const target=await page.evaluate(id=>globalThis.__minecraftE2E?.prepareSingleplayerMiningTarget?.(id)||null,blockId);
@@ -45,37 +58,32 @@ async function minePreparedTarget(page,blockId,hotbarIndex,toolTitle,expectedDro
   await expect(selected).toHaveAttribute('data-durability-damage','1',{timeout:5_000});
   await page.mouse.up({button:'left'});
   await expect(selected).toHaveAttribute('data-durability-remaining','249');
-  await expect(page.locator(`#hotbar [data-hotbar-index]`).filter({has:page.locator(`[title="${expectedDropTitle}"]`)}).first()).toBeVisible({timeout:5_000});
+  await expect(page.locator(`#hotbar [data-hotbar-index][title="${expectedDropTitle}"]`).first()).toBeVisible({timeout:5_000});
 }
 
-test('iron ingots craft source-backed iron axe and shovel with effective-tool mining but ordinary drops',async({page})=>{
+test('iron ingots craft source-backed iron axe and shovel with effective-tool mining and ordinary drops',async({page})=>{
   const pageErrors=[],consoleErrors=[];
   page.on('pageerror',error=>pageErrors.push(error.message));
   page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
 
   await page.goto('/?e2e=1');
   await createSingleplayerWorld(page,{name:'CI Iron Axe Shovel Progression',seed:'ci-iron-axe-shovel-2026',mode:'survival',prompt:'平原'});
-  await runCommand(page,'/give iron_ingot 4');
-  await runCommand(page,'/give stick 4');
 
-  await lockPointer(page);
-  const table=await page.evaluate(()=>globalThis.__minecraftE2E?.prepareSingleplayerMiningTarget?.(9)||null);
-  expect(table).not.toBeNull();
-  await useTarget(page);
-  const workbench=page.locator('#workbench');
-  await expect(workbench).not.toHaveClass(/hidden/);
-  await expect.poll(()=>page.evaluate(()=>document.pointerLockElement===null),{timeout:5_000}).toBe(true);
-
-  await placeFromInventory(page,workbench,'铁锭',[0,1,3]);
-  await placeFromInventory(page,workbench,'木棍',[4,7]);
+  await runCommand(page,'/give iron_ingot 3');
+  await runCommand(page,'/give stick 2');
+  let workbench=await openPreparedWorkbench(page);
+  await placeFromInventory(workbench,'铁锭',[0,1,3]);
+  await placeFromInventory(workbench,'木棍',[4,7]);
   await takeResultToHotbar(page,workbench,'铁斧',27);
+  await closeWorkbench(page,workbench);
 
-  await placeFromInventory(page,workbench,'铁锭',[1]);
-  await placeFromInventory(page,workbench,'木棍',[4,7]);
+  await runCommand(page,'/give iron_ingot 1');
+  await runCommand(page,'/give stick 2');
+  workbench=await openPreparedWorkbench(page);
+  await placeFromInventory(workbench,'铁锭',[1]);
+  await placeFromInventory(workbench,'木棍',[4,7]);
   await takeResultToHotbar(page,workbench,'铁锹',28);
-
-  await page.keyboard.press('e');
-  await expect(workbench).toHaveClass(/hidden/);
+  await closeWorkbench(page,workbench);
 
   const axe=page.locator('#hotbar [data-hotbar-index="0"]');
   const shovel=page.locator('#hotbar [data-hotbar-index="1"]');
