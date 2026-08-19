@@ -16,7 +16,7 @@ This matrix is the roadmap authority. Percentages are planning estimates, not au
 |---|---:|---|---|
 | Browser engine / chunk / rendering foundation | 85% | PARTIAL | lighting parity, generic non-cube gameplay breadth, advanced particles, broader performance work |
 | Desktop/mobile controls and core UI | 75% | PARTIAL | full settings/accessibility, polished mobile customization, broader browser/device matrix |
-| Singleplayer survival core | 58% | PARTIAL | hunger/food breadth, farming, full iron/tool progression, effects/enchanting/brewing, generic block-entity scheduling |
+| Singleplayer survival core | 58% | PARTIAL | hunger/food breadth, farming, remaining iron tools/armor, effects/enchanting/brewing, generic block-entity scheduling |
 | Blocks/items/recipes breadth | 16% | PARTIAL | most 1.20.1 registry content is not exposed |
 | World generation / biomes / caves / structures | 18% | PARTIAL | true biome pipeline, caves, broad ore distribution, features, structures, Nether/End |
 | Entities / PvE | 35% | PARTIAL | species breadth, pathfinding/spawn parity, breeding/taming/riding, server authority |
@@ -32,7 +32,7 @@ This matrix is the roadmap authority. Percentages are planning estimates, not au
 | Advancements/statistics | 0% | TODO | entire system |
 | Engineering/CI | 90% | PARTIAL | broaden browser/device/performance/load coverage and eliminate known flaky presentation timing |
 
-**Overall strict Minecraft Java 1.20.1 parity planning estimate remains ~35%.** Completing one narrow Furnace progression slice does not justify a large overall percentage jump while most registries and major gameplay domains remain absent.
+**Overall strict Minecraft Java 1.20.1 parity planning estimate remains ~35%.** Completing the narrow iron-pickaxe continuation does not justify a large overall percentage jump while most registries and major gameplay domains remain absent.
 
 ## 1. Runtime, rendering and platform
 
@@ -95,9 +95,9 @@ The bed uses multiple internal block-state IDs, but counts as one gameplay famil
 
 ## 3. Items and crafting
 
-Current runtime item registry: **33 IDs** at this delivery baseline.
+Current runtime item registry: **34 IDs** at this delivery baseline.
 
-Current recipes: **seven**.
+Current recipes: **eight**.
 
 | Feature | Status | Notes |
 |---|---|---|
@@ -107,12 +107,13 @@ Current recipes: **seven**.
 | 3×3 workbench crafting | DONE | Small recipe set only; multiplayer authority exists. |
 | Wooden pickaxe | DONE | Mining speed, harvest rules and durability supported. |
 | Stone pickaxe | DONE | Source-backed item, 3×3 cobblestone/stick recipe, stone-tier speed/harvest and 131 durability are wired. |
-| Iron/gold/diamond/netherite tools | FOUNDATION | Tier rules/assets may exist in part, but gameplay items/recipes/progression are not wired. |
+| Iron pickaxe | DONE | Source-backed Java 1.20.1 item texture, 3×3 iron-ingot/stick recipe, iron-tier speed 6, 250 durability and shared mining/drop integration are wired. |
+| Other iron/gold/diamond/netherite tools | FOUNDATION | Shared tier rules exist, but the remaining gameplay items/recipes/behaviours are not wired. |
 | Raw iron | PARTIAL | Source-backed item is produced by correctly harvested iron ore and can be processed into registered `iron_ingot` through the shared smelting rules in both persistent singleplayer and authoritative multiplayer Furnace paths. Broader ore/smelting content is absent. |
-| Iron ingot | PARTIAL | Source-backed registered gameplay item exists and is the Furnace smelting output; iron tools/armor and broader recipes are not wired. |
+| Iron ingot | PARTIAL | Source-backed registered Furnace output now has a real iron-pickaxe recipe consumer; other iron tools/armor and broader recipes are not wired. |
 | Furnace block item | PARTIAL | Source-backed three-face Inventory/hotbar preview and block placement content exist; dynamic facing/lit parity is absent. |
 | Glass block item | DONE | Source-identical Java 1.20.1 glass texture is deterministically generated and used by Inventory/hotbar without a false terrain-atlas fallback. |
-| Swords/axes/shovels/hoes | TODO | Full behaviour/recipes/durability missing. |
+| Swords/axes/shovels/hoes | TODO | Full behaviour/recipes/durability missing beyond the pickaxe family. |
 | Armor materials beyond leather | TODO | Equipment architecture exists. |
 | Shields | TODO | Blocking/state/network rules required. |
 | Bow/crossbow player mechanics | TODO | Skeleton projectile foundation exists only. |
@@ -138,8 +139,8 @@ Current recipes: **seven**.
 | Death drops/respawn | DONE | Recoverable singleplayer loop and authoritative PvP death drops exist. |
 | Custom spawnpoint | DONE | Persistent singleplayer path. |
 | Bed sleep/respawn | PARTIAL | Night skip/safety implemented; occupancy/animation/full rules incomplete. |
-| Tool durability | PARTIAL | Wooden and stone pickaxes use item-instance durability; broad tool/armor durability coverage is not complete. |
-| Stone → iron mining progression | PARTIAL | Stone-tier iron harvest → raw iron → Furnace → registered iron ingot works in singleplayer and authoritative multiplayer processing paths. Iron pickaxe/tools/armor continuation is still absent. |
+| Tool durability | PARTIAL | Wooden, stone and iron pickaxes use item-instance durability; broad tool/armor durability coverage is not complete. |
+| Stone → iron mining progression | PARTIAL | Stone-tier iron harvest → raw iron → Furnace → iron ingot → 3×3 iron-pickaxe crafting now works. Remaining iron tools/armor, coal and broader mining progression are absent. |
 | Armor durability | TODO | Equipment exists but armor wear does not. |
 | Hunger/exhaustion/saturation | TODO | Major survival gap. |
 | Eating/drinking | TODO | Major survival gap. |
@@ -289,7 +290,7 @@ Terrain v2 compatibility note: if generated `IRON_ORE` cells are normalized back
 | Feature | Status | Notes |
 |---|---|---|
 | Deterministic imported block atlas subset | DONE | Runtime hashes/provenance tracked. |
-| Imported implemented item textures | DONE | Current subset includes source-backed stone pickaxe, raw iron, iron ingot and direct glass block-item texture. |
+| Imported implemented item textures | DONE | Current subset includes source-backed stone pickaxe, raw iron, iron ingot, iron pickaxe and direct glass block-item texture. |
 | Imported furnace source closure | DONE | Canonical directory-backed Java 1.20.1 furnace blockstate/models/textures and GUI texture are used; no placeholder art is substituted. |
 | Imported 8 current mob texture sheets | DONE | Texture-backed cuboid models. |
 | Imported red-bed entity texture | DONE | Used by world bed renderer. |
@@ -323,20 +324,19 @@ Terrain v2 compatibility note: if generated `IRON_ORE` cells are normalized back
 
 | Feature | Status | Notes |
 |---|---|---|
-| Node syntax/logic regression gate | DONE | #116 final exact head passed 160 automatically discovered logic/server/Worker scripts. #117 pre-E2E integration head `3ef6a33823b96313abab3000e5abb68ef63db019` passed **161 scripts**, adding persistent singleplayer Furnace coverage while retaining all authoritative Furnace checks; final exact-head CI is still required before merge. |
-| Chromium E2E | DONE | #116 final exact head passed both 21-test Chromium shards without retries. #117 adds a real singleplayer Pointer-Lock/right-click Furnace test covering mid-smelt IndexedDB save/re-enter, resumed processing, 2× iron-ingot extraction and XP; that new test must pass on the final exact head before merge. |
-| Asset source reproducibility audit | DONE | Selective Minecraft source/runtime outputs are reproducible; furnace/iron-ingot assets are directory-backed from the tracked Java 1.20.1 source tree and validated rather than replaced with placeholders. |
+| Node syntax/logic regression gate | DONE | #117 final exact head `f20b0d787a1c8511fe795859919dc88c9a091be0` passed 162 automatically discovered logic/server/Worker scripts. #118 must retain that complete suite while extending iron-pickaxe progression contracts on its own exact head. |
+| Chromium E2E | DONE | #117 final exact head passed both Chromium shards and actually executed the persistent singleplayer Furnace test. #118 adds a real workbench → iron-pickaxe → iron-ore durability/drop E2E; merge requires that test and both shards to pass again on the rebased exact head. |
+| Asset source reproducibility audit | DONE | Selective Minecraft source/runtime outputs are reproducible; #118 extends the directory-backed pipeline to canonical Java 1.20.1 `iron_pickaxe.png` and requires generated/tracked runtime bytes to match. |
 | GitHub Pages deployment | DONE | Current public Web delivery path. |
 | Failure artifacts | DONE | Browser failures preserve screenshots/traces/context. |
 | Real Android device coverage | TODO | Automated Chromium emulation exists, real device matrix does not. |
 | iOS Safari coverage | TODO | Not yet established. |
 | Load/performance budgets | FOUNDATION | Runtime is designed for bounded objects/workers; formal budgets/benchmarks need expansion. |
 
-## Immediate roadmap after #117
+## Immediate roadmap after #118
 
-1. Continue the iron progression with **iron pickaxe/tools/armor**, including source-backed assets, recipes, durability, mining-tier/combat/armor behaviour.
-2. Add **coal ore + coal item + coal fuel** and broaden the Furnace recipe/fuel registry without forking singleplayer/multiplayer smelting rules.
-3. Add a **server-owned XP/level domain** before claiming multiplayer Furnace XP parity or server-authoritative PvE XP.
-4. Add **durable server world/container persistence** and a generic block-entity/loaded-chunk tick lifecycle, then chest/barrel shared containers.
-5. Continue interpreted-model gameplay validation with slabs/stairs/doors/fences/torches while keeping visual models separate from collision/state/update rules.
-6. Resume the larger missing domains: biome/caves/structures worldgen, server-authoritative PvE/projectiles/explosions, hunger/food/farming/breeding, redstone, Nether/End and audio when a valid sound source is available.
+1. Add the remaining **iron axe / shovel / sword / hoe** with source-backed textures, recipes, durability and shared mining/combat behaviour.
+2. Add **iron armor** on the existing Equipment foundation, while keeping armor durability as a separate parity gap until wear is implemented.
+3. Deliver **coal ore + coal item + coal fuel** as a separate terrain/world-compatibility change: deterministic generation must bump or explicitly version the terrain contract instead of silently changing existing seeded worlds.
+4. Add a **server-owned XP/level domain** before claiming multiplayer Furnace XP parity or server-authoritative PvE XP.
+5. Add **durable server world/container persistence** and a generic block-entity/loaded-chunk tick lifecycle, then chest/barrel shared containers.
