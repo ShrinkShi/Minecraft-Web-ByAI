@@ -24,7 +24,7 @@ export class SingleplayerFurnaceRuntime{
   serialize(){return this.hub.serialize();}
   restore(records){
     if(records===undefined||records===null)return Object.freeze({restored:0,discarded:0});if(!Array.isArray(records))return Object.freeze({restored:0,discarded:1});let restored=0,discarded=0;
-    for(const record of records){try{const target=cell(record?.target);if(this.world.getBlock(target.x,target.y,target.z)!==BLOCK.FURNACE){discarded++;continue;}this.hub.restore(record);restored++;}catch{discarded++;}}
+    for(const record of records){try{cell(record?.target);this.hub.restore(record);restored++;}catch{discarded++;}}
     return Object.freeze({restored,discarded});
   }
   publish(target=this.openTarget){if(!target||!this.hub.has(target))return null;return publishFurnaceSnapshot(wireSnapshot(this.hub.snapshot(target)));}
