@@ -60,14 +60,18 @@ test('authoritative furnace UI uses vanilla texture and accepts same-revision pr
   const furnace=page.locator('#furnace');await expect(furnace).not.toHaveClass(/hidden/);await expect(furnace.locator('.furnace-input')).toBeVisible();await expect(furnace.locator('.furnace-fuel')).toBeVisible();await expect(furnace.locator('.furnace-output')).toBeVisible();
   const background=await furnace.locator('.furnace-panel').evaluate(element=>getComputedStyle(element).backgroundImage);expect(background).toContain('MC%E5%8E%9F%E7%89%88%E7%B4%A0%E6%9D%90assets/minecraft/textures/gui/container/furnace.png');
   await expect(furnace.locator('.furnace-input')).toHaveAttribute('data-furnace-slot','0');await expect(furnace.locator('.furnace-fuel')).toHaveAttribute('data-furnace-slot','1');await expect(furnace.locator('.furnace-output')).toHaveAttribute('data-furnace-output','');
-  const before=await furnace.locator('.furnace-cook-clip').evaluate(element=>getComputedStyle(element).width);expect(parseFloat(before)).toBeGreaterThan(0);
+  const before=await furnace.locator('.furnace-cook-clip').evaluate(element=>getComputedStyle(element).width);expect(parseFloat(before)).toBeGreaterThan(0);await furnace.locator('.furnace-input').evaluate(element=>element.dataset.timerIdentity='preserve-me');
 
   await page.evaluate(async()=>{const channel=await import('/src/multiplayer-furnace-channel.js');channel.publishMultiplayerFurnaceSnapshot({version:1,kind:'furnace-container-snapshot',session:'s:ui-test',target:{x:1,y:64,z:2},revision:7,slots:[{id:'raw_iron',count:2},{id:'block:5',count:1},null],burnRemaining:149,burnTotal:300,cookProgress:100,cookTotal:200,storedExperience:0,lit:true});});
   await expect.poll(async()=>parseFloat(await furnace.locator('.furnace-cook-clip').evaluate(element=>getComputedStyle(element).width))).toBeGreaterThan(parseFloat(before));
-  await expect(furnace.locator('.furnace-status')).toContainText('50%');
+  await expect(furnace.locator('.furnace-status')).toContainText('50%');await expect(furnace.locator('.furnace-input')).toHaveAttribute('data-timer-identity','preserve-me');
 
   await furnace.locator('.furnace-input').dispatchEvent('pointerdown',{button:0,shiftKey:false});await furnace.locator('.furnace-output').dispatchEvent('pointerdown',{button:2,shiftKey:true});
-  const actions=await page.evaluate(()=>window.__furnaceUiActions);expect(actions).toEqual([{type:'slot-click',slot:0,button:0,shift:false},{type:'take-output',button:2,shift:true}]);
+  await furnace.locator('.furnace-close').click();await expect(furnace).toHaveClass(/hidden/);
+  let actions=await page.evaluate(()=>window.__furnaceUiActions);expect(actions).toEqual([{type:'slot-click',slot:0,button:0,shift:false},{type:'take-output',button:2,shift:true},{type:'close'}]);
+
+  await page.evaluate(async()=>{const channel=await import('/src/multiplayer-furnace-channel.js');channel.publishMultiplayerFurnaceSnapshot({version:1,kind:'furnace-container-snapshot',session:'s:ui-test',target:{x:1,y:64,z:2},revision:7,slots:[{id:'raw_iron',count:2},{id:'block:5',count:1},null],burnRemaining:148,burnTotal:300,cookProgress:101,cookTotal:200,storedExperience:0,lit:true});});
+  await expect(furnace).toHaveClass(/hidden/);
 
   await page.evaluate(async()=>{const channel=await import('/src/multiplayer-furnace-channel.js');channel.publishMultiplayerFurnaceClose({version:1,kind:'furnace-container-close',session:'s:ui-test',target:{x:1,y:64,z:2},reason:'client-closed'});window.__releaseFurnaceUiTestSender?.();delete window.__releaseFurnaceUiTestSender;});
   await expect(furnace).toHaveClass(/hidden/);expect(pageErrors).toEqual([]);expect(consoleErrors).toEqual([]);
