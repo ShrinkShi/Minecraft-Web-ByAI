@@ -8,7 +8,7 @@ Status legend:
 - `TODO` — not meaningfully implemented yet.
 - `BLOCKED` — requires an external asset/source or prerequisite that is not currently present.
 
-This matrix is the roadmap authority. Percentages are planning estimates, not automated coverage metrics.
+This matrix is the roadmap authority. Percentages are planning estimates, not automated coverage metrics. Feature PRs update this file for the state that will exist after that PR merges; an unmerged PR does not retroactively change `main`.
 
 ## Overall baseline
 
@@ -16,23 +16,23 @@ This matrix is the roadmap authority. Percentages are planning estimates, not au
 |---|---:|---|---|
 | Browser engine / chunk / rendering foundation | 85% | PARTIAL | lighting parity, generic non-cube gameplay breadth, advanced particles, broader performance work |
 | Desktop/mobile controls and core UI | 75% | PARTIAL | full settings/accessibility, polished mobile customization, broader browser/device matrix |
-| Singleplayer survival core | 55% | PARTIAL | user-facing furnace/iron continuation, hunger/food breadth, farming, full progression, effects/enchanting/brewing |
-| Blocks/items/recipes breadth | 15% | PARTIAL | most 1.20.1 registry content is not exposed |
+| Singleplayer survival core | 55% | PARTIAL | singleplayer furnace interaction/persistence, hunger/food breadth, farming, full progression, effects/enchanting/brewing |
+| Blocks/items/recipes breadth | 16% | PARTIAL | most 1.20.1 registry content is not exposed |
 | World generation / biomes / caves / structures | 18% | PARTIAL | true biome pipeline, caves, broad ore distribution, features, structures, Nether/End |
 | Entities / PvE | 35% | PARTIAL | species breadth, pathfinding/spawn parity, breeding/taming/riding, server authority |
-| Multiplayer server foundation | 65% | PARTIAL | durable persistence, rooms/auth/operators, server PvE, furnace protocol/runtime integration and broader shared containers |
-| Full multiplayer Minecraft parity | 48% | PARTIAL | same as above plus prediction/reconciliation and wider gameplay coverage |
-| Original resource integration | 35% | PARTIAL | much wider registry use, item models, tint/animation, audio |
+| Multiplayer server foundation | 68% | PARTIAL | durable persistence, rooms/auth/operators, server PvE, authoritative XP and broader shared containers |
+| Full multiplayer Minecraft parity | 50% | PARTIAL | same as above plus prediction/reconciliation and wider gameplay coverage |
+| Original resource integration | 36% | PARTIAL | much wider registry use, item models, tint/animation, audio |
 | Audio/music | 0% | BLOCKED | supplied archive contains no sound object set or sounds.json |
 | Redstone | 3% | FOUNDATION | block state/update scheduler/power graph/components |
-| Farming/food/smelting | 10% | FOUNDATION | authoritative furnace processing state now exists; user-facing furnace, food effects, crops, breeding and broad recipes remain |
+| Farming/food/smelting | 15% | PARTIAL | furnace block/content and authoritative multiplayer processing exist; singleplayer furnace, food effects, crops, breeding and broad recipes remain |
 | Villagers/trading | 0% | TODO | entire system |
 | Enchanting/brewing/status effects | 0% | TODO | entire system |
 | Nether/End/portal progression | 0% | TODO | dimensions, portals, dimension worldgen, bosses |
 | Advancements/statistics | 0% | TODO | entire system |
-| Engineering/CI | 90% | PARTIAL | broaden browser/device/performance/load coverage |
+| Engineering/CI | 90% | PARTIAL | broaden browser/device/performance/load coverage and eliminate known flaky presentation timing |
 
-**Overall strict Minecraft Java 1.20.1 parity planning estimate: ~35%.**
+**Overall strict Minecraft Java 1.20.1 parity planning estimate remains ~35%.** The furnace delivery is a narrow progression slice and does not justify a large overall percentage jump.
 
 ## 1. Runtime, rendering and platform
 
@@ -49,9 +49,9 @@ This matrix is the roadmap authority. Percentages are planning estimates, not au
 | Local/pinned Three.js runtime | DONE | Historical runtime CDN dependency removed. |
 | Water transparent pass | PARTIAL | No vanilla fluid levels/flow/animation/refraction. |
 | Bed special model renderer | DONE | Red bed world visual uses imported entity texture; logical collision still simplified. |
-| General blockstate/model JSON interpreter | PARTIAL | Source-backed JSON preloads/compiles into the real Worker/VoxelWorld opt-in path; crafting table, iron ore and glass are live gameplay roots, but broad registry coverage is still missing. |
+| General blockstate/model JSON interpreter | PARTIAL | Source-backed JSON preloads/compiles into the real Worker/VoxelWorld opt-in path; crafting table, iron ore, glass and furnace are live gameplay roots, but broad registry coverage is still missing. |
 | General multipart/variant model support | PARTIAL | Weighted variants/multipart compile and execute in the runtime; generalized gameplay-state/neighbor-state mapping is not wired yet. |
-| Interpreted translucent block layer | PARTIAL | Glass now proves real translucent model-atlas rendering and same-type internal-face culling; broader transparent families, sorting edge cases and panes remain incomplete. |
+| Interpreted translucent block layer | PARTIAL | Glass proves real translucent model-atlas rendering and same-type internal-face culling; broader transparent families, sorting edge cases and panes remain incomplete. |
 | Animated block/item textures | TODO | Water animation metadata retained but playback absent. |
 | Biome tint/color resolver | TODO | Current compatibility uses baked/default tint where required. |
 | Vanilla lighting model | TODO | Current lighting/day-night is simplified. |
@@ -63,14 +63,14 @@ This matrix is the roadmap authority. Percentages are planning estimates, not au
 
 ### Implemented gameplay block families
 
-`grass_block`, `dirt`, `stone`, `sand`, `oak_planks`, `oak_log`, `oak_leaves`, `water`, `crafting_table`, `cobblestone`, `red_bed`, `iron_ore`, `glass`.
+`grass_block`, `dirt`, `stone`, `sand`, `oak_planks`, `oak_log`, `oak_leaves`, `water`, `crafting_table`, `cobblestone`, `red_bed`, `iron_ore`, `glass`, `furnace`.
 
 The bed uses multiple internal block-state IDs, but counts as one gameplay family.
 
 | Feature family | Status | Notes |
 |---|---|---|
-| Basic full cubes | PARTIAL | Small hand-authored gameplay registry only. |
-| Directional full cubes | PARTIAL | Crafting table gameplay semantics exist and use the source-backed interpreted-model runtime. |
+| Basic full cubes | PARTIAL | Small gameplay registry only. |
+| Directional full cubes | PARTIAL | Crafting table and furnace render through source-backed interpreted models, but generalized per-cell directional state is not available. |
 | Beds | PARTIAL | Two-block state + rendering + sleep/respawn; full vanilla support/update/bounce/dimension rules incomplete. |
 | Ores | PARTIAL | Iron ore has gameplay metadata, source-backed model, shared worldgen and stone-tier harvest; other ores and exact vanilla distribution are absent. |
 | Stone variants | TODO | Granite/diorite/andesite/deepslate/tuff/etc. |
@@ -86,7 +86,7 @@ The bed uses multiple internal block-state IDs, but counts as one gameplay famil
 | Ladders/vines | TODO | Non-full collision/placement. |
 | Torches/lanterns | TODO | Model + lighting integration. |
 | Chests/barrels | TODO | Persistent block entity and shared viewer concurrency needed. |
-| Furnaces/smokers/blast furnaces | FOUNDATION | PR #111 adds deterministic processing rules plus world-cell authoritative state/revision/serialization; no gameplay furnace block/model/UI/protocol binding yet. |
+| Furnaces/smokers/blast furnaces | PARTIAL | Furnace block `21`, original Java model/assets, harvest/drop metadata, recipe and iron-ingot content exist. PR #116 adds server-authoritative furnace container/tick/viewer/WebSocket/UI binding. Singleplayer container binding, durable storage, dynamic facing/lit state, smokers and blast furnaces remain. |
 | Signs/hanging signs | TODO | Block entities/text UI. |
 | Bookshelves/chiseled bookshelf | TODO | State/container interactions. |
 | Shulker boxes | TODO | End/content prerequisites. |
@@ -95,9 +95,9 @@ The bed uses multiple internal block-state IDs, but counts as one gameplay famil
 
 ## 3. Items and crafting
 
-Current runtime item registry: 31 IDs at this delivery baseline.
+Current runtime item registry: **33 IDs** at this delivery baseline.
 
-Current recipes: six.
+Current recipes: **seven**.
 
 | Feature | Status | Notes |
 |---|---|---|
@@ -108,15 +108,18 @@ Current recipes: six.
 | Wooden pickaxe | DONE | Mining speed, harvest rules and durability supported. |
 | Stone pickaxe | DONE | Source-backed item, 3×3 cobblestone/stick recipe, stone-tier speed/harvest and 131 durability are wired. |
 | Iron/gold/diamond/netherite tools | FOUNDATION | Tier rules/assets may exist in part, but gameplay items/recipes/progression are not wired. |
-| Raw iron | PARTIAL | Source-backed item is produced by correctly harvested iron ore; PR #111 can process it into a logical iron-ingot output server-side, but iron ingot is not yet a registered gameplay item and no furnace UI is exposed. |
-| Glass block item | DONE | Source-identical Java 1.20.1 glass texture is deterministically generated from the tracked source ZIP and used by Inventory/hotbar without a false terrain-atlas fallback. |
+| Raw iron | PARTIAL | Source-backed item is produced by correctly harvested iron ore and can be processed by the shared smelting rules into registered `iron_ingot`; player-usable furnace processing is currently authoritative-multiplayer only. |
+| Iron ingot | PARTIAL | Source-backed registered gameplay item exists and is the furnace smelting output; iron tools/armor and broader recipes are not wired. |
+| Furnace block item | PARTIAL | Source-backed three-face Inventory/hotbar preview and block placement content exist; dynamic facing/lit parity is absent. |
+| Glass block item | DONE | Source-identical Java 1.20.1 glass texture is deterministically generated and used by Inventory/hotbar without a false terrain-atlas fallback. |
 | Swords/axes/shovels/hoes | TODO | Full behaviour/recipes/durability missing. |
 | Armor materials beyond leather | TODO | Equipment architecture exists. |
 | Shields | TODO | Blocking/state/network rules required. |
 | Bow/crossbow player mechanics | TODO | Skeleton projectile foundation exists only. |
 | Buckets | TODO | Fluid/state interaction required. |
 | Food items and eating | TODO | Hunger/saturation system needs completion. |
-| Furnace recipes | FOUNDATION | Deterministic raw iron → iron ingot recipe, fuel times, 200-tick cooking, cooldown and XP bookkeeping exist; registry/UI/runtime integration remains. |
+| Furnace crafting recipe | PARTIAL | Vanilla-shaped eight-cobblestone furnace recipe is registered; recipe book/discovery parity is absent. |
+| Furnace smelting recipes | PARTIAL | Deterministic raw iron → iron ingot, fuel times, 200-tick cooking, cooldown and XP bookkeeping exist. Broad vanilla recipe/fuel coverage and singleplayer furnace binding remain. |
 | Smithing | TODO | Netherite/template system absent. |
 | Stonecutter/loom/grindstone/etc. | TODO | Workstation/container systems absent. |
 | Recipe book | TODO | No full recipe discovery/UI. |
@@ -131,12 +134,12 @@ Current recipes: six.
 | Oxygen/drowning | PARTIAL | Functional simplified implementation. |
 | Swimming/buoyancy | PARTIAL | No sprint-swimming/crawl/pitch-directed vanilla parity. |
 | Fall damage | PARTIAL | Player collision/fall handling exists but full vanilla edge cases are not a parity claim. |
-| Experience/levels | PARTIAL | XP orbs + level formulas exist; enchanting/repair/etc. absent. |
+| Experience/levels | PARTIAL | Singleplayer XP orbs + level formulas exist; multiplayer does not yet have a server-owned XP/level domain, so furnace output XP is not authoritative-player state yet. |
 | Death drops/respawn | DONE | Recoverable singleplayer loop and authoritative PvP death drops exist. |
 | Custom spawnpoint | DONE | Persistent singleplayer path. |
 | Bed sleep/respawn | PARTIAL | Night skip/safety implemented; occupancy/animation/full rules incomplete. |
 | Tool durability | PARTIAL | Wooden and stone pickaxes use item-instance durability; broad tool/armor durability coverage is not complete. |
-| Stone → iron mining progression | PARTIAL | Stone-tier iron harvest → raw iron exists and the authoritative smelting foundation now models raw iron → iron ingot, but the furnace block/UI/protocol and registered iron-ingot/tool continuation are still absent. |
+| Stone → iron mining progression | PARTIAL | Stone-tier iron harvest → raw iron → registered iron ingot now exists through the authoritative multiplayer furnace path. Singleplayer furnace interaction and iron pickaxe/tool continuation are still absent. |
 | Armor durability | TODO | Equipment exists but armor wear does not. |
 | Hunger/exhaustion/saturation | TODO | Major survival gap. |
 | Eating/drinking | TODO | Major survival gap. |
@@ -215,18 +218,20 @@ Terrain v2 compatibility note: if generated `IRON_ORE` cells are normalized back
 | Remote player replication/rendering | DONE | Public player IDs and interpolation. |
 | Authoritative world edits | DONE | Bootstrap + live revisions. |
 | Authoritative mining | DONE | Survival timing/progress/crack feedback; shared harvest rules cover iron ore and ordinary glass breaking. |
-| Authoritative placement | DONE | Creative + Survival ordinary block placement; focused server-controller coverage includes glass consumption/mutation. |
+| Authoritative placement | DONE | Creative + Survival ordinary block placement. |
 | Authoritative ground items | DONE | Drop/pickup lifecycle. |
 | Authoritative Inventory | DONE | Full slots + cursor transactions. |
 | Authoritative Equipment | DONE | Dual-revision Inventory/Equipment transactions. |
 | Authoritative 2×2 crafting | DONE | Server-owned recipe state. |
 | Authoritative workbench | DONE | Server-owned transient 3×3 container. |
+| Authoritative furnace container | PARTIAL | PR #116 adds strict world-cell snapshot/close/transaction wire, dual revision guards, 20 Hz server processing, shared viewers, authoritative Inventory cursor transactions, forced invalidation and browser Furnace UI. Durable storage, server-owned player XP and complete vanilla furnace state remain. |
 | Authoritative chat | DONE | Session-derived sender + rate limit. |
 | Authoritative command channel | DONE | Development/admin permission gate. |
 | Authoritative PvP melee | DONE | HP, mitigation, knockback, death/drop/respawn. |
 | Authoritative PvE/mobs/projectiles/explosions | TODO | Next major multiplayer authority milestone. |
+| Authoritative XP/levels | TODO | Singleplayer XP exists, but multiplayer server does not yet own XP/level state. Furnace stored XP currently has no production player-XP sink. |
 | Persistent server world saves | TODO | Sparse edits are authoritative but not durable server storage. |
-| Persistent/shared containers | FOUNDATION | Furnace state is now world-cell keyed with revision guards and serialize/restore contracts; no WebSocket binding or durable server storage is wired yet, and chests remain absent. |
+| Persistent/shared containers | PARTIAL | Furnace is world-cell keyed, survives viewer close, ticks on the server and replicates to concurrent viewers. State is still process-memory only; durable save/restore is not wired and chests remain absent. |
 | Rooms/world list | TODO | Current server is a direct world endpoint. |
 | Accounts/authentication | TODO | Sessions are transport identity only. |
 | OP/whitelist/ban/mute | TODO | Current command enable flag is not operator auth. |
@@ -257,7 +262,7 @@ Terrain v2 compatibility note: if generated `IRON_ORE` cells are normalized back
 |---|---|---|
 | Workbench | DONE | Singleplayer + authoritative multiplayer transient container. |
 | Chest | TODO | Persistent block entity and shared viewer concurrency needed. |
-| Furnace | FOUNDATION | Deterministic 3-slot processing, fuel/cook timers, raw-iron recipe, proportional stored XP, stable transaction revisions, world-cell persistence and serialization exist; gameplay block, UI, server tick/protocol binding and durable storage remain. |
+| Furnace | PARTIAL | Gameplay block/model/item, eight-cobblestone recipe, raw-iron smelting, 3-slot state, fuel/cook timers, proportional stored XP, stable transaction revisions and authoritative multiplayer server/UI binding exist. Singleplayer container binding, durable server save, authoritative multiplayer XP award, dynamic facing/lit state and broad vanilla recipe/fuel coverage remain. |
 | Hopper | TODO | Redstone/inventory automation prerequisite. |
 | Crop growth | TODO | Scheduled ticks/world rules needed. |
 | Farmland/hydration | TODO | None. |
@@ -284,14 +289,15 @@ Terrain v2 compatibility note: if generated `IRON_ORE` cells are normalized back
 | Feature | Status | Notes |
 |---|---|---|
 | Deterministic imported block atlas subset | DONE | Runtime hashes/provenance tracked. |
-| Imported implemented item textures | DONE | Current subset includes source-backed stone pickaxe, raw iron and the direct glass block-item texture. |
+| Imported implemented item textures | DONE | Current subset includes source-backed stone pickaxe, raw iron, iron ingot and direct glass block-item texture. |
+| Imported furnace source closure | DONE | Canonical directory-backed Java 1.20.1 furnace blockstate/models/textures and GUI texture are used; no placeholder art is substituted. |
 | Imported 8 current mob texture sheets | DONE | Texture-backed cuboid models. |
 | Imported red-bed entity texture | DONE | Used by world bed renderer. |
-| Full block/model resource interpretation | PARTIAL | Source-backed closure and model atlas feed live crafting-table, iron-ore and glass Worker/VoxelWorld rendering; broad registry/state coverage remains missing. |
-| Full item model interpretation | TODO | Current items mostly bind direct textures. |
+| Full block/model resource interpretation | PARTIAL | Source-backed closure/model atlas feed live crafting-table, iron-ore, glass and furnace Worker/VoxelWorld rendering; broad registry/state coverage remains missing. |
+| Full item model interpretation | TODO | Current items mostly bind direct textures or project-side block preview renderers. |
 | Entity geometry exact model-layer parity | PARTIAL | Current models are compatible reconstructions. |
 | Player skin pipeline | TODO | None. |
-| Sound registry/audio engine | BLOCKED | Current supplied ZIP has no sounds or sounds.json. |
+| Sound registry/audio engine | BLOCKED | Current supplied source tree has no sounds or sounds.json. |
 | Music | BLOCKED | Same source gap. |
 | Spatial SFX | BLOCKED | Audio source + engine required. |
 | Animated textures | TODO | None. |
@@ -317,11 +323,20 @@ Terrain v2 compatibility note: if generated `IRON_ORE` cells are normalized back
 
 | Feature | Status | Notes |
 |---|---|---|
-| Node syntax/logic regression gate | DONE | PR #111 adds the **149th** automatically discovered logic/server/Worker regression, covering furnace processing, item-state integrity, transaction revisions and persistence. |
-| Chromium E2E | DONE | Existing sharded browser smoke remains **37 / 37**; PR #111 is a non-UI foundation and does not claim new user-facing furnace E2E coverage. |
-| Asset source reproducibility audit | DONE | Selective Minecraft source/runtime outputs are reproducible; direct glass item texture is regenerated from the tracked Java 1.20.1 source ZIP and compared byte-for-byte. Furnace source assets are deliberately deferred rather than replaced with placeholders. |
+| Node syntax/logic regression gate | DONE | #116 reviewed code head runs **156** automatically discovered logic/server/Worker scripts, including furnace controller, real WebSocket runtime, strict wire, content and smelting-state coverage. |
+| Chromium E2E | DONE | #116 reviewed code head ran 41 unique browser tests across two shards. Furnace content/UI tests passed; shard 2 job succeeded with one retry-recovered flaky `multiplayer-survival-mining` presentation test. A new real multiplayer furnace browser E2E is part of #116 closure and must pass on the final exact head before merge. |
+| Asset source reproducibility audit | DONE | Selective Minecraft source/runtime outputs are reproducible; furnace/iron-ingot assets are directory-backed from the tracked Java 1.20.1 source tree and validated rather than replaced with placeholders. |
 | GitHub Pages deployment | DONE | Current public Web delivery path. |
-| Failure artifacts | DONE | Browser failures preserve diagnostics; #110 exposed and fixed the real texture-layer resolver signature mismatch instead of weakening the translucent assertion. |
+| Failure artifacts | DONE | Browser failures preserve screenshots/traces/context. |
 | Real Android device coverage | TODO | Automated Chromium emulation exists, real device matrix does not. |
 | iOS Safari coverage | TODO | Not yet established. |
 | Load/performance budgets | FOUNDATION | Runtime is designed for bounded objects/workers; formal budgets/benchmarks need expansion. |
+
+## Immediate roadmap after #116
+
+1. Bind the shared furnace state/smelting engine into **singleplayer** world-cell persistence and the same Furnace UI.
+2. Add a **server-owned XP/level domain** before claiming multiplayer furnace XP parity or server-authoritative PvE XP.
+3. Continue iron progression with iron pickaxe/tools/armor and coal fuel/ore.
+4. Add durable server world/container persistence, then chest/barrel shared containers.
+5. Continue interpreted-model gameplay validation with slabs/stairs/doors/fences/torches while keeping visual models separate from collision/state/update rules.
+6. Resume the larger missing domains: biome/caves/structures worldgen, server-authoritative PvE/projectiles/explosions, hunger/food/farming/breeding, redstone, Nether/End and audio when a valid sound source is available.
