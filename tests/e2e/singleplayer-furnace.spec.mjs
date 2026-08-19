@@ -58,7 +58,10 @@ test('singleplayer furnace right-clicks through gameplay, persists across reload
   await expect(planks).toBeVisible();
   await planks.click();
   await furnace.locator('[data-furnace-slot="1"]').click();
-  await expect.poll(()=>snapshot(page)).toMatchObject({slots:[{id:'raw_iron',count:2},{id:'block:5',count:2},null],lit:true});
+  // Once both input and a valid fuel are present, the 20 Hz Furnace tick may
+  // immediately consume one plank into burnRemaining. Assert the committed
+  // fuel lifecycle instead of requiring a transient pre-consumption count of 2.
+  await expect.poll(()=>snapshot(page)).toMatchObject({slots:[{id:'raw_iron',count:2},{id:'block:5',count:1},null],lit:true});
   await expect.poll(async()=>Math.floor((await snapshot(page))?.cookProgress||0),{timeout:8_000}).toBeGreaterThan(20);
   const beforeSave=await snapshot(page);
 
