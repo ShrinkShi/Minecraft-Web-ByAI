@@ -40,9 +40,10 @@ export class Inventory{
 
   seedCreative(){CREATIVE_START.forEach((id,i)=>{this.slots[creativeSeedSlot(i)]={id,count:maxStack(id)};});}
   snapshot(){return{slots:this.slots.map(cloneStack)};}
+  persistenceSnapshot(){return{slots:this.slots.map(cloneStack),cursor:cloneStack(this.cursor)};}
 
   restore(snapshot){
-    const restored=snapshotSlots(snapshot);if(!restored)return false;this.slots=restored;
+    const restored=snapshotSlots(snapshot),cursor=snapshotCursor(snapshot);if(!restored)return false;this.slots=restored;this.cursor=cursor;
     const legacyOverflow=legacyStack(snapshot.slots[INVENTORY_SLOT_COUNT],'legacy overflow stack');if(legacyOverflow)this.insertExistingStack(legacyOverflow,[[0,INVENTORY_SLOT_COUNT]]);
     return true;
   }
