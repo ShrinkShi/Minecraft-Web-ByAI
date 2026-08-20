@@ -1,5 +1,6 @@
 import {watchDeviceProfile} from './device-profile.js';
 import {ensureChatCommandCompletion} from './chat-command-completion.js';
+import {triggerFirstPersonAttack,triggerFirstPersonUse} from './immersive-game-shell.js';
 
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 const actionName=name=>name==='use'?'secondary':name;
@@ -21,8 +22,8 @@ export class MobileControls{
     },{passive:false});
     const release=e=>{if(e.pointerId===this.movePointer){this.movePointer=null;this.resetMove();}if(e.pointerId===this.lookPointer){this.lookPointer=null;this.lookLast=null;}const hold=this.holds.get(e.pointerId);if(hold){this.holds.delete(e.pointerId);this.bus.setButton(this.source,hold,false);}};
     window.addEventListener('pointerup',release);window.addEventListener('pointercancel',release);
-    for(const button of this.root.querySelectorAll('[data-mobile-action]'))button.addEventListener('pointerdown',e=>{if(!this.interactive())return;e.preventDefault();e.stopPropagation();this.bus.action(this.source,actionName(button.dataset.mobileAction));});
-    for(const button of this.root.querySelectorAll('[data-mobile-hold]'))button.addEventListener('pointerdown',e=>{if(!this.interactive())return;e.preventDefault();e.stopPropagation();const name=button.dataset.mobileHold==='attack'?'primary':button.dataset.mobileHold;this.holds.set(e.pointerId,name);this.bus.setButton(this.source,name,true);});
+    for(const button of this.root.querySelectorAll('[data-mobile-action]'))button.addEventListener('pointerdown',e=>{if(!this.interactive())return;e.preventDefault();e.stopPropagation();const action=button.dataset.mobileAction;if(action==='use')triggerFirstPersonUse();this.bus.action(this.source,actionName(action));});
+    for(const button of this.root.querySelectorAll('[data-mobile-hold]'))button.addEventListener('pointerdown',e=>{if(!this.interactive())return;e.preventDefault();e.stopPropagation();const raw=button.dataset.mobileHold,name=raw==='attack'?'primary':raw;if(raw==='attack')triggerFirstPersonAttack();this.holds.set(e.pointerId,name);this.bus.setButton(this.source,name,true);});
     for(const button of this.root.querySelectorAll('[data-mobile-toggle]'))button.addEventListener('pointerdown',e=>{if(!this.interactive())return;e.preventDefault();e.stopPropagation();const name=button.dataset.mobileToggle,next=!this.toggles[name];this.toggles[name]=next;button.classList.toggle('active',next);button.setAttribute('aria-pressed',String(next));this.bus.setButton(this.source,name,next);});
   }
 
