@@ -59,13 +59,25 @@ test('iron ingots craft a source-backed iron sword whose real mob hit costs one 
   expect(await sword.locator('img').getAttribute('src')).toContain('assets/items/iron_sword.png');
   await expect(sword).not.toHaveAttribute('data-durability-damage');
 
-  // Move both player and target well above terrain. If entity targeting fails,
-  // there is no nearby block for mining to create a false-positive durability hit.
-  await runCommand(page,'/tp 0 55 0');
-  await runCommand(page,'/summon zombie 0 55 -2');
-  await expect(page.locator('#chat-log')).toContainText('已召唤 zombie');
+  // The workbench fixture already respawned the player on stable terrain and cleared
+  // six eye-level cells straight ahead. Remove only the fixture table in creative so
+  // the later survival click cannot mine a block and fake a sword-durability hit.
+  await runCommand(page,'/gamemode creative');
   await lockPointer(page);
   await page.evaluate(()=>globalThis.__minecraftE2E?.setLook?.(0,0));
+  await page.mouse.down({button:'left'});
+  await page.waitForTimeout(180);
+  await page.mouse.up({button:'left'});
+  await runCommand(page,'/gamemode survival');
+  await expect(sword).not.toHaveAttribute('data-durability-damage');
+
+  // Player eye height is 1.62 while a zombie center is 0.9 above its feet. A small
+  // downward pitch aims through the real hostile-mob raycast sphere instead of just
+  // above it. The target is still created through the ordinary /summon command.
+  await runCommand(page,'/summon zombie ~ ~ ~-2');
+  await expect(page.locator('#chat-log')).toContainText('已召唤 zombie');
+  await lockPointer(page);
+  await page.evaluate(()=>globalThis.__minecraftE2E?.setLook?.(0,-0.35));
   await page.mouse.down({button:'left'});
   await page.mouse.up({button:'left'});
 
