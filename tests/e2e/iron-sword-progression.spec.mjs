@@ -83,7 +83,7 @@ test('iron ingots craft a source-backed iron sword whose real mob hit costs one 
 
   await expect(sword).toHaveAttribute('data-durability-damage','1',{timeout:5_000});
   await expect(sword).toHaveAttribute('data-durability-remaining','249');
-  await expect(sword).toHaveAttribute('title',/耐久：249 \/ 250/);
+  await expect(sword).toHaveAttribute('title',/耐久 249 \/ 250/);
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });
