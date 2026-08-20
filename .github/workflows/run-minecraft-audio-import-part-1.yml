@@ -7,12 +7,6 @@ on:
 
 env:
   IMPORT_BRANCH: ${{ github.event.pull_request.head.ref }}
-  TARGET_DIR: 原版Minecraft音频文件
-  EXPECTED_COUNT: '2114'
-  EXPECTED_TOTAL_BYTES: '431521776'
-  EXPECTED_SET_SHA256: 34f8f17290a7e5637d8104aae26f217fddd29c4c216c23729ebf4e95df75d278
-  BATCH_MAX_FILES: '175'
-  BATCH_MAX_BYTES: '47185920'
 
 permissions:
   contents: write
@@ -29,26 +23,8 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
 
-      - name: Execute exact import program
+      - name: Import and verify exact uploaded object set
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PYRUN'
-          from pathlib import Path
-          import os
-
-          workflow = Path('.github/workflows/import-minecraft-audio-part-1.yml').read_text(encoding='utf-8')
-          marker_start = "          python - <<'PY'\n"
-          marker_end = "          PY\n"
-          start = workflow.index(marker_start) + len(marker_start)
-          end = workflow.index(marker_end, start)
-          block = workflow[start:end]
-          lines = []
-          for line in block.splitlines():
-              if line.startswith('          '):
-                  line = line[10:]
-              lines.append(line)
-          os.environ['GITHUB_REF_NAME'] = os.environ['IMPORT_BRANCH']
-          code = '\n'.join(lines) + '\n'
-          exec(compile(code, 'minecraft-audio-import-part-1.py', 'exec'), {'__name__': '__main__'})
-          PYRUN
+          python .github/import-minecraft-audio-part-1.py
