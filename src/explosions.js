@@ -1,5 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
 import {BLOCKS} from './blocks.js';
+import {bedPartner,isBedBlock} from './bed-rules.js';
 import {explosionDamage,explosionDestroysBlock,explosionKnockback} from './explosion-rules.js';
 
 export class ExplosionSystem{
@@ -13,8 +14,12 @@ export class ExplosionSystem{
     if(!position||!Number.isFinite(radius)||radius<=0)return{destroyed:0,damage:0};let destroyed=0;
     const minX=Math.floor(position.x-radius),maxX=Math.floor(position.x+radius),minY=Math.max(0,Math.floor(position.y-radius)),maxY=Math.floor(position.y+radius),minZ=Math.floor(position.z-radius),maxZ=Math.floor(position.z+radius);
     for(let x=minX;x<=maxX;x++)for(let y=minY;y<=maxY;y++)for(let z=minZ;z<=maxZ;z++){
-      const id=this.world.getBlock(x,y,z),def=BLOCKS[id];if(!def?.solid)continue;const dx=x+.5-position.x,dy=y+.5-position.y,dz=z+.5-position.z,distance=Math.hypot(dx,dy,dz);
-      if(explosionDestroysBlock(distance,radius,def.hardness||0)&&this.world.setBlock(x,y,z,0)){destroyed++;this.onBlockDestroyed({id,block:def,position:{x,y,z},explosion:{x:position.x,y:position.y,z:position.z,radius}});}
+      const id=this.world.getBlock(x,y,z),def=BLOCKS[id];if(!def?.solid)continue;const dx=x+.5-position.x,dy=y+.5-position.y,dz=z+.5-position.z,distance=Math.hypot(dx,dy,dz);if(!explosionDestroysBlock(distance,radius,def.hardness||0))continue;
+      if(!this.world.setBlock(x,y,z,0))continue;destroyed++;
+      if(isBedBlock(id)){
+        const partner=bedPartner({x,y,z},id);if(partner&&this.world.getBlock(partner.x,partner.y,partner.z)===partner.id&&this.world.setBlock(partner.x,partner.y,partner.z,0))destroyed++;
+      }
+      this.onBlockDestroyed({id,block:def,position:{x,y,z},explosion:{x:position.x,y:position.y,z:position.z,radius}});
     }
     let damage=0;if(player){const centerY=player.position.y+player.height*.5,distance=Math.hypot(player.position.x-position.x,centerY-position.y,player.position.z-position.z);damage=explosionDamage(distance,damageRadius,maxDamage);if(damage>0)this.onPlayerBlast({amount:damage,source:{x:position.x,z:position.z},knockback:explosionKnockback(distance,damageRadius),position});}
     this.spawnParticles(position,radius);return{destroyed,damage};
