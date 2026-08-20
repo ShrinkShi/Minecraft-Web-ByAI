@@ -12,8 +12,8 @@ import {DAYLIGHT_BURN_DAMAGE,MOB_HURT_FLASH_SECONDS,creeperFuseVisual,mobHitVisu
 const tempA=new THREE.Vector3(),tempB=new THREE.Vector3(),SPAWN_GROUND=new Set([BLOCK.GRASS,BLOCK.DIRT,BLOCK.STONE,BLOCK.SAND,BLOCK.COBBLESTONE]);
 
 export class HostileMobSystem{
-  constructor(scene,world,{maxEntities=8,cellSize=8,onPlayerHit=()=>{},onProjectile=()=>{},onExplosion=()=>{},onDeath=()=>{},onBurn=()=>{},onFuseStart=()=>{}}={}){
-    this.scene=scene;this.world=world;this.maxEntities=maxEntities;this.onPlayerHit=onPlayerHit;this.onProjectile=onProjectile;this.onExplosion=onExplosion;this.onDeath=onDeath;this.onBurn=onBurn;this.onFuseStart=onFuseStart;this.store=new EntityStore({cellSize});this.visuals=new Map();this.spawnTimer=.7;this.aiAccumulator=0;this.simulationTimeMs=0;
+  constructor(scene,world,{maxEntities=8,cellSize=8,onPlayerHit=()=>{},onProjectile=()=>{},onExplosion=()=>{},onDeath=()=>{},onBurn=()=>{},onFuseStart=()=>{},getEnvironment=()=>({weather:'clear'})}={}){
+    this.scene=scene;this.world=world;this.maxEntities=maxEntities;this.onPlayerHit=onPlayerHit;this.onProjectile=onProjectile;this.onExplosion=onExplosion;this.onDeath=onDeath;this.onBurn=onBurn;this.onFuseStart=onFuseStart;this.getEnvironment=typeof getEnvironment==='function'?getEnvironment:()=>({weather:'clear'});this.store=new EntityStore({cellSize});this.visuals=new Map();this.spawnTimer=.7;this.aiAccumulator=0;this.simulationTimeMs=0;
     this.resources={geometries:new Set(),materials:new Set(),textures:new Set(),textureCache:new Map(),materialCache:new Map()};this.templates=new Map();for(const[type,def]of Object.entries(HOSTILE_MOBS))this.templates.set(type,createMobModelTemplate(type,def,this.resources));
   }
 
@@ -95,8 +95,8 @@ export class HostileMobSystem{
     this.simulationTimeMs+=dt*1000;this.spawnTimer-=dt;if(this.spawnTimer<=0){this.spawnTimer=1.15;this.trySpawnAround(player,gameTime);}
     for(const record of[...this.store.values()]){const position=this.store.getPosition(record.id),def=HOSTILE_MOBS[record.type];if(!position||!def)continue;const dx=position.x-player.position.x,dz=position.z-player.position.z;if(dx*dx+dz*dz>48*48){this.despawn(record.id);continue;}this.updateDaylightBurn(record,def,record.components,position,gameTime,weather,dt);if(!this.store.has(record.id))continue;this.moveAndAttack(record,dt,player);}
   }
-  update(dt,player,gameTime,environment={}){
-    if(!player)return;this.aiAccumulator=Math.min(.5,this.aiAccumulator+dt);while(this.aiAccumulator>=.1){this.tick(.1,player,gameTime,environment);this.aiAccumulator-=.1;}
+  update(dt,player,gameTime,environment=null){
+    if(!player)return;const effectiveEnvironment=environment&&typeof environment==='object'?environment:(this.getEnvironment?.()||{});this.aiAccumulator=Math.min(.5,this.aiAccumulator+dt);while(this.aiAccumulator>=.1){this.tick(.1,player,gameTime,effectiveEnvironment);this.aiAccumulator-=.1;}
     const smoothing=1-Math.exp(-14*dt);for(const record of this.store.values()){const position=this.store.getPosition(record.id),visual=this.visuals.get(record.id),def=HOSTILE_MOBS[record.type];if(!position||!visual||!def)continue;visual.position.lerp(tempA.set(position.x,position.y,position.z),smoothing);const hit=mobHitVisual(record.components.hurtPulse);let scale=hit.scale,white=0;if(def.attackStyle==='fuse'&&record.components.fuse>0){const fuse=creeperFuseVisual(record.components.fuse/def.fuseTime,record.components.fuse);scale*=fuse.scale;white=fuse.white;}visual.scale.setScalar(scale);applyMobVisualState(visual,{hurtStrength:hit.strength,burning:record.components.burning,white});animateMobVisual(visual,dt,visual.userData.mobSpeed||0);}
   }
   snapshot(){
