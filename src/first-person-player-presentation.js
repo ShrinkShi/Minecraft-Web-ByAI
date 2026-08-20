@@ -26,8 +26,10 @@ function configureTexture(texture){texture.magFilter=THREE.NearestFilter;texture
 function cropTexture(url,rect){
   const texture=configureTexture(new THREE.TextureLoader().load(url)),[u0,v0,u1,v1]=rect;texture.wrapS=texture.wrapT=THREE.ClampToEdgeWrapping;texture.repeat.set((u1-u0)/STEVE_SKIN_SIZE,(v1-v0)/STEVE_SKIN_SIZE);texture.offset.set(u0/STEVE_SKIN_SIZE,1-v1/STEVE_SKIN_SIZE);texture.needsUpdate=true;return texture;
 }
-function skinMaterials(url,uvs,{transparent=false}={}){return FACE_ORDER.map(face=>new THREE.MeshBasicMaterial({map:cropTexture(url,uvs[face]),transparent,alphaTest:transparent?.01:0,side:THREE.FrontSide,toneMapped:false}));}
-function disposeObject(root){root?.traverse?.(object=>{object.geometry?.dispose?.();const materials=Array.isArray(object.material)?object.material:[object.material];for(const material of materials){if(!material)continue;material.map?.dispose?.();material.dispose?.();}});}
+function skinMaterials(url,uvs,{transparent=false}={}){return FACE_ORDER.map(face=>new THREE.MeshBasicMaterial({map:cropTexture(url,uvs[face]),transparent,alphaTest:transparent ? .01 : 0,side:THREE.FrontSide,toneMapped:false}));}
+function disposeObject(root){
+  const geometries=new Set(),materials=new Set(),textures=new Set();root?.traverse?.(object=>{if(object.geometry)geometries.add(object.geometry);const list=Array.isArray(object.material)?object.material:[object.material];for(const material of list)if(material){materials.add(material);if(material.map)textures.add(material.map);}});for(const geometry of geometries)geometry.dispose?.();for(const material of materials)material.dispose?.();for(const texture of textures)texture.dispose?.();
+}
 function blockMaterial(url){const map=configureTexture(new THREE.TextureLoader().load(url));return new THREE.MeshBasicMaterial({map,transparent:true,alphaTest:.02,toneMapped:false});}
 function flatItemGroup(def){
   const group=new THREE.Group(),front=blockMaterial(def.texture),back=front.clone(),edge=new THREE.MeshBasicMaterial({color:0x3d352f,toneMapped:false}),geometry=new THREE.BoxGeometry(.38,.38,.045),materials=[edge,edge,edge,edge,front,back],mesh=new THREE.Mesh(geometry,materials);mesh.rotation.z=-Math.PI/4;group.add(mesh);return group;
