@@ -1,7 +1,7 @@
 import {DoubleTapForwardSprint} from './sprint-gesture.js';
 import {ensureChatCommandCompletion} from './chat-command-completion.js';
 import {pointerLookIntent} from './pointer-look-rules.js';
-import {installImmersiveGameShell,triggerFirstPersonAttack,triggerFirstPersonUse} from './immersive-game-shell.js';
+import {publishFirstPersonAction} from './first-person-action-channel.js';
 
 const MOVEMENT_CODES=new Set(['KeyW','KeyA','KeyS','KeyD']);
 const BUTTON_CODES=new Map([['Space','jump'],['ShiftLeft','sneak'],['ShiftRight','sneak'],['KeyR','sprint']]);
@@ -11,7 +11,7 @@ export const desktopButtonForCode=code=>BUTTON_CODES.get(code)||null;
 
 export class DesktopControls{
   constructor(canvas,bus){
-    this.canvas=canvas;this.bus=bus;this.source='desktop';this.gameplayEnabled=false;this.keys=new Set();this.forwardSprint=new DoubleTapForwardSprint();this.pointerMoveReady=false;this.releaseImmersiveShell=installImmersiveGameShell(canvas);ensureChatCommandCompletion();this.bind();
+    this.canvas=canvas;this.bus=bus;this.source='desktop';this.gameplayEnabled=false;this.keys=new Set();this.forwardSprint=new DoubleTapForwardSprint();this.pointerMoveReady=false;ensureChatCommandCompletion();this.bind();
   }
 
   bind(){
@@ -42,8 +42,8 @@ export class DesktopControls{
     };
     this.onMouseDown=e=>{
       if(!this.gameplayEnabled)return;
-      if(e.button===0){triggerFirstPersonAttack();this.bus.setButton(this.source,'primary',true);}
-      else if(e.button===2){triggerFirstPersonUse();this.bus.action(this.source,'secondary');}
+      if(e.button===0){publishFirstPersonAction('attack');this.bus.setButton(this.source,'primary',true);}
+      else if(e.button===2){publishFirstPersonAction('use');this.bus.action(this.source,'secondary');}
     };
     this.onMouseUp=e=>{if(e.button===0)this.bus.setButton(this.source,'primary',false);};
     this.onWheel=e=>{if(!this.gameplayEnabled)return;this.bus.action(this.source,'hotbar-step',{step:e.deltaY>0?1:-1});};
@@ -63,5 +63,5 @@ export class DesktopControls{
 
   reset(){this.keys.clear();this.forwardSprint.reset();this.bus.resetSource(this.source);}
   setGameplayEnabled(enabled){const next=!!enabled;if(next===this.gameplayEnabled)return;this.gameplayEnabled=next;this.pointerMoveReady=false;if(!next)this.reset();}
-  dispose(){this.reset();this.releaseImmersiveShell?.();this.releaseImmersiveShell=null;window.removeEventListener('keydown',this.onKeyDown);window.removeEventListener('keyup',this.onKeyUp);window.removeEventListener('blur',this.onWindowBlur);document.removeEventListener('mousemove',this.onMouseMove);this.canvas.removeEventListener('mousedown',this.onMouseDown);window.removeEventListener('mouseup',this.onMouseUp);this.canvas.removeEventListener('wheel',this.onWheel);this.canvas.removeEventListener('click',this.onCanvasClick);}
+  dispose(){this.reset();window.removeEventListener('keydown',this.onKeyDown);window.removeEventListener('keyup',this.onKeyUp);window.removeEventListener('blur',this.onWindowBlur);document.removeEventListener('mousemove',this.onMouseMove);this.canvas.removeEventListener('mousedown',this.onMouseDown);window.removeEventListener('mouseup',this.onMouseUp);this.canvas.removeEventListener('wheel',this.onWheel);this.canvas.removeEventListener('click',this.onCanvasClick);}
 }
