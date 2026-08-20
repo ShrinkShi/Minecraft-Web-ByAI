@@ -45,7 +45,7 @@ export function bindMobVisual(visual){
 
 export function applyMobVisualState(visual,{hurtStrength=0,burning=false,white=0}={}){
   if(!visual)return;const hurt=Math.max(0,Math.min(1,Number(hurtStrength)||0)),flash=Math.max(0,Math.min(1,Number(white)||0));
-  for(const material of visual.userData.mobInstanceMaterials||[]){if(material.color){material.color.setRGB(1,1-hurt*.72,1-hurt*.72);}if(material.emissive){const burn=burning?.22:0;material.emissive.setRGB(Math.max(flash,burn),Math.max(flash,burning?.07:0),flash*.95);material.emissiveIntensity=1;}}
+  for(const material of visual.userData.mobInstanceMaterials||[]){if(material.color){material.color.setRGB(1,1-hurt*.72,1-hurt*.72);}if(material.emissive){const burn=burning ? .22 : 0;material.emissive.setRGB(Math.max(flash,burn),Math.max(flash,burning ? .07 : 0),flash*.95);material.emissiveIntensity=1;}}
   const fire=visual.userData.mobFireGroup;if(fire){fire.visible=!!burning;if(burning){const phase=visual.userData.mobWalkPhase||0,scale=1+.06*Math.sin(phase*2.7);fire.scale.set(scale,1+.08*Math.sin(phase*3.4),scale);for(const child of fire.children)if(child.material)child.material.opacity=.4+.13*(.5+.5*Math.sin(phase*4+child.rotation.y));}}
 }
 
