@@ -1,7 +1,7 @@
 import {DoubleTapForwardSprint} from './sprint-gesture.js';
 import {ensureChatCommandCompletion} from './chat-command-completion.js';
 import {pointerLookIntent} from './pointer-look-rules.js';
-import {installImmersiveGameShell} from './immersive-game-shell.js';
+import {installImmersiveGameShell,triggerFirstPersonAttack,triggerFirstPersonUse} from './immersive-game-shell.js';
 
 const MOVEMENT_CODES=new Set(['KeyW','KeyA','KeyS','KeyD']);
 const BUTTON_CODES=new Map([['Space','jump'],['ShiftLeft','sneak'],['ShiftRight','sneak'],['KeyR','sprint']]);
@@ -36,13 +36,15 @@ export class DesktopControls{
     this.onKeyUp=e=>{if(MOVEMENT_CODES.has(e.code)||BUTTON_CODES.has(e.code)){this.keys.delete(e.code);if(e.code==='KeyW')this.forwardSprint.release();this.syncContinuous();}};
     this.onMouseMove=e=>{
       if(!this.gameplayEnabled||document.pointerLockElement!==this.canvas)return;
-      // Browsers may emit one synthetic/warped movement sample while pointer lock is entering.
-      // Dropping that first sample prevents a large pitch/yaw snap after menus or latency stalls.
       if(!this.pointerMoveReady){this.pointerMoveReady=true;return;}
       const look=pointerLookIntent(Number(e.movementX)||0,Number(e.movementY)||0);
       this.bus.look(this.source,look.yawDelta,look.pitchDelta);
     };
-    this.onMouseDown=e=>{if(!this.gameplayEnabled)return;if(e.button===0)this.bus.setButton(this.source,'primary',true);else if(e.button===2)this.bus.action(this.source,'secondary');};
+    this.onMouseDown=e=>{
+      if(!this.gameplayEnabled)return;
+      if(e.button===0){triggerFirstPersonAttack();this.bus.setButton(this.source,'primary',true);}
+      else if(e.button===2){triggerFirstPersonUse();this.bus.action(this.source,'secondary');}
+    };
     this.onMouseUp=e=>{if(e.button===0)this.bus.setButton(this.source,'primary',false);};
     this.onWheel=e=>{if(!this.gameplayEnabled)return;this.bus.action(this.source,'hotbar-step',{step:e.deltaY>0?1:-1});};
     this.onCanvasClick=()=>this.bus.action(this.source,'focus');
