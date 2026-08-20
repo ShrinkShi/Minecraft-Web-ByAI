@@ -3,14 +3,9 @@ import {FirstPersonViewModel} from './first-person-player-presentation.js';
 import {ITEMS} from './items.js';
 import {gameAudioSnapshot,playGameSound,unlockGameAudio} from './audio-system.js';
 import {subscribeFirstPersonActions} from './first-person-action-channel.js';
+import {GAMEPLAY_KEY_LOCK_CODES,isEditableGameplayTarget,shouldSuppressBrowserShortcut} from './immersive-shell-rules.js';
 
-export const GAMEPLAY_KEY_LOCK_CODES=Object.freeze([
-  'KeyW','KeyA','KeyS','KeyD','KeyE','KeyQ','KeyR','KeyT','Slash','Space','Tab','F3','F5',
-  'ShiftLeft','ShiftRight','Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9'
-]);
-
-function editableTarget(target){if(!target||typeof target!=='object')return false;const tag=String(target.tagName||'').toLowerCase();return tag==='input'||tag==='textarea'||tag==='select'||target.isContentEditable===true;}
-export function shouldSuppressBrowserShortcut(event,{gameplayActive=true}={}){if(!gameplayActive||!event||editableTarget(event.target))return false;if(event.code==='F3'||event.code==='F5'||event.code==='Tab')return true;return !!(event.ctrlKey||event.metaKey)&&event.code==='KeyW';}
+export {GAMEPLAY_KEY_LOCK_CODES,shouldSuppressBrowserShortcut};
 
 let installed=null;
 function hasBrowserDom(){return typeof document!=='undefined'&&typeof window!=='undefined'&&typeof document.querySelector==='function';}
@@ -34,7 +29,7 @@ export function installImmersiveGameShell(canvas){
   async function lockKeyboard(){if(!gameFocused()||!desktopPointer())return false;const keyboard=globalThis.navigator?.keyboard;if(!keyboard||typeof keyboard.lock!=='function')return false;try{await keyboard.lock([...GAMEPLAY_KEY_LOCK_CODES]);return true;}catch{return false;}}
   function unlockKeyboard(){try{globalThis.navigator?.keyboard?.unlock?.();}catch{}}
   async function enterImmersiveControl(event){if(!gameFocused()||!desktopPointer()||document.pointerLockElement===canvas)return;event.preventDefault();event.stopImmediatePropagation();unlockGameAudio();try{if(!document.fullscreenElement&&document.documentElement?.requestFullscreen)await document.documentElement.requestFullscreen({navigationUI:'hide'});}catch{}await lockKeyboard();try{await canvas.requestPointerLock?.();}catch{}}
-  function onKeyDown(event){const active=gameFocused();if(!shouldSuppressBrowserShortcut(event,{gameplayActive:active}))return;event.preventDefault();if(event.code==='F3'&&!editableTarget(event.target)){event.stopImmediatePropagation();debugVisible=!debugVisible;debug.classList.toggle('hidden',!debugVisible);}}
+  function onKeyDown(event){const active=gameFocused();if(!shouldSuppressBrowserShortcut(event,{gameplayActive:active}))return;event.preventDefault();if(event.code==='F3'&&!isEditableGameplayTarget(event.target)){event.stopImmediatePropagation();debugVisible=!debugVisible;debug.classList.toggle('hidden',!debugVisible);}}
   function onPointerLockChange(){if(document.pointerLockElement===canvas){unlockGameAudio();void lockKeyboard();}else unlockKeyboard();}
   function onFullscreenChange(){if(!document.fullscreenElement)unlockKeyboard();else if(document.pointerLockElement===canvas)void lockKeyboard();}
   function onResize(){resizeViewModel();}
