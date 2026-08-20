@@ -1,6 +1,6 @@
 # Minecraft Web - 当前开发进度
 
-更新时间：2026-08-20
+更新时间：2026-08-21
 
 当前事实以 GitHub `main`、`docs/PROJECT_BASELINE.md`、`docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md` 和当前交付 PR 的 exact head 为准。本文只维护已合并基线、正在进行的交付和紧邻下一步。
 
@@ -10,7 +10,7 @@
 
 当前 `main`：
 
-`201b09c532e5d40e9e4079c8c5954be8449e398d`
+`7b582e4f68ed21a6f3687ea273bd314c8d8e9917`
 
 该 main 已包含：
 
@@ -20,126 +20,135 @@
 - #114 / #115：玩家与实体视觉回归修复；
 - #116：authoritative multiplayer Furnace container runtime；
 - #117：persistent singleplayer Furnace runtime；
-- #118：source-backed iron pickaxe progression。最终 exact head `7b87fb03bfb354adc3eb2c11221644c0839bccd6` 通过 Minecraft asset source audit、162 个 logic/server/Worker scripts、Chromium 22/22 + 22/22，并实际执行工作台→铁镐→铁矿石 progression E2E 后 squash merge。
+- #118：source-backed iron pickaxe progression；
+- #119：tool-effectiveness / harvest-requirement 语义拆分，以及 source-backed iron axe / iron shovel progression。#119 最终 exact head `e5cdc476ed2f28ba09f68de1d5130fce74c89b65` 通过 Minecraft asset source audit、163 个 logic/server/Worker scripts、Chromium 23/23 + 22/22 后 squash merge。
 
-#118 完成后，早期铁矿链已经具备：石镐采铁矿 → 粗铁 → Furnace → 铁锭 → 工作台铁镐。铁斧/铁锹之前仍缺失，且现有 block metadata 还把“哪种工具挖得快”和“没有哪种工具就不能掉落”混在同一个 `requires` 字段中，无法正确表达木头/泥土这类可徒手掉落但使用专用工具更快的方块。
+#119 合并后，当前铁系基础链已经具备：石镐采铁矿 → 粗铁 → Furnace → 铁锭 → 工作台铁镐/铁斧/铁锹。`effectiveTool` 只负责开采效率，`requires` / `minToolTier` 独立负责掉落资格，木头和泥土不会因为斧/锹更快而失去徒手掉落。
 
-## 当前进行中：PR #119 Tool effectiveness split + iron axe/shovel progression
+## 当前进行中：PR #120 Iron sword + shared melee item profiles
 
-PR：#119
+PR：#120
 
-分支：`content/v0.4-tool-effectiveness-iron-axe-shovel`
+分支：`content/v0.4-iron-sword-melee-profile`
 
-当前基线：`main 201b09c532e5d40e9e4079c8c5954be8449e398d`
+当前基线：`main 7b582e4f68ed21a6f3687ea273bd314c8d8e9917`
 
-### #119 交付内容
+实现稳定阶段 exact head：`d7f535e2da117685e3f8b6a1075e61fb0514a755`
 
-1. 拆分 mining effectiveness 与 harvest requirement
-   - 新增 block metadata `effectiveTool`，只表示高效开采工具类型；
-   - `requires` / `minToolTier` 继续只表示能否获得掉落物的工具/等级门槛；
-   - `miningToolMultiplier()` 优先读取 `effectiveTool`，并对旧 block metadata 保留 `requires` fallback；
-   - `canHarvestBlock()` 不读取 `effectiveTool`，仍由 harvest requirement 独立决定掉落资格。
+### #120 交付内容
 
-2. 现有方块语义迁移
-   - 草方块、泥土、沙子：`effectiveTool = shovel`，但徒手仍能正常 harvest；
-   - 橡木木板、橡木原木、工作台：`effectiveTool = axe`，但徒手仍能正常 harvest；
-   - 石头、圆石、铁矿石、Furnace：继续 `requires = pickaxe`，同时显式 `effectiveTool = pickaxe`，因此“镐更快”和“需要镐才能掉落”两个事实不再依赖同一字段的隐含双重语义；
-   - 错误工具仍只获得既有通用 1.2 倍 multiplier，不能靠 tier 绕过 harvest requirement。
+1. Source-backed iron sword
+   - 新增 `iron_sword` gameplay item；
+   - Java 1.20.1 canonical source：`MC原版素材assets/minecraft/textures/item/iron_sword.png`；
+   - runtime：`./assets/items/iron_sword.png`；
+   - 正确 SHA-256：`ed1fa2f83955583e70a19791455d13989e8bd93b1d7240e775a57141022bed6b`；
+   - 16×16，runtime 与 canonical source 字节一致；
+   - item registry 增至 37 IDs；
+   - 3×3 workbench recipe：2 铁锭纵向 + 1 木棍，共 11 条 recipe；
+   - 6 点基础近战伤害、250 耐久；
+   - 剑使用顶层 `durability`，不伪装成 mining `tool`。
 
-3. Source-backed iron axe / iron shovel
-   - 新增 `iron_axe`、`iron_shovel` gameplay items；
-   - 两者使用现有 item-instance durability framework，耐久 250、iron tier、mining speed 6；
-   - 不改变历史 creative/starter hotbar slot 顺序；
-   - canonical source：`MC原版素材assets/minecraft/textures/item/iron_axe.png` 与 `iron_shovel.png`；
-   - runtime：`./assets/items/iron_axe.png` 与 `./assets/items/iron_shovel.png`；
-   - build pipeline 从追踪的 Java 1.20.1 原版目录逐字节复制到 runtime `./assets/` 边界；
-   - iron axe SHA-256：`8dea40bac06c6f14bb0ad9e8b47de63250f6d6a46ae9439b85ddd1377f1edb49`；
-   - iron shovel SHA-256：`c9d36d59ec53ebc631bd24930f62087c316eef39bd237d8bb69cb2bb629dfae5`；
-   - 两张纹理均固定为 16×16，runtime 与 canonical source 字节一致。
+2. Shared melee item profile
+   - 新增 `meleeProfile(itemId)`，统一解析手持物伤害、attack speed、当前项目采用的满充近似间隔和成功命中的耐久成本；
+   - iron sword：attack speed 1.6，对应当前硬间隔 625 ms，成功命中 wear 1；
+   - pickaxe / axe / shovel 也进入同一 resolver，避免所有武器继续共享固定 600 ms；
+   - iron axe 继续体现高伤害但更慢攻击节奏，而不是在固定 600 ms 下无条件压过铁剑。
 
-4. Workbench recipes
-   - iron axe：真实 2×3 shaped recipe，3 铁锭 + 2 木棍，并由通用 matcher 支持左右镜像；
-   - iron shovel：1 铁锭 + 2 木棍纵向 shaped recipe；
-   - 两者都要求 3×3 workbench，不允许 2×2 crafting grid 误合成；
-   - 当前 recipe 总数提升到 10 条。
+3. Singleplayer melee wiring
+   - `primaryActionStart()` 的实体攻击从手持物 `meleeProfile()` 读取 damage / interval；
+   - 实际调用 mob `hurt()` 后只在返回 `applied:true` 时损耗武器；
+   - 空挥、攻击自身 cooldown 拒绝、目标 hurt-cooldown 拒绝均不应消耗耐久；
+   - creative 保留即时高伤害且不产生 survival weapon wear。
 
-5. Regression / browser evidence
-   - 新增 `check-iron-axe-shovel-progression.mjs`，锁 item metadata、recipe/mirror、starter hotbar、effective-tool/harvest 分离、canonical/runtime hashes 与 PNG dimensions；
-   - `check-mining-rules.mjs` 明确验证徒手 dirt/log 等仍可 harvest，同时铁锹/铁斧显著提速；
-   - `check-tool-tier-rules.mjs` 锁定 `effectiveTool` 不会意外产生 harvest tier requirement；
-   - 旧 Furnace / iron progression block-shape contract 已同步显式 `effectiveTool:'pickaxe'`；
-   - 新增 `iron-axe-shovel-progression.spec.mjs`：真实单人世界中先 3 铁锭 + 2 木棍工作台合成铁斧，再 1 铁锭 + 2 木棍合成铁锹，然后分别砍原木、挖泥土，验证原版 runtime 图标、对应掉落与耐久 250→249；测试不使用 `/give iron_axe` 或 `/give iron_shovel` 绕过 progression；
-   - 实现稳定阶段的 pre-doc head 已通过 asset source audit、163 scripts，以及 Chromium shard 1/2 和 2/2；shard 1 实际执行新 E2E 并 23/23 通过。这些结果只作为实现稳定证据，最终合并仍只认文档落地后的 exact-head CI。
+4. Authoritative multiplayer PvP wiring
+   - server combat state 支持每次攻击传入 item-specific interval，同时保留历史默认 cooldown；
+   - 显式 `combatOptions.attackCooldownMs` 仍优先，用于既有仿真/测试注入，不被 item profile 意外覆盖；
+   - server 在目标伤害实际 `applied` 后才调用 authoritative Inventory `damageSelected()`；
+   - Inventory revision 正常推进并复制给客户端；
+   - 无需新增 wire protocol。
 
-### #119 明确不做
+5. Regression evidence
+   - `check-melee-rules.mjs`：锁共享 damage / attack interval / durability-cost profile；
+   - `check-iron-sword-progression.mjs`：锁铁剑 item、recipe、250 durability、source/runtime hash 与 16×16 texture；
+   - `check-authoritative-melee-profile-runtime.mjs`：锁 6 damage、625 ms sword interval、axe slower interval、成功命中才 wear，以及 authoritative Inventory replication；
+   - `iron-sword-progression.spec.mjs`：真实单人世界 → 2 铁锭 + 1 木棍工作台合成铁剑 → 普通 `/summon zombie` → 真实 raycast / 左键攻击 → 热栏耐久 250→249；测试不通过 `/give iron_sword` 绕过合成，也不会靠误挖方块伪造耐久消耗。
 
-- iron sword；
-- iron hoe；
-- axe log stripping；
-- shovel dirt-path creation / campfire extinguish；
-- sword sweep、shield disable、item-specific attack-speed/cooldown parity；
-- hoe 对 leaves 等完整 effective-tool 覆盖；
+### 实现稳定证据
+
+实现稳定阶段 exact head `d7f535e2da117685e3f8b6a1075e61fb0514a755` 已通过：
+
+- Minecraft asset source audit：PASS，包含最终 generated-vs-tracked runtime 比对；
+- JavaScript syntax + **166** 个自动发现的 logic/server/Worker scripts：PASS；
+- Chromium shard 1/2：**23/23 PASS**，其中 `iron-sword-progression.spec.mjs` 实际执行并通过；
+- Chromium shard 2/2：**23/23 PASS**，覆盖 multiplayer PvP、authoritative mining、tool durability、workbench、persistent singleplayer Furnace 与长期 smoke 回归。
+
+这些只作为 pre-doc 实现稳定证据。本文和 feature matrix 落地后会产生新的 exact head；最终合并不得继承上述旧 head 绿灯，必须重新跑完整 asset audit、166 scripts 和两路 Chromium。
+
+### #120 明确不做
+
+- Java 1.20.1 完整 attack-strength 曲线；
+- sweep attack；
+- critical hit 完整规则；
+- shield disable / blocking interaction；
+- attack animation / cooldown indicator 完整 Java UI parity；
+- iron hoe / farmland tilling；
+- axe stripping；
+- shovel path creation / campfire extinguish；
 - iron armor；
 - coal/worldgen；
-- protocol/world/block IDs。
+- server-authoritative PvE。
 
-因此铁斧和铁锹在 #119 后应标为 **PARTIAL**，不能标成完整 Java 1.20.1 parity。当前交付只完成 source-backed item、recipe、durability 与核心 effective mining semantics。
+因此 **iron sword 与 held-item melee semantics 必须标为 PARTIAL**。当前 625 ms 等间隔是基于 attack speed 的“满充攻击硬门槛近似”，不是 Java 1.20.1 连续 attack-strength / damage scaling 的等价实现。
 
-## #119 收口门槛
+## #120 最终收口门槛
 
 只有以下条件同时满足才允许 Ready + squash merge：
 
-1. branch 必须基于 `main 201b09c5…` 且 behind=0；
-2. `effectiveTool` 与 `requires/minToolTier` 必须保持独立语义，徒手可掉落方块不得因新增 axe/shovel effectiveness 变成无掉落；
-3. 石头/圆石/铁矿/Furnace 的 pickaxe harvest requirement 不得被放宽；
-4. iron axe/shovel canonical Java 1.20.1 textures 与 tracked runtime outputs 必须可重建、字节一致；
-5. 两条 3×3 recipe、250 durability、matching-tool mining speed 与 ordinary drops 必须由 logic contract 覆盖；
-6. 新 browser E2E 必须实际工作台合成两种工具并真实破坏原木/泥土；
-7. exact branch HEAD JavaScript syntax + 完整 logic/server/Worker 全绿；
-8. exact branch HEAD Minecraft asset source audit 全绿；
-9. exact branch HEAD 两路 Chromium jobs 全绿；
-10. feature matrix 与本文同步真实 parity；
-11. 无 unresolved review/thread/comment 阻塞。
+1. branch 仍基于 `main 7b582e4f…` 且 behind=0；
+2. canonical iron-sword texture 与 runtime output 可从 tracked Java 1.20.1 source 重建且字节一致；
+3. iron sword recipe、6 damage、250 durability、1.6 attack speed profile 均有 logic contract；
+4. 单人和多人都从共享 melee profile 读取手持物规则；
+5. 只有真实 `applied` damage 才产生 weapon wear；
+6. authoritative PvP weapon wear 必须推进并复制 Inventory revision；
+7. browser E2E 必须真实工作台合成铁剑并真实命中 mob，验证 250→249；
+8. 文档后的 exact branch HEAD Minecraft asset source audit 全绿；
+9. 文档后的 exact branch HEAD JavaScript syntax + 166 logic/server/Worker scripts 全绿；
+10. 文档后的 exact branch HEAD 两路 Chromium 全绿，且 iron-sword E2E 确认实际执行；
+11. PR body、feature matrix 与本文使用正确 texture hash 和真实 parity 口径；
+12. 无 unresolved review/thread/comment 阻塞。
 
-## #119 合并后的下一步
+## #120 合并后的下一步
 
-### 1. Iron sword as a combat-specific delivery
+### 1. Iron hoe + secondary tool actions
 
-铁剑不应只是给 `ITEMS` 加一行数据。下一阶段应至少解决：
+下一阶段不应只把锄头加进 `ITEMS`。需要形成行为闭环：
 
-- source-backed iron sword item/recipe/durability；
-- 玩家 melee damage 使用手持武器 metadata；
-- 单人和多人 PvP 共用一致伤害规则；
-- 明确当前攻击冷却与 Java 1.20.1 attack-speed 差异；
-- 之后再独立考虑 sweep attack、shield interaction 等行为。
-
-### 2. Iron hoe / secondary tool actions
-
-锄与斧/锹的右键行为需要专门交付：
-
+- source-backed iron hoe + 3×3 recipe + durability；
 - farmland tilling；
-- axe stripping；
-- shovel path creation；
-- 对应 world mutation / durability / multiplayer authority；
-- 再扩充 hoe/axe 的完整 effective block families。
+- axe log stripping；
+- shovel dirt-path creation；
+- 对应 world mutation / item wear；
+- 单人和 multiplayer authority 规则一致；
+- 再扩充 hoe/axe/shovel 的真实 effective block families。
 
-### 3. Iron armor
+### 2. Iron armor
 
-在现有 Equipment / armorPoints foundation 上补 iron helmet/chestplate/leggings/boots 与 recipes；armor durability/wear 仍应作为独立缺口，不把“可装备”误写成完整护甲 parity。
+在现有 Equipment / armorPoints foundation 上补 iron helmet/chestplate/leggings/boots 与 recipes。Armor durability/wear 仍作为独立缺口，不把“可装备”误写成完整护甲 parity。
 
-### 4. Coal progression as a terrain-version delivery
+### 3. Coal progression as a terrain-version delivery
 
 独立实现 coal ore block/model/texture、coal item/fuel 与 deterministic generation。新增自然煤矿会改变 seeded-world bytes，因此必须显式处理 terrain generator version / multiplayer compatibility，不能夹进普通 item PR。
 
-### 5. Multiplayer XP and durable block-entity infrastructure
+### 4. Multiplayer XP and durable block-entity infrastructure
 
-继续推进 server-owned XP/level、durable server world/container persistence、generic block-entity storage 与 loaded-chunk/scheduled tick 生命周期。
+继续推进 server-owned XP/level、durable server world/container persistence、generic block-entity storage 与 loaded-chunk/scheduled tick 生命周期，再扩展 chest/barrel 等持久容器。
 
 ## 工程规则
 
 - 每个交付 PR 只认 exact branch HEAD 的 CI；
 - feature PR 改变 parity 状态时必须在同一 PR 更新 feature matrix；
 - mining effectiveness 与 harvest/drop eligibility 是两个独立维度，不能再次复用同一字段表达；
+- melee damage、attack timing、hurt cooldown 与 durability wear 需要分层，不能用一个固定 cooldown 假装完整 Java combat；
 - gameplay state、renderer state、collision state、server authority 和 persistence 分层；
 - 单人/多人共用 deterministic gameplay core，但各自 authority backend 不混淆；
 - source-backed assets 必须可重建、可验证 provenance；
