@@ -29,5 +29,13 @@ replace_once(_asset_path,
 
 '''
 patched=prefix+replacement+end+suffix
+marker="print('farming phase 1 integration patch applied')"
+if patched.count(marker)!=1: raise SystemExit('farming bootstrap completion marker drifted')
+extra=r'''replace_once('scripts/check-minecraft-model-runtime.mjs',
+"assert.deepEqual(runtime.blockIds,[BLOCK.CRAFTING_TABLE,BLOCK.IRON_ORE,BLOCK.GLASS,BLOCK.FURNACE]);",
+"assert.deepEqual(runtime.blockIds,[BLOCK.CRAFTING_TABLE,BLOCK.IRON_ORE,BLOCK.GLASS,BLOCK.FURNACE,BLOCK.FARMLAND,BLOCK.FARMLAND_MOISTURE_1,BLOCK.FARMLAND_MOISTURE_2,BLOCK.FARMLAND_MOISTURE_3,BLOCK.FARMLAND_MOISTURE_4,BLOCK.FARMLAND_MOISTURE_5,BLOCK.FARMLAND_MOISTURE_6,BLOCK.FARMLAND_MOISTURE_7,BLOCK.WHEAT_AGE_0,BLOCK.WHEAT_AGE_1,BLOCK.WHEAT_AGE_2,BLOCK.WHEAT_AGE_3,BLOCK.WHEAT_AGE_4,BLOCK.WHEAT_AGE_5,BLOCK.WHEAT_AGE_6,BLOCK.WHEAT_AGE_7]);")
+
+'''
+patched=patched.replace(marker,extra+marker,1)
 namespace={'__file__':str(helper),'__name__':'__main__'}
 exec(compile(patched,str(helper),'exec'),namespace,namespace)
