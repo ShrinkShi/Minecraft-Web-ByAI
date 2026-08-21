@@ -19,12 +19,7 @@ export const MINECRAFT_MODEL_BLOCK_REGISTRY=Object.freeze({
   // The current voxel payload stores block IDs only, so the first furnace slice
   // uses the canonical north-facing unlit state. Facing/lit are state upgrades,
   // not reasons to fall back to handmade geometry or textures.
-  [BLOCK.FURNACE]:descriptor('minecraft:furnace',{state:{facing:'north',lit:'false'}}),
-  // Player-created secondary-tool states use deterministic canonical slices.
-  // Farmland moisture is not simulated yet, so newly tilled soil starts dry.
-  [BLOCK.FARMLAND]:descriptor('minecraft:farmland',{state:{moisture:'0'}}),
-  [BLOCK.DIRT_PATH]:descriptor('minecraft:dirt_path'),
-  [BLOCK.STRIPPED_OAK_LOG]:descriptor('minecraft:stripped_oak_log',{state:{axis:'y'}})
+  [BLOCK.FURNACE]:descriptor('minecraft:furnace',{state:{facing:'north',lit:'false'}})
 });
 
 export function minecraftModelBlockDescriptor(blockId){
