@@ -7,12 +7,6 @@ on:
       - 'tools/apply-coal-progression.py'
       - 'tools/fix-coal-bootstrap.py'
       - '.github/workflows/coal-progression-apply.yml'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'tools/apply-coal-progression.py'
-      - 'tools/fix-coal-bootstrap.py'
-      - '.github/workflows/coal-progression-apply.yml'
   workflow_dispatch:
 
 permissions:
@@ -59,7 +53,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git rm tools/apply-coal-progression.py tools/fix-coal-bootstrap.py .github/workflows/coal-progression-apply.yml
+          git rm -f tools/apply-coal-progression.py tools/fix-coal-bootstrap.py .github/workflows/coal-progression-apply.yml
           git add -A
           git commit -m 'feat: add coal progression and terrain v3'
           git push origin HEAD:feature/coal-progression
