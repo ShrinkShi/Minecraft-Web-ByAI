@@ -1,6 +1,6 @@
 # 文件职责清单
 
-本文不是仓库 `ls` 的复制品，而是**架构责任清单**：列出会影响玩法状态、authority、资源生命周期或下一阶段扩张方式的主要文件。完整目标/完成度见 `PROJECT_BASELINE.md` 与 `MINECRAFT_1_20_1_FEATURE_MATRIX.md`。
+本文不是仓库 `ls` 的复制品，而是**架构责任清单**：列出会影响玩法状态、authority、资源生命周期、原版资源 provenance 或下一阶段扩张方式的主要文件。完整目标/完成度见 `PROJECT_BASELINE.md` 与 `MINECRAFT_1_20_1_FEATURE_MATRIX.md`。
 
 新增重要 subsystem 时应在同一个 PR 更新本文；普通 test fixture/小 helper 不要求逐文件登记。
 
@@ -8,176 +8,144 @@
 
 | 路径 | 职责 | 约束 |
 |---|---|---|
-| `index.html` | 菜单、HUD、Inventory/Workbench、聊天、死亡界面、多人连接等 DOM 壳 | 不承载 authoritative gameplay 规则 |
-| `styles.css` | 基础 Minecraft 风格 UI | 避免逐帧 layout 工作 |
-| `mobile.css` | landscape touch UI、portrait rotate overlay、safe-area | 只负责 presentation |
-| `armor.css` / `oxygen.css` / `death.css` | 对应 HUD/overlay 表现 | 不成为 gameplay truth |
-| `src/ui.js` | Hotbar/Inventory/Crafting/Equipment/HUD DOM binding | multiplayer authoritative state 只从 snapshot/result 渲染 |
-| `src/death-screen.js` | 死亡覆盖层 DOM 状态 | 不决定掉落/重生规则 |
-| `src/jade.js` / Jade 相关规则 | crosshair target 信息展示 | read-only，不成为 target authority |
-| command completion 模块 | slash command suggestion/completion | 只影响输入体验，不绕过 command authority |
+| `index.html` | 菜单、HUD、Inventory/Workbench、聊天、死亡界面、多人连接 DOM 壳 | 不承载 authoritative gameplay 规则 |
+| `styles.css` / feature CSS | Minecraft 风格 UI 与 HUD/overlay | 不成为 gameplay truth；避免逐帧 layout |
+| `src/ui.js` | Hotbar/Inventory/Crafting/Equipment/HUD DOM binding | multiplayer 只从 authoritative snapshot/result 渲染 |
+| `src/death-screen.js` | 死亡覆盖层 DOM | 不决定掉落/重生规则 |
+| `src/jade*.js` | crosshair inspection/presentation | read-only，不成为 target authority |
 
 ## Application/runtime composition
 
 | 路径 | 职责 | 约束 |
 |---|---|---|
-| `src/main.js` | 浏览器应用状态机、菜单/单人/多人入口、顶层 gameplay orchestration | 不继续吸收可独立纯化的规则；设备输入不在此分叉玩法 |
-| `src/client-gameplay-runtime.js` | 构建/拥有共享 browser gameplay object graph | singleplayer/multiplayer 复用 renderer/world/client systems；authority 决策在 adapter 层 |
-| `src/device-profile.js` | mobile/desktop + orientation 环境判定 | 不进入 world/gameplay state |
-| `src/control-intents.js` | 统一 canonical gameplay intent/state | desktop/touch/gamepad/network 不得定义不同玩法 |
-| `src/desktop-controls.js` | Keyboard/Mouse/Pointer Lock → intent | 不修改 World/Inventory |
-| `src/mobile-controls.js` | touch/joystick/buttons → intent | 不实现独立移动/战斗规则 |
+| `src/main.js` | 浏览器应用状态机、单人/多人顶层 orchestration、单人交互入口 | 继续把纯规则/presentation 拆出，不吸收可独立 subsystem |
+| `src/client-gameplay-runtime.js` | 构建和拥有共享 browser gameplay object graph | singleplayer/multiplayer 共用 world/player/client systems；dispose 必须释放 audio/visual/world resources |
+| `src/device-profile.js` | mobile/desktop/orientation 判定 | 不进入 world/gameplay state |
+| `src/control-intents.js` | canonical gameplay intent/state | desktop/touch/network 不得定义不同玩法 |
+| `src/desktop-controls.js` / `src/mobile-controls.js` | 设备输入 → intent | 不修改 World/Inventory |
 
 ## World / blocks / rendering
 
 | 路径 | 职责 | 约束 |
 |---|---|---|
-| `src/blocks.js` | 当前 block IDs/metadata/render classification/face tiles | gameplay registry 仍很小；下一阶段应由更通用 registry/model pipeline 扩张 |
-| `src/world.js` | browser chunk streaming、worker requests、edit overlay、mesh install/dispose、queries | chunk lifecycle 是 opaque/water/special/model visuals 的 owner；GPU resource 必须显式 dispose |
-| `src/terrain-generator.js` | browser/server 共用 deterministic terrain generation | worldgen 升级时必须保持 shared deterministic source |
-| `src/world-worker.js` | terrain Worker adapter | 只包装纯 generator，不复制算法 |
-| `src/mesh-worker.js` | 当前 chunk visible-face meshing + water + special descriptors | legacy full-cube fast path 必须保留；generic model 接入不得退化为一 block 一 Mesh |
-| `src/minecraft-model-mesh-batch.js` | interpreted model face → chunk-level `opaque/cutout/translucent` TypedArray batches | texture/layer/tint/cull 通过纯 callback 注入；Worker 可 transferable；禁止 per-block material/Mesh |
-| `src/bed-rules.js` | bed facing/foot/head/partner/anchor metadata | gameplay state 与 visual geometry 分离 |
-| `src/bed-model-specs.js` | bed cuboid/UV/facing pure spec | Node-testable，不依赖 Three.js |
-| `src/bed-model-renderer.js` | texture-backed red-bed Three.js adapter/cache | 跟随 chunk/world lifecycle dispose |
-| `src/weather-rules.js` | rain/thunder pure profiles | 不操作 Three.js/DOM |
-| `src/weather-system.js` | pooled precipitation renderer | 固定容量/显式 resource disposal |
+| `src/blocks.js` | block IDs/metadata/render classification/face fallback | ID append-only；player-created state 不得静默改写已有 seed bytes |
+| `src/world.js` | chunk streaming、worker requests、edit overlay、mesh lifecycle、queries | GPU/CPU chunk resources必须显式 dispose |
+| `src/terrain-generator.js` | browser/server deterministic terrain | worldgen 改动必须版本化并保持 shared source |
+| `src/world-worker.js` | terrain Worker adapter | 不复制生成算法 |
+| `src/mesh-worker.js` | legacy visible-face meshing + water + special/model descriptors | generic model path不得退化为一 block 一 Mesh |
+| `src/minecraft-model-mesh-batch.js` | interpreted faces → chunk-level opaque/cutout/translucent TypedArrays | texture/layer/tint/cull 纯 callback 注入 |
+| `src/bed-rules.js` / `src/bed-model-*` | bed state、partner、geometry、Three.js rendering | gameplay state 与 visual geometry 分离 |
+| `src/weather-rules.js` / `src/weather-system.js` | weather pure rules + pooled renderer | fixed capacity、显式 dispose |
 
 ## Minecraft resource / model / asset pipeline
 
 | 路径 | 职责 | 约束 |
 |---|---|---|
-| `MC原版素材assets.zip` | 用户提供的 Minecraft Java 1.20.1 client resource tree | source archive；存在资源不代表 runtime gameplay 已支持 |
-| `src/asset-manifest.js` | logical runtime asset key → tracked source-backed runtime URL | 不允许 missing key 静默伪造“原版资源”；legacy terrain atlas 与 generic model atlas 是独立资源契约 |
-| `src/minecraft-resource-id.js` | Minecraft namespace/resource path 规范化与 browser asset path helpers | traversal/非法 segment fail-closed；model/blockstate/texture 层共用 |
-| `src/minecraft-model-resolver.js` | parent inheritance、texture variables、elements/faces 的纯 model 语义解析 | Node/browser-neutral；loadModel 注入；不操作 Three.js/DOM/Worker |
-| `src/minecraft-blockstate-resolver.js` | variants/weights/x-y/uvlock/multipart 条件解析与确定性选择 | caller 提供 deterministic selection；不调用 `Math.random()` |
-| `src/minecraft-model-geometry.js` | normalized elements → renderer-neutral cuboid faces/UV/normals/bounds | element rotation/rescale 在此处理；atlas 和 Three.js 不进入该层 |
-| `src/minecraft-model-instance.js` | blockstate model-instance x/y transform、cullface rotation、UV/uvlock | element rotation 与 model-instance rotation 分离 |
-| `src/minecraft-model-texture-binding.js` | tracked model-atlas manifest strict validator/resolver + #100 textureBinding adapter | 校验 canonical path/provenance/pixel↔UV/packing；render layer policy 由 caller 注入 |
-| `assets/minecraft/runtime-manifest.json` | 现有 selective runtime subset/provenance metadata | 与 generated model atlas contract 分离 |
-| `assets/model-textures/model-texture-atlas.png` | interpreted model 第一批 acceptance texture atlas | 128×128/1px gutter；由 source closure 确定性重建 |
-| `assets/model-textures/model-texture-atlas.json` | model texture ID → pixel/normalized region + provenance | runtime resolver 的数据输入；不承担 block render-layer policy |
-| `tools/audit-minecraft-assets.py` | source ZIP deterministic inventory/audit | source hash/layout/probes 必须稳定 |
-| `tools/import-minecraft-assets.py` | selective legacy runtime resource extraction | 只导入明确 runtime subset；不等于 model dependency closure |
-| `tools/build-minecraft-runtime-assets.py` | legacy browser-ready runtime assets build | 输出需可重建、checksum 可比 |
-| `tools/minecraft_model_closure.py` | blockstate → model parents → textures/metadata dependency closure | unsafe/ambiguous/missing/cyclic resource fail-closed；输出 provenance |
-| `tools/minecraft_model_atlas.py` | dependency closure → deterministic model texture atlas + manifest | 生成物必须与 tracked PNG/JSON 逐字节一致；当前 animated/non-square texture fail-closed |
-| `.github/workflows/asset-source-audit.yml` | read-only source/resource/atlas reproducibility gate | `contents: read`；不得 self-push；legacy runtime subset 与 model atlas 分别校验 |
+| `MC原版素材assets.zip` / `MC原版素材assets/` | 用户提供的 Java 1.20.1 client resource tree | source input；存在资源不代表 runtime 已实现对应玩法 |
+| `原版Minecraft音频文件/` | #122 导入的 Java 1.20.1 sound-object corpus、映射表和来源说明 | **source availability only**；不得把目录存在写成完整 audio parity |
+| `src/asset-manifest.js` | logical runtime asset key → tracked source-backed URL | missing key fail closed；direct canonical binding 必须显式 audit |
+| `src/minecraft-resource-id.js` | namespace/path 规范化 | traversal/非法 segment fail closed |
+| `src/minecraft-model-resolver.js` | parent inheritance、textures、elements/faces | Node/browser-neutral；不操作 Three.js |
+| `src/minecraft-blockstate-resolver.js` | variants/weights/rotation/uvlock/multipart | deterministic selection，不直接 `Math.random()` |
+| `src/minecraft-model-geometry.js` | model elements → renderer-neutral faces | atlas/Three.js 不进入该层 |
+| `src/minecraft-model-instance.js` | blockstate instance rotation/cull/uvlock | element rotation 与 instance rotation 分离 |
+| `src/minecraft-model-texture-binding.js` | tracked model-atlas strict binding | 校验 provenance/pixel↔UV/packing |
+| `assets/minecraft/runtime-manifest.json` | selective runtime subset/provenance | 与 model atlas contract 分离 |
+| `assets/model-textures/*` | interpreted-model atlas + manifest | generated output 必须 deterministic |
+| `tools/audit-minecraft-assets.py` | source archive deterministic audit | source hash/layout/probes 稳定 |
+| `tools/import-minecraft-assets.py` | selective legacy runtime extraction | 不等于 dependency closure |
+| `tools/build-minecraft-runtime-assets.py` | browser-ready runtime build | tracked output 可重建 |
+| `tools/minecraft_model_closure.py` | blockstate→models→textures dependency closure | missing/cyclic/unsafe fail closed |
+| `tools/minecraft_model_atlas.py` | closure→deterministic atlas | tracked PNG/JSON 必须逐字节可重建 |
+| `.github/workflows/asset-source-audit.yml` | read-only source/reproducibility gate | `contents: read`，不得 self-push |
 
-当前 generic model 纯语义链已经到达 `blockstate/model → geometry → instance transform → chunk batching → tracked atlas binding`。下一步才允许把**预解析/缓存后的** model template 接入 Worker/VoxelWorld；chunk rebuild 热路径不得递归加载/解释 parent JSON。
+## Original audio subsystem
+
+| 路径 | 职责 | 约束 |
+|---|---|---|
+| `src/vanilla-sounds.js` | source-backed Minecraft sound event→variant registry、object URL、OGG fetch/decode cache、trace | variant 必须绑定真实 SHA-1 + logical path；资源存在不等于事件已接入 |
+| `src/vanilla-block-audio.js` | ordinary block transition break/place 与 local-player distance-driven step presentation | block→block tool mutation不误播 ordinary event；dispose 恢复 wrapped methods |
+| `src/audio-system.js` | #121 interim procedural WebAudio fallback | 只服务尚未迁移的 swing/shoot/burn/prime/explosion 等；不得标记为 source-backed Minecraft audio |
+| `scripts/check-vanilla-tool-sounds.mjs` | tool + current block sound variant/entity contract | 真实读取 OGG 并重算 SHA-1，不接受只校验字符串映射 |
+| `tests/e2e/iron-hoe-secondary-action.spec.mjs` | live browser source-audio acceptance | 必须看到真实 OGG HTTP 200/body/decode，且失败 use 不重复发成功事件 |
+
+当前 audio 边界仍是 **PARTIAL**：local/singleplayer tool/block subset 已 source-backed；multiplayer replicated edits、remote footsteps、entity/ambient/music/spatial audio 尚未完成。
 
 ## Inventory / items / crafting / progression
 
 | 路径 | 职责 | 约束 |
 |---|---|---|
-| `src/items.js` | 当前 runtime item registry/metadata | 当前约 28 IDs；床 world texture 已 source-backed，但 inventory bed icon 仍是明确的临时 SVG，因为 source 中无 standalone red-bed item PNG |
-| `src/item-stack.js` | item-instance normalization/identity/damage/merge rules | multiplayer/singleplayer 共用 item-instance semantics |
-| `src/inventory.js` | 36 slots + cursor/stack movement/snapshot | authoritative multiplayer 时只应用 server state |
-| `src/equipment.js` | head/chest/legs/feet slots | 与 Inventory 独立 state domain |
-| `src/recipes.js` | current recipe matching + CraftingGrid | 当前 5 recipes；后续需扩 broad registry/recipe content |
-| `src/mining-rules.js` | shared mining speed/progress/harvest eligibility | browser/server 共用 semantics |
-| tool-tier 规则模块 | tool tier rank/minimum harvest contracts | progression foundation，不等于完整工具内容已实现 |
-| durability display/rules 模块 | item-instance durability presentation | UI 不能预测 authoritative wear |
+| `src/items.js` | runtime item registry/metadata | #123 delivery boundary 为 40 IDs；source-backed/direct canonical provenance必须明确 |
+| `src/item-stack.js` | item-instance normalize/damage/merge | singleplayer/multiplayer 共用语义 |
+| `src/inventory.js` | 36 slots + cursor/snapshot | authoritative multiplayer 不做本地 truth |
+| `src/equipment.js` | armor equipment slots | 与 Inventory 独立 state domain |
+| `src/recipes.js` | current recipe matcher | #123 delivery boundary 为 14 recipes；仍远非全量 registry |
+| `src/mining-rules.js` | mining speed/progress/harvest eligibility | browser/server shared |
+| `src/tool-secondary-actions.js` | singleplayer/browser-neutral till/strip/flatten resolver | 只描述可变换目标/前置条件，不直接负责 durability/audio |
+| `server/tool-secondary-action-rules.mjs` | server authoritative secondary-action resolver | 与 browser semantics 对齐；客户端 target 不可信 |
+| durability/item rules | item-instance durability | UI 不预测 authoritative wear |
 
 ## Player / survival rules
 
 | 路径 | 职责 | 约束 |
 |---|---|---|
-| `src/player.js` | browser Player/camera/local movement adapter | multiplayer position 不由本地 integrator 作为 truth |
-| `src/player-orientation-rules.js` | camera-aligned yaw movement/raycast basis | shared pure rule |
-| `src/player-motion-rules.js` | platform-neutral motion planning | browser/server 共享 |
-| `src/player-environment-rules.js` | AABB collision/water/ground query rules | environment 通过 callbacks 注入 |
-| `src/combat.js` | cooldown/hurt/damage/knockback pure rules | presentation-independent |
-| `src/armor-rules.js` | 当前基础 armor mitigation | 仍是过渡公式，不声称 Java full parity |
-| `src/death-rules.js` | death loss/XP/recoverability | 不操作 UI |
-| `src/respawn-rules.js` | preferred spawn normalization/safety candidate ordering | world safety由调用方提供 |
-| `src/sleep-rules.js` | sleep window/quorum | multiplayer-ready pure rule，不等于完整 sleep system |
-| `src/sleep-safety-rules.js` | nearby hostile blocker volume | 与 respawn Y offset 分离 |
-| `src/oxygen-rules.js` | air/drowning state transitions | transient state |
-| `src/swim-rules.js` | water coverage/movement modifiers | coverage=0 必须不污染 dry movement |
-| XP/experience modules | level formulas + orb system | enchanting 等尚未实现 |
+| `src/player.js` | browser player/camera/local movement | multiplayer position 不以本地 integrator 为 truth |
+| orientation/motion/environment pure modules | camera-aligned movement、collision、水/ground queries | browser/server shared where applicable |
+| `src/combat.js` / `src/melee-rules.js` | combat cooldown/damage/profile | 不把 hard interval 假装成完整 Java attack-strength curve |
+| `src/armor-rules.js` | 当前基础 mitigation | 过渡公式，不声称 full parity |
+| death/respawn/sleep/oxygen/swim rules | 对应 pure state transition | 不操作 UI/Three.js |
+| XP/experience modules | level formula + orbs | multiplayer server-owned XP 尚未完成 |
 
 ## Entities / PvE visuals
 
 | 路径 | 职责 | 约束 |
 |---|---|---|
-| `src/entity-store.js` | entity identity/components/position store | 与 spatial index 分离 |
-| `src/spatial-hash.js` | X/Z candidate narrowing | 避免全表 N² 查询 |
-| `src/mobs.js` | current 8 mob definitions/loot/xp | 不是完整 vanilla registry |
-| passive/hostile mob systems | local spawn/AI/update orchestration | 当前 PvE 主要仍是 client gameplay domain |
-| `src/projectile-rules.js` / projectile system | arrow trajectory/hit/runtime | multiplayer server authority 尚待迁移 |
-| explosion rules/system | simplified creeper explosion | multiplayer server authority 尚待迁移 |
-| `src/mob-model-specs.js` | 8 current species cuboid/UV/pivot pure specs | geometry provenance 与 texture provenance 分开 |
-| `src/mob-model-renderer.js` | Three.js texture-backed mob model builder/cache | shared texture/material resources必须 dispose |
+| `src/entity-store.js` / `src/spatial-hash.js` | entity identity/components + candidate narrowing | 避免全表 N² |
+| `src/mobs.js` | current 8 mob definitions/loot/xp | 不等于完整 registry |
+| passive/hostile mob systems | local spawn/AI/update | PvE authority 尚未迁到 server |
+| projectile/explosion rules/systems | local projectile/explosion simulation | multiplayer server authority 尚待实现 |
+| mob model specs/renderer | source-textured compatible cuboid geometry | texture provenance 与 reconstructed geometry provenance 分开 |
 
-## Multiplayer client protocol
+## Multiplayer client / server authority
 
 | 路径/模块 | 职责 | 约束 |
 |---|---|---|
-| control/view/action frame modules | strict platform-neutral realtime input schemas | 不包含 trusted target/device identity |
-| network sequence/session modules | uint32 ordering/replay guards | 不同 semantic domain 独立 sequencing |
-| handshake/WebSocket client | secure-by-default transport/session lifecycle | malformed/stale/unknown messages fail closed |
-| multiplayer bootstrap | world-info/world edits/required snapshot synchronization barrier | ready 前不进入 gameplay |
-| movement session | input bridge + authoritative player interpolation + remote state plumbing | local camera look可响应；位置来自 authority |
-| remote player system | other-player model/interpolation lifecycle | public playerId 与 transport session identity 分离 |
-| authoritative presentation channels | Inventory/Equipment/Crafting/Mining/PvP 等 browser reconciliation | sender release/reconnect 不得污染新 session |
+| control/view/action frame modules | strict realtime input schemas | 不包含 trusted target/device identity |
+| handshake/sequence/session modules | transport lifecycle + replay guards | 不同 semantic domain 独立 sequencing |
+| multiplayer bootstrap/movement session | authoritative snapshot barrier/interpolation | local camera可响应，位置来自 authority |
+| authoritative presentation channels | Inventory/Equipment/Crafting/Mining/PvP/Furnace reconciliation | reconnect/release 不污染新 session |
+| `server/start.mjs` + runtime/config | production Node composition | one explicit authority lifecycle |
+| server terrain/world session | deterministic base + sparse edits + fixed tick | generated base 与 mutable overlay 分离 |
+| server Inventory/item/equipment/crafting hubs | authoritative state/revisions | mutation only through validated transaction/action |
+| survival/creative block use controllers | authoritative placement + #123 till/strip/flatten | survival 成功 mutation 后才 wear；creative no wear |
+| PvP combat authority | HP/target/cooldown/mitigation/knockback/death/respawn | dead state阻止非法 action/pickup |
 
-## Server runtime / authority
-
-| 路径/模块 | 职责 | 约束 |
-|---|---|---|
-| `server/start.mjs` | production Node server entrypoint | env config + graceful shutdown |
-| server runtime/config modules | compose HTTP/WS + world + state hubs | one explicit authoritative runtime lifecycle |
-| multiplayer server transport | Upgrade/Origin/subprotocol/session/input validation | untrusted client boundary |
-| player input state | accepted control/view/action history/queues | bounded memory + independent replay gates |
-| player simulation | fixed 20 Hz authoritative movement/collision | browser不能提交 position/velocity |
-| server terrain world | deterministic terrain + sparse authoritative edits | generated base 与 mutable overlay 分离 |
-| authoritative world session | player tick/world/session lifecycle | single scheduler owner |
-| remote player replication hub | public identity + snapshot/despawn broadcast | 不暴露 transport session as public identity |
-| server Inventory hub/state | slots/cursor/revisions | mutation only through validated transactions |
-| server item entity hub | ground items/gravity/pickup/lifetime | simulation 每 authoritative world tick 执行一次 |
-| survival mining/use controllers | server raycast/mining/placement | client target 不可信 |
-| Equipment authority | equipment + Inventory dual-revision transactions | cross-domain atomicity |
-| player crafting authority | permanent 2×2 state | server derives recipe output |
-| Workbench authority | transient 3×3 server container | block identity/reach/container id validated |
-| chat authority | server-derived sender + ordering/rate limit | session identity不是账户身份 |
-| command authority | whitelisted server mutations + permission flag | 当前开关不是 OP/auth system |
-| PvP combat authority | HP/cooldown/targeting/mitigation/knockback/death/respawn | dead state blocks inappropriate actions/pickup |
-
-当前 **不** 在 server authority 的大域：mobs/PvE/projectiles/explosions、durable multiplayer persistence、persistent shared block containers、accounts/rooms/operator identity。
+当前仍不在 server authority 的大域：mobs/PvE/projectiles/explosions、XP/levels、durable world/container persistence、accounts/rooms/operator identity。
 
 ## Tests / CI
 
 | 路径 | 职责 |
 |---|---|
-| `scripts/run-logic-checks.mjs` | auto-discover logic regression entrypoint |
+| `scripts/run-logic-checks.mjs` | 自动发现 logic regression |
 | `scripts/check-*.mjs` | pure/contract/Worker/server integration regressions |
 | `tests/e2e/*.spec.mjs` | real Chromium integration suites |
-| `playwright.config.mjs` | browser test projects/sharding settings |
-| `.github/workflows/quality.yml` | Node syntax/logic + 2-way Chromium shard quality gate |
-| `docs/TESTING.md` | validation rules/exact-head policy |
+| `playwright.config.mjs` | browser test projects/sharding |
+| `.github/workflows/quality.yml` | Node syntax/logic + 2-way Chromium gate |
+| `docs/TESTING.md` | exact-head validation policy |
 
-测试数量只作为某个 exact HEAD 的交付证据，不作为长期固定常量；新增 `check-*.mjs` 会由 runner 自动发现。
+测试数量只作为某个 exact HEAD 的交付证据，不作为长期常量。#123 pre-doc head `c9bd6b9…` 的 Repository quality #941：shard 1 为 24/24，shard 2 为 23/23，均无 retry。
 
 ## Documentation authority
 
 | 路径 | 职责 |
 |---|---|
-| `README.md` | user/developer overview，不维护 exhaustive TODO |
-| `docs/PROJECT_BASELINE.md` | 当前 main 的权威实现事实 |
+| `README.md` | user/developer overview |
+| `CHANGELOG.md` | 版本/Unreleased 累积变更，不替代 roadmap |
+| `docs/PROJECT_BASELINE.md` | 已合并 main 的权威事实 |
 | `docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md` | 1.20.1 parity/roadmap authority |
-| `docs/PROGRESS.md` | current active work dashboard |
-| `docs/ARCHITECTURE.md` | current architecture/authority boundaries |
+| `docs/PROGRESS.md` | current active delivery dashboard |
+| `docs/ARCHITECTURE.md` | architecture/authority boundaries |
 | `docs/TESTING.md` | quality gate/validation policy |
-| `docs/NETWORKING.md` | networking protocol design/invariants |
-| `docs/SERVER.md` | Node authoritative server run/security boundary |
-| `CHANGELOG.md` | chronological historical record，不作为当前 TODO authority |
+| `docs/FILE_MANIFEST.md` | 本文件：重要 subsystem/文件职责 |
 
-## Manifest maintenance rule
-
-- 新增架构级模块/authority domain/model pipeline 时必须更新本文件。
-- 文件职责变化时更新原行，不在末尾重复追加矛盾描述。
-- 历史一次性 patch scripts/workflows 不允许留在 delivery tree。
-- 临时生成工具若只是迁移手段，应在 final diff 删除；稳定 reproducibility 工具才进入长期 manifest。
+文档规则：feature PR 改变 parity 时必须同步 matrix；source resource availability 与 runtime implementation 必须分别描述；只有 exact HEAD 的完整 CI 可以作为 Ready/merge 证据。
