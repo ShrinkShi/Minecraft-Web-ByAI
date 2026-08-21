@@ -12,6 +12,7 @@ import {WorldStorage,worldIdFor} from './storage.js';
 import {executeCommand} from './commands.js';
 import {canAttack} from './combat.js';
 import {meleeProfile} from './melee-rules.js';
+import {resolveToolSecondaryAction,toolActionFaceY} from './tool-secondary-actions.js';
 import {experienceState} from './experience.js';
 import {rollMobLoot,rollMobXp} from './mobs.js';
 import {deathLossPlan} from './death-rules.js';
@@ -241,7 +242,10 @@ function primaryActionStart(){
 }
 function primaryActionEnd(){singleplayerMining.cancel();selectedTarget=null;}
 function secondaryAction(){
-  if(sessionKind==='multiplayer'){ui.showToast('联机放置/使用权威尚未接入');return;}if(!canControl()||!player)return;const hit=aim();if(hit&&isBedBlock(hit.id)){if(player.mode!=='spectator')activateBed(hit);return;}if(hit?.id===9){openWorkbench();return;}if(hit?.id===BLOCK.FURNACE){openFurnace(hit);return;}if(player.mode==='spectator'||player.mode==='adventure'||!hit)return;const selected=ui.selectedItem(),def=ITEMS[selected?.id];if(def?.placeKind==='bed'){const plan=placeBed(hit.previous);if(!plan){ui.showToast('这里无法放置床');return;}if(player.mode!=='creative')ui.consumeSelected(1);ui.showToast(`放置 ${def.name}`);markSaveDirty();return;}if(!def?.blockId||def.blockId===8)return;const p=hit.previous;if(playerOccupies(p.x,p.y,p.z))return;if(world.setBlock(p.x,p.y,p.z,def.blockId)){if(player.mode!=='creative')ui.consumeSelected(1);ui.showToast(`放置 ${def.name}`);markSaveDirty();}
+  if(sessionKind==='multiplayer'){ui.showToast('联机放置/使用权威尚未接入');return;}if(!canControl()||!player)return;const hit=aim();if(hit&&isBedBlock(hit.id)){if(player.mode!=='spectator')activateBed(hit);return;}if(hit?.id===9){openWorkbench();return;}if(hit?.id===BLOCK.FURNACE){openFurnace(hit);return;}if(player.mode==='spectator'||player.mode==='adventure'||!hit)return;const selected=ui.selectedItem(),def=ITEMS[selected?.id];
+  const toolAction=resolveToolSecondaryAction({itemId:selected?.id,targetBlockId:hit.id,aboveBlockId:hit.y+1<WORLD_HEIGHT?world.getBlock(hit.x,hit.y+1,hit.z):BLOCK.AIR,faceY:toolActionFaceY(hit)});
+  if(toolAction){if(world.setBlock(hit.x,hit.y,hit.z,toolAction.resultBlockId)){if(player.mode!=='creative'){const wear=inventory?.damageAt(HOTBAR_START+ui.selected,selected.id,toolAction.durabilityCost);if(wear?.changed&&wear.broken)ui.showToast(`${ITEMS[selected.id]?.name||selected.id} 已损坏`);}const verb=toolAction.kind==='till'?'耕作':toolAction.kind==='strip'?'剥皮':'铲平';ui.showToast(`${verb} ${BLOCKS[hit.id]?.name||'方块'}`);markSaveDirty();}return;}
+  if(def?.placeKind==='bed'){const plan=placeBed(hit.previous);if(!plan){ui.showToast('这里无法放置床');return;}if(player.mode!=='creative')ui.consumeSelected(1);ui.showToast(`放置 ${def.name}`);markSaveDirty();return;}if(!def?.blockId||def.blockId===8)return;const p=hit.previous;if(playerOccupies(p.x,p.y,p.z))return;if(world.setBlock(p.x,p.y,p.z,def.blockId)){if(player.mode!=='creative')ui.consumeSelected(1);ui.showToast(`放置 ${def.name}`);markSaveDirty();}
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden){clearPlayerInput();persistWorld();}});window.addEventListener('beforeunload',()=>{try{multiplayerMovement?.close(1000,'page unload');}catch{}persistWorld();});
 
