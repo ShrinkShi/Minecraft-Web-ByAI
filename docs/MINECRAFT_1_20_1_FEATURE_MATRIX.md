@@ -2,23 +2,23 @@
 
 Status: `DONE` / `PARTIAL` / `FOUNDATION` / `TODO` / `BLOCKED`.
 
-Percentages are planning estimates, not automated coverage. `PROJECT_BASELINE.md` records merged main; this matrix describes the **projected post-PR #125 state** where explicitly noted.
+Percentages are planning estimates, not automated coverage. `PROJECT_BASELINE.md` records merged main; this matrix describes the **projected post-PR #126 state** where explicitly noted.
 
-## Overall projected state after PR #125
+## Overall projected state after PR #126
 
 | Domain | Planning completion | Status | Main gaps |
 |---|---:|---|---|
 | Browser engine / chunk / rendering | 85% | PARTIAL | lighting parity, broad collision/model/state/tint/animation |
 | Desktop/mobile controls and core UI | 78% | PARTIAL | settings/accessibility/keybind UI, recipe book |
-| Singleplayer survival core | 66% | PARTIAL | hunger/food/farming, effects/enchanting/brewing, broad progression |
-| Blocks/items/recipes breadth | 22% | PARTIAL | most 1.20.1 registry content absent |
-| World generation / biomes / caves / structures | 18% | PARTIAL | biome pipeline, caves, broad ores/features/structures, Nether/End |
+| Singleplayer survival core | 67% | PARTIAL | hunger/food/farming, effects/enchanting/brewing, broad progression |
+| Blocks/items/recipes breadth | 23% | PARTIAL | most 1.20.1 registry content absent |
+| World generation / biomes / caves / structures | 20% | PARTIAL | biome pipeline, caves, vanilla ore placement breadth, features/structures, Nether/End |
 | Entities / PvE | 40% | PARTIAL | species breadth, pathfinding/spawns, breeding/taming/riding, server authority |
 | Multiplayer server foundation | 70% | PARTIAL | durable persistence, PvE/XP, rooms/auth/operators, broader block entities |
 | Full multiplayer Minecraft parity | 52% | PARTIAL | PvE authority, prediction breadth, wider content and replicated SFX |
-| Original resource integration | 47% | PARTIAL | broad registry use, tint/animation, generated sound registry |
+| Original resource integration | 48% | PARTIAL | broad registry use, tint/animation, generated sound registry |
 | Audio / SFX / music | 12% | PARTIAL | current tool/block/mining/mob subset; broad events/spatial/music remain |
-| Farming / food / processing | 24% | PARTIAL | Furnace + farmland creation; hunger/crops/food/broad fuels absent |
+| Farming / food / processing | 27% | PARTIAL | Furnace + coal fuel + farmland creation; hunger/crops/food/broad fuels absent |
 | Redstone | 3% | FOUNDATION | neighbor updates, scheduled ticks, power graph/components |
 | Villagers / trading | 0% | TODO | entire system |
 | Enchanting / brewing / status effects | 0% | TODO | entire system |
@@ -26,7 +26,7 @@ Percentages are planning estimates, not automated coverage. `PROJECT_BASELINE.md
 | Advancements / statistics | 0% | TODO | entire system |
 | Engineering / CI | 90% | PARTIAL | performance/load/device/visual-diff breadth |
 
-**Overall strict Java 1.20.1 parity remains conservatively about 35%.** Iron armor closes an important survival slice but does not materially shrink the dominant registry/worldgen/dimension gaps.
+**Overall strict Java 1.20.1 parity remains conservatively about 35%.** Coal closes another survival/progression slice, but simplified coal generation is not vanilla worldgen parity and does not materially shrink the dominant registry/worldgen/dimension gaps.
 
 ## Runtime / rendering / UI
 
@@ -40,15 +40,15 @@ Percentages are planning estimates, not automated coverage. `PROJECT_BASELINE.md
 | Generic blockstate/model interpreter | PARTIAL | Selected roots live; broad registry/state/collision breadth incomplete. |
 | Water | PARTIAL | Static/simplified; no full levels/flow. |
 | Vanilla lighting / biome tint / animated textures | TODO | Major rendering parity gaps. |
-| Inventory / Workbench / Furnace UI | PARTIAL | Workbench now canonical source-backed layout; recipe book/settings breadth missing. |
+| Inventory / Workbench / Furnace UI | PARTIAL | Workbench canonical source-backed layout; recipe book/settings breadth missing. |
 
 ## Blocks / items / crafting
 
-Projected post-#125 registry: **44 runtime item IDs / 18 recipes**.
+Projected post-#126 registry: **46 runtime item IDs / 18 recipes**.
 
 Current gameplay families/states remain:
 
-`grass_block`, `dirt`, `stone`, `sand`, `oak_planks`, `oak_log`, `oak_leaves`, `water`, `crafting_table`, `cobblestone`, `red_bed`, `iron_ore`, `glass`, `furnace`, `farmland`, `dirt_path`, `stripped_oak_log`.
+`grass_block`, `dirt`, `stone`, `sand`, `oak_planks`, `oak_log`, `oak_leaves`, `water`, `crafting_table`, `cobblestone`, `red_bed`, `iron_ore`, `coal_ore`, `glass`, `furnace`, `farmland`, `dirt_path`, `stripped_oak_log`.
 
 | Feature | Status | Notes |
 |---|---|---|
@@ -58,6 +58,7 @@ Current gameplay families/states remain:
 | Wooden/stone/iron swords | PARTIAL | Full Java combat curve/critical/sweep/shield absent. |
 | Iron axe/shovel/hoe | PARTIAL | Current secondary actions; breadth narrow. |
 | Raw iron / iron ingot | PARTIAL | Stone→iron chain. |
+| Coal / coal ore | PARTIAL | #126: wooden+ pickaxe harvest, canonical assets, 1600-tick Furnace fuel; charcoal/coal block/ore XP/enchantments absent. |
 | **Iron armor** | PARTIAL | #125: 4 pieces, recipes, 15 armor points, durability/wear, local + authoritative PvP state. Third-person armor model/sounds/enchantments absent. |
 | Leather armor durability | PARTIAL | #125 restores Java durability metadata and generic wear. |
 | Gold/diamond/netherite progression | TODO | Architecture exists but content absent. |
@@ -65,7 +66,7 @@ Current gameplay families/states remain:
 | Slabs/stairs/fences/walls/doors | TODO | Broad shapes/state/collision missing. |
 | Chests/barrels/hoppers | TODO | Durable block-entity foundation required. |
 
-Iron armor is intentionally not inserted into the historical `CREATIVE_START`; it is registered/craftable/giveable without shifting existing starter-slot contracts.
+Iron armor, coal and coal ore are intentionally not inserted into the historical `CREATIVE_START`; they remain registered/obtainable without shifting existing starter-slot contracts.
 
 ## Survival / combat
 
@@ -89,10 +90,11 @@ Iron armor is intentionally not inserted into the historical `CREATIVE_START`; i
 
 | Feature | Status | Notes |
 |---|---|---|
-| Deterministic shared terrain | DONE | Browser/server versioned generator. |
+| Deterministic shared terrain | DONE | Browser/server current generator v3; singleplayer keeps explicit v2 support for legacy local saves. |
+| Singleplayer terrain-version persistence | PARTIAL | #126 save schema v8 stores `terrainVersion`; unversioned pre-#126 local saves pin to v2 rather than silently adopting coal. |
 | Heightmap / surface / sea / oak trees | DONE | Simplified baseline. |
 | Iron ore | PARTIAL | Simplified deterministic distribution. |
-| Coal ore | TODO | Next planned terrain-version delivery. |
+| Coal ore | PARTIAL | #126 deterministic v3 injection; exact v2 byte compatibility is locked, but distribution is not vanilla Java 1.20.1 placement. |
 | Biomes/climate | TODO | No Java biome pipeline. |
 | Caves/aquifers | TODO | None. |
 | Broad ores/features/structures | TODO | None. |
@@ -117,6 +119,7 @@ Current mobs: cow, sheep, pig, chicken, zombie, skeleton, creeper, spider.
 |---|---|---|
 | Handshake/session/input/movement | DONE | Real authoritative runtime. |
 | World edits/mining/placement | DONE | Revisioned server truth. |
+| Terrain generator compatibility | DONE | Current multiplayer sessions require exact current terrain version; terrain-v2 peer is rejected against a v3 server. |
 | Ground items / Inventory / item durability | DONE | Server-owned. |
 | Equipment transactions | DONE | Server-owned. |
 | **Armor wear replication** | PARTIAL | #125 extends authoritative Equipment with damage/break revisions and PvP integration. |
@@ -144,7 +147,7 @@ Current mobs: cow, sheep, pig, chicken, zombie, skeleton, creeper, spider.
 
 | Feature | Status | Notes |
 |---|---|---|
-| Furnace | PARTIAL | Raw iron smelting + current fuel baseline. |
+| Furnace | PARTIAL | Raw iron smelting + current fuels; #126 adds coal at 1600 ticks. |
 | Farmland creation | PARTIAL | Hoe tilling exists. |
 | Moisture/irrigation/trampling | TODO | None. |
 | Wheat/seeds/growth/harvest | TODO | None. |
@@ -159,11 +162,10 @@ Current mobs: cow, sheep, pig, chicken, zombie, skeleton, creeper, spider.
 - Nether/End/portals/bosses: 0%.
 - Advancements/statistics: 0%.
 
-## Immediate roadmap after #125
+## Immediate roadmap after #126
 
-1. coal ore + coal + Furnace fuel + terrain compatibility/version;
-2. hunger/saturation/exhaustion + first food set;
-3. wheat/seeds/farmland hydration/growth/harvest;
-4. broad block/item/recipe registry families;
-5. biome/cave/ore/feature/structure worldgen;
-6. server-owned PvE/XP and durable block-entity/world persistence.
+1. hunger/saturation/exhaustion + first food set;
+2. wheat/seeds/farmland hydration/growth/harvest;
+3. broad block/item/recipe registry families;
+4. biome/cave/ore/feature/structure worldgen;
+5. server-owned PvE/XP and durable block-entity/world persistence.
