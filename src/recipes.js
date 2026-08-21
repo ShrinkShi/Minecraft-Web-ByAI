@@ -12,6 +12,10 @@ const RECIPES=[
   {id:'iron_shovel',kind:'shaped',pattern:[['iron_ingot'],['stick'],['stick']],result:{id:'iron_shovel',count:1},minSize:3},
   {id:'iron_hoe',kind:'shaped',pattern:[['iron_ingot','iron_ingot'],[null,'stick'],[null,'stick']],result:{id:'iron_hoe',count:1},minSize:3},
   {id:'iron_sword',kind:'shaped',pattern:[['iron_ingot'],['iron_ingot'],['stick']],result:{id:'iron_sword',count:1},minSize:3},
+  {id:'iron_helmet',kind:'shaped',pattern:[['iron_ingot','iron_ingot','iron_ingot'],['iron_ingot',null,'iron_ingot']],result:{id:'iron_helmet',count:1},minSize:3},
+  {id:'iron_chestplate',kind:'shaped',pattern:[['iron_ingot',null,'iron_ingot'],['iron_ingot','iron_ingot','iron_ingot'],['iron_ingot','iron_ingot','iron_ingot']],result:{id:'iron_chestplate',count:1},minSize:3},
+  {id:'iron_leggings',kind:'shaped',pattern:[['iron_ingot','iron_ingot','iron_ingot'],['iron_ingot',null,'iron_ingot'],['iron_ingot',null,'iron_ingot']],result:{id:'iron_leggings',count:1},minSize:3},
+  {id:'iron_boots',kind:'shaped',pattern:[['iron_ingot',null,'iron_ingot'],['iron_ingot',null,'iron_ingot']],result:{id:'iron_boots',count:1},minSize:3},
   {id:'furnace',kind:'shaped',pattern:[['block:10','block:10','block:10'],['block:10',null,'block:10'],['block:10','block:10','block:10']],result:{id:'block:21',count:1},minSize:3}
 ];
 
