@@ -172,6 +172,21 @@ async function decodedBuffer(context,variant){
   return pending;
 }
 
+export async function preloadVanillaSoundEvent(eventName){
+  const variants=VANILLA_SOUND_EVENTS[eventName];
+  if(!variants?.length)return{preloaded:false,reason:'unknown-event',eventName,count:0};
+  const AudioContextCtor=globalThis.AudioContext||globalThis.webkitAudioContext;
+  if(typeof AudioContextCtor!=='function')return{preloaded:false,reason:'audio-context-unavailable',eventName,count:0};
+  try{
+    audioContext ||= new AudioContextCtor();
+    await Promise.all(variants.map(variant=>decodedBuffer(audioContext,variant)));
+    return{preloaded:true,eventName,count:variants.length};
+  }catch(error){
+    console.warn(`无法预解码 Minecraft 原版音效 ${eventName}`,error);
+    return{preloaded:false,reason:'preload-failed',eventName,count:0,error};
+  }
+}
+
 export async function playVanillaSoundEvent(eventName,{volume=1,playbackRate=1,random=Math.random}={}){
   const variants=VANILLA_SOUND_EVENTS[eventName];
   if(!variants?.length)return{played:false,reason:'unknown-event',eventName};

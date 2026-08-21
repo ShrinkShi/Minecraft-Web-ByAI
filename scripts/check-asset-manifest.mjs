@@ -11,16 +11,17 @@ for(const key of [
   'item.leather_helmet','item.leather_chestplate','item.leather_leggings','item.leather_boots','item.raw_beef','item.leather','item.raw_mutton',
   'item.raw_porkchop','item.raw_chicken','item.feather','item.rotten_flesh','item.bone','item.arrow','item.gunpowder','item.string',
   'entity.bed.red','entity.cow','entity.sheep','entity.sheep_fur','entity.pig','entity.chicken','entity.zombie','entity.skeleton','entity.creeper','entity.spider','entity.player.steve',
-  'metadata.minecraft_runtime','metadata.minecraft_model_atlas','metadata.minecraft_player'
+  'gui.crafting_table_panel','metadata.minecraft_runtime','metadata.minecraft_model_atlas','metadata.minecraft_player'
 ])assert.ok(ASSET_KEYS.includes(key),`${key} must be declared`);
 
-const DIRECT_CANONICAL_KEYS=new Set(['item.wooden_sword','item.stone_sword','item.bow','item.iron_hoe','block.stripped_oak_log','block.stripped_oak_log_top']);
+const DIRECT_CANONICAL_KEYS=new Set(['item.wooden_sword','item.stone_sword','item.bow','item.iron_hoe','block.stripped_oak_log','block.stripped_oak_log_top','gui.crafting_table_panel']);
 for(const key of ASSET_KEYS){
   const record=assetRecord(key);assert.ok(record,`${key} must resolve to a manifest record`);assert.equal(record.source,ASSET_SOURCE.USER_SUPPLIED,`${key} must resolve from the user-supplied original Minecraft source assets`);
   if(DIRECT_CANONICAL_KEYS.has(key)){
     assert.equal(record.directCanonical,true,`${key} must explicitly declare direct canonical usage`);
     if(key.startsWith('item.'))assert.match(record.url,/^\.\/MC原版素材assets\/minecraft\/textures\/item\/(?:wooden_sword|stone_sword|bow|iron_hoe)\.png$/,`${key} must stay on the audited canonical item path`);
-    else assert.match(record.url,/^\.\/MC原版素材assets\/minecraft\/textures\/block\/stripped_oak_log(?:_top)?\.png$/,`${key} must stay on the audited canonical block path`);
+    else if(key.startsWith('block.'))assert.match(record.url,/^\.\/MC原版素材assets\/minecraft\/textures\/block\/stripped_oak_log(?:_top)?\.png$/,`${key} must stay on the audited canonical block path`);
+    else assert.match(record.url,/^\.\/MC原版素材assets\/minecraft\/textures\/gui\/container\/crafting_table\.png$/,`${key} must stay on the audited canonical GUI path`);
   }else{
     assert.equal(record.directCanonical,undefined,`${key} may not silently bypass the runtime asset boundary`);
     assert.match(record.url,/^\.\/assets\//,`${key} must remain inside ./assets/`);
@@ -37,6 +38,9 @@ assert.equal(assetUrl('metadata.minecraft_player'),'./assets/minecraft/player-as
 assert.equal(assetUrl('block.glass'),'./assets/items/glass.png');
 assert.equal(assetUrl('block.stripped_oak_log'),'./MC原版素材assets/minecraft/textures/block/stripped_oak_log.png');
 assert.equal(assetUrl('block.stripped_oak_log_top'),'./MC原版素材assets/minecraft/textures/block/stripped_oak_log_top.png');
+assert.equal(assetUrl('gui.crafting_table_panel'),'./MC原版素材assets/minecraft/textures/gui/container/crafting_table.png');
+assert.equal(assetRecord('gui.crafting_table_panel').minecraftVersion,'1.20.1');
+assert.equal(assetRecord('gui.crafting_table_panel').directCanonical,true);
 assert.equal(assetUrl('item.stick'),'./assets/items/stick.png');
 assert.equal(assetUrl('item.wooden_pickaxe'),'./assets/items/wooden_pickaxe.png');
 assert.equal(assetUrl('item.stone_pickaxe'),'./assets/items/stone_pickaxe.png');
@@ -97,8 +101,9 @@ assert.equal(snapshot['item.bow'].directCanonical,true);
 assert.equal(snapshot['item.iron_hoe'].directCanonical,true);
 assert.equal(snapshot['block.stripped_oak_log'].directCanonical,true);
 assert.equal(snapshot['block.stripped_oak_log_top'].directCanonical,true);
+assert.equal(snapshot['gui.crafting_table_panel'].directCanonical,true);
 assert.equal(snapshot['item.iron_pickaxe'].source,ASSET_SOURCE.USER_SUPPLIED);
 assert.equal(snapshot['entity.spider'].source,ASSET_SOURCE.USER_SUPPLIED);
 assert.equal(snapshot['entity.player.steve'].source,ASSET_SOURCE.USER_SUPPLIED);
 
-console.log('logical asset manifest + original-Minecraft source-backed item/entity/player/model presentation bindings: PASS');
+console.log('logical asset manifest + original-Minecraft source-backed item/entity/player/gui/model presentation bindings: PASS');

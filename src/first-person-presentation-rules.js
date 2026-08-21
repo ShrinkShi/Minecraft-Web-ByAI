@@ -7,6 +7,12 @@ export const STEVE_RIGHT_ARM_BASE_FRONT=Object.freeze(STEVE_RIGHT_ARM_UVS.front)
 export const STEVE_RIGHT_ARM_SLEEVE_FRONT=Object.freeze(STEVE_RIGHT_ARM_SLEEVE_UVS.front);
 export const FIRST_PERSON_ATTACK_DURATION=.28;
 export const FIRST_PERSON_USE_DURATION=.38;
+export const FIRST_PERSON_RIGHT_ARM_LAYOUT=Object.freeze({
+  baseCenterY:.39,
+  sleeveCenterY:.403,
+  itemAnchorY:.77,
+  rotationZ:Math.PI
+});
 
 export function minecraftSkinCropCss(rect,{scale=17,skinSize=STEVE_SKIN_SIZE}={}){
   if(!Array.isArray(rect)||rect.length!==4||!rect.every(Number.isFinite))throw new TypeError('skin crop rect must contain four finite numbers');

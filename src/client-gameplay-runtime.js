@@ -14,6 +14,7 @@ import {JadeRuntimeInspector} from './jade-runtime-inspector.js';
 import {itemForBlock} from './items.js';
 import {playGameSound} from './audio-system.js';
 import {installVanillaBlockAudio} from './vanilla-block-audio.js';
+import {playMobSoundEvent} from './vanilla-mob-sounds.js';
 
 function callback(value,label){if(typeof value!=='function')throw new TypeError(`${label} must be a function`);return value;}
 function finite(value,label){if(typeof value!=='number'||!Number.isFinite(value))throw new TypeError(`${label} must be a finite number`);return value;}
@@ -44,13 +45,15 @@ export async function createClientGameplayRuntime({
     const emitDestroyedBlock=event=>{
       const itemId=itemForBlock(event?.id);if(itemId&&event?.position)drops.spawn(itemId,1,new THREE.Vector3(event.position.x+.5,event.position.y+.55,event.position.z+.5));onExplosionBlockDestroyed(event);
     };
+    const emitMobSound=event=>{if(!player||!event?.position)return;void playMobSoundEvent(event,{x:player.position.x,y:player.position.y+player.eye*.7,z:player.position.z});};
     explosions=new ExplosionSystem(scene,world,{onPlayerBlast,onBlockDestroyed:emitDestroyedBlock});
-    passiveMobs=new PassiveMobSystem(scene,world,{onDeath:onMobDeath});
+    passiveMobs=new PassiveMobSystem(scene,world,{onDeath:onMobDeath,onSound:emitMobSound});
     hostileMobs=new HostileMobSystem(scene,world,{
       onPlayerHit,
       onProjectile:event=>{playGameSound('shoot',{minIntervalMs:70});onHostileProjectile(event);},
       onExplosion:event=>{playGameSound('explosion',{minIntervalMs:80});onHostileExplosion(event);},
       onDeath:onMobDeath,
+      onSound:emitMobSound,
       onBurn:event=>{playGameSound('burn',{gain:.65,minIntervalMs:300});onMobBurn(event);},
       onFuseStart:event=>{playGameSound('creeper-prime',{minIntervalMs:250});onCreeperPrime(event);},
       getEnvironment:()=>({weather:weatherSystem?.type||weather})

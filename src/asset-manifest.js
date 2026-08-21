@@ -27,6 +27,7 @@ const GUI_RECORDS=Object.fromEntries(Object.entries(GUI_FILES).map(([key,file])=
 
 const CANONICAL_ITEM_ROOT='./MC原版素材assets/minecraft/textures/item';
 const CANONICAL_BLOCK_ROOT='./MC原版素材assets/minecraft/textures/block';
+const CANONICAL_GUI_ROOT='./MC原版素材assets/minecraft/textures/gui/container';
 const RECORDS=Object.freeze({
   'terrain.block_atlas':supplied('texture-atlas','./assets/textures/atlas.png',{minecraftVersion:'1.20.1'}),
   'block.model_atlas':supplied('texture-atlas','./assets/model-textures/model-texture-atlas.png',{minecraftVersion:'1.20.1'}),
@@ -80,6 +81,7 @@ const RECORDS=Object.freeze({
   'entity.spider':supplied('entity-texture','./assets/minecraft/textures/entity/spider/spider.png'),
   'entity.player.steve':supplied('entity-texture','./assets/minecraft/textures/entity/player/wide/steve.png',{minecraftVersion:'1.20.1'}),
   ...GUI_RECORDS,
+  'gui.crafting_table_panel':supplied('gui-texture',`${CANONICAL_GUI_ROOT}/crafting_table.png`,{minecraftVersion:'1.20.1',directCanonical:true}),
   'metadata.minecraft_runtime':supplied('asset-metadata','./assets/minecraft/runtime-manifest.json'),
   'metadata.minecraft_model_atlas':supplied('asset-metadata','./assets/model-textures/model-texture-atlas.json',{minecraftVersion:'1.20.1'}),
   'metadata.minecraft_gui':supplied('asset-metadata','./assets/gui/gui-manifest.json',{minecraftVersion:'1.20.1'}),

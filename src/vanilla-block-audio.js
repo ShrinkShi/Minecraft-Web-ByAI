@@ -1,7 +1,11 @@
 import {BLOCK,BLOCKS} from './blocks.js';
 import {playBlockSound} from './vanilla-sounds.js';
+import {playMiningHitSound} from './vanilla-mining-audio.js';
 
-const STEP_DISTANCE=.55;
+// Java tracks walking distance at roughly 0.6x planar travel and emits a step
+// around each whole tracked unit. Using raw browser travel directly therefore
+// needs a substantially larger threshold than the previous 0.55 blocks.
+export const STEP_DISTANCE=1.6;
 const MAX_TRACKED_FRAME_DISTANCE=1;
 
 function audibleBedPart(block){return !block?.bed||block.bedPart==='foot';}
@@ -12,10 +16,11 @@ export function blockSoundTransition(previous,next){
   return null;
 }
 
-export function installVanillaBlockAudio({world,player,playSound=playBlockSound}={}){
+export function installVanillaBlockAudio({world,player,playSound=playBlockSound,playMiningSound=playMiningHitSound,eventTarget=globalThis}={}){
   if(!world||typeof world.getBlock!=='function'||typeof world.setBlock!=='function')throw new TypeError('world must expose getBlock/setBlock');
   if(!player||typeof player.update!=='function'||!player.position)throw new TypeError('player must expose update/position');
   if(typeof playSound!=='function')throw new TypeError('playSound must be a function');
+  if(typeof playMiningSound!=='function')throw new TypeError('playMiningSound must be a function');
 
   const originalSetBlock=world.setBlock,originalUpdate=player.update;
   let lastX=player.position.x,lastZ=player.position.z,stepDistance=0,disposed=false;
@@ -39,12 +44,16 @@ export function installVanillaBlockAudio({world,player,playSound=playBlockSound}
     return result;
   }
 
+  function miningHit(event){const blockId=Number(event?.detail?.blockId);if(BLOCKS[blockId])void playMiningSound(blockId);}
+
   world.setBlock=wrappedSetBlock;player.update=wrappedUpdate;
+  if(typeof eventTarget?.addEventListener==='function')eventTarget.addEventListener('minecraft:mining-hit',miningHit);
   return Object.freeze({
     dispose(){
       if(disposed)return false;disposed=true;
       if(world.setBlock===wrappedSetBlock)world.setBlock=originalSetBlock;
       if(player.update===wrappedUpdate)player.update=originalUpdate;
+      if(typeof eventTarget?.removeEventListener==='function')eventTarget.removeEventListener('minecraft:mining-hit',miningHit);
       return true;
     }
   });
