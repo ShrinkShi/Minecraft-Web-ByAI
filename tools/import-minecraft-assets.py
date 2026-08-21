@@ -48,6 +48,7 @@ RUNTIME_FILES = {
     "textures/block/crafting_table_side.png": "assets/minecraft/textures/block/crafting_table_side.png",
     "textures/block/cobblestone.png": "assets/minecraft/textures/block/cobblestone.png",
     "textures/block/iron_ore.png": "assets/minecraft/textures/block/iron_ore.png",
+    "textures/block/coal_ore.png": "assets/minecraft/textures/block/coal_ore.png",
     "textures/block/white_wool.png": "assets/minecraft/textures/block/white_wool.png",
     "textures/item/stick.png": "assets/minecraft/textures/item/stick.png",
     "textures/item/wooden_pickaxe.png": "assets/minecraft/textures/item/wooden_pickaxe.png",

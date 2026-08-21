@@ -27,7 +27,7 @@ assert.deepEqual(pngSize(atlasPath),[64,64],'atlas must remain 4 * 16px');
 assert.deepEqual(Object.keys(runtime.atlas.tiles).map(Number).sort((a,b)=>a-b),Array.from({length:16},(_,index)=>index));
 assert.equal(runtime.atlas.tiles['12'].source,'textures/block/crafting_table_front.png');
 assert.equal(runtime.atlas.tiles['14'].source,'textures/block/iron_ore.png');
-assert.equal(runtime.atlas.tiles['15'].source,'textures/block/white_wool.png');
+assert.equal(runtime.atlas.tiles['15'].source,'textures/block/coal_ore.png');
 assert.equal(runtime.atlas.tiles['0'].treatment,'grass');
 assert.equal(runtime.atlas.tiles['8'].treatment,'foliage');
 assert.equal(runtime.atlas.tiles['9'].treatment,'water');
@@ -78,7 +78,7 @@ for(const [relative,size] of Object.entries(entityDimensions)){
 
 for(const required of [
   'textures/block/grass_block_top.png','textures/block/grass_block_side.png','textures/block/grass_block_side_overlay.png',
-  'textures/block/crafting_table_front.png','textures/block/iron_ore.png','textures/block/white_wool.png',
+  'textures/block/crafting_table_front.png','textures/block/iron_ore.png','textures/block/coal_ore.png','textures/block/white_wool.png',
   'textures/item/stick.png','textures/item/wooden_pickaxe.png','textures/item/stone_pickaxe.png','textures/item/raw_iron.png','textures/item/iron_ingot.png',
   'textures/entity/bed/red.png','models/block/grass_block.json','models/block/crafting_table.json',
   'blockstates/furnace.json','models/block/furnace.json','models/block/furnace_on.json','models/block/orientable.json','models/block/orientable_with_bottom.json'
@@ -89,4 +89,4 @@ assert.deepEqual(runtime.tintProfile.foliage,[119,171,47]);
 assert.deepEqual(runtime.tintProfile.water,[63,118,228]);
 assert.deepEqual(runtime.tintProfile.leather,[160,101,64]);
 
-console.log('Minecraft 1.20.1 directory-backed runtime assets + furnace/ingot/iron-pickaxe provenance + entity dimensions/checksums: PASS');
+console.log('Minecraft 1.20.1 directory-backed runtime assets + coal atlas/furnace provenance + entity dimensions/checksums: PASS');

@@ -37,4 +37,4 @@ try{
   const address=await server.listen(),ws=await openClient(`ws://127.0.0.1:${address.port}${server.path}`),messages=queue(ws);ws.send(JSON.stringify(encodeClientHello()));const welcome=await messages.next('real welcome'),realInfoWire=await messages.next('real world info');assert.deepEqual(welcome,{v:MULTIPLAYER_HANDSHAKE_VERSION,kind:'welcome',session:'real-world-info-session'});assert.deepEqual(decodeServerWorldInfo(realInfoWire,{expectedSession:welcome.session}),{version:1,kind:'world-info',session:welcome.session,worldId:'real-world',terrainVersion:TERRAIN_GENERATOR_VERSION,seed:'golden-seed',prompt:'mountain forest',tickRate:20});assert.throws(()=>server.sendWorldInfo(welcome.session,infoState('other')),/must match target session/);assert.equal(server.sendWorldInfo('missing',infoState('missing')),null);ws.close(1000,'done');
 }finally{await server.close();}
 
-console.log('websocket single-world metadata delivery + terrain v2 compatibility downlink: PASS');
+console.log('websocket single-world metadata delivery + terrain v3 compatibility downlink: PASS');

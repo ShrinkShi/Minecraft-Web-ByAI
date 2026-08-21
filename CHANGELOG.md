@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-22 - Coal progression / terrain v3
+
+- 新增煤矿石（block 27）与煤炭物品，木镐及以上可采集；煤炭作为熔炉燃料燃烧 1600 ticks。
+- terrain generator 升级到 v3：独立 deterministic coal field，铁矿优先级保持不变；回归测试锁定 coal→stone 后与 v2 字节一致。
+- 4×4 terrain atlas 的 tile 15 从 white wool 调整为 canonical Java 1.20.1 coal ore；white wool 与 coal item 改为直接引用仓库中已审计 canonical PNG。
+- 增加 coal progression logic + Chromium 回归，并同步 server world-info / authoritative terrain 的版本兼容断言。
+
 ## [Unreleased]
 
 > 2026-08-21 merged baseline: `main 6159b9f47a54bf7e3610897c55f1ee1fdbf6ed7d` includes PR #124. PR #125 is the active unmerged iron-armor delivery. Merged facts live in `docs/PROJECT_BASELINE.md`; projected parity in `docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md`.

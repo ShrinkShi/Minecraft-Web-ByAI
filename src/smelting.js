@@ -10,6 +10,7 @@ export const SMELTING_RECIPES=Object.freeze({
 export const FURNACE_FUELS=Object.freeze({
   'block:5':300,
   'block:6':300,
+  coal:1600,
   stick:100,
   wooden_pickaxe:200
 });
