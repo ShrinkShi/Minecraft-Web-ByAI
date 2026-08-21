@@ -2,7 +2,18 @@
 
 ## [Unreleased]
 
-> 2026-08-16 documentation baseline: this section records the accumulated v0.4 state through the generic Minecraft model/resource pipeline. Detailed per-PR chronology remains available in Git history/Pull Requests; current roadmap truth lives in `docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md` and active implementation state in `docs/PROGRESS.md`.
+> 2026-08-21 documentation baseline: this section records the accumulated v0.4 state through PR #122 and the in-progress #123 delivery. Detailed per-PR chronology remains available in Git history/Pull Requests; current roadmap truth lives in `docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md` and active implementation state in `docs/PROGRESS.md`.
+
+### 2026-08-21 — original audio corpus and tool-action delivery
+
+- PR #122 将单独提供的 Minecraft Java 1.20.1 原版音频对象集、映射表和来源说明导入仓库，解除“没有 sound objects”的资源阻塞；这只代表 source availability，不等于完整 SFX/music runtime 已实现。
+- PR #123 新增 source-backed `iron_hoe`、标准/镜像工作台配方、250 durability，以及 append-only `farmland` / `dirt_path` / `stripped_oak_log` gameplay states。
+- till / strip / flatten 使用共享确定性 secondary-action rules；survival 只有真实 world mutation 成功后才 wear，creative authoritative path 不 wear。
+- singleplayer 与 authoritative server use-controller 对齐 grass/dirt tilling、oak-log stripping、grass/dirt path flattening 行为边界。
+- `item.hoe.till`、`item.axe.strip`、`item.shovel.flatten` 首批接入真实 Java 1.20.1 OGG；CI 读取对象并重算 SHA-1，Chromium E2E 要求真实 HTTP fetch/decode。
+- 新增 `vanilla-block-audio`：当前 grass/gravel/stone/sand/wood/glass gameplay sound types 获得 source-backed break/place/step；脚步按真实水平位移累计，不按帧率触发。
+- ordinary break/place 不会因 block→block tool mutation 误响；explosion 批量删块显式静音，避免同时启动大量 break OGG；两格床避免重复 ordinary sound。
+- 当前 source-backed audio 仍是窄范围 PARTIAL：multiplayer replicated edit SFX、remote footsteps、完整 entity/ambient/weather sound、spatial attenuation 和 music scheduling 尚未实现。
 
 ### Project baseline / documentation
 
@@ -32,18 +43,20 @@
 - 两格红床不再使用红 tint full-cube visual：PR #94 将床标记为 special/non-full-cube render，mesh Worker 输出 special descriptors，`BedModelRenderer` 使用导入的 Java 1.20.1 `entity/bed/red.png` 构建 partial red-bed visual，并绑定 chunk remesh/unload 生命周期。
 - PR #96–#100 建立 renderer-neutral Minecraft block model 解释/编译链：resource IDs、parent/texture inheritance、blockstate variants/multipart、cuboid geometry、element/model rotation、`uvlock`、cull/tint 以及 chunk-level `opaque/cutout/translucent` TypedArray batching。
 - generic model batching明确保持 chunk-level shared buffers/material contract，不允许退化为“一 block 一 Three.js Mesh”。
+- 后续交付已把 selected source-backed model roots 正式接入 mesh Worker / VoxelWorld；当前仍只是有限 gameplay registry，并非完整 Java block registry。
 
 ### Survival / Inventory / crafting
 
 - 完整 36-slot Inventory + 9-slot hotbar；cursor left/right/merge/split/place-one/Shift transfer。
 - Equipment head/chest/legs/feet 四槽与第一版皮革护甲减伤。
-- 2×2 player crafting + 3×3 Workbench；当前配方集包括 planks、sticks、crafting table、red bed、wooden pickaxe。
-- 建立 shared mining rules、harvest tool tier foundation 和 wooden-pickaxe durability/item-instance lifecycle。
-- durability 从 authoritative item stack damage 渲染到 hotbar/Inventory/Crafting UI；singleplayer/multiplayer mining 都进入明确耐久消费路径。
+- 2×2 player crafting + 3×3 Workbench；当前配方随 v0.4 progression 已扩展到 14 条，包括 wood/stone/iron tools/weapons、bed、furnace 等当前内容。
+- 建立 shared mining rules、harvest tool tier foundation 和 item-instance durability lifecycle。
+- durability 从 authoritative item stack damage 渲染到 hotbar/Inventory/Crafting UI；singleplayer/multiplayer mining 和现有 tool/weapon wear 都进入明确路径。
 - survival/adventure 死亡清算 Inventory/cursor/Crafting/Equipment；普通死亡生成可回收 item/XP，虚空死亡不可回收。
 - 独立 DeathScreen、显式 respawn、`/kill`、`/xp`、持久化 `/spawnpoint`。
 - 两格床支持四方向 foot/head、原子放置、partner cleanup、respawn anchor、night skip 和 nearby-hostile sleep safety。
 - 水下 15 秒 oxygen、drowning damage、三点 coverage swimming/buoyancy。
+- stone→iron progression 已形成石镐采铁矿→粗铁→Furnace→铁锭→铁镐/铁斧/铁锹/铁剑/铁锄的当前闭环。
 
 ### Entities / combat
 
@@ -52,6 +65,7 @@
 - 单人基础 AI、Combat、skeleton arrows、creeper explosion、mob loot + XP orb/level progression。
 - PR #93 将八种现有 mob 从程序化纯色视觉替换为 imported Minecraft Java 1.20.1 texture-backed cuboid models；sheep wool 使用独立 overlay material。
 - mob geometry 是基于已验证 texture sheet 的 vanilla-compatible reconstruction；资源 ZIP 不包含 `.bbmodel` 或 Java entity model-layer geometry data，因此不伪称 geometry 从 ZIP 提取。
+- #121 增加第一人称 3D viewmodel、wood/stone swords、hit feedback、simplified hostile daylight burning、skeleton ranged presentation、creeper fuse 和 explosion effects。
 
 ### Multiplayer / server authority
 
@@ -74,9 +88,11 @@ v0.4 已从协议前置发展为真实 Node authoritative server/runtime：
 - authoritative Equipment dual-revision transactions；
 - authoritative 2×2 player crafting；
 - authoritative 3×3 Workbench container；
+- authoritative Furnace state/viewers/transactions；
 - authoritative chat channel and controlled command channel；
 - browser-native multiplayer timer binding fix；
-- PR #90 完成第一阶段 server-authoritative PvP：HP/death revision、melee targeting、solid-block occlusion、cooldowns、armor mitigation、knockback、death drops、dead-player action/pickup guards 和 server respawn。
+- PR #90 完成第一阶段 server-authoritative PvP：HP/death revision、melee targeting、solid-block occlusion、cooldowns、armor mitigation、knockback、death drops、dead-player action/pickup guards 和 server respawn；
+- #123 authoritative block use 增加 till / strip / flatten，survival success-only wear 与 creative no-wear 保持明确。
 
 真实 WebSocket/Chromium 回归已覆盖多条双客户端 authoritative 路径。
 
@@ -84,35 +100,37 @@ v0.4 已从协议前置发展为真实 Node authoritative server/runtime：
 
 - 建立 logical `asset-manifest.js`，runtime 不再把 resource path 散落为隐式真相。
 - 仓库跟踪 `MC原版素材assets.zip`；deterministic audit 识别 7,623 files，约包含 977 block textures、582 item textures、497 entity textures、2,016 block model JSON、1,675 item model JSON、1,005 blockstates。
-- source archive 中没有 `.bbmodel`，这是 vanilla Java resource tree 的正常结果；entity geometry 不能从 texture/resource JSON 伪造 provenance。
-- source archive 中 **没有 sound files，也没有 `sounds.json`**，因此音效/音乐仍是明确 blocked domain。
+- 该原始 client resource archive 中没有 `.bbmodel`，entity geometry 不能从 texture/resource JSON 伪造 provenance。
+- 该原始 archive 本身没有 sound files / `sounds.json`；但 #122 已从单独提供的 Java 1.20.1 音频对象输入建立并跟踪 `原版Minecraft音频文件/` corpus，因此原版音频 source 已不再 blocked。runtime parity 仍按已接入事件逐项计算。
 - selective importer/build pipeline 将当前 gameplay 所需 block/item/entity resources 导入 runtime，并保留 source/runtime checksum/provenance。
 - terrain atlas 迁移为 Minecraft 1.20.1 original texture subset；当前没有 runtime biome tint，因此 grass/foliage/water compatibility 使用明确记录的 default/Plains tint 处理。
-- 导入 current item textures、iron-ore/white-wool atlas tiles、red-bed entity texture、八种 current mob texture sheets。
+- 导入 current item textures、iron-ore/white-wool atlas tiles、red-bed entity texture、八种 current mob texture sheets，以及当前 progression 所需 iron tools/weapons。
 - red bed inventory icon 仍是明确的程序化临时 SVG：source archive 没有 standalone `textures/item/red_bed.png`，不能把不存在的资源伪装成已导入原版 item icon。
 - PR #101 建立 deterministic blockstate/model parent/texture dependency closure；unsafe/ambiguous/missing/cyclic source dependency fail-closed，并为每个文件保留 SHA-256/provenance。
-- PR #102 从第一批 9 个 acceptance block roots 自动得到 9 blockstates / 42 models / 14 textures / 0 metadata 的 65-file closure，生成并跟踪独立 128×128 model texture atlas 与 manifest；CI 从 source ZIP 重建并逐字节比较 tracked PNG/JSON，workflow 保持 `contents: read`。
-- model atlas 与 legacy 4×4 terrain atlas 保持独立，避免 generic model expansion 改写既有 tile-ID fast-path contract。
-- PR #103 增加 strict model-atlas runtime resolver/binding：校验 canonical resource path、source provenance、SHA metadata、pixel region↔normalized UV、closure texture count、power-of-two/gutter/packing contract，并直接适配 #100 chunk batcher 的 texture-binding callback；render-layer policy 仍由 caller 注入。
+- PR #102 从 acceptance roots 构建 deterministic model texture atlas / manifest；CI 从 source 重建并比较 tracked PNG/JSON，workflow 保持 `contents: read`。
+- model atlas 与 legacy terrain atlas 保持独立，避免 generic model expansion 改写既有 tile-ID fast-path contract。
+- PR #103 增加 strict model-atlas runtime resolver/binding，并在后续内容 PR 中继续扩展 live model roots。
+- #123 canonical `iron_hoe.png` 和 stripped-oak-log side/top textures 保留 direct binding audit；原版 OGG variant 同样按真实对象 SHA-1 约束。
 
 ### Engineering quality
 
-- `npm run test:logic` 已改为 `scripts/run-logic-checks.mjs` 自动发现回归，不再维护容易漂移的手工串联列表。
+- `npm run test:logic` 使用 `scripts/run-logic-checks.mjs` 自动发现回归，不维护易漂移的手工串联列表。
 - `Repository quality`：Node 22 syntax + logic/server/Worker regressions，再运行两个 Chromium shards；同 ref 新 push 会取消旧 run。
-- Minecraft assets 另有 read-only deterministic source audit；最终 workflow 不保留 self-push 权限。
+- Minecraft assets 另有 read-only deterministic source audit；workflow 不保留 self-push 权限。
 - browser failures 保留 Playwright trace/screenshot/report artifacts。
-- logic regression 数量不再作为长期固定常量；每个 delivery PR 只记录 exact HEAD 当时自动发现并通过的实际数量。
+- logic regression 数量不作为长期固定常量；每个 delivery PR 只记录 exact HEAD 当时实际通过数量。
+- #123 pre-doc exact head `c9bd6b9…` 的 Repository quality #941：static-checks success，Chromium shard 1 **24/24**、shard 2 **23/23**，均无 retry；失败 artifact 上传均 skipped。
 
 ### Current major limitations
 
-- Minecraft content breadth 仍是主要缺口：当前正式 gameplay block families 约 11 类、runtime item IDs 约 28、recipes 5。
-- generic blockstate/model **纯语义与 atlas/batching 基础已经存在**，但尚未把预解析 model templates 正式接入 `mesh-worker.js` / `VoxelWorld`，因此大量原版 blocks 还没有进入 gameplay registry/worldgen。
-- worldgen 仍是 16×16×64 deterministic fBm heightmap + basic surface/sea/oak tree，不是 vanilla biome/cave/ore/feature/structure pipeline。
-- hunger/saturation、完整 food/farming/smelting/tool progression、enchanting/brewing/status effects 尚未完成。
+- Minecraft content breadth 仍是主要缺口：#123 delivery boundary 约 17 个当前 gameplay block families/states、40 runtime item IDs、14 recipes，距离 Java 1.20.1 全 registry 仍极远。
+- generic blockstate/model 语义、atlas/batching 与 selected live Worker/VoxelWorld roots 已存在，但 broad block registry、neighbor state、collision-shape breadth 仍缺失。
+- worldgen 仍是 16×16×64 deterministic fBm heightmap + basic surface/sea/oak tree + simplified iron ore，不是 vanilla biome/cave/ore/feature/structure pipeline。
+- hunger/saturation、完整 food/farming、iron armor、enchanting/brewing/status effects 尚未完成。
 - mobs/PvE/projectiles/explosions 仍不是 multiplayer server-authoritative domain。
-- durable multiplayer world/player persistence、rooms/accounts/operators、persistent shared containers、reconnect/resume 未完成。
+- durable multiplayer world/player persistence、rooms/accounts/operators、durable shared containers、reconnect/resume 未完成。
 - redstone、Nether、End、boss progression 尚未实质实现。
-- audio source/AudioEngine 尚未实现，因为当前 supplied archive 没有声音资源。
+- source-backed audio 只覆盖首批 tool/block events；完整 sound registry、entity/ambient/music/spatial audio 仍是大缺口。
 
 ## [0.3.0] - 2026-08-11
 

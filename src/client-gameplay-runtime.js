@@ -13,6 +13,7 @@ import {WeatherSystem} from './weather-system.js';
 import {JadeRuntimeInspector} from './jade-runtime-inspector.js';
 import {itemForBlock} from './items.js';
 import {playGameSound} from './audio-system.js';
+import {installVanillaBlockAudio} from './vanilla-block-audio.js';
 
 function callback(value,label){if(typeof value!=='function')throw new TypeError(`${label} must be a function`);return value;}
 function finite(value,label){if(typeof value!=='number'||!Number.isFinite(value))throw new TypeError(`${label} must be a finite number`);return value;}
@@ -21,10 +22,10 @@ function objectOrNull(value,label){if(value===null||value===undefined)return nul
 function safeDispose(value){try{value?.dispose?.();}catch{}}
 
 export class ClientGameplayRuntime{
-  constructor({world,player,inventory,equipment,drops,experienceOrbs,projectiles,explosions,passiveMobs,hostileMobs,weatherSystem,jadeInspector=null}){
-    Object.assign(this,{world,player,inventory,equipment,drops,experienceOrbs,projectiles,explosions,passiveMobs,hostileMobs,weatherSystem,jadeInspector});this.disposed=false;
+  constructor({world,player,inventory,equipment,drops,experienceOrbs,projectiles,explosions,passiveMobs,hostileMobs,weatherSystem,jadeInspector=null,vanillaBlockAudio=null}){
+    Object.assign(this,{world,player,inventory,equipment,drops,experienceOrbs,projectiles,explosions,passiveMobs,hostileMobs,weatherSystem,jadeInspector,vanillaBlockAudio});this.disposed=false;
   }
-  dispose(){if(this.disposed)return false;this.jadeInspector?.dispose();this.weatherSystem?.dispose();this.explosions?.dispose();this.projectiles?.dispose();this.hostileMobs?.dispose();this.passiveMobs?.dispose();this.experienceOrbs?.dispose();this.drops?.dispose();this.player?.dispose();this.world?.dispose();this.disposed=true;return true;}
+  dispose(){if(this.disposed)return false;this.vanillaBlockAudio?.dispose();this.jadeInspector?.dispose();this.weatherSystem?.dispose();this.explosions?.dispose();this.projectiles?.dispose();this.hostileMobs?.dispose();this.passiveMobs?.dispose();this.experienceOrbs?.dispose();this.drops?.dispose();this.player?.dispose();this.world?.dispose();this.disposed=true;return true;}
 }
 
 export async function createClientGameplayRuntime({
@@ -34,10 +35,10 @@ export async function createClientGameplayRuntime({
   centerX=finite(centerX,'centerX');centerZ=finite(centerZ,'centerZ');renderDistance=positiveInteger(renderDistance,'renderDistance');savedEdits=objectOrNull(savedEdits,'savedEdits')||{};inventoryState=objectOrNull(inventoryState,'inventoryState');equipmentState=objectOrNull(equipmentState,'equipmentState');
   for(const [label,value] of Object.entries({onWorldEdit,onWorldProgress,onInventoryPickup,onExperience,onPlayerHit,onPlayerBlast,onMobDeath,onHostileProjectile,onHostileExplosion,onMobBurn,onCreeperPrime,onExplosionBlockDestroyed}))callback(value,label);
 
-  let world=null,player=null,inventory=null,equipment=null,drops=null,experienceOrbs=null,projectiles=null,explosions=null,passiveMobs=null,hostileMobs=null,weatherSystem=null,jadeInspector=null;
+  let world=null,player=null,inventory=null,equipment=null,drops=null,experienceOrbs=null,projectiles=null,explosions=null,passiveMobs=null,hostileMobs=null,weatherSystem=null,jadeInspector=null,vanillaBlockAudio=null;
   try{
     world=new VoxelWorld(scene,{seed:String(seed??'1'),prompt:String(prompt??''),renderDistance,savedEdits,onEdit:onWorldEdit,onProgress:onWorldProgress});await world.generateArea(centerX,centerZ);
-    inventory=new Inventory(mode,inventoryState);equipment=new Equipment(equipmentState);player=new PlayerController(camera,canvas,world,scene);if(controlState!==null&&controlState!==undefined)player.setControlState(controlState);player.setMode(mode);
+    inventory=new Inventory(mode,inventoryState);equipment=new Equipment(equipmentState);player=new PlayerController(camera,canvas,world,scene);if(controlState!==null&&controlState!==undefined)player.setControlState(controlState);player.setMode(mode);vanillaBlockAudio=installVanillaBlockAudio({world,player});
     drops=new DropSystem(scene,world,inventory,onInventoryPickup);experienceOrbs=new ExperienceOrbSystem(scene,world,onExperience);weatherSystem=new WeatherSystem(scene);weatherSystem.setWeather(weather);
     projectiles=new ProjectileSystem(scene,world,{onPlayerHit});
     const emitDestroyedBlock=event=>{
@@ -54,6 +55,6 @@ export async function createClientGameplayRuntime({
       onFuseStart:event=>{playGameSound('creeper-prime',{minIntervalMs:250});onCreeperPrime(event);},
       getEnvironment:()=>({weather:weatherSystem?.type||weather})
     });
-    jadeInspector=new JadeRuntimeInspector({world,player,inventory,passiveMobs,hostileMobs});return new ClientGameplayRuntime({world,player,inventory,equipment,drops,experienceOrbs,projectiles,explosions,passiveMobs,hostileMobs,weatherSystem,jadeInspector});
-  }catch(error){safeDispose(jadeInspector);safeDispose(weatherSystem);safeDispose(explosions);safeDispose(projectiles);safeDispose(hostileMobs);safeDispose(passiveMobs);safeDispose(experienceOrbs);safeDispose(drops);safeDispose(player);safeDispose(world);throw error;}
+    jadeInspector=new JadeRuntimeInspector({world,player,inventory,passiveMobs,hostileMobs});return new ClientGameplayRuntime({world,player,inventory,equipment,drops,experienceOrbs,projectiles,explosions,passiveMobs,hostileMobs,weatherSystem,jadeInspector,vanillaBlockAudio});
+  }catch(error){safeDispose(vanillaBlockAudio);safeDispose(jadeInspector);safeDispose(weatherSystem);safeDispose(explosions);safeDispose(projectiles);safeDispose(hostileMobs);safeDispose(passiveMobs);safeDispose(experienceOrbs);safeDispose(drops);safeDispose(player);safeDispose(world);throw error;}
 }

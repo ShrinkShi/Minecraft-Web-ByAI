@@ -26,6 +26,7 @@ const GUI_RECORDS=Object.fromEntries(Object.entries(GUI_FILES).map(([key,file])=
 ]));
 
 const CANONICAL_ITEM_ROOT='./MC原版素材assets/minecraft/textures/item';
+const CANONICAL_BLOCK_ROOT='./MC原版素材assets/minecraft/textures/block';
 const RECORDS=Object.freeze({
   'terrain.block_atlas':supplied('texture-atlas','./assets/textures/atlas.png',{minecraftVersion:'1.20.1'}),
   'block.model_atlas':supplied('texture-atlas','./assets/model-textures/model-texture-atlas.png',{minecraftVersion:'1.20.1'}),
@@ -35,6 +36,8 @@ const RECORDS=Object.freeze({
   'block.furnace_top':supplied('block-texture','./assets/items/furnace_top.png',{minecraftVersion:'1.20.1'}),
   'block.furnace_side':supplied('block-texture','./assets/items/furnace_side.png',{minecraftVersion:'1.20.1'}),
   'block.furnace_front':supplied('block-texture','./assets/items/furnace_front.png',{minecraftVersion:'1.20.1'}),
+  'block.stripped_oak_log':supplied('block-texture',`${CANONICAL_BLOCK_ROOT}/stripped_oak_log.png`,{minecraftVersion:'1.20.1',directCanonical:true}),
+  'block.stripped_oak_log_top':supplied('block-texture',`${CANONICAL_BLOCK_ROOT}/stripped_oak_log_top.png`,{minecraftVersion:'1.20.1',directCanonical:true}),
 
   'item.stick':supplied('item-texture','./assets/items/stick.png'),
   'item.wooden_pickaxe':supplied('item-texture','./assets/items/wooden_pickaxe.png'),
@@ -42,6 +45,7 @@ const RECORDS=Object.freeze({
   'item.wooden_sword':supplied('item-texture',`${CANONICAL_ITEM_ROOT}/wooden_sword.png`,{minecraftVersion:'1.20.1',directCanonical:true}),
   'item.stone_sword':supplied('item-texture',`${CANONICAL_ITEM_ROOT}/stone_sword.png`,{minecraftVersion:'1.20.1',directCanonical:true}),
   'item.bow':supplied('item-texture',`${CANONICAL_ITEM_ROOT}/bow.png`,{minecraftVersion:'1.20.1',directCanonical:true}),
+  'item.iron_hoe':supplied('item-texture',`${CANONICAL_ITEM_ROOT}/iron_hoe.png`,{minecraftVersion:'1.20.1',directCanonical:true,sha256:'4ed88a87c141168b4552041174e83105e5d5825ea9b96836dd4869c674848d69'}),
   'item.iron_pickaxe':supplied('item-texture','./assets/items/iron_pickaxe.png',{minecraftVersion:'1.20.1',sha256:'67305d8bd14e1d60633258f52055fce5aeaea7837c10e62d436fc16f163be627'}),
   'item.iron_axe':supplied('item-texture','./assets/items/iron_axe.png',{minecraftVersion:'1.20.1',sha256:'8dea40bac06c6f14bb0ad9e8b47de63250f6d6a46ae9439b85ddd1377f1edb49'}),
   'item.iron_shovel':supplied('item-texture','./assets/items/iron_shovel.png',{minecraftVersion:'1.20.1',sha256:'c9d36d59ec53ebc631bd24930f62087c316eef39bd237d8bb69cb2bb629dfae5'}),
