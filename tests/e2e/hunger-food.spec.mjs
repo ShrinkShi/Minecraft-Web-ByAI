@@ -1,6 +1,58 @@
 import {test,expect} from '@playwright/test';
 import {createSingleplayerWorld} from './helpers/world-flow.mjs';
-async function runCommand(page,text){await page.evaluate(()=>window.dispatchEvent(new KeyboardEvent('keydown',{code:'Slash',bubbles:true})));await expect(page.locator('#chat-input-wrap')).not.toHaveClass(/hidden/);await page.locator('#chat-input').fill(text);await page.locator('#chat-input').press('Enter');await expect(page.locator('#chat-input-wrap')).toHaveClass(/hidden/);}
+
+async function runCommand(page,text){
+  await page.evaluate(()=>window.dispatchEvent(new KeyboardEvent('keydown',{code:'Slash',bubbles:true})));
+  await expect(page.locator('#chat-input-wrap')).not.toHaveClass(/hidden/);
+  await page.locator('#chat-input').fill(text);
+  await page.locator('#chat-input').press('Enter');
+  await expect(page.locator('#chat-input-wrap')).toHaveClass(/hidden/);
+}
+
 async function key(page,code){await page.evaluate(code=>window.dispatchEvent(new KeyboardEvent('keydown',{code,bubbles:true})),code);}
 async function savedWorlds(page){return page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('minecraft-web-by-ai',1);request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction('worlds','readonly'),getAll=tx.objectStore('worlds').getAll();getAll.onerror=()=>reject(getAll.error);getAll.onsuccess=()=>{const value=getAll.result;db.close();resolve(value);};};}));}
-test('singleplayer food consumes into Java-style hunger state and persists schema v9',async({page})=>{const pageErrors=[],consoleErrors=[];page.on('pageerror',error=>pageErrors.push(error.message));page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});await page.goto('/?e2e=1');await createSingleplayerWorld(page,{name:'CI Hunger Food',seed:'ci-hunger-food-2026',mode:'survival',prompt:'平原'});await runCommand(page,'/give bread 2');await key(page,'KeyE');const bread=page.locator('#inventory-grid [data-inv-index]').filter({has:page.locator('img[alt="面包"]')}).first();await expect(bread).toBeVisible();await bread.click({modifiers:['Shift']});await key(page,'Escape');await page.evaluate(()=>globalThis.__minecraftE2E.setPlayerVitals({hp:20,food:10,saturation:0,exhaustion:0,timer:0}));const canvas=page.locator('#game-canvas');await canvas.click({position:{x:8,y:8}});await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.id||null),{timeout:5_000}).toBe('game-canvas');await canvas.dispatchEvent('mousedown',{button:2,bubbles:true});await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E.playerVitals()),{timeout:3_000}).toMatchObject({food:15,saturation:6});await expect(page.locator('#hotbar [data-hotbar-index="0"]')).toHaveAttribute('title','面包');await expect(page.locator('#hotbar [data-hotbar-index="0"]')).toHaveAttribute('title','面包');await page.evaluate(()=>globalThis.__minecraftE2E.setPlayerVitals({hp:20,food:20,saturation:5,exhaustion:0,timer:0}));await canvas.dispatchEvent('mousedown',{button:2,bubbles:true});await expect(page.locator('#toast')).toContainText('饥饿值已满');await expect(page.locator('#hotbar [data-hotbar-index="0"]')).toHaveAttribute('title','面包');await page.evaluate(()=>globalThis.__minecraftE2E.setPlayerVitals({hp:18,food:20,saturation:5,exhaustion:0,timer:.49}));await expect.poll(async()=>Number((await page.evaluate(()=>globalThis.__minecraftE2E.playerVitals())).hp),{timeout:2_000}).toBeGreaterThan(18);await page.evaluate(()=>globalThis.__minecraftE2E.setPlayerVitals({hp:2,food:0,saturation:0,exhaustion:0,timer:3.95}));await expect.poll(async()=>Number((await page.evaluate(()=>globalThis.__minecraftE2E.playerVitals())).hp),{timeout:2_000}).toBe(1);await page.waitForTimeout(250);expect((await page.evaluate(()=>globalThis.__minecraftE2E.playerVitals())).hp).toBe(1);await key(page,'Escape');await expect(page.locator('#pause-menu')).toHaveClass(/active/);await expect.poll(async()=>{const record=(await savedWorlds(page)).find(world=>world.name==='CI Hunger Food');if(!record)return null;return{version:record.version,terrainVersion:record.terrainVersion,hunger:record.player?.hunger,saturation:record.player?.saturation,hasExhaustion:Number.isFinite(record.player?.exhaustion),hasTimer:Number.isFinite(record.player?.foodTickTimer)};},{timeout:10_000}).toEqual({version:9,terrainVersion:3,hunger:0,saturation:0,hasExhaustion:true,hasTimer:true});expect(pageErrors).toEqual([]);expect(consoleErrors).toEqual([]);});
+
+test('singleplayer food consumes into Java-style hunger state and persists schema v9',async({page})=>{
+  const pageErrors=[],consoleErrors=[];
+  page.on('pageerror',error=>pageErrors.push(error.message));
+  page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
+  await page.goto('/?e2e=1');
+  await createSingleplayerWorld(page,{name:'CI Hunger Food',seed:'ci-hunger-food-2026',mode:'survival',prompt:'平原'});
+  await runCommand(page,'/give bread 2');
+  await key(page,'KeyE');
+  const bread=page.locator('#inventory-grid [data-inv-index]').filter({has:page.locator('img[alt="面包"]')}).first();
+  await expect(bread).toBeVisible();
+  await bread.click({modifiers:['Shift']});
+  await key(page,'Escape');
+
+  const selected=page.locator('#hotbar [data-hotbar-index="0"]');
+  await expect(selected).toHaveAttribute('title','面包');
+  await expect(selected.locator('.slot-count')).toHaveText('2');
+  await page.evaluate(()=>globalThis.__minecraftE2E.setPlayerVitals({hp:20,food:10,saturation:0,exhaustion:0,timer:0}));
+  const canvas=page.locator('#game-canvas');
+  await canvas.click({position:{x:8,y:8}});
+  await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.id||null),{timeout:5_000}).toBe('game-canvas');
+  await canvas.dispatchEvent('mousedown',{button:2,bubbles:true});
+  await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E.playerVitals()),{timeout:3_000}).toMatchObject({food:15,saturation:6});
+  await expect(selected).toHaveAttribute('title','面包');
+  await expect(selected.locator('.slot-count')).toHaveText('');
+
+  await page.evaluate(()=>globalThis.__minecraftE2E.setPlayerVitals({hp:20,food:20,saturation:5,exhaustion:0,timer:0}));
+  await canvas.dispatchEvent('mousedown',{button:2,bubbles:true});
+  await expect(page.locator('#toast')).toContainText('饥饿值已满');
+  await expect(selected).toHaveAttribute('title','面包');
+  await expect(selected.locator('.slot-count')).toHaveText('');
+
+  await page.evaluate(()=>globalThis.__minecraftE2E.setPlayerVitals({hp:18,food:20,saturation:5,exhaustion:0,timer:.49}));
+  await expect.poll(async()=>Number((await page.evaluate(()=>globalThis.__minecraftE2E.playerVitals())).hp),{timeout:2_000}).toBeGreaterThan(18);
+  await page.evaluate(()=>globalThis.__minecraftE2E.setPlayerVitals({hp:2,food:0,saturation:0,exhaustion:0,timer:3.95}));
+  await expect.poll(async()=>Number((await page.evaluate(()=>globalThis.__minecraftE2E.playerVitals())).hp),{timeout:2_000}).toBe(1);
+  await page.waitForTimeout(250);
+  expect((await page.evaluate(()=>globalThis.__minecraftE2E.playerVitals())).hp).toBe(1);
+
+  await key(page,'Escape');
+  await expect(page.locator('#pause-menu')).toHaveClass(/active/);
+  await expect.poll(async()=>{const record=(await savedWorlds(page)).find(world=>world.name==='CI Hunger Food');if(!record)return null;return{version:record.version,terrainVersion:record.terrainVersion,hunger:record.player?.hunger,saturation:record.player?.saturation,hasExhaustion:Number.isFinite(record.player?.exhaustion),hasTimer:Number.isFinite(record.player?.foodTickTimer)};},{timeout:10_000}).toEqual({version:9,terrainVersion:3,hunger:0,saturation:0,hasExhaustion:true,hasTimer:true});
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
