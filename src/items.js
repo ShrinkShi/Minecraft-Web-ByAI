@@ -20,6 +20,8 @@ export const ITEMS={
   wooden_pickaxe:textured('木镐',1,'item.wooden_pickaxe',{attackDamage:2,combat:{attackSpeed:1.2,durabilityCost:2},tool:{kind:'pickaxe',tier:'wood',speed:2,durability:59}}),
   stone_pickaxe:textured('石镐',1,'item.stone_pickaxe',{attackDamage:3,combat:{attackSpeed:1.2,durabilityCost:2},tool:{kind:'pickaxe',tier:'stone',speed:4,durability:131}}),
   iron_pickaxe:textured('铁镐',1,'item.iron_pickaxe',{attackDamage:4,combat:{attackSpeed:1.2,durabilityCost:2},tool:{kind:'pickaxe',tier:'iron',speed:6,durability:250}}),
+  wooden_sword:textured('木剑',1,'item.wooden_sword',{attackDamage:4,durability:59,combat:{attackSpeed:1.6,durabilityCost:1}}),
+  stone_sword:textured('石剑',1,'item.stone_sword',{attackDamage:5,durability:131,combat:{attackSpeed:1.6,durabilityCost:1}}),
   iron_axe:textured('铁斧',1,'item.iron_axe',{attackDamage:9,combat:{attackSpeed:.9,durabilityCost:2},tool:{kind:'axe',tier:'iron',speed:6,durability:250}}),
   iron_shovel:textured('铁锹',1,'item.iron_shovel',{attackDamage:4.5,combat:{attackSpeed:1,durabilityCost:2},tool:{kind:'shovel',tier:'iron',speed:6,durability:250}}),
   iron_sword:textured('铁剑',1,'item.iron_sword',{attackDamage:6,durability:250,combat:{attackSpeed:1.6,durabilityCost:1}}),

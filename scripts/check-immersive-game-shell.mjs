@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {GAMEPLAY_KEY_LOCK_CODES,shouldSuppressBrowserShortcut} from '../src/immersive-game-shell.js';
+import {GAMEPLAY_KEY_LOCK_CODES,shouldSuppressBrowserShortcut} from '../src/immersive-shell-rules.js';
 
 assert.ok(GAMEPLAY_KEY_LOCK_CODES.includes('KeyW'),'locking KeyW is required so Chromium can deliver Ctrl+W to the game');
 assert.ok(GAMEPLAY_KEY_LOCK_CODES.includes('F3'));

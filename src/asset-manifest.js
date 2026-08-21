@@ -25,6 +25,7 @@ const GUI_RECORDS=Object.fromEntries(Object.entries(GUI_FILES).map(([key,file])=
   supplied('gui-sprite',`./assets/gui/${file}`,{minecraftVersion:'1.20.1'})
 ]));
 
+const CANONICAL_ITEM_ROOT='./MC原版素材assets/minecraft/textures/item';
 const RECORDS=Object.freeze({
   'terrain.block_atlas':supplied('texture-atlas','./assets/textures/atlas.png',{minecraftVersion:'1.20.1'}),
   'block.model_atlas':supplied('texture-atlas','./assets/model-textures/model-texture-atlas.png',{minecraftVersion:'1.20.1'}),
@@ -38,6 +39,9 @@ const RECORDS=Object.freeze({
   'item.stick':supplied('item-texture','./assets/items/stick.png'),
   'item.wooden_pickaxe':supplied('item-texture','./assets/items/wooden_pickaxe.png'),
   'item.stone_pickaxe':supplied('item-texture','./assets/items/stone_pickaxe.png'),
+  'item.wooden_sword':supplied('item-texture',`${CANONICAL_ITEM_ROOT}/wooden_sword.png`,{minecraftVersion:'1.20.1',directCanonical:true}),
+  'item.stone_sword':supplied('item-texture',`${CANONICAL_ITEM_ROOT}/stone_sword.png`,{minecraftVersion:'1.20.1',directCanonical:true}),
+  'item.bow':supplied('item-texture',`${CANONICAL_ITEM_ROOT}/bow.png`,{minecraftVersion:'1.20.1',directCanonical:true}),
   'item.iron_pickaxe':supplied('item-texture','./assets/items/iron_pickaxe.png',{minecraftVersion:'1.20.1',sha256:'67305d8bd14e1d60633258f52055fce5aeaea7837c10e62d436fc16f163be627'}),
   'item.iron_axe':supplied('item-texture','./assets/items/iron_axe.png',{minecraftVersion:'1.20.1',sha256:'8dea40bac06c6f14bb0ad9e8b47de63250f6d6a46ae9439b85ddd1377f1edb49'}),
   'item.iron_shovel':supplied('item-texture','./assets/items/iron_shovel.png',{minecraftVersion:'1.20.1',sha256:'c9d36d59ec53ebc631bd24930f62087c316eef39bd237d8bb69cb2bb629dfae5'}),
