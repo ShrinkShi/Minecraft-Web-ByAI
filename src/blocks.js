@@ -38,8 +38,9 @@ export const BLOCKS = {
   // runtime. This registration makes the block a real placeable/minable world node;
   // normal visuals come from the source-backed interpreted Java model.
   21:{name:'熔炉',solid:true,hardness:3.5,tiles:[3,3,3],drops:'block:21',requires:'pickaxe',effectiveTool:'pickaxe',minToolTier:'wood',interactive:true,interactionKind:'furnace'},
-  // These states are created only by held-tool secondary actions. Normal rendering
-  // opts into the Java 1.20.1 model runtime; legacy tiles remain fail-open only.
+  // These states are created only by held-tool secondary actions. Their gameplay
+  // identity/collision is real, but this PR deliberately keeps the legacy terrain
+  // tiles as a visual fallback; canonical interpreted-model visuals are follow-up work.
   24:{name:'耕地',solid:true,hardness:.6,tiles:[2,2,2],drops:'block:2',effectiveTool:'shovel',fullCube:false},
   25:{name:'土径',solid:true,hardness:.65,tiles:[2,2,2],drops:'block:2',effectiveTool:'shovel',fullCube:false},
   26:{name:'去皮橡木原木',solid:true,hardness:2,tiles:[7,7,6],drops:'block:26',effectiveTool:'axe'}
