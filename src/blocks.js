@@ -11,7 +11,9 @@ export const BLOCK = Object.freeze({
   BED_SOUTH_FOOT:BED_IDS.south.foot,BED_SOUTH_HEAD:BED_IDS.south.head,
   BED_WEST_FOOT:BED_IDS.west.foot,BED_WEST_HEAD:BED_IDS.west.head,
   BED_EAST_FOOT:BED_IDS.east.foot,BED_EAST_HEAD:BED_IDS.east.head,
-  IRON_ORE:19,GLASS:20,FURNACE:21
+  IRON_ORE:19,GLASS:20,FURNACE:21,
+  // Player-created states are append-only and intentionally outside terrain generation.
+  FARMLAND:24,DIRT_PATH:25,STRIPPED_OAK_LOG:26
 });
 
 export const BLOCKS = {
@@ -22,7 +24,7 @@ export const BLOCKS = {
   4:{name:'沙子',solid:true,hardness:.5,tiles:[4,4,4],drops:'block:4',effectiveTool:'shovel'},
   5:{name:'橡木木板',solid:true,hardness:2,tiles:[5,5,5],drops:'block:5',effectiveTool:'axe'},
   6:{name:'橡木原木',solid:true,hardness:2,tiles:[7,7,6],drops:'block:6',effectiveTool:'axe'},
-  7:{name:'橡树树叶',solid:true,transparent:true,hardness:.2,tiles:[8,8,8],drops:null},
+  7:{name:'橡树树叶',solid:true,transparent:true,hardness:.2,tiles:[8,8,8],drops:null,effectiveTool:'hoe'},
   8:{name:'水',solid:false,liquid:true,transparent:true,hardness:100,tiles:[9,9,9],drops:null},
   9:{name:'工作台',solid:true,hardness:2.5,tiles:[10,5,11],faces:{top:10,bottom:5,east:11,north:12,south:11,west:12},drops:'block:9',effectiveTool:'axe'},
   10:{name:'圆石',solid:true,hardness:2,tiles:[13,13,13],drops:'block:10',requires:'pickaxe',effectiveTool:'pickaxe',minToolTier:'wood'},
@@ -35,7 +37,12 @@ export const BLOCKS = {
   // Furnace interaction/state already lives in the authoritative furnace container
   // runtime. This registration makes the block a real placeable/minable world node;
   // normal visuals come from the source-backed interpreted Java model.
-  21:{name:'熔炉',solid:true,hardness:3.5,tiles:[3,3,3],drops:'block:21',requires:'pickaxe',effectiveTool:'pickaxe',minToolTier:'wood',interactive:true,interactionKind:'furnace'}
+  21:{name:'熔炉',solid:true,hardness:3.5,tiles:[3,3,3],drops:'block:21',requires:'pickaxe',effectiveTool:'pickaxe',minToolTier:'wood',interactive:true,interactionKind:'furnace'},
+  // These states are created only by held-tool secondary actions. Normal rendering
+  // opts into the Java 1.20.1 model runtime; legacy tiles remain fail-open only.
+  24:{name:'耕地',solid:true,hardness:.6,tiles:[2,2,2],drops:'block:2',effectiveTool:'shovel',fullCube:false},
+  25:{name:'土径',solid:true,hardness:.65,tiles:[2,2,2],drops:'block:2',effectiveTool:'shovel',fullCube:false},
+  26:{name:'去皮橡木原木',solid:true,hardness:2,tiles:[7,7,6],drops:'block:26',effectiveTool:'axe'}
 };
 
 for(const id of BED_BLOCK_IDS){
