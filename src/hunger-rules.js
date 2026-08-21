@@ -30,7 +30,7 @@ export function movementExhaustion(distance,{sprinting=false,swimming=false}={})
   if(swimming)return distance*.01;if(sprinting)return distance*.1;return 0;
 }
 
-export function jumpExhaustion({sprinting=false}={}){return sprinting===true?.2:.05;}
+export function jumpExhaustion({sprinting=false}={}){return sprinting===true ? .2 : .05;}
 export function attackExhaustion(){return .1;}
 export function damageExhaustion(){return .1;}
 
