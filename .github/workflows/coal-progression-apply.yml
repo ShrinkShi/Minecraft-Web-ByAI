@@ -6,6 +6,11 @@ on:
     paths:
       - 'tools/apply-coal-progression.py'
       - '.github/workflows/coal-progression-apply.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tools/apply-coal-progression.py'
+      - '.github/workflows/coal-progression-apply.yml'
   workflow_dispatch:
 
 permissions:
