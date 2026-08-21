@@ -7,9 +7,9 @@ export const PLAYER_MODEL_SCALE=.9;
 const box=(name,size,offset,uv,{inflate=0,layer='base'}={})=>Object.freeze({name,size:Object.freeze(size),offset:Object.freeze(offset),uv:Object.freeze(uv),inflate,layer});
 const part=(name,pivot,boxes)=>Object.freeze({name,pivot:Object.freeze(pivot),boxes:Object.freeze(boxes)});
 
-// Modern 64x64 wide Steve layout. Left limbs use their own 1.8+ texture regions
-// rather than mirroring the right side; second-layer hat/jacket/sleeves/pants
-// are kept as slightly inflated cuboids like the Java player renderer.
+// Modern 64x64 wide Steve layout. The local model faces -Z at yaw=0, so the
+// player's anatomical right side is +X when viewed from behind. Keep the limb
+// pivots on that physical side while retaining each limb's own modern skin UVs.
 export const PLAYER_MODEL_SPEC=Object.freeze({
   textureSize:PLAYER_SKIN_TEXTURE_SIZE,
   heightPixels:PLAYER_MODEL_PIXELS,
@@ -22,19 +22,19 @@ export const PLAYER_MODEL_SPEC=Object.freeze({
       box('body',[8,12,4],[-4,-12,-2],[16,16]),
       box('jacket',[8,12,4],[-4,-12,-2],[16,32],{inflate:.25,layer:'overlay'})
     ]),
-    part('rightArm',[-6,22,0],[
+    part('rightArm',[6,22,0],[
       box('rightArm',[4,12,4],[-2,-10,-2],[40,16]),
       box('rightSleeve',[4,12,4],[-2,-10,-2],[40,32],{inflate:.25,layer:'overlay'})
     ]),
-    part('leftArm',[6,22,0],[
+    part('leftArm',[-6,22,0],[
       box('leftArm',[4,12,4],[-2,-10,-2],[32,48]),
       box('leftSleeve',[4,12,4],[-2,-10,-2],[48,48],{inflate:.25,layer:'overlay'})
     ]),
-    part('rightLeg',[-2,12,0],[
+    part('rightLeg',[2,12,0],[
       box('rightLeg',[4,12,4],[-2,-12,-2],[0,16]),
       box('rightPants',[4,12,4],[-2,-12,-2],[0,32],{inflate:.25,layer:'overlay'})
     ]),
-    part('leftLeg',[2,12,0],[
+    part('leftLeg',[-2,12,0],[
       box('leftLeg',[4,12,4],[-2,-12,-2],[16,48]),
       box('leftPants',[4,12,4],[-2,-12,-2],[0,48],{inflate:.25,layer:'overlay'})
     ])
