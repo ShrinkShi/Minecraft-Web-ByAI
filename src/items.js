@@ -30,10 +30,14 @@ export const ITEMS={
   raw_iron:textured('粗铁',64,'item.raw_iron'),
   iron_ingot:textured('铁锭',64,'item.iron_ingot'),
   bed:{name:'床',stack:1,placeKind:'bed',itemPreview:'bed-model',entityAssetKey:'entity.bed.red'},
-  leather_helmet:textured('皮革帽子',1,'item.leather_helmet',{armorSlot:'head',armorPoints:1}),
-  leather_chestplate:textured('皮革外套',1,'item.leather_chestplate',{armorSlot:'chest',armorPoints:3}),
-  leather_leggings:textured('皮革裤子',1,'item.leather_leggings',{armorSlot:'legs',armorPoints:2}),
-  leather_boots:textured('皮革靴子',1,'item.leather_boots',{armorSlot:'feet',armorPoints:1}),
+  leather_helmet:textured('皮革帽子',1,'item.leather_helmet',{armorSlot:'head',armorPoints:1,durability:55}),
+  leather_chestplate:textured('皮革外套',1,'item.leather_chestplate',{armorSlot:'chest',armorPoints:3,durability:80}),
+  leather_leggings:textured('皮革裤子',1,'item.leather_leggings',{armorSlot:'legs',armorPoints:2,durability:75}),
+  leather_boots:textured('皮革靴子',1,'item.leather_boots',{armorSlot:'feet',armorPoints:1,durability:65}),
+  iron_helmet:textured('铁头盔',1,'item.iron_helmet',{armorSlot:'head',armorPoints:2,durability:165}),
+  iron_chestplate:textured('铁胸甲',1,'item.iron_chestplate',{armorSlot:'chest',armorPoints:6,durability:240}),
+  iron_leggings:textured('铁护腿',1,'item.iron_leggings',{armorSlot:'legs',armorPoints:5,durability:225}),
+  iron_boots:textured('铁靴子',1,'item.iron_boots',{armorSlot:'feet',armorPoints:2,durability:195}),
   raw_beef:textured('生牛肉',64,'item.raw_beef',{color:0xb7473f}),
   leather:textured('皮革',64,'item.leather',{color:0x8b5a2b}),
   white_wool:{name:'白色羊毛',stack:64,color:0xf0eee7,tile:15,assetKey:'block.white_wool'},
@@ -50,6 +54,6 @@ export const ITEMS={
 
 // Preserve the historical starter slot order; new content is appended so
 // existing authoritative/bootstrap slot contracts do not silently shift.
-export const CREATIVE_START=['block:1','block:2','block:3','block:4','block:5','block:6','block:7','block:9','wooden_pickaxe','bed','stone_pickaxe','block:20','block:21'];
+export const CREATIVE_START=['block:1','block:2','block:3','block:4','block:5','block:6','block:7','block:9','wooden_pickaxe','bed','stone_pickaxe','block:20','block:21','iron_helmet','iron_chestplate','iron_leggings','iron_boots'];
 export const itemForBlock=blockId=>ITEMS[`block:${blockId}`]?`block:${blockId}`:BLOCKS[blockId]?.drops||null;
 export const maxStack=itemId=>ITEMS[itemId]?.stack||64;
