@@ -3,13 +3,12 @@ import {isBedBlock} from '../src/bed-rules.js';
 import {assertClientSessionId} from '../src/client-input-envelope.js';
 import {ITEMS} from '../src/items.js';
 import {assertHotbarSlot} from '../src/inventory-layout.js';
-import {resolveToolSecondaryAction,toolActionFaceY} from '../src/tool-secondary-actions.js';
 import {applyAuthoritativeBlockPlacement} from './block-placement-rules.mjs';
 import {DEFAULT_BLOCK_REACH,raycastAuthoritativeBlock} from './block-targeting.mjs';
+import {applyAuthoritativeToolSecondaryAction} from './tool-secondary-action-rules.mjs';
 
 function worldLike(value){if(!value||typeof value!=='object'||typeof value.getBlock!=='function')throw new TypeError('world must expose getBlock');return value;}
 function mutationBoundary(value){if(typeof value!=='function')throw new TypeError('setBlock must be a function');return value;}
-function mutation(value){if(!value||typeof value!=='object'||typeof value.changed!=='boolean')throw new TypeError('block mutation must return a change result');return value;}
 function inventoryLike(value){if(!value||typeof value!=='object'||typeof value.selectedStack!=='function'||typeof value.commitSelected!=='function'||typeof value.damageSelected!=='function')throw new TypeError('inventories must expose selectedStack, commitSelected and damageSelected');return value;}
 function callback(value,label){if(typeof value!=='function')throw new TypeError(`${label} must be a function`);return value;}
 function reach(value){if(typeof value!=='number'||!Number.isFinite(value)||value<=0||value>16)throw new RangeError('maxDistance must be greater than 0 and at most 16');return value;}
@@ -29,11 +28,10 @@ export class SurvivalBlockUseController{
   }
 
   toolAction(session,action,stack,target){
-    const currentId=this.world.getBlock(target.x,target.y,target.z);if(currentId!==target.id)return frozen({kind:'use',attempted:true,reason:'stale-target',selectedSlot:action.selectedSlot,itemId:stack.id,target,toolAction:null,consumed:null});
-    const aboveId=target.y+1<64?this.world.getBlock(target.x,target.y+1,target.z):BLOCK.AIR,plan=resolveToolSecondaryAction({itemId:stack.id,targetBlockId:currentId,aboveBlockId:aboveId,faceY:toolActionFaceY(target)});if(!plan)return null;
-    const change=mutation(this.setBlock(target.x,target.y,target.z,plan.resultBlockId));if(!change.changed)return frozen({kind:'use',attempted:true,reason:'mutation-declined',selectedSlot:action.selectedSlot,itemId:stack.id,target,toolAction:plan,consumed:null});
-    const wear=this.inventories.damageSelected(session,action.selectedSlot,stack.id,plan.durabilityCost);if(wear.changed){try{this.onInventoryChanged(session,wear.snapshot);}catch{}}
-    return frozen({kind:'use',attempted:true,reason:plan.kind,selectedSlot:action.selectedSlot,itemId:stack.id,target,toolAction:plan,consumed:null,wear:Object.freeze({changed:wear.changed,broken:wear.broken,reason:wear.reason}),inventoryRevision:wear.snapshot.revision});
+    const applied=applyAuthoritativeToolSecondaryAction(this.world,target,{itemId:stack.id,setBlock:this.setBlock});if(!applied.handled)return null;
+    if(!applied.changed)return frozen({kind:'use',attempted:true,reason:applied.reason,selectedSlot:action.selectedSlot,itemId:stack.id,target,toolAction:applied.plan,consumed:null});
+    const wear=this.inventories.damageSelected(session,action.selectedSlot,stack.id,applied.plan.durabilityCost);if(wear.changed){try{this.onInventoryChanged(session,wear.snapshot);}catch{}}
+    return frozen({kind:'use',attempted:true,reason:applied.reason,selectedSlot:action.selectedSlot,itemId:stack.id,target,toolAction:applied.plan,consumed:null,wear:Object.freeze({changed:wear.changed,broken:wear.broken,reason:wear.reason}),inventoryRevision:wear.snapshot.revision});
   }
 
   step(session,player,actions=[]){
