@@ -19,7 +19,7 @@ const world={
   setBlock(x,y,z,id){const cell=key(x,y,z),previous=cells.get(cell)??BLOCK.AIR;if(previous===id)return false;cells.set(cell,id);return true;}
 };
 const player={
-  position:{x:.25,y:1,z:.25},grounded:true,flying:false,mode:'survival',swimCoverage:0,dx:0,
+  position:{x:.25,y:1,z:1.25},grounded:true,flying:false,mode:'survival',swimCoverage:0,dx:0,
   update(){this.position.x+=this.dx;return this.position.x;}
 };
 const originalSetBlock=world.setBlock,originalUpdate=player.update,sounds=[];
@@ -39,7 +39,7 @@ assert.equal(world.setBlock(4,0,0,BLOCK.BED_NORTH_HEAD),true);assert.equal(sound
 assert.equal(world.setBlock(5,0,0,BLOCK.BED_NORTH_FOOT),true);assert.deepEqual(sounds.pop(),{blockId:BLOCK.BED_NORTH_FOOT,action:'place'});
 
 for(let x=0;x<=4;x++)world.setBlock(x,0,1,BLOCK.STONE,{sound:false});
-player.position.x=.25;player.position.z=1.25;player.dx=.2;sounds.length=0;
+player.position.x=.25;player.dx=.2;sounds.length=0;
 player.update(.05);player.update(.05);assert.equal(sounds.length,0);
 player.update(.05);assert.deepEqual(sounds,[{blockId:BLOCK.STONE,action:'step'}],'0.6 blocks of grounded movement should cross the 0.55 step threshold once');
 player.update(.05);assert.equal(sounds.length,1,'distance remainder must not become frame-rate-driven sound spam');
