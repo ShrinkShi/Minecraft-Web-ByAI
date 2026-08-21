@@ -2,9 +2,14 @@ import assert from 'node:assert/strict';
 import {BLOCK} from '../src/blocks.js';
 import {SINGLEPLAYER_MINING_HIT_INTERVAL_MS,SingleplayerMiningController} from '../src/singleplayer-mining-controller.js';
 import {blockHitPlayback} from '../src/vanilla-mining-audio.js';
+import {miningHitBlockId} from '../src/vanilla-mining-audio-runtime.js';
 
 assert.equal(SINGLEPLAYER_MINING_HIT_INTERVAL_MS,200);
 assert.deepEqual(blockHitPlayback(),{volume:.25,playbackRate:.5});
+assert.equal(miningHitBlockId({detail:{blockId:BLOCK.STONE}}),BLOCK.STONE);
+assert.equal(miningHitBlockId({detail:{blockId:'3'}}),BLOCK.STONE);
+assert.equal(miningHitBlockId({detail:{blockId:'bad'}}),null);
+assert.equal(miningHitBlockId(null),null);
 
 let mode='survival',target={x:4,y:20,z:4,id:BLOCK.STONE,previous:{x:4,y:20,z:5}},hits=[];
 const controller=new SingleplayerMiningController({
@@ -22,4 +27,4 @@ clock=200;controller.step(clock);assert.equal(hits.length,2,'200ms boundary shou
 clock=250;target={...target,x:5};controller.step(clock);assert.equal(hits.length,3,'changing target should restart hit cadence immediately for the new block');assert.equal(hits.at(-1).x,5);
 mode='creative';clock=450;controller.step(clock);assert.equal(hits.length,3,'creative instant mining must not emit survival digging-hit cadence');
 controller.cancel();
-console.log('singleplayer mining hit cadence + source-backed hit playback profile: PASS');
+console.log('singleplayer mining hit cadence + browser audio event bridge + source-backed hit playback profile: PASS');
