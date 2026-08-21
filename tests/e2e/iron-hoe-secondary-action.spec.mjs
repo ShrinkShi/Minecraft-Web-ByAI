@@ -30,13 +30,18 @@ async function placeFromInventory(workbench,title,indices){
   await item.click();
   for(const index of indices)await workbench.locator(`[data-craft-size="3"][data-craft-index="${index}"]`).click({button:'right'});
 }
+async function soundCount(page,eventName){return page.evaluate(name=>(globalThis.__minecraftE2ESounds||[]).filter(event=>event.eventName===name).length,eventName);}
 
-test('iron ingots craft an iron hoe whose real till action costs durability only once',async({page})=>{
+test('iron ingots craft an iron hoe whose real till action costs durability and plays the original sound only on success',async({page})=>{
   const pageErrors=[],consoleErrors=[];
   page.on('pageerror',error=>pageErrors.push(error.message));
   page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
 
   await page.goto('/?e2e=1');
+  await page.evaluate(()=>{
+    globalThis.__minecraftE2ESounds=[];
+    window.addEventListener('minecraft:sound',event=>globalThis.__minecraftE2ESounds.push(event.detail));
+  });
   await createSingleplayerWorld(page,{name:'CI Iron Hoe Secondary Action',seed:'ci-iron-hoe-2026',mode:'survival',prompt:'平原'});
   await runCommand(page,'/give iron_ingot 2');
   await runCommand(page,'/give stick 2');
@@ -68,13 +73,19 @@ test('iron ingots craft an iron hoe whose real till action costs durability only
   await expect(hoe).toHaveAttribute('data-durability-remaining','249');
   await expect(hoe).toHaveAttribute('title',/耐久 249 \/ 250/);
   await expect(page.locator('#toast')).toContainText('耕作 草方块');
+  await expect.poll(()=>soundCount(page,'item.hoe.till'),{timeout:5_000}).toBe(1);
+  const tillSound=await page.evaluate(()=>(globalThis.__minecraftE2ESounds||[]).find(event=>event.eventName==='item.hoe.till')||null);
+  expect(tillSound?.logicalPath).toMatch(/^minecraft\/sounds\/item\/hoe\/till[124]\.ogg$/);
+  expect(tillSound?.sha1).toMatch(/^[0-9a-f]{40}$/);
 
   // The target is now farmland, which is not a valid second till target. A second
-  // real right click must therefore leave the same tool instance at exactly 249.
+  // real right click must therefore leave the same tool instance at exactly 249
+  // and must not emit another successful-use sound event.
   await useTarget(page);
   await page.waitForTimeout(250);
   await expect(hoe).toHaveAttribute('data-durability-damage','1');
   await expect(hoe).toHaveAttribute('data-durability-remaining','249');
+  expect(await soundCount(page,'item.hoe.till')).toBe(1);
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });
