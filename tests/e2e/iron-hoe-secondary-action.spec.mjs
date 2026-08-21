@@ -33,9 +33,12 @@ async function placeFromInventory(workbench,title,indices){
 async function soundCount(page,eventName){return page.evaluate(name=>(globalThis.__minecraftE2ESounds||[]).filter(event=>event.eventName===name).length,eventName);}
 
 test('iron ingots craft an iron hoe whose real till action costs durability and plays the original sound only on success',async({page})=>{
-  const pageErrors=[],consoleErrors=[];
+  const pageErrors=[],consoleErrors=[],audioWarnings=[];
   page.on('pageerror',error=>pageErrors.push(error.message));
-  page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
+  page.on('console',message=>{
+    if(message.type()==='error')consoleErrors.push(message.text());
+    if(message.type()==='warning'&&message.text().includes('无法播放 Minecraft 原版音效'))audioWarnings.push(message.text());
+  });
 
   await page.goto('/?e2e=1');
   await page.evaluate(()=>{
@@ -67,7 +70,13 @@ test('iron ingots craft an iron hoe whose real till action costs durability and 
   const grass=await page.evaluate(()=>globalThis.__minecraftE2E?.prepareSingleplayerMiningTarget?.(1)||null);
   expect(grass).not.toBeNull();
   await page.evaluate(()=>globalThis.__minecraftE2E?.setLook?.(0,0));
+  const originalSoundResponse=page.waitForResponse(response=>{
+    try{return response.status()===200&&decodeURIComponent(response.url()).includes('/原版Minecraft音频文件/');}
+    catch{return false;}
+  },{timeout:5_000});
   await useTarget(page);
+  const response=await originalSoundResponse;
+  expect((await response.body()).byteLength).toBeGreaterThan(4_000);
 
   await expect(hoe).toHaveAttribute('data-durability-damage','1',{timeout:5_000});
   await expect(hoe).toHaveAttribute('data-durability-remaining','249');
@@ -82,10 +91,11 @@ test('iron ingots craft an iron hoe whose real till action costs durability and 
   // real right click must therefore leave the same tool instance at exactly 249
   // and must not emit another successful-use sound event.
   await useTarget(page);
-  await page.waitForTimeout(250);
+  await page.waitForTimeout(500);
   await expect(hoe).toHaveAttribute('data-durability-damage','1');
   await expect(hoe).toHaveAttribute('data-durability-remaining','249');
   expect(await soundCount(page,'item.hoe.till')).toBe(1);
+  expect(audioWarnings).toEqual([]);
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });
