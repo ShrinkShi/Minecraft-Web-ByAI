@@ -52,8 +52,9 @@ export const ITEMS={
   string:textured('线',64,'item.string',{color:0xe3e1dc})
 };
 
-// Preserve the historical starter slot order; new content is appended so
-// existing authoritative/bootstrap slot contracts do not silently shift.
-export const CREATIVE_START=['block:1','block:2','block:3','block:4','block:5','block:6','block:7','block:9','wooden_pickaxe','bed','stone_pickaxe','block:20','block:21','iron_helmet','iron_chestplate','iron_leggings','iron_boots'];
+// Keep the historical starter inventory stable. Progression content such as
+// iron armor is registered and craftable/giveable without silently shifting
+// existing authoritative/bootstrap starter-slot contracts.
+export const CREATIVE_START=['block:1','block:2','block:3','block:4','block:5','block:6','block:7','block:9','wooden_pickaxe','bed','stone_pickaxe','block:20','block:21'];
 export const itemForBlock=blockId=>ITEMS[`block:${blockId}`]?`block:${blockId}`:BLOCKS[blockId]?.drops||null;
 export const maxStack=itemId=>ITEMS[itemId]?.stack||64;
