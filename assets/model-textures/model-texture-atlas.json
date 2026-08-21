@@ -4,19 +4,21 @@
     "height": 128,
     "packing": "power-of-two-shelf-v1",
     "path": "model-texture-atlas.png",
-    "sha256": "9b9d2837806b361e9f03454e1ca8ff25c5ce24e7784c8737e42be93b2c805ead",
+    "sha256": "a334cef556ee195e363880ba28b10cad3fb7ce32c89c0d9cf5e3628a18fe9272",
     "width": 128
   },
   "closure": {
-    "blockstates": 10,
+    "blockstates": 13,
     "metadata": 0,
-    "models": 46,
-    "textures": 18
+    "models": 54,
+    "textures": 24
   },
   "format": 1,
   "minecraftVersion": "1.20.1",
   "roots": [
     "minecraft:crafting_table",
+    "minecraft:dirt_path",
+    "minecraft:farmland",
     "minecraft:furnace",
     "minecraft:glass",
     "minecraft:grass_block",
@@ -25,370 +27,35 @@
     "minecraft:oak_fence",
     "minecraft:oak_slab",
     "minecraft:oak_stairs",
+    "minecraft:stripped_oak_log",
     "minecraft:torch"
   ],
   "sourceKind": "directory",
   "sourceRoot": "MC原版素材assets",
   "textures": {
-    "minecraft:block/crafting_table_front": {
-      "canonical": "assets/minecraft/textures/block/crafting_table_front.png",
-      "height": 16,
-      "pixelRegion": {
-        "height": 16,
-        "width": 16,
-        "x": 1,
-        "y": 1
-      },
-      "region": {
-        "u0": 0.0078125,
-        "u1": 0.1328125,
-        "v0": 0.0078125,
-        "v1": 0.1328125
-      },
-      "source": "MC原版素材assets/minecraft/textures/block/crafting_table_front.png",
-      "sourceBytes": 351,
-      "sourceSha256": "ff53d9803d469fec24d2bc0d547f5e2155b080788f3cd701ca3e39973985665d",
-      "width": 16
-    },
-    "minecraft:block/crafting_table_side": {
-      "canonical": "assets/minecraft/textures/block/crafting_table_side.png",
-      "height": 16,
-      "pixelRegion": {
-        "height": 16,
-        "width": 16,
-        "x": 19,
-        "y": 1
-      },
-      "region": {
-        "u0": 0.1484375,
-        "u1": 0.2734375,
-        "v0": 0.0078125,
-        "v1": 0.1328125
-      },
-      "source": "MC原版素材assets/minecraft/textures/block/crafting_table_side.png",
-      "sourceBytes": 337,
-      "sourceSha256": "414736f6eab354a21063908a71e0372a6c52191d808113f1c8bfbbdf4c39ffc3",
-      "width": 16
-    },
-    "minecraft:block/crafting_table_top": {
-      "canonical": "assets/minecraft/textures/block/crafting_table_top.png",
-      "height": 16,
-      "pixelRegion": {
-        "height": 16,
-        "width": 16,
-        "x": 37,
-        "y": 1
-      },
-      "region": {
-        "u0": 0.2890625,
-        "u1": 0.4140625,
-        "v0": 0.0078125,
-        "v1": 0.1328125
-      },
-      "source": "MC原版素材assets/minecraft/textures/block/crafting_table_top.png",
-      "sourceBytes": 262,
-      "sourceSha256": "989c4e768fa5f145e5eea1027c1fe4c6adcf5eaf5234dc4140bb6404b4c1b532",
-      "width": 16
-    },
-    "minecraft:block/dirt": {
-      "canonical": "assets/minecraft/textures/block/dirt.png",
-      "height": 16,
-      "pixelRegion": {
-        "height": 16,
-        "width": 16,
-        "x": 55,
-        "y": 1
-      },
-      "region": {
-        "u0": 0.4296875,
-        "u1": 0.5546875,
-        "v0": 0.0078125,
-        "v1": 0.1328125
-      },
-      "source": "MC原版素材assets/minecraft/textures/block/dirt.png",
-      "sourceBytes": 266,
-      "sourceSha256": "fb0450253248276e0b8d653d5a4d21c59763cbf775c0e048469ff500afaaef68",
-      "width": 16
-    },
-    "minecraft:block/furnace_front": {
-      "canonical": "assets/minecraft/textures/block/furnace_front.png",
-      "height": 16,
-      "pixelRegion": {
-        "height": 16,
-        "width": 16,
-        "x": 73,
-        "y": 1
-      },
-      "region": {
-        "u0": 0.5703125,
-        "u1": 0.6953125,
-        "v0": 0.0078125,
-        "v1": 0.1328125
-      },
-      "source": "MC原版素材assets/minecraft/textures/block/furnace_front.png",
-      "sourceBytes": 294,
-      "sourceSha256": "5b8915d5ce6a02e44f39cc64d19c22138e9ec7f53dc163913018a3d95d3c1b7f",
-      "width": 16
-    },
-    "minecraft:block/furnace_front_on": {
-      "canonical": "assets/minecraft/textures/block/furnace_front_on.png",
-      "height": 16,
-      "pixelRegion": {
-        "height": 16,
-        "width": 16,
-        "x": 91,
-        "y": 1
-      },
-      "region": {
-        "u0": 0.7109375,
-        "u1": 0.8359375,
-        "v0": 0.0078125,
-        "v1": 0.1328125
-      },
-      "source": "MC原版素材assets/minecraft/textures/block/furnace_front_on.png",
-      "sourceBytes": 322,
-      "sourceSha256": "c9cb46d068a002db47660ff4c97eabfd330f60500afdc21d081012cacf60272c",
-      "width": 16
-    },
-    "minecraft:block/furnace_side": {
-      "canonical": "assets/minecraft/textures/block/furnace_side.png",
-      "height": 16,
-      "pixelRegion": {
-        "height": 16,
-        "width": 16,
-        "x": 109,
-        "y": 1
-      },
-      "region": {
-        "u0": 0.8515625,
-        "u1": 0.9765625,
-        "v0": 0.0078125,
-        "v1": 0.1328125
-      },
-      "source": "MC原版素材assets/minecraft/textures/block/furnace_side.png",
-      "sourceBytes": 280,
-      "sourceSha256": "565969ff712498ca1ab1e77230f3f304e25eca63bdca0f480ec26d8b44368d3d",
-      "width": 16
-    },
-    "minecraft:block/furnace_top": {
-      "canonical": "assets/minecraft/textures/block/furnace_top.png",
-      "height": 16,
-      "pixelRegion": {
-        "height": 16,
-        "width": 16,
-        "x": 1,
-        "y": 19
-      },
-      "region": {
-        "u0": 0.0078125,
-        "u1": 0.1328125,
-        "v0": 0.1484375,
-        "v1": 0.2734375
-      },
-      "source": "MC原版素材assets/minecraft/textures/block/furnace_top.png",
-      "sourceBytes": 273,
-      "sourceSha256": "7694f519b9067f00d1a9de8a3465c2986f0a895e5797a1b69b71a66c40ac36be",
-      "width": 16
-    },
-    "minecraft:block/glass": {
-      "canonical": "assets/minecraft/textures/block/glass.png",
-      "height": 16,
-      "pixelRegion": {
-        "height": 16,
-        "width": 16,
-        "x": 19,
-        "y": 19
-      },
-      "region": {
-        "u0": 0.1484375,
-        "u1": 0.2734375,
-        "v0": 0.1484375,
-        "v1": 0.2734375
-      },
-      "source": "MC原版素材assets/minecraft/textures/block/glass.png",
-      "sourceBytes": 147,
-      "sourceSha256": "cb89c706dce86eac3123cef087d359b5f23098b658a468fb91662b4a9922bcd0",
-      "width": 16
-    },
-    "minecraft:block/grass_block_side": {
-      "canonical": "assets/minecraft/textures/block/grass_block_side.png",
-      "height": 16,
-      "pixelRegion": {
-        "height": 16,
-        "width": 16,
-        "x": 37,
-        "y": 19
-      },
-      "region": {
-        "u0": 0.2890625,
-        "u1": 0.4140625,
-        "v0": 0.1484375,
-        "v1": 0.2734375
-      },
-      "source": "MC原版素材assets/minecraft/textures/block/grass_block_side.png",
-      "sourceBytes": 408,
-      "sourceSha256": "dedaa0171af63df63a6cf7e3e6c7078d4d5830fd93923f3005302ed0f02104c5",
-      "width": 16
-    },
-    "minecraft:block/grass_block_side_overlay": {
-      "canonical": "assets/minecraft/textures/block/grass_block_side_overlay.png",
-      "height": 16,
-      "pixelRegion": {
-        "height": 16,
-        "width": 16,
-        "x": 55,
-        "y": 19
-      },
-      "region": {
-        "u0": 0.4296875,
-        "u1": 0.5546875,
-        "v0": 0.1484375,
-        "v1": 0.2734375
-      },
-      "source": "MC原版素材assets/minecraft/textures/block/grass_block_side_overlay.png",
-      "sourceBytes": 177,
-      "sourceSha256": "43d98318407d9d122b83468cf183d18722e548c2144f9c2ffe2021b5c3e770e0",
-      "width": 16
-    },
-    "minecraft:block/grass_block_snow": {
-      "canonical": "assets/minecraft/textures/block/grass_block_snow.png",
-      "height": 16,
-      "pixelRegion": {
-        "height": 16,
-        "width": 16,
-        "x": 73,
-        "y": 19
-      },
-      "region": {
-        "u0": 0.5703125,
-        "u1": 0.6953125,
-        "v0": 0.1484375,
-        "v1": 0.2734375
-      },
-      "source": "MC原版素材assets/minecraft/textures/block/grass_block_snow.png",
-      "sourceBytes": 307,
-      "sourceSha256": "53f100fe981f39331c8197bf8044dd3a79d1e5ede87c6b32996091758145c485",
-      "width": 16
-    },
-    "minecraft:block/grass_block_top": {
-      "canonical": "assets/minecraft/textures/block/grass_block_top.png",
-      "height": 16,
-      "pixelRegion": {
-        "height": 16,
-        "width": 16,
-        "x": 91,
-        "y": 19
-      },
-      "region": {
-        "u0": 0.7109375,
-        "u1": 0.8359375,
-        "v0": 0.1484375,
-        "v1": 0.2734375
-      },
-      "source": "MC原版素材assets/minecraft/textures/block/grass_block_top.png",
-      "sourceBytes": 560,
-      "sourceSha256": "b2aa2204118c7323c0f8d263eb30dee99b6b69cb1f6df3115272a69fd188e507",
-      "width": 16
-    },
-    "minecraft:block/iron_ore": {
-      "canonical": "assets/minecraft/textures/block/iron_ore.png",
-      "height": 16,
-      "pixelRegion": {
-        "height": 16,
-        "width": 16,
-        "x": 109,
-        "y": 19
-      },
-      "region": {
-        "u0": 0.8515625,
-        "u1": 0.9765625,
-        "v0": 0.1484375,
-        "v1": 0.2734375
-      },
-      "source": "MC原版素材assets/minecraft/textures/block/iron_ore.png",
-      "sourceBytes": 292,
-      "sourceSha256": "af864e4f225fff7b54ea859225755ca9e597e40d531643e9945b121634fe6376",
-      "width": 16
-    },
-    "minecraft:block/oak_door_bottom": {
-      "canonical": "assets/minecraft/textures/block/oak_door_bottom.png",
-      "height": 16,
-      "pixelRegion": {
-        "height": 16,
-        "width": 16,
-        "x": 1,
-        "y": 37
-      },
-      "region": {
-        "u0": 0.0078125,
-        "u1": 0.1328125,
-        "v0": 0.2890625,
-        "v1": 0.4140625
-      },
-      "source": "MC原版素材assets/minecraft/textures/block/oak_door_bottom.png",
-      "sourceBytes": 240,
-      "sourceSha256": "2f162e4f1b165986811cfdbee9434deb3cb512b3f210292a186f504b65d19fee",
-      "width": 16
-    },
-    "minecraft:block/oak_door_top": {
-      "canonical": "assets/minecraft/textures/block/oak_door_top.png",
-      "height": 16,
-      "pixelRegion": {
-        "height": 16,
-        "width": 16,
-        "x": 19,
-        "y": 37
-      },
-      "region": {
-        "u0": 0.1484375,
-        "u1": 0.2734375,
-        "v0": 0.2890625,
-        "v1": 0.4140625
-      },
-      "source": "MC原版素材assets/minecraft/textures/block/oak_door_top.png",
-      "sourceBytes": 234,
-      "sourceSha256": "5a401cba3322770f653f129d8c1fa0c833baa09a35c2262de84955112f721112",
-      "width": 16
-    },
-    "minecraft:block/oak_planks": {
-      "canonical": "assets/minecraft/textures/block/oak_planks.png",
-      "height": 16,
-      "pixelRegion": {
-        "height": 16,
-        "width": 16,
-        "x": 37,
-        "y": 37
-      },
-      "region": {
-        "u0": 0.2890625,
-        "u1": 0.4140625,
-        "v0": 0.2890625,
-        "v1": 0.4140625
-      },
-      "source": "MC原版素材assets/minecraft/textures/block/oak_planks.png",
-      "sourceBytes": 268,
-      "sourceSha256": "3b00412fec87bd07b83825b86de49bcb6c186ca7799f41721a36b04e5d8ed161",
-      "width": 16
-    },
-    "minecraft:block/torch": {
-      "canonical": "assets/minecraft/textures/block/torch.png",
-      "height": 16,
-      "pixelRegion": {
-        "height": 16,
-        "width": 16,
-        "x": 55,
-        "y": 37
-      },
-      "region": {
-        "u0": 0.4296875,
-        "u1": 0.5546875,
-        "v0": 0.2890625,
-        "v1": 0.4140625
-      },
-      "source": "MC原版素材assets/minecraft/textures/block/torch.png",
-      "sourceBytes": 138,
-      "sourceSha256": "329db8f31720564ca9c6eeb3bafb98bb30a4d277e958e55806720cc01dbf296d",
-      "width": 16
-    }
+    "minecraft:block/crafting_table_front": {"canonical":"assets/minecraft/textures/block/crafting_table_front.png","height":16,"pixelRegion":{"height":16,"width":16,"x":1,"y":1},"region":{"u0":0.0078125,"u1":0.1328125,"v0":0.0078125,"v1":0.1328125},"source":"MC原版素材assets/minecraft/textures/block/crafting_table_front.png","sourceBytes":351,"sourceSha256":"ff53d9803d469fec24d2bc0d547f5e2155b080788f3cd701ca3e39973985665d","width":16},
+    "minecraft:block/crafting_table_side": {"canonical":"assets/minecraft/textures/block/crafting_table_side.png","height":16,"pixelRegion":{"height":16,"width":16,"x":19,"y":1},"region":{"u0":0.1484375,"u1":0.2734375,"v0":0.0078125,"v1":0.1328125},"source":"MC原版素材assets/minecraft/textures/block/crafting_table_side.png","sourceBytes":337,"sourceSha256":"414736f6eab354a21063908a71e0372a6c52191d808113f1c8bfbbdf4c39ffc3","width":16},
+    "minecraft:block/crafting_table_top": {"canonical":"assets/minecraft/textures/block/crafting_table_top.png","height":16,"pixelRegion":{"height":16,"width":16,"x":37,"y":1},"region":{"u0":0.2890625,"u1":0.4140625,"v0":0.0078125,"v1":0.1328125},"source":"MC原版素材assets/minecraft/textures/block/crafting_table_top.png","sourceBytes":262,"sourceSha256":"989c4e768fa5f145e5eea1027c1fe4c6adcf5eaf5234dc4140bb6404b4c1b532","width":16},
+    "minecraft:block/dirt": {"canonical":"assets/minecraft/textures/block/dirt.png","height":16,"pixelRegion":{"height":16,"width":16,"x":55,"y":1},"region":{"u0":0.4296875,"u1":0.5546875,"v0":0.0078125,"v1":0.1328125},"source":"MC原版素材assets/minecraft/textures/block/dirt.png","sourceBytes":266,"sourceSha256":"fb0450253248276e0b8d653d5a4d21c59763cbf775c0e048469ff500afaaef68","width":16},
+    "minecraft:block/dirt_path_side": {"canonical":"assets/minecraft/textures/block/dirt_path_side.png","height":16,"pixelRegion":{"height":16,"width":16,"x":73,"y":1},"region":{"u0":0.5703125,"u1":0.6953125,"v0":0.0078125,"v1":0.1328125},"source":"MC原版素材assets/minecraft/textures/block/dirt_path_side.png","sourceBytes":289,"sourceSha256":"e49ab7eb622892aa3c9419f12a12f68a33db9f043fcd2a8b2d11ac8d27bd5f5d","width":16},
+    "minecraft:block/dirt_path_top": {"canonical":"assets/minecraft/textures/block/dirt_path_top.png","height":16,"pixelRegion":{"height":16,"width":16,"x":91,"y":1},"region":{"u0":0.7109375,"u1":0.8359375,"v0":0.0078125,"v1":0.1328125},"source":"MC原版素材assets/minecraft/textures/block/dirt_path_top.png","sourceBytes":258,"sourceSha256":"f1bf44dab03955bd1f9cbd377e270b100c4eba4595aaee4290a3b0cb9a7966be","width":16},
+    "minecraft:block/farmland": {"canonical":"assets/minecraft/textures/block/farmland.png","height":16,"pixelRegion":{"height":16,"width":16,"x":109,"y":1},"region":{"u0":0.8515625,"u1":0.9765625,"v0":0.0078125,"v1":0.1328125},"source":"MC原版素材assets/minecraft/textures/block/farmland.png","sourceBytes":243,"sourceSha256":"ed094bddfac0f6def533096acfcf836fd667b6f14c90b571bc676a3bf58b54d8","width":16},
+    "minecraft:block/farmland_moist": {"canonical":"assets/minecraft/textures/block/farmland_moist.png","height":16,"pixelRegion":{"height":16,"width":16,"x":1,"y":19},"region":{"u0":0.0078125,"u1":0.1328125,"v0":0.1484375,"v1":0.2734375},"source":"MC原版素材assets/minecraft/textures/block/farmland_moist.png","sourceBytes":244,"sourceSha256":"5a00ccac1d2e35ec72e4ef31fc0e7126464a5dde6df64c6701849e8f7e92ef75","width":16},
+    "minecraft:block/furnace_front": {"canonical":"assets/minecraft/textures/block/furnace_front.png","height":16,"pixelRegion":{"height":16,"width":16,"x":19,"y":19},"region":{"u0":0.1484375,"u1":0.2734375,"v0":0.1484375,"v1":0.2734375},"source":"MC原版素材assets/minecraft/textures/block/furnace_front.png","sourceBytes":294,"sourceSha256":"5b8915d5ce6a02e44f39cc64d19c22138e9ec7f53dc163913018a3d95d3c1b7f","width":16},
+    "minecraft:block/furnace_front_on": {"canonical":"assets/minecraft/textures/block/furnace_front_on.png","height":16,"pixelRegion":{"height":16,"width":16,"x":37,"y":19},"region":{"u0":0.2890625,"u1":0.4140625,"v0":0.1484375,"v1":0.2734375},"source":"MC原版素材assets/minecraft/textures/block/furnace_front_on.png","sourceBytes":322,"sourceSha256":"c9cb46d068a002db47660ff4c97eabfd330f60500afdc21d081012cacf60272c","width":16},
+    "minecraft:block/furnace_side": {"canonical":"assets/minecraft/textures/block/furnace_side.png","height":16,"pixelRegion":{"height":16,"width":16,"x":55,"y":19},"region":{"u0":0.4296875,"u1":0.5546875,"v0":0.1484375,"v1":0.2734375},"source":"MC原版素材assets/minecraft/textures/block/furnace_side.png","sourceBytes":280,"sourceSha256":"565969ff712498ca1ab1e77230f3f304e25eca63bdca0f480ec26d8b44368d3d","width":16},
+    "minecraft:block/furnace_top": {"canonical":"assets/minecraft/textures/block/furnace_top.png","height":16,"pixelRegion":{"height":16,"width":16,"x":73,"y":19},"region":{"u0":0.5703125,"u1":0.6953125,"v0":0.1484375,"v1":0.2734375},"source":"MC原版素材assets/minecraft/textures/block/furnace_top.png","sourceBytes":273,"sourceSha256":"7694f519b9067f00d1a9de8a3465c2986f0a895e5797a1b69b71a66c40ac36be","width":16},
+    "minecraft:block/glass": {"canonical":"assets/minecraft/textures/block/glass.png","height":16,"pixelRegion":{"height":16,"width":16,"x":91,"y":19},"region":{"u0":0.7109375,"u1":0.8359375,"v0":0.1484375,"v1":0.2734375},"source":"MC原版素材assets/minecraft/textures/block/glass.png","sourceBytes":147,"sourceSha256":"cb89c706dce86eac3123cef087d359b5f23098b658a468fb91662b4a9922bcd0","width":16},
+    "minecraft:block/grass_block_side": {"canonical":"assets/minecraft/textures/block/grass_block_side.png","height":16,"pixelRegion":{"height":16,"width":16,"x":109,"y":19},"region":{"u0":0.8515625,"u1":0.9765625,"v0":0.1484375,"v1":0.2734375},"source":"MC原版素材assets/minecraft/textures/block/grass_block_side.png","sourceBytes":408,"sourceSha256":"dedaa0171af63df63a6cf7e3e6c7078d4d5830fd93923f3005302ed0f02104c5","width":16},
+    "minecraft:block/grass_block_side_overlay": {"canonical":"assets/minecraft/textures/block/grass_block_side_overlay.png","height":16,"pixelRegion":{"height":16,"width":16,"x":1,"y":37},"region":{"u0":0.0078125,"u1":0.1328125,"v0":0.2890625,"v1":0.4140625},"source":"MC原版素材assets/minecraft/textures/block/grass_block_side_overlay.png","sourceBytes":177,"sourceSha256":"43d98318407d9d122b83468cf183d18722e548c2144f9c2ffe2021b5c3e770e0","width":16},
+    "minecraft:block/grass_block_snow": {"canonical":"assets/minecraft/textures/block/grass_block_snow.png","height":16,"pixelRegion":{"height":16,"width":16,"x":19,"y":37},"region":{"u0":0.1484375,"u1":0.2734375,"v0":0.2890625,"v1":0.4140625},"source":"MC原版素材assets/minecraft/textures/block/grass_block_snow.png","sourceBytes":307,"sourceSha256":"53f100fe981f39331c8197bf8044dd3a79d1e5ede87c6b32996091758145c485","width":16},
+    "minecraft:block/grass_block_top": {"canonical":"assets/minecraft/textures/block/grass_block_top.png","height":16,"pixelRegion":{"height":16,"width":16,"x":37,"y":37},"region":{"u0":0.2890625,"u1":0.4140625,"v0":0.2890625,"v1":0.4140625},"source":"MC原版素材assets/minecraft/textures/block/grass_block_top.png","sourceBytes":560,"sourceSha256":"b2aa2204118c7323c0f8d263eb30dee99b6b69cb1f6df3115272a69fd188e507","width":16},
+    "minecraft:block/iron_ore": {"canonical":"assets/minecraft/textures/block/iron_ore.png","height":16,"pixelRegion":{"height":16,"width":16,"x":55,"y":37},"region":{"u0":0.4296875,"u1":0.5546875,"v0":0.2890625,"v1":0.4140625},"source":"MC原版素材assets/minecraft/textures/block/iron_ore.png","sourceBytes":292,"sourceSha256":"af864e4f225fff7b54ea859225755ca9e597e40d531643e9945b121634fe6376","width":16},
+    "minecraft:block/oak_door_bottom": {"canonical":"assets/minecraft/textures/block/oak_door_bottom.png","height":16,"pixelRegion":{"height":16,"width":16,"x":73,"y":37},"region":{"u0":0.5703125,"u1":0.6953125,"v0":0.2890625,"v1":0.4140625},"source":"MC原版素材assets/minecraft/textures/block/oak_door_bottom.png","sourceBytes":240,"sourceSha256":"2f162e4f1b165986811cfdbee9434deb3cb512b3f210292a186f504b65d19fee","width":16},
+    "minecraft:block/oak_door_top": {"canonical":"assets/minecraft/textures/block/oak_door_top.png","height":16,"pixelRegion":{"height":16,"width":16,"x":91,"y":37},"region":{"u0":0.7109375,"u1":0.8359375,"v0":0.2890625,"v1":0.4140625},"source":"MC原版素材assets/minecraft/textures/block/oak_door_top.png","sourceBytes":234,"sourceSha256":"5a401cba3322770f653f129d8c1fa0c833baa09a35c2262de84955112f721112","width":16},
+    "minecraft:block/oak_planks": {"canonical":"assets/minecraft/textures/block/oak_planks.png","height":16,"pixelRegion":{"height":16,"width":16,"x":109,"y":37},"region":{"u0":0.8515625,"u1":0.9765625,"v0":0.2890625,"v1":0.4140625},"source":"MC原版素材assets/minecraft/textures/block/oak_planks.png","sourceBytes":268,"sourceSha256":"3b00412fec87bd07b83825b86de49bcb6c186ca7799f41721a36b04e5d8ed161","width":16},
+    "minecraft:block/stripped_oak_log": {"canonical":"assets/minecraft/textures/block/stripped_oak_log.png","height":16,"pixelRegion":{"height":16,"width":16,"x":1,"y":55},"region":{"u0":0.0078125,"u1":0.1328125,"v0":0.4296875,"v1":0.5546875},"source":"MC原版素材assets/minecraft/textures/block/stripped_oak_log.png","sourceBytes":397,"sourceSha256":"0d5e4b1e67e4a9a703477ac92d33280fb2558d365c2cbf76585e381205254f23","width":16},
+    "minecraft:block/stripped_oak_log_top": {"canonical":"assets/minecraft/textures/block/stripped_oak_log_top.png","height":16,"pixelRegion":{"height":16,"width":16,"x":19,"y":55},"region":{"u0":0.1484375,"u1":0.2734375,"v0":0.4296875,"v1":0.5546875},"source":"MC原版素材assets/minecraft/textures/block/stripped_oak_log_top.png","sourceBytes":278,"sourceSha256":"49f29df2d1c5c4ab02e27ccd516f68e64e9a79297a3e79d831dc078c60e59036","width":16},
+    "minecraft:block/torch": {"canonical":"assets/minecraft/textures/block/torch.png","height":16,"pixelRegion":{"height":16,"width":16,"x":37,"y":55},"region":{"u0":0.2890625,"u1":0.4140625,"v0":0.4296875,"v1":0.5546875},"source":"MC原版素材assets/minecraft/textures/block/torch.png","sourceBytes":138,"sourceSha256":"329db8f31720564ca9c6eeb3bafb98bb30a4d277e958e55806720cc01dbf296d","width":16}
   }
 }
