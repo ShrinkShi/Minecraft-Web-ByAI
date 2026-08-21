@@ -1,4 +1,4 @@
-"""Shared acceptance roots for the first generic Minecraft block-model pipeline."""
+"""Shared acceptance roots for the generic Minecraft block-model pipeline."""
 
 MINECRAFT_MODEL_ACCEPTANCE_BLOCKS = (
     "minecraft:iron_ore",
@@ -11,4 +11,7 @@ MINECRAFT_MODEL_ACCEPTANCE_BLOCKS = (
     "minecraft:grass_block",
     "minecraft:crafting_table",
     "minecraft:furnace",
+    "minecraft:farmland",
+    "minecraft:dirt_path",
+    "minecraft:stripped_oak_log",
 )
