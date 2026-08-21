@@ -37,7 +37,7 @@ Browser failures保留 trace/screenshot/report artifacts。Node pure tests不能
 - current mob source OGG mapping + local attenuation;
 - focused browser acceptance observes real source-object HTTP response.
 
-## #125 iron armor contracts
+## #125 iron armor contracts（merged baseline）
 
 ### Pure armor rules
 
@@ -92,9 +92,48 @@ Production `CombatRuntimeController` requires an Equipment domain exposing the a
 9. verify armor HUD = 6 points;
 10. exercise browser-side damaged Equipment snapshot/wear contract.
 
+## #126 coal / terrain-version contracts
+
+### Coal gameplay and assets
+
+`check-coal-progression.mjs`, `check-asset-manifest.mjs` and `check-minecraft-runtime-assets.mjs` must prove:
+
+- append-only `BLOCK.COAL_ORE = 27` and `coal` item registration;
+- wooden pickaxe and above can harvest coal ore while invalid tools cannot;
+- successful authoritative-style break produces exactly one coal drop;
+- coal is a Furnace fuel for **1600 ticks**;
+- `coal_ore.png` is the canonical source for terrain atlas tile 15;
+- `coal.png` and moved `white_wool.png` item presentation resolve through audited canonical Java 1.20.1 paths;
+- generated 4×4 atlas and manifests match tracked outputs byte/checksum-for-byte/checksum.
+
+### Terrain v3 + v2 local compatibility
+
+`check-terrain-generator.mjs` / `check-singleplayer-terrain-version.mjs` must prove:
+
+- current generator version = 3 and supported local generator set = `[2,3]`;
+- v3 coal injection never overwrites deterministic v2 iron positions;
+- four golden chunks retain legacy normalized checksums;
+- each explicit v2 generator chunk is byte-identical to the corresponding v3 chunk after coal→stone normalization;
+- unversioned pre-#126 local save records resolve to terrain v2;
+- new local worlds resolve to terrain v3;
+- save schema v8 requires a valid `terrainVersion` and rejects unsupported/corrupt versions rather than silently regenerating against another base terrain.
+
+Multiplayer uses a stricter rule: server world-info accepts only the exact current terrain generator version. Supporting v2 for local IndexedDB worlds does **not** make mixed-v2/v3 multiplayer valid.
+
+### Browser coal acceptance
+
+`tests/e2e/coal-progression.spec.mjs` covers a real singleplayer survival flow:
+
+1. create world and equip a wooden pickaxe;
+2. prepare a real coal-ore target through the E2E world hook;
+3. Jade identifies 煤矿石 and wooden minimum tier;
+4. held primary mining breaks the block and wears the wooden pickaxe;
+5. canonical coal item appears in the hotbar through normal pickup;
+6. no page/console errors are accepted.
+
 ## Asset policy
 
-Source-backed claims must prove declared source path/provenance. Direct canonical item/block/GUI bindings require explicit allowlist + exact path audit. Files existing in the original asset tree do not make gameplay implemented by themselves.
+Source-backed claims must prove declared source path/provenance. Direct canonical item/block/GUI bindings require explicit allowlist + exact path audit. Files existing in the original asset tree do not make gameplay implemented by themselves。
 
 ## Exact-head delivery rule
 
@@ -105,10 +144,11 @@ PR Ready / merge前只认最终 branch HEAD：
 3. `behind_by=0` or explicit drift handling;
 4. exact HEAD static-checks PASS;
 5. exact HEAD both Chromium shards PASS;
-6. reviews / review threads / conversation comments checked;
-7. guarded merge uses expected head SHA.
+6. exact HEAD Minecraft asset source audit PASS;
+7. reviews / review threads / conversation comments checked;
+8. guarded merge uses expected head SHA.
 
-Any commit after a green run invalidates that run as final evidence.
+Any commit after a green run invalidates that run as final evidence。
 
 ## Current known testing debt
 
