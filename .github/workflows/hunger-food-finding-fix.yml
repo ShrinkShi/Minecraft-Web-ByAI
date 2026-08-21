@@ -1,0 +1,68 @@
+name: Close hunger core findings
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/hunger-food-finding-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feature/hunger-food-core'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Apply hunger rule fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          def edit(path,old,new):
+              p=Path(path);s=p.read_text(encoding='utf-8')
+              if s.count(old)!=1: raise SystemExit(f'{path}: anchor count {s.count(old)} for {old[:80]!r}')
+              p.write_text(s.replace(old,new,1),encoding='utf-8')
+
+          edit('src/hunger-rules.js','export const NORMAL_STARVATION_FLOOR_HP=1;','export const NORMAL_STARVATION_FLOOR_HP=1;\nexport const SPRINT_FOOD_THRESHOLD=6;')
+          edit('src/hunger-rules.js',"export function jumpExhaustion({sprinting=false}={}){return sprinting===true ? .2 : .05;}\nexport function attackExhaustion(){return .1;}","export function canSprintWithHunger(food,mode='survival'){mode=modeValue(mode);food=clamp(finite(food,'food'),0,MAX_FOOD_LEVEL);return mode!=='survival'||food>SPRINT_FOOD_THRESHOLD;}\nexport function jumpExhaustion({sprinting=false}={}){return sprinting===true ? .2 : .05;}\nexport function attackExhaustion(){return .1;}")
+          edit('src/hunger-rules.js',"  while(exhaustion>EXHAUSTION_THRESHOLD){\n    exhaustion-=EXHAUSTION_THRESHOLD;changed=true;\n    if(saturation>0)saturation=Math.max(0,saturation-1);\n    else if(food>0)food=Math.max(0,food-1);\n  }","  if(exhaustion>EXHAUSTION_THRESHOLD){\n    exhaustion-=EXHAUSTION_THRESHOLD;changed=true;\n    if(saturation>0)saturation=Math.max(0,saturation-1);\n    else if(food>0)food=Math.max(0,food-1);\n  }")
+          edit('src/hunger-rules.js',"  if(timer!==state.timer){state=createHungerState({...state,timer});changed=true;}\n  const postDrain=drainExhaustion(state);state=postDrain.state;changed=changed||postDrain.changed;\n  return Object.freeze({state,heal,damage,changed});","  if(timer!==state.timer){state=createHungerState({...state,timer});changed=true;}\n  return Object.freeze({state,heal,damage,changed});")
+
+          edit('src/player.js',"import {addHungerExhaustion,attackExhaustion,consumeFood,createHungerState,damageExhaustion,jumpExhaustion,movementExhaustion,stepHunger as stepHungerRules} from './hunger-rules.js';","import {addHungerExhaustion,attackExhaustion,canSprintWithHunger,consumeFood,createHungerState,damageExhaustion,jumpExhaustion,movementExhaustion,stepHunger as stepHungerRules} from './hunger-rules.js';")
+          edit('src/player.js',"    const jumpProbe=!this.flying&&this.swimCoverage===0&&this.controlState.jump&&this.isGroundedProbe();\n    if(this.mode==='survival'&&jumpProbe)this.addExhaustion(jumpExhaustion({sprinting:this.controlState.sprint&&this.controlState.forward>0}));\n    const motion=planPlayerMotionStep({dt,yaw:this.yaw,control:this.controlState,velocity:this.velocity,flying:this.flying,swimCoverage:this.swimCoverage,grounded:jumpProbe,walkSpeed:this.walk,sprintSpeed:this.sprint});","    const jumpProbe=!this.flying&&this.swimCoverage===0&&this.controlState.jump&&this.isGroundedProbe(),sprintAllowed=canSprintWithHunger(this.hunger,this.mode),motionControl=sprintAllowed?this.controlState:{...this.controlState,sprint:false};\n    if(this.mode==='survival'&&jumpProbe)this.addExhaustion(jumpExhaustion({sprinting:motionControl.sprint&&motionControl.forward>0}));\n    const motion=planPlayerMotionStep({dt,yaw:this.yaw,control:motionControl,velocity:this.velocity,flying:this.flying,swimCoverage:this.swimCoverage,grounded:jumpProbe,walkSpeed:this.walk,sprintSpeed:this.sprint});")
+          edit('src/player.js',"movementExhaustion(distance,{sprinting:this.controlState.sprint&&Math.hypot(this.controlState.forward,this.controlState.side)>0,swimming:this.swimCoverage>0})","movementExhaustion(distance,{sprinting:motionControl.sprint&&Math.hypot(motionControl.forward,motionControl.side)>0,swimming:this.swimCoverage>0})")
+
+          edit('src/main.js',"if(result?.applied&&player.mode==='survival')player.recordAttackExhaustion();if(result?.applied&&player.mode!=='creative'","if(result?.applied&&player.mode==='survival'){const exhaustionBefore=player.exhaustion;player.recordAttackExhaustion();if(player.exhaustion!==exhaustionBefore)markSaveDirty();}if(result?.applied&&player.mode!=='creative'")
+          edit('src/main.js',"if(!ui.hasOpenPanel()&&!ui.isChatOpen())player.update(dt);","if(!ui.hasOpenPanel()&&!ui.isChatOpen()){const exhaustionBefore=player.exhaustion;player.update(dt);if(player.exhaustion!==exhaustionBefore)markSaveDirty();}")
+
+          p=Path('scripts/check-hunger-food.mjs');s=p.read_text(encoding='utf-8')
+          s=s.replace("addHungerExhaustion,attackExhaustion,consumeFood","addHungerExhaustion,attackExhaustion,canSprintWithHunger,consumeFood")
+          old="assert.equal(movementExhaustion(10,{sprinting:true}),1);assert.equal(movementExhaustion(10,{swimming:true}),.1);assert.equal(jumpExhaustion(),.05);assert.equal(jumpExhaustion({sprinting:true}),.2);assert.equal(attackExhaustion(),.1);assert.equal(damageExhaustion(),.1);\nstep=stepHunger(createHungerState({food:20,saturation:5}),{dt:.5,hp:18});close(step.heal,5/6);assert.equal(step.damage,0);assert.equal(step.state.saturation,4);close(step.state.exhaustion,1);\nstep=stepHunger(createHungerState({food:18,saturation:0}),{dt:4,hp:18});assert.equal(step.heal,1);assert.equal(step.state.food,17);close(step.state.exhaustion,2);"
+          new="assert.equal(movementExhaustion(10,{sprinting:true}),1);assert.equal(movementExhaustion(10,{swimming:true}),.1);assert.equal(jumpExhaustion(),.05);assert.equal(jumpExhaustion({sprinting:true}),.2);assert.equal(attackExhaustion(),.1);assert.equal(damageExhaustion(),.1);assert.equal(canSprintWithHunger(7,'survival'),true);assert.equal(canSprintWithHunger(6,'survival'),false);assert.equal(canSprintWithHunger(0,'creative'),true);\nstep=stepHunger(createHungerState({food:20,saturation:5}),{dt:.5,hp:18});close(step.heal,5/6);assert.equal(step.damage,0);assert.equal(step.state.saturation,5);close(step.state.exhaustion,5);step=stepHunger(step.state,{dt:.05,hp:18+step.heal});assert.equal(step.state.saturation,4);close(step.state.exhaustion,1);\nstep=stepHunger(createHungerState({food:18,saturation:0}),{dt:4,hp:18});assert.equal(step.heal,1);assert.equal(step.state.food,18);close(step.state.exhaustion,6);step=stepHunger(step.state,{dt:.05,hp:19});assert.equal(step.state.food,17);close(step.state.exhaustion,2);"
+          if s.count(old)!=1: raise SystemExit('check-hunger-food regen anchor mismatch')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          PY
+      - name: Validate findings
+        run: |
+          node --check src/hunger-rules.js
+          node --check src/player.js
+          node --check src/main.js
+          node --check scripts/check-hunger-food.mjs
+          npm install --no-audit --no-fund --no-package-lock
+          npm run test:logic
+      - name: Commit fix and remove bootstrap workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- src/hunger-rules.js src/player.js src/main.js scripts/check-hunger-food.mjs
+          git rm -- .github/workflows/hunger-food-finding-fix.yml
+          git diff --cached --check
+          git commit -m 'fix: align hunger ticks and sprint gating'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
