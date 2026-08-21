@@ -2,7 +2,22 @@
 
 ## [Unreleased]
 
-> 2026-08-22 merged baseline: `main 2bb4f98474198d68a9b6fc676422d2f4e850866f` includes PR #125. PR #126 is the active unmerged coal / terrain-v3 delivery. Merged facts live in `docs/PROJECT_BASELINE.md`; projected parity in `docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md`.
+> 2026-08-22 merged baseline: `main 3961c7ff6f59dcb5d08542c8a99a8f0b36dfbf29` includes PR #126. PR #127 is the active unmerged hunger / food delivery. Merged facts live in `docs/PROJECT_BASELINE.md`; projected parity in `docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md`.
+
+### 2026-08-22 — PR #127 hunger / food survival core
+
+- 用独立 pure `hunger-rules.js` 替换旧的固定时间线性 hunger drain 占位逻辑，显式建模 food、saturation、exhaustion 与 food tick timer。
+- exhaustion 按 Java FoodData 顺序处理：`>4` 时每 tick 最多消费一次，优先减 saturation，再减 food；regen 新增的 exhaustion 留到下一 tick 处理。
+- sprint ground movement / swimming / jump / sprint-jump / successful attack / successful damage 接入 exhaustion；survival food `<=6` 时禁止 sprint。
+- 新增 food=20+saturation 的 fast natural regeneration、food>=18 的 normal regeneration，以及当前固定 Normal-style 1 HP starvation floor。
+- 新增 apple、bread、cooked beef/mutton/porkchop/chicken；现有 raw meats 与 rotten flesh 进入 food registry。新增食物纹理直接使用仓库中 audited canonical Java 1.20.1 item PNG。
+- Furnace 新增四种 raw meat → cooked meat 配方，200 ticks、0.35 XP；coal 继续保持 1600-tick fuel。
+- 单机右键可直接食用：满 hunger 时拒绝并不消费；目前仍是即时使用，不声明 vanilla ~1.6s eating-duration parity。
+- raw chicken / rotten flesh 的 Hunger 状态效果尚未实现，因为通用 status-effect 系统仍为空白。
+- singleplayer save schema 升到 v9，新增 exhaustion / foodTickTimer persistence；`terrainVersion` 从 schema v8 起必填的兼容合同拆成独立常量，避免版本升级倒退 #126 规则。
+- 多人 hunger/eating 尚未 server-authoritative；客户端明确拒绝本地 multiplayer food use，避免产生 client-side competing truth。
+- 新增 pure hunger/food/Furnace regression 与 real Chromium eating/regen/starvation/IndexedDB acceptance；existing smoke snapshots 升级到 save schema v9。
+- CI finding closure 包括：一物品 hotbar 数字错误断言、regen/exhaustion 同 tick 顺序、food<=6 sprint gate、微小 movement / bare-hand attack exhaustion save-dirty。
 
 ### 2026-08-22 — PR #126 coal progression / terrain v3
 
@@ -51,10 +66,10 @@
 - unified desktop/mobile controls and first/third-person presentation;
 - deterministic terrain + terrain/mesh Workers + chunk batching/lifecycle;
 - generic Minecraft blockstate/model interpretation for selected roots;
-- Inventory/Equipment/Crafting/Workbench/Furnace/durability/bed/death/oxygen/weather/XP slices;
+- Inventory/Equipment/Crafting/Workbench/Furnace/durability/bed/death/oxygen/weather/XP/hunger-food slices;
 - current 8 mobs with source textures and compatible reconstructed geometry;
 - real Node authoritative multiplayer covering movement/world/mining/placement/items/Inventory/Equipment/Crafting/Workbench/Furnace/chat/commands/PvP;
-- strict overall Java 1.20.1 parity planning estimate remains about 35% because registry/worldgen/food/farming/redstone/dimensions/enchanting/brewing remain large gaps.
+- strict overall Java 1.20.1 parity planning estimate remains about 35% because registry/worldgen/farming/redstone/dimensions/enchanting/brewing/status effects remain large gaps。
 
 ## [0.3.0] - 2026-08-11
 
