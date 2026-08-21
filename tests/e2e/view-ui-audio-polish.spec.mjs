@@ -38,14 +38,14 @@ test('live browser keeps Steve right-side limbs, corrected first-person arm dire
 
 test('mining-hit bridge emits source-backed block audio and begins OGG prefetch in the live browser',async({page})=>{
   await page.goto('/?e2e=1');
+  const responsePromise=page.waitForResponse(response=>{
+    try{return decodeURIComponent(new URL(response.url()).pathname).includes('/原版Minecraft音频文件/')&&response.status()===200;}catch{return false;}
+  },{timeout:15_000});
   const soundPromise=page.evaluate(()=>new Promise(resolve=>{
     const timeout=setTimeout(()=>resolve(null),10_000);
     addEventListener('minecraft:sound',event=>{clearTimeout(timeout);resolve(event.detail);},{once:true});
     dispatchEvent(new CustomEvent('minecraft:mining-hit',{detail:{blockId:3,x:0,y:64,z:0}}));
   }));
-  const responsePromise=page.waitForResponse(response=>{
-    try{return decodeURIComponent(new URL(response.url()).pathname).includes('/原版Minecraft音频文件/')&&response.status()===200;}catch{return false;}
-  },{timeout:15_000});
   const [sound,response]=await Promise.all([soundPromise,responsePromise]);
   expect(sound).not.toBeNull();expect(sound.eventName).toBe('block.stone.step');expect(sound.sha1).toMatch(/^[0-9a-f]{40}$/);expect(sound.logicalPath).toMatch(/^minecraft\/sounds\/step\/stone\d\.ogg$/);
   expect(response.status()).toBe(200);
