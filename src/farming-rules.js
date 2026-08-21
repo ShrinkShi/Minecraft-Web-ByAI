@@ -48,7 +48,7 @@ export function nextFarmlandBlock(blockId,{hydrated=false,hasCrop=false}={}){
 
 export function wheatGrowthChance(farmlandBlockId){
   const moisture=farmlandMoisture(farmlandBlockId);if(moisture===null)return 0;
-  return moisture>0?.45:.20;
+  return moisture>0 ? .45 : .20;
 }
 
 export function nextWheatBlock(blockId,farmlandBlockId,random=Math.random){
