@@ -1,89 +1,82 @@
 # Project Baseline — 2026-08-21
 
-This document is the authoritative human-readable snapshot of what is actually present on GitHub `main` at the baseline commit below. It exists to prevent roadmap/documentation drift from being mistaken for implementation state.
+This document is the authoritative human-readable snapshot of what is actually present on GitHub `main` at the baseline commit below. Open PR work is deliberately excluded from merged facts.
 
 ## Authority
 
 - Baseline branch: `main`
-- Baseline commit: `95fabd9294c0e9a0b38658a4978d912cf6c5d77b`
-- Baseline includes merged PRs through **#122**.
+- Baseline commit: `643310e636f8915bc35ec4803777c12b1a147ad0`
+- Baseline includes merged PRs through **#123**.
 - Development line: `v0.4.0-dev`.
 - Stable release label remains `v0.3.0` until a release is intentionally cut.
-- A feature counts as merged implementation only when its code is on `main`; an open feature PR may document its projected post-merge state in the feature matrix, but does not retroactively change this baseline.
-- PR descriptions and older progress documents are historical evidence when they conflict with `main`.
+- A feature counts as merged implementation only when its code is on `main`.
 
 ## Planning completion estimate
 
-Two different completion measures must stay separate:
-
-- browser voxel/Minecraft engine foundation: mature enough to support continued content expansion, but still missing several parity/performance/product layers;
-- strict Minecraft Java 1.20.1 gameplay/content parity: still conservatively about **35% overall**.
-
-The parity number remains low because missing breadth is dominant: most blocks/items/recipes, biome/cave/structure worldgen, farming/food depth, redstone, dimensions, many mobs, server PvE, enchanting/brewing, broad audio runtime and product/server persistence.
+Strict Minecraft Java 1.20.1 gameplay/content parity remains conservatively about **35% overall**. Engine/authority foundations are substantially further along than content breadth. Most registry content, biome/cave/structure worldgen, food/farming depth, redstone, dimensions, enchanting/brewing, server PvE, broad audio and durable multiplayer persistence remain incomplete.
 
 ## Current verified runtime facts
 
 ### Browser/client foundation
 
-- One shared Web runtime for desktop and mobile; device input converges through `ControlIntentBus`.
+- Shared desktop/mobile Web runtime with `ControlIntentBus`.
 - Pointer Lock desktop controls and landscape touch controls.
 - First-person plus F5 third-person camera cycle.
-- Three.js first-person held-item viewmodel with source-backed Steve arm/sleeve and 3D held presentation from PR #121; exact Java transforms/equip/attack-strength animation remain incomplete.
-- 16×16×64 compact voxel chunks, dynamic streaming, separate terrain/mesh Workers, TypedArray/Transferable paths and explicit unload/dispose lifecycle.
-- Chunk-level merged geometry; the generic model path is not allowed to degrade to one Three.js Mesh per block.
-- Three.js is pinned and prepared as same-origin runtime content.
+- Three.js first-person source-backed Steve arm/sleeve + 3D held-item/block viewmodel with attack/use animation.
+- Source-backed articulated wide-Steve third-person model.
+- 16×16×64 compact voxel chunks, terrain/mesh Workers, Transferable paths, bounded streaming/unload/disposal.
+- Chunk-level merged legacy and interpreted-model geometry; no one-Mesh-per-block regression.
 - IndexedDB singleplayer persistence for current world/player/inventory/equipment/Furnace state.
+
+At this baseline, the user-reported first-person arm orientation and third-person physical left/right limb presentation bugs are still present on `main`; they belong to open PR #124 and are not counted as merged fixes here.
 
 ### World and blocks
 
-Current merged gameplay block families on `main` are:
+Current gameplay families/states include:
 
-`grass_block`, `dirt`, `stone`, `sand`, `oak_planks`, `oak_log`, `oak_leaves`, `water`, `crafting_table`, `cobblestone`, `red_bed`, `iron_ore`, `glass`, `furnace`.
+`grass_block`, `dirt`, `stone`, `sand`, `oak_planks`, `oak_log`, `oak_leaves`, `water`, `crafting_table`, `cobblestone`, `red_bed`, `iron_ore`, `glass`, `furnace`, `farmland`, `dirt_path`, `stripped_oak_log`.
 
 The bed uses several internal facing/foot/head IDs but is one gameplay family.
 
 Rendering/resource facts:
 
-- red bed uses a source-backed Java 1.20.1 entity texture and dedicated partial-bed renderer;
-- generic blockstate/model parsing, model inheritance, variants/multipart, geometry transforms, atlas binding and chunk batching foundations are implemented;
-- crafting table, iron ore, glass and furnace are live source-backed generic-model gameplay roots;
-- glass uses a translucent interpreted rendering path with same-glass internal-face culling;
-- broad block registry/state/collision parity is still absent.
+- red bed uses Java 1.20.1 entity texture + dedicated paired partial-bed renderer;
+- blockstate/model inheritance, variants/multipart, rotations, culling/tint metadata, deterministic model atlas and chunk batching exist for selected live roots;
+- crafting table, iron ore, glass, furnace and the current player-created states are integrated into the present rendering/resource pipeline;
+- broad Java block registry/state/collision-shape parity is absent.
 
-Current terrain generation is a deterministic shared browser/server fBm heightmap baseline with surface layers, sea/water, oak trees and simplified deterministic underground iron ore. Prompt keywords modify coarse generation parameters. It is **not** a Java biome/cave/aquifer/feature/structure pipeline.
+World generation is still a deterministic browser/server fBm heightmap baseline with simple surface layers, sea/water, oak trees and simplified underground iron ore. It is not a Java biome/cave/aquifer/feature/structure pipeline.
 
 ### Items, crafting and progression
 
-At this main baseline:
+At main `643310e…`:
 
-- 36-slot Inventory + 9-slot hotbar and cursor/stack/Shift transaction semantics;
+- 36-slot Inventory + 9-slot hotbar with cursor/stack/Shift transaction semantics;
 - Equipment head/chest/legs/feet foundation with current leather armor support;
-- runtime item registry: **39 IDs**;
-- recipe registry: **13 recipes**;
-- source-backed/current progression includes wooden, stone and iron pickaxes; wooden, stone and iron swords; iron axe; iron shovel; raw iron; iron ingot; Furnace and glass block items;
-- tool/weapon item-instance durability is wired for the implemented damageable set;
-- mining effectiveness is distinct from harvest/drop eligibility;
-- shared held-item melee profiles drive current damage, hard minimum attack interval and successful-hit wear;
-- Java continuous attack-strength scaling, critical/sweep/shield semantics remain incomplete.
+- runtime item registry: **40 IDs**;
+- recipe registry: **14 recipes**;
+- wooden/stone/iron pickaxes, wooden/stone/iron swords, iron axe, iron shovel and iron hoe are in the current progression set;
+- raw iron → Furnace → iron ingot → iron pickaxe/axe/shovel/sword/hoe forms the current stone→iron tool/weapon chain;
+- tool/weapon item-instance durability exists for the implemented damageable set;
+- mining effectiveness remains distinct from harvest/drop eligibility;
+- till / strip / flatten secondary actions are shared between singleplayer and authoritative server rules with success-only survival wear and creative no-wear.
 
-The current stone→iron chain on `main` is real: stone-tier iron ore harvest → raw iron → Furnace → iron ingot → iron pickaxe/axe/shovel/sword crafting.
-
-**Iron hoe and till/strip/flatten secondary actions are not part of this baseline; they belong to open PR #123.**
+Iron armor is not in this baseline.
 
 ### Survival and processing
 
-Implemented merged slices include:
+Implemented slices include:
 
 - HP, damage, knockback, hurt cooldown, death settlement and explicit respawn;
 - recoverable singleplayer item/XP drops and custom spawnpoint;
-- two-block bed placement, respawn anchor, night skip and nearby-hostile sleep safety;
-- oxygen, drowning and simplified swimming/buoyancy;
-- weather/time state and pooled rain/thunder presentation;
-- XP orbs and Java-style level calculations in singleplayer;
-- persistent singleplayer Furnace runtime using the shared 3-slot processing core, fuel/cook timers and stored XP bookkeeping;
-- simplified hostile daylight burning / wet extinguish presentation from PR #121.
+- paired bed placement, respawn anchor, night skip and nearby-hostile sleep safety;
+- oxygen/drowning and simplified swimming/buoyancy;
+- time/weather state with pooled rain/thunder presentation;
+- singleplayer XP orbs/level calculations;
+- persistent singleplayer Furnace using the shared 3-slot processing core;
+- simplified hostile daylight burning/wet extinguish presentation.
 
-Major gaps include full hunger/saturation/food behavior, farming/crops, iron armor progression/wear, broad smelting/fuels, fire/lava entity rules, enchanting, brewing and status effects.
+Major gaps include complete hunger/saturation/food behavior, crop/farming lifecycle, iron armor/wear, broad smelting/fuels, generic fire/lava entity rules, enchanting, brewing and status effects.
 
 ### Entities and PvE
 
@@ -92,94 +85,85 @@ Current gameplay mobs:
 - passive: cow, sheep, pig, chicken;
 - hostile: zombie, skeleton, creeper, spider.
 
-All eight use imported Java 1.20.1 texture sheets with project-side compatible cuboid geometry. Texture provenance is source-backed; geometry is a reconstruction and is not falsely described as extracted `.bbmodel`/Java model-layer data.
+All eight use imported Java 1.20.1 texture sheets with project-side compatible cuboid geometry. Singleplayer has simplified AI/combat, skeleton arrows, creeper explosions, loot/XP, hit feedback and current combat presentation. Full pathfinding, vanilla spawn/equipment/variant rules, breeding/taming/riding and most species are absent.
 
-Singleplayer includes simplified AI/combat, skeleton arrows, creeper explosions, loot/XP, per-entity hit feedback and expanded combat/explosion presentation. Full pathfinding, vanilla spawn/equipment/variant rules, breeding/taming/riding and most species are absent.
+At this baseline these mobs do **not** yet have the source-backed ambient/hurt/death sound runtime introduced by open PR #124.
 
 ### Multiplayer/server authority
 
-The project has a real Node WebSocket authoritative runtime. Merged work covers:
+The Node WebSocket authoritative runtime currently covers:
 
-- strict handshake/session/input protocol and independent sequence/replay gates;
-- deterministic shared terrain and 20 Hz authoritative movement/collision;
-- authoritative self/remote player snapshots and remote rendering;
-- authoritative sparse world edits with bootstrap/live revisions;
+- strict handshake/session/input protocol and sequence/replay gates;
+- deterministic shared terrain + 20 Hz movement/collision;
+- self/remote player snapshots and remote rendering;
+- revisioned sparse world edits;
 - creative/survival mining and ordinary placement;
-- authoritative ground item entities, drop/pickup/lifetime;
-- authoritative Inventory/cursor and item damage replication;
+- till / strip / flatten authoritative block use;
+- ground item entities, pickup/lifetime;
+- authoritative Inventory/cursor + item damage;
 - authoritative Equipment transactions;
-- authoritative 2×2 crafting and transient 3×3 Workbench container;
-- authoritative Furnace container/process runtime with shared viewers (process-memory only);
-- authoritative chat and controlled command channels;
-- server-owned PvP HP, melee targeting, mitigation, knockback, death drops and respawn.
+- 2×2 player crafting + transient 3×3 Workbench;
+- authoritative Furnace container/process runtime in process memory;
+- chat and controlled command channels;
+- server-owned PvP HP/melee/armor mitigation/knockback/death drops/respawn.
 
-Major authority gaps remain: mobs/PvE/projectiles/explosions, XP/levels, durable multiplayer world/container persistence, accounts/rooms/operator identity and reconnect/resume.
+Major gaps: mobs/PvE/projectiles/explosions, XP/levels, durable world/container persistence, rooms/accounts/operators, reconnect/resume and replicated broad SFX.
 
 ## Minecraft resource baseline
 
-### Java client resource tree
+### Java client resources
 
-Tracked source input: `MC原版素材assets.zip` / extracted tracked subset.
+The project tracks a Java 1.20.1 client resource input with hundreds of block/item/entity textures and thousands of model/blockstate JSON files. That resource tree does not contain entity model-layer geometry and is not treated as if `.bbmodel` data existed.
 
-The deterministic audit of that resource tree found thousands of Java client resources including roughly:
+### Java 1.20.1 audio object corpus
 
-- 977 block textures;
-- 582 item textures;
-- 497 entity textures;
-- 2,016 block model JSON files;
-- 1,675 item model JSON files;
-- 1,005 blockstates;
-- no `.bbmodel` files.
+PR #122 added a separately supplied original Java 1.20.1 sound-object corpus under `原版Minecraft音频文件/` with mapping/source metadata.
 
-That particular resource tree does not contain the Minecraft sound-object store or a usable full sound source input by itself.
+PR #123 then made a first source-backed runtime subset real:
 
-### Separate Java 1.20.1 audio source
+- `item.hoe.till`, `item.axe.strip`, `item.shovel.flatten`;
+- grass / gravel / stone / sand / wood / glass break/place/step families;
+- Java-style break/place/step volume/pitch profile for the current block sound types;
+- local ordinary block mutation and local player footstep presentation.
 
-PR #122 added the separately supplied Java 1.20.1 audio object corpus under `原版Minecraft音频文件/`, together with mapping metadata/source notes.
+This is still a narrow subset. Entity voices, broader combat/player/environment events, music, remote multiplayer replication and full spatial audio remain incomplete on this baseline.
 
-This changes the baseline in one important way:
+## Known presentation regressions at this baseline
 
-- **original sound objects are now available as tracked source input**;
-- **source availability is not the same as runtime audio parity**.
+These are intentionally recorded because they are the scope of open PR #124, not merged facts:
 
-At main `95fabd9`, PR #121 still supplies an interim procedural WebAudio feedback layer for a small set of combat/presentation events. The source-backed original tool/block sound runtime being developed in PR #123 is not yet part of `main` and must not be counted here.
-
-### Remaining resource/render/audio gaps
-
-- broad generated gameplay registry from the Java resource tree;
-- full item-model interpretation;
-- generalized gameplay state/neighbor-state mapping and collision shapes;
-- biome tint/color-map runtime;
-- animated texture playback;
-- generalized source-backed sound-event registry/runtime;
-- spatial audio and remote sound presentation;
-- ambient/environment sound scheduling and music playback.
+1. first-person right arm is visually reversed;
+2. third-person physical limb sides make right-hand actions appear on the visual left;
+3. Workbench still uses the legacy generic panel composition instead of canonical crafting-table container geometry;
+4. local footsteps use an overly dense distance cadence;
+5. mining has no continuous source-backed hit cadence and final break audio can cold-start late;
+6. current mobs lack source-backed ambient/hurt/death audio.
 
 ## Quality baseline
 
-The project quality policy is exact-head based:
+Repository quality is exact-head based:
 
 - Node 22 JavaScript syntax;
-- automatically discovered logic/server/Worker regression scripts;
+- automatically discovered logic/server/Worker checks;
 - two Chromium browser-smoke shards;
 - deterministic asset/source audits where affected;
-- failure traces/screenshots/reports for browser regressions.
+- failure trace/screenshot/report artifacts.
 
-Merged delivery history through #122 passed its required gates before merge. Exact run/test counts belong to the delivery PR/head that produced them and are not treated as permanent project constants.
+No open PR inherits a green result from an older head.
 
 ## Documentation policy
 
-1. `docs/PROJECT_BASELINE.md` records **merged `main` facts only** at its stated baseline commit.
-2. `docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md` is the parity/roadmap authority and may describe the state expected after the currently open feature PR, clearly labeled as such.
-3. `docs/PROGRESS.md` is the active delivery dashboard.
-4. `README.md` is the user/developer overview, not an exhaustive roadmap.
-5. `CHANGELOG.md` is chronological history and current Unreleased accumulation.
-6. Every feature PR that changes parity status must update the matrix in the same PR.
-7. Resource files existing in the repository do **not** make their corresponding gameplay/render/audio feature implemented.
-8. A feature PR is not Ready based on an older green commit; the current exact branch HEAD must pass the required quality gate.
+1. `PROJECT_BASELINE.md` records merged `main` only.
+2. `MINECRAFT_1_20_1_FEATURE_MATRIX.md` is parity/roadmap authority and may state projected post-PR status when clearly labeled.
+3. `PROGRESS.md` is the active delivery dashboard.
+4. `README.md` is an overview, not the exhaustive roadmap.
+5. `CHANGELOG.md` records chronological Unreleased/release changes.
+6. Features that change parity must update the matrix in the same PR.
+7. Resource availability does not equal runtime implementation.
+8. Ready/merge requires the current exact branch HEAD quality gate.
 
-## Immediate development line after this baseline
+## Immediate active delivery
 
-The active delivery after `main 95fabd9` is PR #123: source-backed iron hoe, till/strip/flatten secondary tool actions, new player-created block states and the first source-backed original tool/block sound runtime.
+Open PR #124 fixes the six presentation/audio regressions listed above: player hand orientation, canonical Workbench UI, footstep cadence, mining hit/break audio responsiveness and a first source-backed ambient/hurt/death baseline for the current eight mobs.
 
-After that delivery, the nearest planned work is iron armor, coal progression/worldgen compatibility, broader original audio runtime, server-owned XP and durable multiplayer block-entity/world persistence.
+After that, the nearest planned content line is iron armor, followed by coal progression/worldgen compatibility, broader registry-driven original audio and server-owned XP/durable block-entity persistence.
