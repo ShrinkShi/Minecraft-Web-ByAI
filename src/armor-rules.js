@@ -1,10 +1,23 @@
-export function armorReduction(armorPoints,{perPoint=.04,maxReduction=.8}={}){
-  if(!Number.isFinite(armorPoints)||armorPoints<0)throw new RangeError('armorPoints must be a finite non-negative number');
-  if(!Number.isFinite(perPoint)||perPoint<0||!Number.isFinite(maxReduction)||maxReduction<0||maxReduction>1)throw new RangeError('armor reduction settings are invalid');
-  return Math.min(maxReduction,armorPoints*perPoint);
+function nonNegative(value,label){if(typeof value!=='number'||!Number.isFinite(value)||value<0)throw new RangeError(`${label} must be a finite non-negative number`);return value;}
+
+export function effectiveArmorPoints(amount,armorPoints,armorToughness=0){
+  amount=nonNegative(amount,'damage amount');armorPoints=nonNegative(armorPoints,'armorPoints');armorToughness=nonNegative(armorToughness,'armorToughness');
+  if(amount===0||armorPoints===0)return 0;
+  const toughnessScale=2+armorToughness/4;
+  return Math.min(20,Math.max(armorPoints-amount/toughnessScale,armorPoints*.2));
 }
 
-export function mitigateArmorDamage(amount,armorPoints,options){
-  if(!Number.isFinite(amount)||amount<0)throw new RangeError('damage amount must be a finite non-negative number');
-  return amount*(1-armorReduction(armorPoints,options));
+export function armorReduction(amount,armorPoints,armorToughness=0){
+  return effectiveArmorPoints(amount,armorPoints,armorToughness)/25;
+}
+
+export function mitigateArmorDamage(amount,armorPoints,armorToughness=0){
+  amount=nonNegative(amount,'damage amount');
+  return amount*(1-armorReduction(amount,armorPoints,armorToughness));
+}
+
+export function armorDurabilityDamage(amount){
+  amount=nonNegative(amount,'damage amount');
+  if(amount<=0)return 0;
+  return Math.max(1,Math.floor(amount/4));
 }

@@ -13,6 +13,7 @@ import {WeatherSystem} from './weather-system.js';
 import {JadeRuntimeInspector} from './jade-runtime-inspector.js';
 import {itemForBlock} from './items.js';
 import {playGameSound} from './audio-system.js';
+import {forwardDamageWithArmorWear} from './armor-damage-bridge.js';
 import {installVanillaBlockAudio} from './vanilla-block-audio.js';
 import {playMobSoundEvent} from './vanilla-mob-sounds.js';
 
@@ -40,16 +41,17 @@ export async function createClientGameplayRuntime({
   try{
     world=new VoxelWorld(scene,{seed:String(seed??'1'),prompt:String(prompt??''),renderDistance,savedEdits,onEdit:onWorldEdit,onProgress:onWorldProgress});await world.generateArea(centerX,centerZ);
     inventory=new Inventory(mode,inventoryState);equipment=new Equipment(equipmentState);player=new PlayerController(camera,canvas,world,scene);if(controlState!==null&&controlState!==undefined)player.setControlState(controlState);player.setMode(mode);vanillaBlockAudio=installVanillaBlockAudio({world,player});
+    const armorAware=(event,forward)=>forwardDamageWithArmorWear({player,equipment,damage:Number(event?.amount)||0,event,callback:forward});
     drops=new DropSystem(scene,world,inventory,onInventoryPickup);experienceOrbs=new ExperienceOrbSystem(scene,world,onExperience);weatherSystem=new WeatherSystem(scene);weatherSystem.setWeather(weather);
-    projectiles=new ProjectileSystem(scene,world,{onPlayerHit});
+    projectiles=new ProjectileSystem(scene,world,{onPlayerHit:event=>armorAware(event,onPlayerHit)});
     const emitDestroyedBlock=event=>{
       const itemId=itemForBlock(event?.id);if(itemId&&event?.position)drops.spawn(itemId,1,new THREE.Vector3(event.position.x+.5,event.position.y+.55,event.position.z+.5));onExplosionBlockDestroyed(event);
     };
     const emitMobSound=event=>{if(!player||!event?.position)return;void playMobSoundEvent(event,{x:player.position.x,y:player.position.y+player.eye*.7,z:player.position.z});};
-    explosions=new ExplosionSystem(scene,world,{onPlayerBlast,onBlockDestroyed:emitDestroyedBlock});
+    explosions=new ExplosionSystem(scene,world,{onPlayerBlast:event=>armorAware(event,onPlayerBlast),onBlockDestroyed:emitDestroyedBlock});
     passiveMobs=new PassiveMobSystem(scene,world,{onDeath:onMobDeath,onSound:emitMobSound});
     hostileMobs=new HostileMobSystem(scene,world,{
-      onPlayerHit,
+      onPlayerHit:event=>armorAware(event,onPlayerHit),
       onProjectile:event=>{playGameSound('shoot',{minIntervalMs:70});onHostileProjectile(event);},
       onExplosion:event=>{playGameSound('explosion',{minIntervalMs:80});onHostileExplosion(event);},
       onDeath:onMobDeath,
