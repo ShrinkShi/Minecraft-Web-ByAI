@@ -9,7 +9,7 @@ const armor={
   iron_leggings:{slot:'legs',points:5,durability:225,asset:'item.iron_leggings'},
   iron_boots:{slot:'feet',points:2,durability:195,asset:'item.iron_boots'}
 };
-for(const [id,expected] of Object.entries(armor)){const item=ITEMS[id];assert.ok(item,`${id} must exist`);assert.equal(item.stack,1);assert.equal(item.armorSlot,expected.slot);assert.equal(item.armorPoints,expected.points);assert.equal(item.durability,expected.durability);assert.equal(item.assetKey,expected.asset);assert.match(item.texture,new RegExp(`/textures/item/${id}\\.png$`));assert.ok(CREATIVE_START.includes(id),`${id} must be reachable from creative inventory`);}
+for(const [id,expected] of Object.entries(armor)){const item=ITEMS[id];assert.ok(item,`${id} must exist`);assert.equal(item.stack,1);assert.equal(item.armorSlot,expected.slot);assert.equal(item.armorPoints,expected.points);assert.equal(item.durability,expected.durability);assert.equal(item.assetKey,expected.asset);assert.match(item.texture,new RegExp(`/textures/item/${id}\\.png$`));assert.equal(CREATIVE_START.includes(id),false,`${id} must not shift the historical starter inventory; it remains craftable/giveable progression content`);}
 
 const stack=id=>id?{id,count:1}:null;
 const recipe=(rows)=>matchRecipe(rows.flat().map(stack),3)?.recipe?.result||null;
