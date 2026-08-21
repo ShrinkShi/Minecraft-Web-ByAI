@@ -1,8 +1,8 @@
 name: Apply singleplayer terrain compatibility
 
 on:
-  push:
-    branches: [feature/coal-progression]
+  pull_request:
+    branches: [main]
     paths:
       - 'tools/apply-singleplayer-terrain-compat.py'
       - '.github/workflows/singleplayer-terrain-compat-apply.yml'
