@@ -54,6 +54,13 @@ terrain v3 是有意的生成版本升级。多人 server world-info 仍使用 w
 
 本切片的煤矿生成是当前 64 高度简化世界中的确定性分布，不是 Minecraft Java 1.20.1 原版 biome/cave/ore placement 算法。实现 coal gameplay chain 不等于 worldgen parity 完成。
 
+### CI finding closure
+
+- exact-head `c7b6ec50288c13818a203b59ddb4a9badda34099` 已通过 asset source audit、static logic/server/Worker 与 Chromium shard 1/2；
+- Chromium shard 2/2 的 3 个失败都来自旧 E2E 仍硬编码 singleplayer save `version:7`，实际产品状态已正确保存 `version:8`，护甲/天气/spawnpoint/bed pair/respawn anchor 均符合预期；
+- browser smoke 已同步到 schema v8，并额外断言 fresh world `terrainVersion:3`；四处旧 v7 断言均已移除；
+- 任何这之后的绿色结果只认新的 exact HEAD，不复用 `c7b6ec50…` 的旧 CI 作为最终合并证据。
+
 ## 当前验证目标
 
 1. 自动发现的全部 logic/server/Worker checks；
