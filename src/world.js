@@ -9,10 +9,11 @@ const floorDiv=(n,d)=>Math.floor(n/d);
 const mod=(n,d)=>((n%d)+d)%d;
 
 export class VoxelWorld{
-  constructor(scene,{seed,prompt,renderDistance=3,onProgress=()=>{},savedEdits={},onEdit=()=>{}}={}){
+  constructor(scene,{seed,prompt,terrainVersion,renderDistance=3,onProgress=()=>{},savedEdits={},onEdit=()=>{}}={}){
     this.scene=scene;
     this.seed=seed;
     this.prompt=prompt;
+    this.terrainVersion=terrainVersion;
     this.renderDistance=renderDistance;
     this.unloadDistance=renderDistance+1;
     this.onProgress=onProgress;
@@ -39,7 +40,7 @@ export class VoxelWorld{
     this.meshWorker=new Worker(new URL('./mesh-worker.js',import.meta.url),{type:'module'});
     this.terrainWorker.onmessage=e=>this.onTerrainWorker(e.data);
     this.meshWorker.onmessage=e=>this.onMeshWorker(e.data);
-    this.terrainWorker.postMessage({type:'init',seed,prompt});
+    this.terrainWorker.postMessage({type:'init',seed,prompt,terrainVersion});
     this.minecraftModelRenderer.initializeWorker(this.meshWorker).then(state=>{
       if(this.disposed)return;
       if(state==='fallback'){

@@ -1,24 +1,31 @@
 import assert from 'node:assert/strict';
 import {BLOCK,CHUNK_SIZE,WORLD_HEIGHT} from '../src/blocks.js';
-import {TERRAIN_GENERATOR_VERSION,hashTerrainSeed,terrainParameters,terrainChunkIndex,createTerrainGenerator} from '../src/terrain-generator.js';
+import {SUPPORTED_TERRAIN_GENERATOR_VERSIONS,TERRAIN_GENERATOR_VERSION,normalizeTerrainGeneratorVersion,hashTerrainSeed,terrainParameters,terrainChunkIndex,createTerrainGenerator} from '../src/terrain-generator.js';
 
 function fnv1a(bytes){let hash=2166136261>>>0;for(const byte of bytes){hash^=byte;hash=Math.imul(hash,16777619);}return hash>>>0;}
 function normalizeV1(bytes){const copy=bytes.slice();for(let i=0;i<copy.length;i++)if(copy[i]===BLOCK.IRON_ORE||copy[i]===BLOCK.COAL_ORE)copy[i]=BLOCK.STONE;return copy;}
 function normalizeV2(bytes){const copy=bytes.slice();for(let i=0;i<copy.length;i++)if(copy[i]===BLOCK.COAL_ORE)copy[i]=BLOCK.STONE;return copy;}
 function blockCounts(bytes){const counts={};for(const id of bytes)counts[id]=(counts[id]||0)+1;return counts;}
 function assertGolden({seed,prompt,cx,cz,seedHash,params,checksum,v2Checksum,counts,sum}){
-  const generator=createTerrainGenerator({seed,prompt}),chunk=generator.generateChunk(cx,cz),legacy=normalizeV1(chunk),v2=normalizeV2(chunk);
+  const generator=createTerrainGenerator({seed,prompt}),chunk=generator.generateChunk(cx,cz),legacy=normalizeV1(chunk),v2=normalizeV2(chunk),previous=createTerrainGenerator({seed,prompt,version:2}).generateChunk(cx,cz);
   assert.equal(generator.seedHash,seedHash);
   assert.deepEqual(generator.parameters,params);
   assert.equal(chunk.length,CHUNK_SIZE*CHUNK_SIZE*WORLD_HEIGHT);
   assert.equal(fnv1a(legacy),checksum,`v3 ore injection changed legacy terrain bytes for ${seed} / ${prompt} / ${cx},${cz}`);
   assert.equal(fnv1a(v2),v2Checksum,`v3 coal injection changed v2 terrain bytes for ${seed} / ${prompt} / ${cx},${cz}`);
+  assert.equal(fnv1a(previous),v2Checksum,`explicit v2 generator drifted for ${seed} / ${prompt} / ${cx},${cz}`);
+  assert.deepEqual(v2,previous,`normalizing v3 coal must reproduce the exact v2 chunk for ${seed} / ${prompt} / ${cx},${cz}`);
   assert.deepEqual(blockCounts(legacy),counts);
   assert.equal(legacy.reduce((total,id)=>total+id,0),sum);
   return{generator,chunk};
 }
 
 assert.equal(TERRAIN_GENERATOR_VERSION,3);
+assert.deepEqual(SUPPORTED_TERRAIN_GENERATOR_VERSIONS,[2,3]);
+assert.equal(normalizeTerrainGeneratorVersion(),3);
+assert.equal(normalizeTerrainGeneratorVersion(2),2);
+assert.throws(()=>normalizeTerrainGeneratorVersion(1),/unsupported terrain generator version/);
+assert.throws(()=>normalizeTerrainGeneratorVersion(4),/unsupported terrain generator version/);
 assert.equal(hashTerrainSeed('ShrinkCraft-2026'),2382936635);
 assert.equal(hashTerrainSeed('golden-seed'),1950149494);
 assert.equal(hashTerrainSeed(''),hashTerrainSeed('1'),'legacy empty seed falls back to "1"');
