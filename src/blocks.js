@@ -13,7 +13,8 @@ export const BLOCK = Object.freeze({
   BED_EAST_FOOT:BED_IDS.east.foot,BED_EAST_HEAD:BED_IDS.east.head,
   IRON_ORE:19,GLASS:20,FURNACE:21,
   // Player-created states are append-only and intentionally outside terrain generation.
-  FARMLAND:24,DIRT_PATH:25,STRIPPED_OAK_LOG:26
+  FARMLAND:24,DIRT_PATH:25,STRIPPED_OAK_LOG:26,
+  COAL_ORE:27
 });
 
 export const BLOCKS = {
@@ -43,7 +44,11 @@ export const BLOCKS = {
   // tiles as a visual fallback; canonical interpreted-model visuals are follow-up work.
   24:{name:'耕地',solid:true,hardness:.6,tiles:[2,2,2],drops:'block:2',effectiveTool:'shovel',fullCube:false},
   25:{name:'土径',solid:true,hardness:.65,tiles:[2,2,2],drops:'block:2',effectiveTool:'shovel',fullCube:false},
-  26:{name:'去皮橡木原木',solid:true,hardness:2,tiles:[7,7,6],drops:'block:26',effectiveTool:'axe'}
+  26:{name:'去皮橡木原木',solid:true,hardness:2,tiles:[7,7,6],drops:'block:26',effectiveTool:'axe'},
+  // Coal keeps the legacy terrain-atlas fast path. Tile 15 is now the canonical
+  // Java 1.20.1 coal_ore texture; white wool item presentation moved to a
+  // direct canonical texture so the 4x4 terrain atlas does not need resizing.
+  27:{name:'煤矿石',solid:true,hardness:3,tiles:[15,15,15],drops:'coal',requires:'pickaxe',effectiveTool:'pickaxe',minToolTier:'wood'}
 };
 
 for(const id of BED_BLOCK_IDS){

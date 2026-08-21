@@ -290,6 +290,11 @@
       "sha256": "483480c2c21a395196ca8255e933a5db3fd6f995be3dacc3c423e971ef964553",
       "source": "MC原版素材assets/minecraft/models/item/wooden_pickaxe.json"
     },
+    "textures/block/coal_ore.png": {
+      "bytes": 301,
+      "sha256": "9f1416938aae93d0fccb953ba7004d8a68e939ff6bb6996cbee4ff050e16600a",
+      "source": "MC原版素材assets/minecraft/textures/block/coal_ore.png"
+    },
     "textures/block/cobblestone.png": {
       "bytes": 265,
       "sha256": "2431a28eaaf9a728a6bf6bfad515a2db74932d5091604c8c66c500734e21883a",

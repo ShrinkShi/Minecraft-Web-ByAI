@@ -45,7 +45,7 @@ ATLAS_TILES = {
     12: ("crafting_table_front.png", None),
     13: ("cobblestone.png", None),
     14: ("iron_ore.png", None),
-    15: ("white_wool.png", None),
+    15: ("coal_ore.png", None),
 }
 
 ITEM_FILES = {

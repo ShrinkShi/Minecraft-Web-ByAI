@@ -5,7 +5,7 @@ let generator=createTerrainGenerator();
 self.onmessage=event=>{
   const message=event.data;
   if(message.type==='init'){
-    generator=createTerrainGenerator({seed:message.seed||'1',prompt:message.prompt||''});
+    generator=createTerrainGenerator({seed:message.seed||'1',prompt:message.prompt||'',version:message.terrainVersion});
     self.postMessage({type:'ready'});return;
   }
   if(message.type!=='generate')return;

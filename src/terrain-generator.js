@@ -1,6 +1,7 @@
 import {BLOCK,CHUNK_SIZE,WORLD_HEIGHT} from './blocks.js';
 
-export const TERRAIN_GENERATOR_VERSION=2;
+export const TERRAIN_GENERATOR_VERSION=3;
+export const SUPPORTED_TERRAIN_GENERATOR_VERSIONS=Object.freeze([2,3]);
 const DEFAULT_SEED='1';
 const DEFAULT_PROMPT='';
 const FNV_OFFSET=2166136261>>>0;
@@ -12,6 +13,13 @@ const IRON_VEIN_CHANCE=.045;
 const IRON_FILL_CHANCE=.22;
 const IRON_VEIN_SALT=0x49a2;
 const IRON_FILL_SALT=0x1f2e;
+const COAL_MIN_Y=4;
+const COAL_MAX_Y=56;
+const COAL_VEIN_CELL=4;
+const COAL_VEIN_CHANCE=.07;
+const COAL_FILL_CHANCE=.28;
+const COAL_VEIN_SALT=0x0c0a1;
+const COAL_FILL_SALT=0x51ad;
 
 export function hashTerrainSeed(value=DEFAULT_SEED){
   const text=String(value||DEFAULT_SEED);let hash=FNV_OFFSET;
@@ -31,7 +39,13 @@ export function terrainParameters(value=DEFAULT_PROMPT){
 
 export function terrainChunkIndex(x,y,z){return x+CHUNK_SIZE*(z+CHUNK_SIZE*y);}
 
-export function createTerrainGenerator({seed=DEFAULT_SEED,prompt=DEFAULT_PROMPT}={}){
+export function normalizeTerrainGeneratorVersion(value=TERRAIN_GENERATOR_VERSION){
+  if(!Number.isInteger(value)||!SUPPORTED_TERRAIN_GENERATOR_VERSIONS.includes(value))throw new RangeError(`unsupported terrain generator version: ${value}`);
+  return value;
+}
+
+export function createTerrainGenerator({seed=DEFAULT_SEED,prompt=DEFAULT_PROMPT,version=TERRAIN_GENERATOR_VERSION}={}){
+  version=normalizeTerrainGeneratorVersion(version);
   const seedHash=hashTerrainSeed(seed),parameters=terrainParameters(prompt);
 
   const hash2=(x,z)=>{
@@ -66,6 +80,15 @@ export function createTerrainGenerator({seed=DEFAULT_SEED,prompt=DEFAULT_PROMPT}
     if(vein>=IRON_VEIN_CHANCE)return false;
     return hash3(x,y,z,IRON_FILL_SALT)<IRON_FILL_CHANCE;
   };
+  const isCoalOre=(x,y,z,top=COAL_MAX_Y+4)=>{
+    if(!Number.isInteger(x)||!Number.isInteger(y)||!Number.isInteger(z)||!Number.isInteger(top))throw new TypeError('coal ore coordinates and surface height must be integers');
+    if(version<3)return false;
+    const maxY=Math.min(COAL_MAX_Y,top-4);
+    if(y<COAL_MIN_Y||y>maxY)return false;
+    const vein=hash3(Math.floor(x/COAL_VEIN_CELL),Math.floor(y/COAL_VEIN_CELL),Math.floor(z/COAL_VEIN_CELL),COAL_VEIN_SALT);
+    if(vein>=COAL_VEIN_CHANCE)return false;
+    return hash3(x,y,z,COAL_FILL_SALT)<COAL_FILL_CHANCE;
+  };
   const set=(chunk,x,y,z,id)=>{if(x>=0&&x<CHUNK_SIZE&&z>=0&&z<CHUNK_SIZE&&y>=0&&y<WORLD_HEIGHT)chunk[terrainChunkIndex(x,y,z)]=id;};
   const tree=(chunk,lx,base,lz)=>{
     for(let y=0;y<4;y++)set(chunk,lx,base+y,lz,BLOCK.LOG);
@@ -85,6 +108,7 @@ export function createTerrainGenerator({seed=DEFAULT_SEED,prompt=DEFAULT_PROMPT}
         if(y===top)id=top<=parameters.sea+1||moisture<parameters.sand?BLOCK.SAND:BLOCK.GRASS;
         else if(y>=top-3)id=top<=parameters.sea+1||moisture<parameters.sand?BLOCK.SAND:BLOCK.DIRT;
         else if(isIronOre(wx,y,wz,top))id=BLOCK.IRON_ORE;
+        else if(isCoalOre(wx,y,wz,top))id=BLOCK.COAL_ORE;
         set(chunk,lx,y,lz,id);
       }
       for(let y=top+1;y<=parameters.sea;y++)set(chunk,lx,y,lz,BLOCK.WATER);
@@ -93,5 +117,5 @@ export function createTerrainGenerator({seed=DEFAULT_SEED,prompt=DEFAULT_PROMPT}
     return chunk;
   };
 
-  return Object.freeze({seedHash,parameters:Object.freeze({...parameters}),hash2,hash3,valueNoise,fbm,heightAt,isIronOre,generateChunk});
+  return Object.freeze({version,seedHash,parameters:Object.freeze({...parameters}),hash2,hash3,valueNoise,fbm,heightAt,isIronOre,isCoalOre,generateChunk});
 }

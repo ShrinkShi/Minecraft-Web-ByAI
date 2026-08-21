@@ -58,4 +58,4 @@ try{
 }finally{if(runtime.state!=='stopped')await runtime.stop();if(socket&&socket.readyState===WebSocket.OPEN)socket.terminate();}
 
 assert.throws(()=>createAuthoritativeServerRuntime({config:null}),/runtime config/);assert.throws(()=>createAuthoritativeServerRuntime({onLog:null}),/onLog/);assert.throws(()=>createAuthoritativeServerRuntime({onError:null}),/onError/);
-console.log('production authoritative runtime + terrain v2 world info + edits + inventory + equipment bootstrap + tick lifecycle: PASS');
+console.log('production authoritative runtime + terrain v3 world info + edits + inventory + equipment bootstrap + tick lifecycle: PASS');

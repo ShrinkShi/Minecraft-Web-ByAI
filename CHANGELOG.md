@@ -2,11 +2,22 @@
 
 ## [Unreleased]
 
-> 2026-08-21 merged baseline: `main 6159b9f47a54bf7e3610897c55f1ee1fdbf6ed7d` includes PR #124. PR #125 is the active unmerged iron-armor delivery. Merged facts live in `docs/PROJECT_BASELINE.md`; projected parity in `docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md`.
+> 2026-08-22 merged baseline: `main 2bb4f98474198d68a9b6fc676422d2f4e850866f` includes PR #125. PR #126 is the active unmerged coal / terrain-v3 delivery. Merged facts live in `docs/PROJECT_BASELINE.md`; projected parity in `docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md`.
+
+### 2026-08-22 — PR #126 coal progression / terrain v3
+
+- 新增煤矿石（block 27）与煤炭物品，木镐及以上可采集；煤炭作为熔炉燃料燃烧 **1600 ticks**。
+- terrain generator 升级到 v3：独立 deterministic coal field，铁矿优先级保持不变；回归测试锁定 coal→stone 后与显式 v2 generator 字节一致。
+- 保留 terrain generator v2 作为 local save compatibility path：PR #126 前没有 `terrainVersion` 的 IndexedDB 世界按 v2 打开，不会因为升级而在原有隐式石头中凭空出现煤矿。
+- singleplayer save schema 升到 v8 并持久化 `terrainVersion`；新世界固定 v3，legacy unversioned 世界首次后续保存会补写 v2，未知/损坏版本拒绝静默加载。
+- multiplayer 仍要求 exact current terrain version；local v2 compatibility 不允许 v2/v3 mixed multiplayer。
+- 4×4 terrain atlas 的 tile 15 从 white wool 调整为 canonical Java 1.20.1 coal ore；white wool 与 coal item 改为直接引用仓库中已审计 canonical PNG。
+- 增加 coal progression、terrain-v2/v3 byte compatibility、singleplayer save pinning 与 Chromium 回归；同步 server world-info / authoritative terrain 的版本兼容断言。
+- 当前煤矿分布仍是 64 高度简化 deterministic worldgen，不声明为 Java 1.20.1 原版 biome/cave/ore placement parity。
 
 ### 2026-08-21 — PR #125 iron armor progression and durability
 
-- 新增 source-backed Java 1.20.1 iron helmet/chestplate/leggings/boots 与四个 vanilla Workbench recipes；projected boundary 44 runtime item IDs / 18 recipes。
+- 新增 source-backed Java 1.20.1 iron helmet/chestplate/leggings/boots 与四个 vanilla Workbench recipes；merged boundary 44 runtime item IDs / 18 recipes。
 - 铁甲数值：helmet 2/165、chestplate 6/240、leggings 5/225、boots 2/195；full set 15 armor points。
 - leather armor 恢复 55/80/75/65 durability，使现有皮甲也进入 generic armor-wear contract。
 - 护甲减伤从旧固定 `armorPoints × 4%` 近似改为 damage-dependent Java-style formula；当前 leather/iron toughness 为 0，未来 diamond/netherite 复用同一扩展点。

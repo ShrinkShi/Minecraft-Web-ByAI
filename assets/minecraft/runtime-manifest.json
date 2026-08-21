@@ -1,7 +1,7 @@
 {
   "atlas": {
     "path": "textures/atlas.png",
-    "sha256": "02f5d5a4926b5da7f217b60028d5fbb5ae864c6b5d0483d021ec074639c921f2",
+    "sha256": "2bfa77c7dd17dd947a05d148c0dbc99f4cba3850c31b5c7ad4be218cd48504f9",
     "tiles": {
       "0": {
         "source": "textures/block/grass_block_top.png",
@@ -32,7 +32,7 @@
         "treatment": null
       },
       "15": {
-        "source": "textures/block/white_wool.png",
+        "source": "textures/block/coal_ore.png",
         "treatment": null
       },
       "2": {
@@ -310,7 +310,7 @@
     "minecraft/models/block/torch.json": "834b8a24a98d2a2c3505de5a33a734fb327cd036086abd2f9f8141c2d309ba89",
     "minecraft/models/item/stick.json": "04048187b6c11f1152546cbb7b29db9877a73b6d2f152e1941d575c9460be8cc",
     "minecraft/models/item/wooden_pickaxe.json": "483480c2c21a395196ca8255e933a5db3fd6f995be3dacc3c423e971ef964553",
-    "minecraft/source-manifest.json": "c242f53ef8e0db679bd7f127dae899677eef136f611809d6daac6a3712d5f12b",
+    "minecraft/source-manifest.json": "7a80269e8445f5ed230e4c9009e279bf3e3fba7b68b59fe4e437cff129307744",
     "minecraft/textures/block/water_flow.png.mcmeta": "802acdb8f55f30146d5ed18414b21ba35650d4e550f81825ea104131c12dc4fc",
     "minecraft/textures/block/water_still.png.mcmeta": "e9b8025fde1b09b0a4d2a38427b04f98f28a593045be6d177eb2b29164c872b0",
     "minecraft/textures/entity/bed/red.png": "73022232cafa0c0c5260e48cb5305a8bcc7f6e09d22f8d1bb51e87a1a84146b2",

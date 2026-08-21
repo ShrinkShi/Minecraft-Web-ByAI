@@ -9,6 +9,7 @@ import {ITEMS} from './items.js';
 import {mitigateArmorDamage} from './armor-rules.js';
 import {createOxygenState,stepOxygen,usesOxygen,MAX_AIR_SECONDS,DROWN_DAMAGE} from './oxygen-rules.js';
 import {WorldStorage,worldIdFor} from './storage.js';
+import {SINGLEPLAYER_SAVE_VERSION,resolveSingleplayerTerrainVersion} from './world-save-compatibility.js';
 import {executeCommand} from './commands.js';
 import {canAttack} from './combat.js';
 import {meleeProfile} from './melee-rules.js';
@@ -100,7 +101,7 @@ async function persistWorld(force=false){
   if(force)saveDirty=true;if(saveInFlight)return saveInFlight;if(!saveDirty)return;
   const drain=(async()=>{try{
     while(sessionKind==='singleplayer'&&world&&player&&worldInfo&&inventory&&equipment&&saveDirty){
-      const record={id:worldInfo.id,name:worldInfo.name,seed:worldInfo.seed,prompt:worldInfo.prompt,mode:player.mode,updatedAt:Date.now(),player:player.snapshot(),inventory:inventory.snapshot(),equipment:equipment.snapshot(),edits:world.exportEdits(),furnaces:singleplayerFurnace?.serialize()||[],gameTime,weather,totalXp,respawnPoint:respawnPoint?{...respawnPoint}:null,version:7};
+      const record={id:worldInfo.id,name:worldInfo.name,seed:worldInfo.seed,prompt:worldInfo.prompt,mode:player.mode,updatedAt:Date.now(),player:player.snapshot(),inventory:inventory.snapshot(),equipment:equipment.snapshot(),edits:world.exportEdits(),furnaces:singleplayerFurnace?.serialize()||[],gameTime,weather,totalXp,respawnPoint:respawnPoint?{...respawnPoint}:null,terrainVersion:worldInfo.terrainVersion,version:SINGLEPLAYER_SAVE_VERSION};
       saveDirty=false;
       try{await storage.putWorld(record);lastSaveAt=performance.now();lastSavedPosition=player?.position.clone()||null;}
       catch(error){saveDirty=true;console.error('世界存档失败',error);ui.showToast('世界存档失败：IndexedDB 不可用');break;}
@@ -165,13 +166,15 @@ function handleMobDeath({type,position}){
 async function startWorld(){
   disposeWorld();sessionKind='singleplayer';ui.setReturnMainLabel(false);const seed=document.querySelector('#world-seed').value||String(Date.now()),prompt=document.querySelector('#terrain-prompt').value,selectedMode=document.querySelector('#game-mode').value,name=document.querySelector('#world-name').value||'新的世界',id=worldIdFor(name,seed);let saved=null;
   try{saved=await storage.getWorld(id);}catch(error){console.warn('无法读取 IndexedDB 存档，将启动无持久化会话',error);}
-  const mode=saved?.mode||selectedMode;worldInfo={id,seed:saved?.seed||seed,prompt:saved?.prompt||prompt,mode,name:saved?.name||name};gameTime=Number.isFinite(saved?.gameTime)?saved.gameTime:6000;weather=saved?.weather||'clear';totalXp=Number.isFinite(saved?.totalXp)?Math.max(0,Math.floor(saved.totalXp)):0;respawnPoint=normalizeRespawnPoint(saved?.respawnPoint);
+  let terrainVersion;try{terrainVersion=resolveSingleplayerTerrainVersion(saved);}catch(error){console.error('世界地形版本不兼容',error);sessionKind=null;ui.showToast(`无法打开世界：${error?.message||error}`);modeScreen('world');return;}
+  const mode=saved?.mode||selectedMode;worldInfo={id,seed:saved?.seed||seed,prompt:saved?.prompt||prompt,mode,name:saved?.name||name,terrainVersion};gameTime=Number.isFinite(saved?.gameTime)?saved.gameTime:6000;weather=saved?.weather||'clear';totalXp=Number.isFinite(saved?.totalXp)?Math.max(0,Math.floor(saved.totalXp)):0;respawnPoint=normalizeRespawnPoint(saved?.respawnPoint);
   const savedDead=Number.isFinite(saved?.player?.hp)&&saved.player.hp<=0,startPosition=savedDead?(respawnPoint||{x:0,z:0}):saved?.player?.position,centerX=Number.isFinite(startPosition?.x)?startPosition.x:0,centerZ=Number.isFinite(startPosition?.z)?startPosition.z:0;modeScreen(null);ui.showLoading(true,saved?'读取世界存档':'启动地形 Worker',2);
-  gameplayRuntime=await createClientGameplayRuntime({scene,camera,canvas,seed:worldInfo.seed,prompt:worldInfo.prompt,renderDistance:3,savedEdits:saved?.edits||{},centerX,centerZ,mode,inventoryState:saved?.inventory||null,equipmentState:saved?.equipment||null,controlState:controlBus.snapshot(),weather,onWorldEdit:markSaveDirty,onWorldProgress:(done,total)=>ui.showLoading(true,`生成区块 ${done}/${total}`,total?Math.round(done/total*100):100),onInventoryPickup:()=>{ui.refreshInventory();markSaveDirty();},onExperience:addExperience,onPlayerHit:handlePlayerHit,onPlayerBlast:handlePlayerBlast,onMobDeath:handleMobDeath,onHostileProjectile:handleHostileProjectile,onHostileExplosion:handleHostileExplosion});
+  gameplayRuntime=await createClientGameplayRuntime({scene,camera,canvas,seed:worldInfo.seed,prompt:worldInfo.prompt,terrainVersion:worldInfo.terrainVersion,renderDistance:3,savedEdits:saved?.edits||{},centerX,centerZ,mode,inventoryState:saved?.inventory||null,equipmentState:saved?.equipment||null,controlState:controlBus.snapshot(),weather,onWorldEdit:markSaveDirty,onWorldProgress:(done,total)=>ui.showLoading(true,`生成区块 ${done}/${total}`,total?Math.round(done/total*100):100),onInventoryPickup:()=>{ui.refreshInventory();markSaveDirty();},onExperience:addExperience,onPlayerHit:handlePlayerHit,onPlayerBlast:handlePlayerBlast,onMobDeath:handleMobDeath,onHostileProjectile:handleHostileProjectile,onHostileExplosion:handleHostileExplosion});
   ({world,player,inventory,equipment,drops,experienceOrbs,projectiles,explosions,passiveMobs,hostileMobs,weatherSystem}=gameplayRuntime);
   const restored=!savedDead&&saved?.player?player.restore(saved.player):false;if(!restored)player.spawn(centerX,centerZ);if(savedDead)await respawnAtPreferredPoint();resetOxygen();
   singleplayerFurnace=new SingleplayerFurnaceRuntime({world,inventory,getMode:()=>player?.mode||'spectator',onChanged:markSaveDirty,onExperience:addExperience,onDrop:(stack,target)=>drops?.spawnStack(stack,new THREE.Vector3(target.x+.5,target.y+.6,target.z+.5))});const furnaceRestore=singleplayerFurnace.restore(saved?.furnaces);
-  ui.bindInventory(inventory,{equipment,onChanged:()=>{markSaveDirty();renderPlayerStatus();},onOverflow:spawnOverflow});running=true;paused=false;saveDirty=!saved||furnaceRestore.discarded>0;lastSavedPosition=player.position.clone();lastAttackAt=-Infinity;ui.hud.classList.remove('hidden');ui.showLoading(false);renderPlayerStatus();applySky();ui.chatMessage('夜间敌对池包括僵尸、骷髅、苦力怕和蜘蛛；水下会消耗氧气；天气指令会切换降雨粒子。');ui.showToast(saved?'已从浏览器存档恢复世界':mode==='creative'?'创造模式':'生存模式');pointer();
+  const needsTerrainMetadataMigration=!!saved&&(saved.terrainVersion!==worldInfo.terrainVersion||saved.version!==SINGLEPLAYER_SAVE_VERSION);
+  ui.bindInventory(inventory,{equipment,onChanged:()=>{markSaveDirty();renderPlayerStatus();},onOverflow:spawnOverflow});running=true;paused=false;saveDirty=!saved||needsTerrainMetadataMigration||furnaceRestore.discarded>0;lastSavedPosition=player.position.clone();lastAttackAt=-Infinity;ui.hud.classList.remove('hidden');ui.showLoading(false);renderPlayerStatus();applySky();ui.chatMessage('夜间敌对池包括僵尸、骷髅、苦力怕和蜘蛛；水下会消耗氧气；天气指令会切换降雨粒子。');ui.showToast(saved?'已从浏览器存档恢复世界':mode==='creative'?'创造模式':'生存模式');pointer();
 }
 
 function multiplayerStateText(state,detail){

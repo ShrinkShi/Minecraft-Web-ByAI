@@ -1,6 +1,6 @@
 # Minecraft Web - 当前开发进度
 
-更新时间：2026-08-21
+更新时间：2026-08-22
 
 ## 当前主线
 
@@ -8,97 +8,85 @@
 
 当前 merged `main`：
 
-`6159b9f47a54bf7e3610897c55f1ee1fdbf6ed7d`
+`2bb4f98474198d68a9b6fc676422d2f4e850866f`
 
-main 已合并到 PR #124。#124 已完成：
+main 已合并到 PR #125。#125 已完成：
 
-- 第一/第三人称右手与 Steve 左右肢体纠正；
-- canonical 1.20.1 Workbench GUI；
-- local footsteps 从 0.55 调整到 1.6-block cadence；
-- survival mining ~200 ms hit cadence；
-- break variants 共享 fetch+decode prewarm cache；
-- 当前 8 种 mob 的 source-backed ambient/hurt/death baseline。
+- iron helmet/chestplate/leggings/boots 注册、canonical Java 1.20.1 item textures 与 4 个 Workbench recipes；
+- full iron set = 15 armor points，四件耐久 165/240/225/195；
+- leather armor durability 恢复 55/80/75/65；
+- 固定“每护甲点 4%”近似替换为 damage-dependent Java-style mitigation；
+- local / authoritative Equipment 支持 armor damage、break 与 revision；
+- singleplayer hostile/projectile/explosion applied-damage wear bridge；
+- two-client authoritative PvP armor mitigation + durability replication；
+- `/give minecraft:<registered_item_id>` 改为 runtime registry 解析；
+- `CREATIVE_START` 保持历史顺序，不因铁甲内容移动 starter slots。
 
-## 当前进行中：PR #125 Iron Armor Progression
+## 当前进行中：PR #126 Coal Progression
 
-分支：`content/v0.4-iron-armor-progression`
+分支：`feature/coal-progression`
 
-基线：`main 6159b9f47a54bf7e3610897c55f1ee1fdbf6ed7d`
+基线：`main 2bb4f98474198d68a9b6fc676422d2f4e850866f`
 
-### 内容
+### 本切片
 
-PR #125 projected post-merge boundary：
+- `BLOCK.COAL_ORE = 27`，不重编号历史方块 ID；
+- canonical Java 1.20.1 `coal_ore.png` 进入 4×4 terrain atlas 的 tile 15；
+- white wool item 改为直接引用 canonical `white_wool.png`，无需扩大 atlas 或改变旧 UV；
+- canonical `coal.png` 直接作为煤炭物品纹理；
+- 木镐及以上可采集煤矿并掉落 `coal`；
+- coal Furnace fuel = **1600 ticks**；
+- terrain generator **v3** 新增独立 deterministic coal field；
+- 生成顺序保持 `iron -> coal`，煤矿不能覆盖已有 v2 铁矿位置；
+- v3 golden regression 锁定“coal→stone 后 == v2 raw bytes”，并继续锁定旧 legacy terrain bytes；
+- terrain generator 同时保留显式 v2 路径，供已有单机世界继续生成未探索区块；
+- singleplayer save schema 升到 **v8**，新增 `terrainVersion`：新世界固定 v3；PR #126 前没有该字段的现有存档按 v2 打开，并在后续保存时补写版本；未知/损坏的 terrain version 明确拒绝，避免静默改变世界。
 
-- runtime item IDs：**44**；
-- recipes：**18**；
-- iron helmet：2 armor / 165 durability；
-- iron chestplate：6 / 240；
-- iron leggings：5 / 225；
-- iron boots：2 / 195；
-- full iron set：15 armor points；
-- four canonical Java 1.20.1 item textures；
-- four vanilla-shaped Workbench recipes。
+### 兼容性边界
 
-铁甲不会插入历史 `CREATIVE_START`，避免改变已有 authoritative/bootstrap starter-slot contract；它仍可正常合成，并可通过 `/give minecraft:<registered_item_id>` 获得。
+terrain v3 是有意的生成版本升级。多人 server world-info 仍使用 wire schema v1，但只接受当前 `TERRAIN_GENERATOR_VERSION`；旧 terrain-v2 peer 会被明确拒绝，避免客户端与服务端用不同 base terrain 解释同一组 edit deltas。
 
-### Armor semantics
+单机与多人策略不同：单机需要长期读取本地 IndexedDB 世界，因此支持 v2/v3 generator；多人 session 必须与服务器当前生成版本严格一致。
 
-- leather armor 恢复 55/80/75/65 durability；
-- 旧“每护甲点固定 4%”近似已替换为 Java-style damage-dependent armor mitigation；
-- `armorDurabilityDamage(rawDamage)` 统一计算护甲磨损；
-- local Equipment snapshot/restore/click/swap/unequip/drain 保留 item-stack `damage`；
-- authoritative Equipment 支持磨损、损坏和 revision；
-- PvP 按“受击前护甲计算减伤 → damage applied → 磨甲并复制 Equipment → death cleanup”顺序；
-- singleplayer hostile/projectile/explosion 通过 applied-damage bridge：hurt-cooldown/rejected hit 不磨甲，致死一击先磨甲再死亡清理，drowning 不磨甲。
+`CREATIVE_START` 不插入 coal/coal ore，继续保持既有 starter-slot 和 authoritative bootstrap 合同。
 
-### Command / registry cleanup
+### Parity 声明
 
-`/give minecraft:<registered_item_id>` 已改为由 runtime item registry 自动解析，不再要求每新增一种物品就手工维护 namespace alias；特殊方块别名仍保留。
+本切片的煤矿生成是当前 64 高度简化世界中的确定性分布，不是 Minecraft Java 1.20.1 原版 biome/cave/ore placement 算法。实现 coal gameplay chain 不等于 worldgen parity 完成。
 
-## 当前验证状态
+### CI finding closure
 
-在文档收口前的 exact head `85a3deaab9d70cd25a83c6786fbed6608ee01140`：
+- exact-head `c7b6ec50288c13818a203b59ddb4a9badda34099` 已通过 asset source audit、static logic/server/Worker 与 Chromium shard 1/2；
+- Chromium shard 2/2 的 3 个失败都来自旧 E2E 仍硬编码 singleplayer save `version:7`，实际产品状态已正确保存 `version:8`，护甲/天气/spawnpoint/bed pair/respawn anchor 均符合预期；
+- browser smoke 已同步到 schema v8，并额外断言 fresh world `terrainVersion:3`；四处旧 v7 断言均已移除；
+- 任何这之后的绿色结果只认新的 exact HEAD，不复用 `c7b6ec50…` 的旧 CI 作为最终合并证据。
 
-- JavaScript syntax：PASS；
-- auto-discovered logic/server/Worker regressions：PASS；
-- Chromium shards 已启动；
-- 该结果只作为 preliminary evidence，因为本次文档收口会移动 HEAD。
+## 当前验证目标
 
-CI 已发现并关闭三类真实 finding：
+1. 自动发现的全部 logic/server/Worker checks；
+2. terrain v3 四组 golden + 显式 v2 generator byte compatibility；
+3. legacy unversioned singleplayer save → terrain v2，新世界 → terrain v3，save schema v8 持久化；
+4. focused coal singleplayer Chromium：木镐挖煤矿、Jade、耐久、canonical coal pickup；
+5. asset-source audit 重建 4×4 terrain atlas，并要求 tracked atlas 与 builder byte-identical；
+6. 两个 Chromium shard 全绿；
+7. branch 对最新 main `behind=0` 且无 review blocker。
 
-1. `/give minecraft:iron_chestplate` 仍依赖旧手工 alias → 改为 registered-item namespace resolution；
-2. 旧 melee test double 缺少新增 `damageArmor()` Equipment contract → 更新测试契约，不在生产代码中静默吞掉缺失能力；
-3. 新铁甲一度被加入 `CREATIVE_START`，导致 Furnace starter slot 位移 → 恢复历史 starter 布局，并修正铁甲测试为“注册/可合成/可 give，但不挪旧 starter slots”。
+## 本切片明确不做
 
-## Ready gate
+- charcoal；
+- torch recipe / dynamic light；
+- coal block；
+- Fortune / Silk Touch 与煤矿挖掘 XP；
+- caves / biome-dependent vanilla ore distribution；
+- hunger / food / farming。
 
-#125 只有在**文档收口后的最终 exact HEAD**满足以下条件才允许 Ready：
+## 后续连续开发顺序
 
-1. static-checks 全绿；
-2. Chromium shard 1/2、2/2 全绿；
-3. focused iron-armor Chromium 测试通过真实 Workbench 合成、canonical PNG decode、装备和 HUD；
-4. authoritative two-client PvP regression验证护甲减伤 + durability replication；
-5. branch 对最新 main `behind=0`；
-6. reviews / threads / PR comments 无 blocker。
-
-## #125 明确不做
-
-- diamond/netherite armor toughness tiers；
-- Protection / Unbreaking / Mending 等附魔；
-- armor equip/break sound graph；
-- 第三人称完整 armor model layer 渲染；
-- shield；
-- hunger/food/farming；
-- coal/worldgen（下一条 delivery）。
-
-## #125 后续连续开发顺序
-
-1. **Coal progression**：coal ore、coal item、Furnace fuel、deterministic generation、terrain-generator version/compatibility；
-2. **Hunger + food core**：hunger、saturation、exhaustion、regen/starvation，至少 bread/apple/cooked meats；
-3. **Farming phase 1**：seeds/wheat、farmland moisture/irrigation、growth/harvest、bread chain；
-4. **Registry breadth**：stone variants、wood species、slab/stair/fence/door 等通用 block families；
-5. **Worldgen**：biomes → caves/aquifers → ores/features → structures；
-6. server-authoritative PvE/XP 与 durable persistence。
+1. **Hunger + food core**：hunger、saturation、exhaustion、regen/starvation，至少 bread/apple/cooked meats；
+2. **Farming phase 1**：seeds/wheat、farmland moisture/irrigation、growth/harvest、bread chain；
+3. **Registry breadth**：stone variants、wood species、slab/stair/fence/door 等通用 block families；
+4. **Worldgen**：biomes → caves/aquifers → ores/features → structures；
+5. server-authoritative PvE/XP 与 durable persistence。
 
 ## 工程规则
 
