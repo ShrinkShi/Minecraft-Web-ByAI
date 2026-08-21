@@ -4,87 +4,86 @@
 
 ## 当前主线
 
-项目处于 `v0.4.0-dev`。严格按 Minecraft Java 1.20.1 完整玩法/内容口径，整体规划完成度仍保守维持约 **35%**。底层浏览器引擎、资源管线和 authoritative multiplayer 已经形成较强基础，但完整 registry、worldgen、food/farming、redstone、dimensions、enchanting/brewing 和 server PvE 仍是大缺口。
+项目处于 `v0.4.0-dev`。严格按 Minecraft Java 1.20.1 完整玩法/内容口径，整体规划完成度仍保守维持约 **35%**。浏览器引擎、资源管线和 authoritative multiplayer 基础已经较强，但完整 registry、原版 worldgen、farming、redstone、dimensions、enchanting/brewing 和 server PvE 仍是主要缺口。
 
 当前 merged `main`：
 
-`2bb4f98474198d68a9b6fc676422d2f4e850866f`
+`3961c7ff6f59dcb5d08542c8a99a8f0b36dfbf29`
 
-main 已合并到 PR #125。#125 已完成：
+main 已合并到 PR #126。#126 已完成 coal progression、terrain generator v3、singleplayer terrain-v2 compatibility 和 save schema v8 terrain-version pinning。
 
-- iron helmet/chestplate/leggings/boots 注册、canonical Java 1.20.1 item textures 与 4 个 Workbench recipes；
-- full iron set = 15 armor points，四件耐久 165/240/225/195；
-- leather armor durability 恢复 55/80/75/65；
-- 固定“每护甲点 4%”近似替换为 damage-dependent Java-style mitigation；
-- local / authoritative Equipment 支持 armor damage、break 与 revision；
-- singleplayer hostile/projectile/explosion applied-damage wear bridge；
-- two-client authoritative PvP armor mitigation + durability replication；
-- `/give minecraft:<registered_item_id>` 改为 runtime registry 解析；
-- `CREATIVE_START` 保持历史顺序，不因铁甲内容移动 starter slots。
+## 当前进行中：PR #127 Hunger + Food Core
 
-## 当前进行中：PR #126 Coal Progression
+分支：`feature/hunger-food-core`
 
-分支：`feature/coal-progression`
+基线：`main 3961c7ff6f59dcb5d08542c8a99a8f0b36dfbf29`
 
-基线：`main 2bb4f98474198d68a9b6fc676422d2f4e850866f`
+当前候选 HEAD 在完成代码 finding closure 后继续以 exact-head CI 为准。
 
-### 本切片
+### 本切片已实现
 
-- `BLOCK.COAL_ORE = 27`，不重编号历史方块 ID；
-- canonical Java 1.20.1 `coal_ore.png` 进入 4×4 terrain atlas 的 tile 15；
-- white wool item 改为直接引用 canonical `white_wool.png`，无需扩大 atlas 或改变旧 UV；
-- canonical `coal.png` 直接作为煤炭物品纹理；
-- 木镐及以上可采集煤矿并掉落 `coal`；
-- coal Furnace fuel = **1600 ticks**；
-- terrain generator **v3** 新增独立 deterministic coal field；
-- 生成顺序保持 `iron -> coal`，煤矿不能覆盖已有 v2 铁矿位置；
-- v3 golden regression 锁定“coal→stone 后 == v2 raw bytes”，并继续锁定旧 legacy terrain bytes；
-- terrain generator 同时保留显式 v2 路径，供已有单机世界继续生成未探索区块；
-- singleplayer save schema 升到 **v8**，新增 `terrainVersion`：新世界固定 v3；PR #126 前没有该字段的现有存档按 v2 打开，并在后续保存时补写版本；未知/损坏的 terrain version 明确拒绝，避免静默改变世界。
+- 新增独立 `src/hunger-rules.js`，替换旧的固定时间线性掉饥饿占位逻辑；
+- hunger / saturation / exhaustion / food tick timer 成为显式状态；
+- exhaustion `> 4` 时按 Java FoodData 顺序每 tick 最多消耗一次：优先 saturation，再 food；
+- sprint 地面移动、swimming、jump、sprint-jump、成功攻击、成功受伤接入 exhaustion；
+- 生存模式 food `<= 6` 禁止 sprint；
+- food=20 且 saturation>0 的快速自然恢复、food>=18 的普通自然恢复；
+- 当前项目没有 difficulty 系统，因此 starvation 暂按 **Normal** 边界：最低降到 1 HP，不直接饿死；
+- save schema 升到 **v9**，持久化 `exhaustion` / `foodTickTimer`；terrainVersion 从 schema v8 开始必填的合同单独保留，避免 v9 升级破坏 #126 兼容规则；
+- 现有 `raw_beef` / `raw_mutton` / `raw_porkchop` / `raw_chicken` / `rotten_flesh` 变为可食用；
+- 新增 `apple`、`bread`、`cooked_beef`、`cooked_mutton`、`cooked_porkchop`、`cooked_chicken`；
+- 新增物品全部直接绑定仓库中 canonical Java 1.20.1 item PNG；
+- Furnace 新增四条肉类烹饪：raw beef/mutton/porkchop/chicken → cooked 对应物，200 ticks，0.35 XP；
+- 单机右键食用：饥饿未满时消费 1 个食物并应用 nutrition/saturation；满饥饿不消费；
+- `scripts/check-hunger-food.mjs` 覆盖食物数值、exhaustion、regen、starvation、sprint gate 和 Furnace cooking；
+- `tests/e2e/hunger-food.spec.mjs` 覆盖真实浏览器吃面包、满饥饿拒绝、快速回血、Normal starvation floor、schema v9 持久化。
 
-### 兼容性边界
+### 已完成的 finding closure
 
-terrain v3 是有意的生成版本升级。多人 server world-info 仍使用 wire schema v1，但只接受当前 `TERRAIN_GENERATOR_VERSION`；旧 terrain-v2 peer 会被明确拒绝，避免客户端与服务端用不同 base terrain 解释同一组 edit deltas。
+1. **schema boundary**：save schema 从 v8 升 v9 后，`terrainVersion` 必填起点不能跟着漂到 v9；已拆成 `TERRAIN_VERSIONED_SAVE_MIN_VERSION=8` 与 `SINGLEPLAYER_SAVE_VERSION=9`。
+2. **hotbar E2E**：数量为 1 时 UI 不显示数字，测试不再错误断言 `.slot-count === 1`，改为断言物品槽仍存在。
+3. **FoodData tick order**：regen 新增 exhaustion 不在同一 tick 立即再次 drain；下一 tick 才处理，和 Java 顺序一致。
+4. **sprint gate**：food <= 6 的 survival player 不再获得 sprint speed / sprint exhaustion。
+5. **persistence dirty**：微小移动、跳跃和裸手成功攻击产生的 exhaustion 不再依赖“以后可能有别的状态变化”才进入存档。
 
-单机与多人策略不同：单机需要长期读取本地 IndexedDB 世界，因此支持 v2/v3 generator；多人 session 必须与服务器当前生成版本严格一致。
+上述 finding 修复均已在临时 integration runner 上通过完整 auto-discovered logic/server/Worker suite；最终合并仍只认后续正常用户提交触发的 exact-head 正式门禁。
 
-`CREATIVE_START` 不插入 coal/coal ore，继续保持既有 starter-slot 和 authoritative bootstrap 合同。
+## 兼容性与 authority 边界
 
-### Parity 声明
+- `PROJECT_BASELINE.md` 只记录 merged main，因此 #127 的 hunger/food 事实在合并前不会写成 merged；
+- 旧 v8 单机世界可恢复 hunger/saturation，缺失的 exhaustion/timer 以 0 安全迁移，并在下一次保存写成 v9；
+- v8/v9 若缺 `terrainVersion` 都按损坏存档拒绝，不回退成 legacy v2；
+- 多人服务器当前没有 authoritative hunger domain。为了避免客户端自说自话，multiplayer secondary 继续明确拒绝本地吃东西，直到服务器拥有 food/hunger transaction/state；
+- `CREATIVE_START` 继续保持历史顺序，新食物不插入 starter slots。
 
-本切片的煤矿生成是当前 64 高度简化世界中的确定性分布，不是 Minecraft Java 1.20.1 原版 biome/cave/ore placement 算法。实现 coal gameplay chain 不等于 worldgen parity 完成。
+## Parity 声明
 
-### CI finding closure
+本 PR 是 hunger/food **核心规则切片**，不是完整 Java 1.20.1 food parity：
 
-- exact-head `c7b6ec50288c13818a203b59ddb4a9badda34099` 已通过 asset source audit、static logic/server/Worker 与 Chromium shard 1/2；
-- Chromium shard 2/2 的 3 个失败都来自旧 E2E 仍硬编码 singleplayer save `version:7`，实际产品状态已正确保存 `version:8`，护甲/天气/spawnpoint/bed pair/respawn anchor 均符合预期；
-- browser smoke 已同步到 schema v8，并额外断言 fresh world `terrainVersion:3`；四处旧 v7 断言均已移除；
-- 任何这之后的绿色结果只认新的 exact HEAD，不复用 `c7b6ec50…` 的旧 CI 作为最终合并证据。
+- 当前食用是一次右键立即完成，尚无原版约 1.6 秒 use-duration / eating animation / use cancellation；
+- raw chicken 与 rotten flesh 的 Hunger 状态效果未实现，因为 status-effect 系统仍为空白；
+- 没有 difficulty/gamerule UI，starvation 暂固定按 Normal floor，natural regeneration 默认开启；
+- apple/bread 当前可通过 `/give` 获得；bread 的 wheat crafting chain 属于下一阶段 farming；
+- 没有 golden food、chorus fruit、stew、cake、honey 等完整食物 registry。
+
+因此整体严格 parity 不因本切片虚高上调。
 
 ## 当前验证目标
 
 1. 自动发现的全部 logic/server/Worker checks；
-2. terrain v3 四组 golden + 显式 v2 generator byte compatibility；
-3. legacy unversioned singleplayer save → terrain v2，新世界 → terrain v3，save schema v8 持久化；
-4. focused coal singleplayer Chromium：木镐挖煤矿、Jade、耐久、canonical coal pickup；
-5. asset-source audit 重建 4×4 terrain atlas，并要求 tracked atlas 与 builder byte-identical；
+2. save schema v9 + terrainVersion-since-v8 兼容回归；
+3. hunger FoodData 顺序、sprint gate、regen/starvation/exhaustion pure contract；
+4. canonical food asset manifest 审计；
+5. focused hunger/food Chromium；
 6. 两个 Chromium shard 全绿；
-7. branch 对最新 main `behind=0` 且无 review blocker。
-
-## 本切片明确不做
-
-- charcoal；
-- torch recipe / dynamic light；
-- coal block；
-- Fortune / Silk Touch 与煤矿挖掘 XP；
-- caves / biome-dependent vanilla ore distribution；
-- hunger / food / farming。
+7. Minecraft asset source audit 全绿；
+8. branch 对最新 main `behind=0` 且无 review/thread/comment blocker。
 
 ## 后续连续开发顺序
 
-1. **Hunger + food core**：hunger、saturation、exhaustion、regen/starvation，至少 bread/apple/cooked meats；
-2. **Farming phase 1**：seeds/wheat、farmland moisture/irrigation、growth/harvest、bread chain；
-3. **Registry breadth**：stone variants、wood species、slab/stair/fence/door 等通用 block families；
+1. **Farming phase 1**：seeds/wheat、farmland moisture/irrigation、growth/harvest、bread chain；
+2. **Hunger phase 2**：use-duration/eating animation、status effects、difficulty/gamerule boundary、server-authoritative hunger；
+3. **Registry breadth**：stone variants、wood species、slab/stair/fence/door 等通用 families；
 4. **Worldgen**：biomes → caves/aquifers → ores/features → structures；
 5. server-authoritative PvE/XP 与 durable persistence。
 
@@ -92,7 +91,7 @@ terrain v3 是有意的生成版本升级。多人 server world-info 仍使用 w
 
 - 只认 exact-head CI；
 - `PROJECT_BASELINE.md` 只写 merged main；
-- feature matrix 可以写清楚标注的 projected PR state；
 - source asset availability ≠ runtime implementation；
 - gameplay pure rules、browser presentation、server authority 分层；
-- 内容扩张不能破坏历史 starter/network/persistence compatibility contract。
+- persistence / terrain version / starter slots / network state 都是兼容性表面；
+- 不通过降低测试或静默 client authority 来换绿色门禁。
