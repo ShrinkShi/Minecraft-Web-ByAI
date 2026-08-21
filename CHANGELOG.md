@@ -2,40 +2,48 @@
 
 ## [Unreleased]
 
-> 2026-08-21 documentation baseline: `main` includes PR #123 at `643310e636f8915bc35ec4803777c12b1a147ad0`; PR #124 is the active unmerged presentation/audio repair delivery. Detailed roadmap truth lives in `docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md`, merged facts in `docs/PROJECT_BASELINE.md`, and active status in `docs/PROGRESS.md`.
+> 2026-08-21 merged baseline: `main 6159b9f47a54bf7e3610897c55f1ee1fdbf6ed7d` includes PR #124. PR #125 is the active unmerged iron-armor delivery. Merged facts live in `docs/PROJECT_BASELINE.md`; projected parity in `docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md`.
+
+### 2026-08-21 — PR #125 iron armor progression and durability
+
+- 新增 source-backed Java 1.20.1 iron helmet/chestplate/leggings/boots 与四个 vanilla Workbench recipes；projected boundary 44 runtime item IDs / 18 recipes。
+- 铁甲数值：helmet 2/165、chestplate 6/240、leggings 5/225、boots 2/195；full set 15 armor points。
+- leather armor 恢复 55/80/75/65 durability，使现有皮甲也进入 generic armor-wear contract。
+- 护甲减伤从旧固定 `armorPoints × 4%` 近似改为 damage-dependent Java-style formula；当前 leather/iron toughness 为 0，未来 diamond/netherite 复用同一扩展点。
+- `Equipment` snapshot/restore/click/swap/unequip/drain 保留 item-stack `damage`；local + authoritative Equipment 支持磨损与损坏。
+- 新增 singleplayer applied-damage armor bridge：hostile/projectile/explosion 只有真实 `applied` 伤害才磨甲，致死一击先磨甲再死亡清理，drowning 不磨甲。
+- authoritative PvP 使用受击前装备计算减伤，成功伤害后磨甲并复制 Equipment revision，再执行 death cleanup。
+- `/give minecraft:<registered_item_id>` 改为 runtime registry-driven namespace resolution，减少新增物品时的手写 alias 耦合。
+- 为保持兼容，iron armor 不加入历史 `CREATIVE_START`，避免挪动既有 Furnace/其他 starter slots；仍可正常合成和 `/give`。
+- 新增/扩展 Node、real WebSocket two-client 与 Chromium armor regressions，覆盖配方、canonical PNG decode、装备/HUD、damage metadata、wear/break/revision 和 PvP replication。
+- CI finding closure：修复 namespace `/give`、旧 Equipment test double 契约和 starter-slot compatibility 冲突，不通过降低生产校验绕过。
 
 ### 2026-08-21 — PR #124 view / Workbench / gameplay-audio repair
 
-- 修正 wide Steve 第三人称肢体物理侧：yaw=0 面向 -Z 时 `rightArm/rightLeg` 位于 +X，`leftArm/leftLeg` 位于 -X；primary/use 继续驱动语义正确的 `rightArm`。
-- 修正第一人称 source-backed Steve 右臂 base/sleeve/held-item anchor 的 shoulder→hand 几何方向，解决手臂上下/朝向反置。
-- Workbench 不再叠 legacy generic grey panel；新增 canonical Java 1.20.1 `textures/gui/container/crafting_table.png` logical asset，按 2× 像素尺寸使用 352×332 panel 与 fixed 3×3/result/inventory/hotbar coordinates。
-- local grounded footsteps 从过密的 0.55-block cadence 调整为 1.6-block horizontal distance cadence；flying/spectator/airborne/swimming/teleport-sized movement 继续 reset/suppress。
-- `SingleplayerMiningController` 新增约 200 ms mining-hit semantic cadence；新 target 首 hit 立即触发、target switch 重启、creative instant break 不进入 survival hit loop。
-- 新增 `vanilla-mining-audio` 与 browser event bridge：mining hit 使用当前 block sound type 的 source-backed step variant + Java-style hit profile，并在挖掘过程中提前 fetch break OGG bytes，减少完成破坏时的 cold network delay。
-- 新增当前八种 gameplay mobs（cow/sheep/pig/chicken/zombie/skeleton/creeper/spider）的 source-backed ambient/hurt/death 基线；ambient 7–16 秒稀疏 cadence，hurt/death 不双播。
-- mob voice 使用 24-block local linear attenuation；这是基础 gain attenuation，不声称完整 positional/HRTF parity。
-- 新增 pure regression 与 focused Chromium acceptance：验证 anatomical limb sides、first-person actual Mesh direction、canonical Workbench computed geometry、mining-hit browser bridge 和真实 `原版Minecraft音频文件/` HTTP response。
-- asset audit 明确授权且只授权审计过的 canonical crafting-table GUI direct binding，未通过删除 provenance 校验绕过 CI finding。
+- 修正 wide Steve 第三人称 anatomical limb sides 与第一人称右臂 shoulder→hand 几何方向。
+- Workbench 使用 canonical Java 1.20.1 `textures/gui/container/crafting_table.png`，352×332（2×）fixed coordinates。
+- local footsteps 从 0.55-block 调整到 1.6-block horizontal cadence。
+- survival mining 增加约 200 ms source-backed hit cadence。
+- mining 在挖掘阶段通过 `vanilla-sounds` shared **fetch + decode AudioBuffer cache** 预热 break variants，最终 break 复用 decoded buffer，降低 cold-start latency。
+- 当前 cow/sheep/pig/chicken/zombie/skeleton/creeper/spider 接入 source-backed ambient/hurt/death baseline，并使用简单 24-block local attenuation。
+- focused Chromium acceptance 验证真实 Three.js limb/viewmodel、Workbench computed geometry 与原版 OGG HTTP 路径。
 
 ### 2026-08-21 — PR #122/#123 original audio corpus and tool-action delivery
 
-- PR #122 导入并跟踪单独提供的 Minecraft Java 1.20.1 原版 sound-object corpus、映射/source notes；source availability 与 runtime parity 分开计算。
-- PR #123 新增 source-backed `iron_hoe`、标准/镜像配方、250 durability，以及 `farmland` / `dirt_path` / `stripped_oak_log` states。
-- till / strip / flatten 进入 singleplayer + authoritative server shared semantics；survival 只有成功 world mutation 后 wear，creative no-wear。
-- `item.hoe.till`、`item.axe.strip`、`item.shovel.flatten` 接入真实 Java 1.20.1 OGG。
-- `vanilla-block-audio` 为当前 grass/gravel/stone/sand/wood/glass sound types 接入 source-backed break/place/step；block→block tool mutation、explosion bulk removal、paired bed duplicate ordinary events 有明确抑制规则。
-- stone→iron progression 当前闭环扩展到 iron pickaxe/axe/shovel/sword/hoe；当前边界 40 runtime item IDs、14 recipes。
+- PR #122 导入并跟踪单独提供的 Java 1.20.1 sound-object corpus、mapping/source notes。
+- PR #123 新增 iron hoe、farmland/dirt_path/stripped_oak_log、till/strip/flatten singleplayer + authoritative semantics。
+- `item.hoe.till` / `item.axe.strip` / `item.shovel.flatten` 与 current grass/gravel/stone/sand/wood/glass break/place/step 使用真实 OGG objects。
+- stone→iron current tool/weapon chain扩展到 iron pickaxe/axe/shovel/sword/hoe；boundary 40 IDs / 14 recipes。
 
 ### v0.4 accumulated foundation
 
-- PC/手机输入统一到 `ControlIntentBus`；desktop Pointer Lock 与 mobile touch 共享 gameplay runtime。
-- F5 first/third-person cameras、source-backed first-person viewmodel 与 articulated Steve player model。
-- deterministic browser/server terrain、chunk/mesh Workers、TypedArray/Transferable、bounded chunk streaming/dispose。
-- generic Minecraft blockstate/model resolver/compiler、deterministic model atlas 与 chunk-level opaque/cutout/translucent batching；selected roots 已进入 live runtime。
-- 36-slot Inventory + 9 hotbar、Equipment、2×2/3×3 crafting、Workbench、Furnace、durability、bed/sleep/respawn、oxygen/swimming/weather、XP/death flows。
-- current gameplay mobs：cow/sheep/pig/chicken/zombie/skeleton/creeper/spider，使用 imported Java 1.20.1 texture sheets + reconstructed compatible cuboid geometry。
-- real Node authoritative WebSocket runtime 覆盖 movement/world edits/mining/placement/items/Inventory/Equipment/player crafting/Workbench/Furnace/chat/commands/PvP；PvE/XP/durable persistence 仍是主要 server gaps。
-- strict Java 1.20.1 overall parity planning estimate remains about 35%；registry breadth、worldgen、food/farming、redstone、dimensions、enchanting/brewing 与 broad audio 仍远未完成。
+- unified desktop/mobile controls and first/third-person presentation;
+- deterministic terrain + terrain/mesh Workers + chunk batching/lifecycle;
+- generic Minecraft blockstate/model interpretation for selected roots;
+- Inventory/Equipment/Crafting/Workbench/Furnace/durability/bed/death/oxygen/weather/XP slices;
+- current 8 mobs with source textures and compatible reconstructed geometry;
+- real Node authoritative multiplayer covering movement/world/mining/placement/items/Inventory/Equipment/Crafting/Workbench/Furnace/chat/commands/PvP;
+- strict overall Java 1.20.1 parity planning estimate remains about 35% because registry/worldgen/food/farming/redstone/dimensions/enchanting/brewing remain large gaps.
 
 ## [0.3.0] - 2026-08-11
 

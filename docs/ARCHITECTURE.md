@@ -1,264 +1,150 @@
 # 架构记录
 
-本文描述当前 v0.4 开发线必须继续遵守的边界。Merged `main` 事实见 `PROJECT_BASELINE.md`，Minecraft Java 1.20.1 parity/roadmap 见 `MINECRAFT_1_20_1_FEATURE_MATRIX.md`。
+Merged facts以 `PROJECT_BASELINE.md` 为准；parity/roadmap 见 `MINECRAFT_1_20_1_FEATURE_MATRIX.md`。
 
 ## 核心原则
 
-1. **玩法语义优先，旧 Java 实现细节不是兼容目标。** 复刻行为/资源语义，不复制历史渲染 API、主线程热点或资源泄漏。
-2. **单客户端、多输入适配器。** Desktop/Touch 只产生统一 intent，不分叉 World/Player/Inventory 规则。
-3. **数据优先。** Chunk、network snapshot、Inventory、Equipment、recipe、Furnace、tool/audio rules 尽量为 plain data / TypedArray / pure modules。
-4. **重活离主线程。** Terrain 与 chunk meshing 进 Worker；主线程负责 input/orchestration/Three.js/WebAudio presentation。
-5. **普通体素批处理。** Legacy full-cube 与 interpreted model 都保持 chunk-level batching，禁止一 block 一 Mesh 扩散。
-6. **生命周期显式。** Chunk、weather、mob visuals、bed、projectiles、explosions、audio wrappers/listeners/cache owners 必须可 teardown。
-7. **Client 不伪造 authority。** Multiplayer 中 server-owned movement/world/Inventory/Equipment/Crafting/Furnace/PvP 只从 server result 推进。
-8. **Authority domains 独立 revision/sequence。** Movement、Inventory、Equipment、container、chat、command 不混成全局 revision。
-9. **确定性与可验证性优先。** Browser/server 共用 deterministic rules；资源构建可重建；核心语义进入 Node regression。
-10. **Source-backed 与 implemented 分开。** 文件存在只是 prerequisite；runtime binding + validation 才算 implemented。
-11. **Presentation 不成为 gameplay truth。** CSS、Three.js、WebAudio 只能消费 state/event；不能决定 mining、damage、crafting 或 authority outcome。
-12. **只认 exact-head。** 文档、测试与 CI 证据必须对应最终 branch HEAD。
+1. 复刻 Java 1.20.1 玩法/资源语义，不复制旧 Java/OpenGL 性能问题。
+2. Desktop/Touch 只产生统一 intent，不分叉 gameplay rules。
+3. World/Inventory/Equipment/recipe/Furnace/armor/audio rules 尽量保持 plain data / pure modules。
+4. Terrain/mesh 重活进 Worker；Three.js/WebAudio 只做 presentation。
+5. Multiplayer client 不伪造 server-owned truth。
+6. Inventory、Equipment、containers、movement 等 authority domains 独立 revision/sequence。
+7. Source asset availability 与 runtime implementation 分开。
+8. Chunk/render/audio/browser bridges 必须有明确 lifecycle/dispose。
+9. Seeded worldgen 改动必须走 generator version/compatibility。
+10. Ready/merge 只认最终 exact branch HEAD。
 
-## 总体运行图
+## Runtime boundary
 
 ```text
 DesktopControls ----\
-                     > ControlIntentBus ----> local singleplayer actions
+                     > ControlIntentBus ----> singleplayer orchestration
 MobileControls  ----/                \
                                    MultiplayerMovementSession
                                              |
-                                             v
                                       WebSocket protocol
                                              |
-                                             v
                                   AuthoritativeServerRuntime
                                   /      |        |        \
                               movement  world   state hubs  containers
-                                  |       |        |            |
-                                  +-------+--------+------------+
                                              |
                                   authoritative snapshots/results
                                              |
-                                             v
                                     browser presentation
-
-seed + prompt
-    |
-    +--> shared terrain-generator.js
-            |                    |
-            v                    v
-      browser Worker       ServerTerrainWorld
-            |
-            v
-       mesh-worker.js
-       /      |       \
- legacy   model batches  specials
-                       \
-                  chunk-level Three.js
-
-Minecraft client resources --------------------> asset/model pipeline
-Java 1.20.1 sound-object corpus ---------------> source audio mappings
-                                                   |
-                         +-------------------------+-------------------+
-                         |                         |                   |
-                    tool/block              mining-hit            mob voices
-                         |                         |                   |
-                         +-------------------------+-------------------+
-                                                   |
-                                             browser WebAudio
 ```
 
-## Client runtime composition
+`createClientGameplayRuntime()` owns the browser gameplay object graph and teardown. Browser installers such as vanilla UI/Workbench/mining-audio are presentation bridges, not gameplay state owners.
 
-`createClientGameplayRuntime()` / `ClientGameplayRuntime` 是 browser gameplay object graph 的构造/销毁边界。Singleplayer 与 Multiplayer 复用 World、Player、renderers 和 presentation systems；authority 由外层 session/adapter 决定。
+## Player / Workbench presentation
 
-要求：
-
-- multiplayer 不复制第二套 World/renderer；
-- input adapter 不直接修改 authoritative World/Inventory；
-- UI 不预测 server-owned transaction result；
-- browser-only Three.js/WebAudio 不泄漏进 Node pure rules；
-- runtime dispose 释放自己拥有的 wrapper/listener/renderer。
-
-`browser-bootstrap.js` 只安装页面级 presentation bridges（vanilla UI、Workbench、mining audio、world shell）；这些 installer 不能变成 gameplay state owner。
-
-## Player presentation boundary
-
-### Third-person wide Steve
-
-`player-model-specs.js` 描述 body-part pivots/boxes/UV，`player-model-renderer.js` 只按语义动画部件。
-
-PR #124 固定坐标约束：本地模型 yaw=0 面向 -Z，因此从玩家背后看 anatomical right 是 **+X**：
-
-- `rightArm/rightLeg`：+X；
-- `leftArm/leftLeg`：-X；
-- primary/use 继续驱动 `rightArm`。
-
-不能通过把 animation channel 改到 `leftArm` 来掩盖错误模型坐标。
-
-### First-person viewmodel
-
-`first-person-presentation-rules.js` 保存可测试 transform contract，`first-person-player-presentation.js` 构造 Three.js arm/sleeve/held-item geometry。
-
-PR #124 修正的是 arm 的 shoulder→hand 几何方向，而不是把右手移动到错误屏幕侧。现阶段仍是兼容 viewmodel，不声称精确复现 Java equip progress / attack-strength 全 transform 链。
-
-## Workbench UI boundary
-
-3×3 crafting gameplay/authority 仍由 `CraftingGrid`、`ui.js` 与 multiplayer Workbench channel/server container 管理。
-
-`vanilla-workbench-presentation.js` 只负责视觉：
-
-- logical asset `gui.crafting_table_panel`；
-- canonical Java 1.20.1 `textures/gui/container/crafting_table.png`；
-- 2× panel 352×332；
-- fixed craft/result/inventory/hotbar coordinates。
-
-因此切换 UI 纹理/坐标不会改变 recipe matching、cursor transaction 或 server revision。
+- wide Steve yaw=0 faces -Z; anatomical right is +X;
+- `rightArm/rightLeg` +X, `leftArm/leftLeg` -X;
+- primary/use continues to animate `rightArm`;
+- first-person viewmodel keeps right-side anchor and correct shoulder→hand direction;
+- Workbench visual uses canonical Java 1.20.1 `crafting_table.png` at 2× 352×332 with fixed slots; recipe/authority state remains outside presentation.
 
 ## World / rendering
 
-`terrain-generator.js` 是 browser/server deterministic source；当前 generator v2 仍是简化 16×16×64 terrain，包含 surface/sea/oak tree/simplified iron ore。会改变 seeded bytes 的自然生成内容必须走 terrain compatibility/version。
+`terrain-generator.js` is browser/server deterministic source. Current world remains a simplified 16×16×64 terrain baseline. Any future coal/ore/biome change that changes natural generated bytes must explicitly version compatibility.
 
-`VoxelWorld` 管 chunk request/load/unload、edit overlay、Worker lifecycle、queries/raycast、remesh 与 GPU resource lifecycle。
+Generic blockstate/model pipeline supports selected live roots with parent/texture inheritance, variants/multipart, rotations, uvlock/cull/tint metadata and chunk-level batching. Broad registry, collision/state breadth, animated textures, biome tint and vanilla lighting remain incomplete.
 
-Generic model pipeline 已是 live foundation：resource-id、model parent/texture inheritance、blockstate variants/multipart、element/model rotation、uvlock/cull/tint、deterministic dependency closure/model atlas、chunk-level opaque/cutout/translucent batching。Selected gameplay roots 已接入；broad registry、neighbor-state/collision breadth、animated texture、biome tint仍缺失。
+## Resource / audio boundary
 
-Bed 继续走 paired special renderer；glass 是当前 interpreted translucent acceptance family。
+`MC原版素材assets/` is Java 1.20.1 client texture/model source; `原版Minecraft音频文件/` is the separately supplied sound-object corpus. Direct canonical bindings must be explicit and audited.
 
-## Minecraft resource architecture
-
-`MC原版素材assets.zip` / extracted tree 是 Java 1.20.1 client texture/model source。规则：
-
-- source asset ≠ gameplay support；
-- source 与 derived runtime output 分离；
-- direct canonical binding 必须显式 audit；
-- missing/unsafe/cyclic dependency fail closed；
-- generated output 可重建并 hash/byte 验证。
-
-PR #124 增加 canonical Workbench GUI direct binding。Asset contract 对 item/block/GUI direct paths分别白名单，不允许“只要在原版目录就绕过 runtime boundary”。
-
-## Original audio architecture
-
-PR #122 提供独立 `原版Minecraft音频文件/` Java 1.20.1 sound-object corpus。当前 runtime 只接入一个窄子集。
-
-### Shared block/tool source layer
-
-`vanilla-sounds.js`：
-
-- event → variants；
-- SHA-1 object URL；
-- fetch/decode cache；
-- source event trace；
-- current tool + grass/gravel/stone/sand/wood/glass block families。
-
-当前 Java-style playback profile：
-
-- break/place：`(volume + 1) / 2`，`pitch × 0.8`；
-- normal step：`volume × 0.15`，original pitch。
-
-`vanilla-block-audio.js` 是 local presentation wrapper：ordinary air↔block mutation + player footsteps。PR #124 将 footstep distance cadence 调整为 1.6 blocks，并继续对 flying/spectator/airborne/swimming/teleport-size frame movement reset/suppress。
-
-### Mining audio
-
-Gameplay controller 只产生 semantic hit，不拥有 WebAudio：
+`vanilla-sounds.js` owns current source-backed mappings and shared decoded-buffer cache. PR #124 mining audio now follows:
 
 ```text
 SingleplayerMiningController
-    | onHit / minecraft:mining-hit
-    v
-vanilla-mining-audio-runtime.js
-    v
-vanilla-mining-audio.js
-    |-- source-backed block step variant as hit
-    `-- early fetch current block break variants
+  -> semantic mining-hit
+  -> vanilla-mining-audio-runtime.js
+  -> vanilla-mining-audio.js
+  -> current block hit sound
+  -> prewarm mapped break variants through shared fetch + decode cache
+  -> final break playback reuses cached AudioBuffer when available
 ```
 
-规则：
+Current mob audio stays presentation-only: mob systems emit semantic events, `vanilla-mob-sounds.js` selects source OGG and applies a simple local distance gain. This is not full HRTF/spatial parity.
 
-- survival target acquisition 首 hit 立即；
-- 持续 hit cadence ≈200 ms；
-- target switch 重启；
-- creative instant break 不走 survival hit loop；
-- hit profile = 0.25 volume / 0.5 playbackRate；
-- early break fetch 只降低 cold network latency，不声称完整 decode/preload scheduler。
+## Inventory / item-instance / Equipment
 
-### Mob voice audio
+Layering:
 
-Passive/Hostile mob systems不直接依赖 WebAudio，只通过 `onSound({type,kind,position,...})` 产出 semantic presentation event。
+```text
+items.js            -> static item definitions
+item-stack.js       -> instance normalize/damage/merge
+inventory.js        -> Inventory state
+recipes.js          -> crafting matcher
+equipment.js        -> local Equipment state
+armor-rules.js      -> pure mitigation/wear semantics
+armor-damage-bridge -> applied-damage ordering bridge
+```
 
-`client-gameplay-runtime.js` 把该 event交给 `vanilla-mob-sounds.js`：
+Damageable item state uses instance `damage`; snapshot/cursor/equipment/container operations must preserve it.
 
-- current eight mobs 的 ambient/hurt/death subset；
-- ambient 7–16 s sparse cadence；
-- death 不再与 hurt 双播；
-- local listener 为 24-block linear gain attenuation。
+`CREATIVE_START` is a compatibility contract, not the entire creative registry. New progression content must not silently shift historical starter slots.
 
-这个 attenuation 只是距离增益，不是 Minecraft 完整 positional audio，更不是 HRTF。未来真正 spatial system 应建立 listener/Panner/event bus，而不是继续把坐标逻辑塞进每个 mob system。
+## Armor architecture — PR #125
 
-### Procedural fallback
+Iron and current leather armor share generic Equipment semantics.
 
-`audio-system.js` 暂时保留尚未迁移的 swing/shoot/burn/prime/explosion 等表现事件。它不能被文档称为 source-backed Java audio。
+### Mitigation
 
-### Future multiplayer audio
+`armor-rules.js` replaces the old fixed 4%-per-point approximation with Java-style damage-dependent mitigation. Armor toughness is modeled as an extension point; current leather/iron have toughness 0. Diamond/netherite should add toughness through the same rule instead of creating tier-specific branches.
 
-Authoritative replicated edits、remote players/mobs 未来应通过明确 network sound/presentation event channel 接入。不得为了“让 wrapper 响”而在客户端伪造 world mutation。
+### Wear
 
-## Inventory / items / progression
+`armorDurabilityDamage(rawDamage)` computes the per-piece durability cost for a successful armor-relevant hit. Local and server Equipment own item mutation/break behavior.
 
-`items.js`（definitions）、`item-stack.js`（instance state）、`inventory.js`（container）、`equipment.js`（equipment domain）、`recipes.js`（matcher）保持分层。
+Singleplayer ordering:
 
-- damageable item 使用 instance `damage`；
-- mining effectiveness 与 harvest eligibility 分开；
-- melee profile 与 wear 分开；
-- multiplayer transaction只发 intent，replacement state由 server 返回。
+```text
+raw hostile/projectile/explosion damage
+ -> main computes armor mitigation from pre-hit equipment
+ -> player.takeDamage(...)
+ -> only if result.applied === true
+ -> armor-damage-bridge calls equipment.damageArmor(rawDamage)
+ -> main continues save/HUD/death cleanup
+```
 
-当前 progression through main #123：wood/stone/iron pickaxes，wood/stone/iron swords，iron axe/shovel/hoe，raw iron/Furnace/iron ingot chain。Iron armor 尚未实现。
+This ensures hurt-cooldown/rejected hits do not wear armor and lethal hits wear armor before death drain. Drowning bypasses the bridge.
 
-## Tool secondary actions
+Authoritative PvP ordering:
 
-- browser-neutral `tool-secondary-actions.js` 描述 till/strip/flatten legal mutation；
-- server `tool-secondary-action-rules.mjs` 对齐语义；
-- world mutation 与 tool wear 分开；
-- survival commit 后 wear；creative no-wear；
-- block→block mutation不被 ordinary block-audio 识别为 break+place。
+```text
+pre-hit Equipment -> armor points
+ -> combat state applies mitigated damage
+ -> if applied: Equipment.damageArmor(rawDamage)
+ -> replicate Equipment revision
+ -> replicate combat / knockback
+ -> if dead: death cleanup drains remaining equipment
+```
 
-未来扩展 broad registry 继续走 data/rules，不在 `main.js` 堆 item-specific branches。
+Missing `damageArmor()` on an authoritative Equipment implementation is a contract error, not something production code should silently ignore.
 
-## Furnace / block entities
+## Multiplayer authority
 
-Furnace 已有共享 3-slot processing core、fuel/cook timers、stored XP bookkeeping、singleplayer persistence 与 multiplayer authoritative viewers/revisions。
+Current server-owned domains: session/input, movement/collision, world edits, mining/placement/secondary actions, ground items, Inventory/item damage, Equipment, crafting/Workbench, Furnace, chat/commands and PvP.
 
-仍缺 durable server storage、server-owned XP extraction、facing/lit parity、loaded-chunk scheduling、broad recipes/fuels、hopper automation。Chest/barrel 需要 generic durable block-entity storage，不能复制 transient Workbench。
-
-## Entities / PvE authority
-
-当前八类 mob 使用 EntityStore/SpatialHash + local low-frequency AI。Gameplay state/hitbox、model texture/geometry、sound presentation保持分层。
-
-**mob/PvE/projectile/explosion 仍不是 multiplayer server-authoritative domain。** 迁移时 server 应拥有 identity/spawn/AI/navigation/combat/projectile/explosion/loot/XP，browser 只消费 snapshots/events并复用 renderer/audio presentation。
-
-## Multiplayer authority domains
-
-当前 server-owned：session/handshake/input validation、movement/collision、player snapshots、world edits、mining/placement、till/strip/flatten、ground items、Inventory/cursor/item damage、Equipment、2×2 crafting、Workbench、Furnace、chat/commands、PvP HP/melee/armor/knockback/death/respawn。
-
-跨域 transaction 显式验证 involved revisions并原子提交。
-
-尚未 server-owned：mobs/PvE/projectiles/explosions、XP/levels、durable persistence/account/product layers、广泛 replicated sound events。
+Still client/singleplayer-owned or incomplete: mobs/PvE/projectiles/explosions, XP/levels, durable persistence, accounts/rooms/reconnect and broad sound-event replication.
 
 ## Persistence
 
-Singleplayer IndexedDB 保存 deterministic base 之外的 edit overlay 与当前 player/world/Inventory/Equipment/Furnace state；generated chunks 不整块持久化。
+Singleplayer IndexedDB stores edit overlay plus player/world/Inventory/Equipment/Furnace state. Equipment snapshots now must preserve damageable armor metadata.
 
-Multiplayer 当前主要是 process runtime state。未来 durable server storage应有独立 versioned world/player/block-entity schema，不复用 browser IndexedDB。
+Multiplayer remains mainly process runtime state; future durable storage must use a dedicated versioned server schema rather than browser IndexedDB concepts.
 
-## Quality gates
+## Quality gate
 
-Feature delivery只认最终 exact branch HEAD：
+Every feature delivery requires:
 
-1. Node/JavaScript syntax；
-2. auto-discovered logic/Worker/server regressions；
-3. two Chromium shards；
-4. affected asset/source/generated audits；
-5. browser integration for Three.js/CSS/WebAudio/HTTP boundaries；
-6. base drift + review/thread/comment surface；
-7. docs/matrix 与代码一致；
-8. Ready 前 exact head 全绿。
-
-PR #124 特别要求 browser直接验证 anatomical limb sides、first-person actual Mesh transforms、Workbench computed geometry、mining-hit event bridge 与 source sound-object HTTP response，而不是只检查字符串或 mock。
+1. Node syntax;
+2. all auto-discovered logic/server/Worker regressions;
+3. two Chromium shards;
+4. affected resource/provenance audits;
+5. browser acceptance for Three.js/CSS/WebAudio/HTTP boundaries;
+6. base drift + reviews/threads/comments check;
+7. docs/matrix aligned with final code;
+8. exact-head green before Ready/merge.
