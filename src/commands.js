@@ -15,6 +15,7 @@ export const ITEM_ALIASES={
 };
 
 const num=(value,current)=>value==='~'?current:value?.startsWith('~')?current+Number(value.slice(1)||0):Number(value);
+const commandItemId=value=>{const alias=String(value||'').toLowerCase();if(ITEM_ALIASES[alias])return ITEM_ALIASES[alias];const vanilla=alias.startsWith('minecraft:')?alias.slice('minecraft:'.length):alias;return ITEMS[vanilla]?vanilla:alias;};
 
 export function executeCommand(text,ctx){
   const raw=text.trim();if(!raw.startsWith('/'))return{ok:true,message:`<玩家> ${raw}`,chat:true};
@@ -24,7 +25,7 @@ export function executeCommand(text,ctx){
     ctx.setMode(mode);return ok(`已将游戏模式切换为 ${mode}`);
   }
   if(name==='give'){
-    const alias=(parts[0]||'').toLowerCase(),itemId=ITEM_ALIASES[alias]||alias,count=Math.max(1,Math.min(2304,Number(parts[1]||1)|0));
+    const alias=(parts[0]||'').toLowerCase(),itemId=commandItemId(alias),count=Math.max(1,Math.min(2304,Number(parts[1]||1)|0));
     if(!ITEMS[itemId])return fail(`未知物品：${alias}`);
     const remaining=ctx.inventory.add(itemId,count);ctx.inventoryChanged();return ok(`给予 ${ITEMS[itemId].name} × ${count-remaining}${remaining?`（背包已满，剩余 ${remaining}）`:''}`);
   }
