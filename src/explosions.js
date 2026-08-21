@@ -15,9 +15,9 @@ export class ExplosionSystem{
     const minX=Math.floor(position.x-radius),maxX=Math.floor(position.x+radius),minY=Math.max(0,Math.floor(position.y-radius)),maxY=Math.floor(position.y+radius),minZ=Math.floor(position.z-radius),maxZ=Math.floor(position.z+radius);
     for(let x=minX;x<=maxX;x++)for(let y=minY;y<=maxY;y++)for(let z=minZ;z<=maxZ;z++){
       const id=this.world.getBlock(x,y,z),def=BLOCKS[id];if(!def?.solid)continue;const dx=x+.5-position.x,dy=y+.5-position.y,dz=z+.5-position.z,distance=Math.hypot(dx,dy,dz);if(!explosionDestroysBlock(distance,radius,def.hardness||0))continue;
-      if(!this.world.setBlock(x,y,z,0))continue;destroyed++;
+      if(!this.world.setBlock(x,y,z,0,{sound:false}))continue;destroyed++;
       if(isBedBlock(id)){
-        const partner=bedPartner({x,y,z},id);if(partner&&this.world.getBlock(partner.x,partner.y,partner.z)===partner.id&&this.world.setBlock(partner.x,partner.y,partner.z,0))destroyed++;
+        const partner=bedPartner({x,y,z},id);if(partner&&this.world.getBlock(partner.x,partner.y,partner.z)===partner.id&&this.world.setBlock(partner.x,partner.y,partner.z,0,{sound:false}))destroyed++;
       }
       this.onBlockDestroyed({id,block:def,position:{x,y,z},explosion:{x:position.x,y:position.y,z:position.z,radius}});
     }

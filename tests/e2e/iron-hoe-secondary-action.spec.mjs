@@ -1,6 +1,8 @@
 import {test,expect} from '@playwright/test';
 import {createSingleplayerWorld} from './helpers/world-flow.mjs';
 
+const TILL_SOUND_HASHES=['0e6696ec35c5f4982cad6a6731edcffb11728aa9','46dd1e5e0f90bb72261e2986d530e80e8fc50560','cb95637a9d5e9b0cb36a2516f0dfac30fed9d720'];
+
 async function runCommand(page,text){
   await page.evaluate(()=>window.dispatchEvent(new KeyboardEvent('keydown',{code:'Slash',bubbles:true})));
   await expect(page.locator('#chat-input-wrap')).not.toHaveClass(/hidden/);
@@ -70,10 +72,7 @@ test('iron ingots craft an iron hoe whose real till action costs durability and 
   const grass=await page.evaluate(()=>globalThis.__minecraftE2E?.prepareSingleplayerMiningTarget?.(1)||null);
   expect(grass).not.toBeNull();
   await page.evaluate(()=>globalThis.__minecraftE2E?.setLook?.(0,0));
-  const originalSoundResponse=page.waitForResponse(response=>{
-    try{return response.status()===200&&decodeURIComponent(response.url()).includes('/原版Minecraft音频文件/');}
-    catch{return false;}
-  },{timeout:5_000});
+  const originalSoundResponse=page.waitForResponse(response=>response.status()===200&&TILL_SOUND_HASHES.some(hash=>response.url().includes(hash)),{timeout:5_000});
   await useTarget(page);
   const response=await originalSoundResponse;
   expect((await response.body()).byteLength).toBeGreaterThan(4_000);
