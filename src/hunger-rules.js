@@ -6,6 +6,7 @@ export const SATURATED_REGEN_INTERVAL_SECONDS=.5;
 export const NATURAL_REGEN_INTERVAL_SECONDS=4;
 export const STARVATION_INTERVAL_SECONDS=4;
 export const NORMAL_STARVATION_FLOOR_HP=1;
+export const SPRINT_FOOD_THRESHOLD=6;
 
 const finite=(value,label)=>{if(typeof value!=='number'||!Number.isFinite(value))throw new TypeError(`${label} must be a finite number`);return value;};
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
@@ -30,6 +31,7 @@ export function movementExhaustion(distance,{sprinting=false,swimming=false}={})
   if(swimming)return distance*.01;if(sprinting)return distance*.1;return 0;
 }
 
+export function canSprintWithHunger(food,mode='survival'){mode=modeValue(mode);food=clamp(finite(food,'food'),0,MAX_FOOD_LEVEL);return mode!=='survival'||food>SPRINT_FOOD_THRESHOLD;}
 export function jumpExhaustion({sprinting=false}={}){return sprinting===true ? .2 : .05;}
 export function attackExhaustion(){return .1;}
 export function damageExhaustion(){return .1;}
@@ -52,7 +54,7 @@ export function consumeFood(value,profile){
 
 function drainExhaustion(state){
   let {food,saturation,exhaustion,timer}=state,changed=false;
-  while(exhaustion>EXHAUSTION_THRESHOLD){
+  if(exhaustion>EXHAUSTION_THRESHOLD){
     exhaustion-=EXHAUSTION_THRESHOLD;changed=true;
     if(saturation>0)saturation=Math.max(0,saturation-1);
     else if(food>0)food=Math.max(0,food-1);
@@ -77,6 +79,5 @@ export function stepHunger(value,{dt,hp,maxHp=20,mode='survival',naturalRegenera
     while(timer>=STARVATION_INTERVAL_SECONDS&&hp-damage>starvationFloorHp){damage+=Math.min(1,hp-damage-starvationFloorHp);timer-=STARVATION_INTERVAL_SECONDS;changed=true;}
   }else timer=0;
   if(timer!==state.timer){state=createHungerState({...state,timer});changed=true;}
-  const postDrain=drainExhaustion(state);state=postDrain.state;changed=changed||postDrain.changed;
   return Object.freeze({state,heal,damage,changed});
 }

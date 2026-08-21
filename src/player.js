@@ -4,7 +4,7 @@ import {applyDamage,knockbackDirection} from './combat.js';
 import {normalizeControlState,registerControlActionInterceptor} from './control-intents.js';
 import {lookDirectionFromYawPitch} from './player-orientation-rules.js';
 import {planPlayerMotionStep} from './player-motion-rules.js';
-import {addHungerExhaustion,attackExhaustion,consumeFood,createHungerState,damageExhaustion,jumpExhaustion,movementExhaustion,stepHunger as stepHungerRules} from './hunger-rules.js';
+import {addHungerExhaustion,attackExhaustion,canSprintWithHunger,consumeFood,createHungerState,damageExhaustion,jumpExhaustion,movementExhaustion,stepHunger as stepHungerRules} from './hunger-rules.js';
 import {PlayerModelFactory} from './player-model-renderer.js';
 import {
   PLAYER_COLLISION_RADIUS,
@@ -100,9 +100,9 @@ export class PlayerController{
   update(dt){
     const startX=this.position.x,startZ=this.position.z;
     this.swimCoverage=this.flying?0:this.waterCoverage();
-    const jumpProbe=!this.flying&&this.swimCoverage===0&&this.controlState.jump&&this.isGroundedProbe();
-    if(this.mode==='survival'&&jumpProbe)this.addExhaustion(jumpExhaustion({sprinting:this.controlState.sprint&&this.controlState.forward>0}));
-    const motion=planPlayerMotionStep({dt,yaw:this.yaw,control:this.controlState,velocity:this.velocity,flying:this.flying,swimCoverage:this.swimCoverage,grounded:jumpProbe,walkSpeed:this.walk,sprintSpeed:this.sprint});
+    const jumpProbe=!this.flying&&this.swimCoverage===0&&this.controlState.jump&&this.isGroundedProbe(),sprintAllowed=canSprintWithHunger(this.hunger,this.mode),motionControl=sprintAllowed?this.controlState:{...this.controlState,sprint:false};
+    if(this.mode==='survival'&&jumpProbe)this.addExhaustion(jumpExhaustion({sprinting:motionControl.sprint&&motionControl.forward>0}));
+    const motion=planPlayerMotionStep({dt,yaw:this.yaw,control:motionControl,velocity:this.velocity,flying:this.flying,swimCoverage:this.swimCoverage,grounded:jumpProbe,walkSpeed:this.walk,sprintSpeed:this.sprint});
     this.velocity.set(motion.velocity.x,motion.velocity.y,motion.velocity.z);
     if(this.flying){
       this.moveAxis('x',motion.displacement.x);this.moveAxis('z',motion.displacement.z);this.moveAxis('y',motion.displacement.y);this.velocity.set(0,0,0);
@@ -115,7 +115,7 @@ export class PlayerController{
       this.velocity.x*=motion.horizontalDrag;this.velocity.z*=motion.horizontalDrag;
       if(this.position.y<-10){this.hp=0;this.setDeathVisual(true);}
     }
-    if(this.mode==='survival'){const distance=Math.hypot(this.position.x-startX,this.position.z-startZ),amount=movementExhaustion(distance,{sprinting:this.controlState.sprint&&Math.hypot(this.controlState.forward,this.controlState.side)>0,swimming:this.swimCoverage>0});if(amount>0)this.addExhaustion(amount);}
+    if(this.mode==='survival'){const distance=Math.hypot(this.position.x-startX,this.position.z-startZ),amount=movementExhaustion(distance,{sprinting:motionControl.sprint&&Math.hypot(motionControl.forward,motionControl.side)>0,swimming:this.swimCoverage>0});if(amount>0)this.addExhaustion(amount);}
     this.syncCamera();this.updateVisual(dt);
   }
 

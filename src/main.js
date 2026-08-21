@@ -241,7 +241,7 @@ ui.chatInput.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Esca
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 function primaryActionStart(){
   if(sessionKind==='multiplayer'){ui.showToast('联机方块/战斗权威尚未接入');return;}if(!canControl()||!player||player.mode==='spectator')return;const entityHit=aimEntity(),blockHit=aim();
-  if(entityHit&&(!blockHit||entityHit.distance<=blockHit.distance)){const now=performance.now(),selected=ui.selectedItem(),profile=meleeProfile(selected?.id||null);singleplayerMining.cancel();selectedTarget=null;if(player.mode!=='creative'&&!canAttack(lastAttackAt,now,profile.attackIntervalMs))return;lastAttackAt=now;const damage=player.mode==='creative'?100:profile.damage,result=entityHit.system.hurt(entityHit.entity,damage,player.position,now);if(result?.applied&&player.mode==='survival')player.recordAttackExhaustion();if(result?.applied&&player.mode!=='creative'&&selected&&profile.durabilityCost>0){const wear=inventory?.damageAt(HOTBAR_START+ui.selected,selected.id,profile.durabilityCost);if(wear?.changed){markSaveDirty();if(wear.broken)ui.showToast(`${ITEMS[selected.id]?.name||selected.id} 已损坏`);}}return;}
+  if(entityHit&&(!blockHit||entityHit.distance<=blockHit.distance)){const now=performance.now(),selected=ui.selectedItem(),profile=meleeProfile(selected?.id||null);singleplayerMining.cancel();selectedTarget=null;if(player.mode!=='creative'&&!canAttack(lastAttackAt,now,profile.attackIntervalMs))return;lastAttackAt=now;const damage=player.mode==='creative'?100:profile.damage,result=entityHit.system.hurt(entityHit.entity,damage,player.position,now);if(result?.applied&&player.mode==='survival'){const exhaustionBefore=player.exhaustion;player.recordAttackExhaustion();if(player.exhaustion!==exhaustionBefore)markSaveDirty();}if(result?.applied&&player.mode!=='creative'&&selected&&profile.durabilityCost>0){const wear=inventory?.damageAt(HOTBAR_START+ui.selected,selected.id,profile.durabilityCost);if(wear?.changed){markSaveDirty();if(wear.broken)ui.showToast(`${ITEMS[selected.id]?.name||selected.id} 已损坏`);}}return;}
   if(player.mode!=='adventure')singleplayerMining.start(performance.now());
 }
 function primaryActionEnd(){singleplayerMining.cancel();selectedTarget=null;}
@@ -302,7 +302,7 @@ function animate(now){
   if(running&&!paused&&player&&!deathState){
     if(sessionKind==='multiplayer')updateMultiplayer(dt);
     else{
-      if(!ui.hasOpenPanel()&&!ui.isChatOpen())player.update(dt);
+      if(!ui.hasOpenPanel()&&!ui.isChatOpen()){const exhaustionBefore=player.exhaustion;player.update(dt);if(player.exhaustion!==exhaustionBefore)markSaveDirty();}
       if(player.hp<=0)beginPlayerDeath(player.position.y<-10?'你掉入了虚空':'你死了');
       if(!deathState){
         world.ensureAround(player.position.x,player.position.z);interaction(now);updateSurvival(dt);updateOxygen(dt,now);
