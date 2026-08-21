@@ -4,7 +4,11 @@ import {normalizeItemStack} from './item-stack.js';
 const recipe=(input,output,{cookTicks=200,experience=0}={})=>Object.freeze({input,output,count:1,cookTicks,experience});
 
 export const SMELTING_RECIPES=Object.freeze({
-  raw_iron:recipe('raw_iron','iron_ingot',{cookTicks:200,experience:.7})
+  raw_iron:recipe('raw_iron','iron_ingot',{cookTicks:200,experience:.7}),
+  raw_beef:recipe('raw_beef','cooked_beef',{cookTicks:200,experience:.35}),
+  raw_mutton:recipe('raw_mutton','cooked_mutton',{cookTicks:200,experience:.35}),
+  raw_porkchop:recipe('raw_porkchop','cooked_porkchop',{cookTicks:200,experience:.35}),
+  raw_chicken:recipe('raw_chicken','cooked_chicken',{cookTicks:200,experience:.35})
 });
 
 export const FURNACE_FUELS=Object.freeze({

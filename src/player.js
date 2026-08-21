@@ -4,6 +4,7 @@ import {applyDamage,knockbackDirection} from './combat.js';
 import {normalizeControlState,registerControlActionInterceptor} from './control-intents.js';
 import {lookDirectionFromYawPitch} from './player-orientation-rules.js';
 import {planPlayerMotionStep} from './player-motion-rules.js';
+import {addHungerExhaustion,attackExhaustion,canSprintWithHunger,consumeFood,createHungerState,damageExhaustion,jumpExhaustion,movementExhaustion,stepHunger as stepHungerRules} from './hunger-rules.js';
 import {PlayerModelFactory} from './player-model-renderer.js';
 import {
   PLAYER_COLLISION_RADIUS,
@@ -21,7 +22,7 @@ export class PlayerController{
     this.camera=camera;this.canvas=canvas;this.world=world;this.scene=scene;
     this.position=new THREE.Vector3(0,40,0);this.velocity=new THREE.Vector3();
     this.yaw=0;this.pitch=0;this.controlState=normalizeControlState();this.grounded=false;this.flying=false;this.viewMode=0;this.swimCoverage=0;
-    this.mode='survival';this.hp=20;this.hunger=20;this.saturation=5;this.hurtUntil=-Infinity;
+    this.mode='survival';this.hp=20;this.hunger=20;this.saturation=5;this.exhaustion=0;this.foodTickTimer=0;this.hurtUntil=-Infinity;
     this.eye=PLAYER_EYE_HEIGHT;this.height=PLAYER_COLLISION_HEIGHT;this.radius=PLAYER_COLLISION_RADIUS;this.walk=4.3;this.sprint=5.6;
     this.playerModelFactory=null;this.avatarVisual=null;this.visualDead=false;this.avatar=this.createAvatar();
     this.releaseVisualActionInterceptor=registerControlActionInterceptor(intent=>{if(intent?.name==='secondary')this.triggerUseAnimation();});
@@ -43,7 +44,7 @@ export class PlayerController{
   setDeathVisual(value){this.visualDead=!!value;return this.visualDead;}
 
   spawn(x,z){const y=this.world.highestSolid(x,z)+1.001;this.position.set(x+.5,y,z+.5);this.velocity.set(0,0,0);this.swimCoverage=0;this.syncCamera();}
-  resetVitals(){this.hp=20;this.hunger=20;this.saturation=5;this.hurtUntil=-Infinity;this.setDeathVisual(false);}
+  resetVitals(){this.hp=20;this.hunger=20;this.saturation=5;this.exhaustion=0;this.foodTickTimer=0;this.hurtUntil=-Infinity;this.setDeathVisual(false);}
   respawn(x=0,z=0){this.resetVitals();this.spawn(x,z);}
   respawnAt(position){
     if(!position||![position.x,position.y,position.z].every(Number.isFinite))return false;const next=new THREE.Vector3(position.x,position.y,position.z);
@@ -53,15 +54,23 @@ export class PlayerController{
   restore(snapshot){
     if(!snapshot)return false;const p=snapshot.position;if(!p||![p.x,p.y,p.z].every(Number.isFinite))return false;
     this.position.set(p.x,p.y,p.z);this.velocity.set(0,0,0);this.swimCoverage=0;this.yaw=Number.isFinite(snapshot.yaw)?snapshot.yaw:0;this.pitch=Number.isFinite(snapshot.pitch)?snapshot.pitch:0;
-    this.hp=Number.isFinite(snapshot.hp)?Math.max(0,Math.min(20,snapshot.hp)):20;this.hunger=Number.isFinite(snapshot.hunger)?Math.max(0,Math.min(20,snapshot.hunger)):20;this.saturation=Number.isFinite(snapshot.saturation)?Math.max(0,Math.min(20,snapshot.saturation)):5;this.hurtUntil=-Infinity;this.setDeathVisual(this.hp<=0);
+    this.hp=Number.isFinite(snapshot.hp)?Math.max(0,Math.min(20,snapshot.hp)):20;this.applyHungerState({food:Number.isFinite(snapshot.hunger)?snapshot.hunger:20,saturation:Number.isFinite(snapshot.saturation)?snapshot.saturation:5,exhaustion:Number.isFinite(snapshot.exhaustion)?snapshot.exhaustion:0,timer:Number.isFinite(snapshot.foodTickTimer)?snapshot.foodTickTimer:0});this.hurtUntil=-Infinity;this.setDeathVisual(this.hp<=0);
     this.viewMode=Number.isInteger(snapshot.viewMode)?((snapshot.viewMode%3)+3)%3:0;if(this.collides(this.position)&&this.mode!=='spectator')return false;this.syncCamera();return true;
   }
 
-  snapshot(){return{position:{x:this.position.x,y:this.position.y,z:this.position.z},yaw:this.yaw,pitch:this.pitch,hp:this.hp,hunger:this.hunger,saturation:this.saturation,mode:this.mode,viewMode:this.viewMode};}
+  snapshot(){return{position:{x:this.position.x,y:this.position.y,z:this.position.z},yaw:this.yaw,pitch:this.pitch,hp:this.hp,hunger:this.hunger,saturation:this.saturation,exhaustion:this.exhaustion,foodTickTimer:this.foodTickTimer,mode:this.mode,viewMode:this.viewMode};}
+
+  hungerState(){return createHungerState({food:this.hunger,saturation:this.saturation,exhaustion:this.exhaustion,timer:this.foodTickTimer});}
+  applyHungerState(value){const state=createHungerState(value);this.hunger=state.food;this.saturation=state.saturation;this.exhaustion=state.exhaustion;this.foodTickTimer=state.timer;return state;}
+  addExhaustion(amount){if(this.mode!=='survival')return this.hungerState();return this.applyHungerState(addHungerExhaustion(this.hungerState(),amount));}
+  recordAttackExhaustion(){return this.addExhaustion(attackExhaustion());}
+  eat(profile){const result=consumeFood(this.hungerState(),profile);if(result.consumed)this.applyHungerState(result.state);return result;}
+  stepHunger(dt){const result=stepHungerRules(this.hungerState(),{dt,hp:this.hp,maxHp:20,mode:this.mode});this.applyHungerState(result.state);if(result.heal>0)this.hp=Math.min(20,this.hp+result.heal);if(result.damage>0){this.hp=Math.max(0,this.hp-result.damage);if(this.hp<=0)this.setDeathVisual(true);}return result;}
 
   takeDamage(amount,now,source=null){
     if(this.mode==='creative'||this.mode==='spectator')return{applied:false,damage:0,hp:this.hp,dead:false};
     const result=applyDamage(this,amount,now,{maxHp:20});
+    if(result.applied)this.addExhaustion(damageExhaustion());
     if(result.applied&&source&&Number.isFinite(source.x)&&Number.isFinite(source.z))this.knockbackFrom(source.x,source.z,.52,.24);
     if(result.dead)this.setDeathVisual(true);
     return result;
@@ -89,9 +98,11 @@ export class PlayerController{
   }
 
   update(dt){
+    const startX=this.position.x,startZ=this.position.z;
     this.swimCoverage=this.flying?0:this.waterCoverage();
-    const jumpProbe=!this.flying&&this.swimCoverage===0&&this.controlState.jump&&this.isGroundedProbe();
-    const motion=planPlayerMotionStep({dt,yaw:this.yaw,control:this.controlState,velocity:this.velocity,flying:this.flying,swimCoverage:this.swimCoverage,grounded:jumpProbe,walkSpeed:this.walk,sprintSpeed:this.sprint});
+    const jumpProbe=!this.flying&&this.swimCoverage===0&&this.controlState.jump&&this.isGroundedProbe(),sprintAllowed=canSprintWithHunger(this.hunger,this.mode),motionControl=sprintAllowed?this.controlState:{...this.controlState,sprint:false};
+    if(this.mode==='survival'&&jumpProbe)this.addExhaustion(jumpExhaustion({sprinting:motionControl.sprint&&motionControl.forward>0}));
+    const motion=planPlayerMotionStep({dt,yaw:this.yaw,control:motionControl,velocity:this.velocity,flying:this.flying,swimCoverage:this.swimCoverage,grounded:jumpProbe,walkSpeed:this.walk,sprintSpeed:this.sprint});
     this.velocity.set(motion.velocity.x,motion.velocity.y,motion.velocity.z);
     if(this.flying){
       this.moveAxis('x',motion.displacement.x);this.moveAxis('z',motion.displacement.z);this.moveAxis('y',motion.displacement.y);this.velocity.set(0,0,0);
@@ -104,6 +115,7 @@ export class PlayerController{
       this.velocity.x*=motion.horizontalDrag;this.velocity.z*=motion.horizontalDrag;
       if(this.position.y<-10){this.hp=0;this.setDeathVisual(true);}
     }
+    if(this.mode==='survival'){const distance=Math.hypot(this.position.x-startX,this.position.z-startZ),amount=movementExhaustion(distance,{sprinting:motionControl.sprint&&Math.hypot(motionControl.forward,motionControl.side)>0,swimming:this.swimCoverage>0});if(amount>0)this.addExhaustion(amount);}
     this.syncCamera();this.updateVisual(dt);
   }
 

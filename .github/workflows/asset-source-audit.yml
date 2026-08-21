@@ -5,6 +5,8 @@ on:
     paths:
       - 'MC原版素材assets/**'
       - 'assets/**'
+      - 'src/asset-manifest.js'
+      - 'scripts/check-asset-manifest.mjs'
       - 'tools/audit-minecraft-assets.py'
       - 'tools/import-minecraft-assets.py'
       - 'tools/build-minecraft-runtime-assets.py'

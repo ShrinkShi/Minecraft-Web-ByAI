@@ -1,12 +1,12 @@
-# Project Baseline — 2026-08-21
+# Project Baseline — 2026-08-22
 
 This document records **merged `main` only**. Open PR work is excluded from merged facts.
 
 ## Authority
 
 - Branch: `main`
-- Commit: `6159b9f47a54bf7e3610897c55f1ee1fdbf6ed7d`
-- Includes merged PRs through **#124**.
+- Commit: `3961c7ff6f59dcb5d08542c8a99a8f0b36dfbf29`
+- Includes merged PRs through **#126**.
 - Development line: `v0.4.0-dev`.
 - Strict Minecraft Java 1.20.1 gameplay/content parity remains a planning estimate of about **35%**; engine/authority foundations are much further along than content breadth.
 
@@ -25,9 +25,9 @@ This document records **merged `main` only**. Open PR work is excluded from merg
 
 Current gameplay families/states:
 
-`grass_block`, `dirt`, `stone`, `sand`, `oak_planks`, `oak_log`, `oak_leaves`, `water`, `crafting_table`, `cobblestone`, `red_bed`, `iron_ore`, `glass`, `furnace`, `farmland`, `dirt_path`, `stripped_oak_log`.
+`grass_block`, `dirt`, `stone`, `sand`, `oak_planks`, `oak_log`, `oak_leaves`, `water`, `crafting_table`, `cobblestone`, `red_bed`, `iron_ore`, `coal_ore`, `glass`, `furnace`, `farmland`, `dirt_path`, `stripped_oak_log`.
 
-World generation remains a deterministic browser/server simplified fBm baseline with surface layers, sea/water, oak trees and simplified underground iron ore. Java biome/climate/caves/aquifers/features/structures, expanded vertical range, Nether and End are not implemented.
+World generation remains a deterministic browser/server simplified fBm baseline with surface layers, sea/water, oak trees and simplified underground iron/coal ore. Terrain generator v3 adds coal while singleplayer keeps an explicit v2 path for pre-#126 saves. Java biome/climate/caves/aquifers/features/structures, expanded vertical range, Nether and End are not implemented.
 
 ## Items, crafting and progression
 
@@ -35,12 +35,14 @@ At merged main:
 
 - 36-slot Inventory + 9 hotbar;
 - Equipment head/chest/legs/feet foundation with leather armor;
-- **40 runtime item IDs**;
-- **14 recipes**;
+- **46 runtime item IDs**;
+- **18 recipes**;
 - wooden/stone/iron pickaxes;
 - wooden/stone/iron swords;
 - iron axe/shovel/hoe;
 - raw iron → Furnace → iron ingot;
+- coal ore → coal, with coal as a 1600-tick Furnace fuel;
+- iron helmet/chestplate/leggings/boots with durability and Java-style damage-dependent armor mitigation;
 - till / strip / flatten in singleplayer and authoritative multiplayer;
 - item-instance durability for implemented tools/weapons.
 
@@ -48,7 +50,7 @@ Current stone→iron tool chain:
 
 `stone pickaxe → iron ore → raw iron → Furnace → iron ingot → iron pickaxe / axe / shovel / sword / hoe`
 
-**Iron armor is not merged on this baseline.** It belongs to open PR #125.
+Merged progression now includes the complete implemented iron tool + iron armor chain and the first coal/fuel slice. `CREATIVE_START` remains intentionally stable.
 
 ## Survival / PvE
 
@@ -107,6 +109,6 @@ A green older head never validates a newer head.
 
 ## Active delivery after this baseline
 
-PR #125, `content/v0.4-iron-armor-progression`, expands iron progression into armor and closes armor durability/state gaps. It is intentionally excluded from merged facts until merged.
+PR #127, `feature/hunger-food-core`, is the current open delivery and is intentionally excluded from merged facts. It replaces the placeholder hunger drain with explicit food/saturation/exhaustion rules, consumption and cooked-food progression.
 
-Nearest planned work after #125: coal ore / coal / Furnace fuel with explicit terrain-generator compatibility, then hunger/food/farming breadth, broader registry/worldgen and server-owned PvE/XP/persistence.
+Nearest planned work after #127: farming phase 1, broader registry/worldgen, then server-owned PvE/XP/persistence.
