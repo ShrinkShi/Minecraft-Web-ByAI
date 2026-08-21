@@ -25,7 +25,7 @@ export const ITEMS={
   stone_sword:textured('石剑',1,'item.stone_sword',{attackDamage:5,durability:131,combat:{attackSpeed:1.6,durabilityCost:1}}),
   iron_axe:textured('铁斧',1,'item.iron_axe',{attackDamage:9,combat:{attackSpeed:.9,durabilityCost:2},tool:{kind:'axe',tier:'iron',speed:6,durability:250}}),
   iron_shovel:textured('铁锹',1,'item.iron_shovel',{attackDamage:4.5,combat:{attackSpeed:1,durabilityCost:2},tool:{kind:'shovel',tier:'iron',speed:6,durability:250}}),
-  iron_hoe:textured('铁锄',1,'item.iron_hoe',{tool:{kind:'hoe',tier:'iron',speed:6,durability:250}}),
+  iron_hoe:textured('铁锄',1,'item.iron_hoe',{attackDamage:1,combat:{attackSpeed:3,durabilityCost:2},tool:{kind:'hoe',tier:'iron',speed:6,durability:250}}),
   iron_sword:textured('铁剑',1,'item.iron_sword',{attackDamage:6,durability:250,combat:{attackSpeed:1.6,durabilityCost:1}}),
   raw_iron:textured('粗铁',64,'item.raw_iron'),
   iron_ingot:textured('铁锭',64,'item.iron_ingot'),
