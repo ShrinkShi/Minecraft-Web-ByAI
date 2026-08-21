@@ -112,6 +112,15 @@ export const TOOL_ACTION_SOUND_EVENTS=Object.freeze({
   flatten:'item.shovel.flatten'
 });
 
+export const BLOCK_SOUND_TYPE_PROFILES=Object.freeze({
+  grass:Object.freeze({volume:1,pitch:1}),
+  gravel:Object.freeze({volume:1,pitch:1}),
+  stone:Object.freeze({volume:1,pitch:1}),
+  sand:Object.freeze({volume:1,pitch:1}),
+  wood:Object.freeze({volume:1,pitch:1}),
+  glass:Object.freeze({volume:1,pitch:1})
+});
+
 const blockSoundTypes={
   [BLOCK.GRASS]:'grass',[BLOCK.DIRT]:'gravel',[BLOCK.STONE]:'stone',[BLOCK.SAND]:'sand',
   [BLOCK.PLANKS]:'wood',[BLOCK.LOG]:'wood',[BLOCK.LEAVES]:'grass',[BLOCK.CRAFTING_TABLE]:'wood',
@@ -135,6 +144,13 @@ export function soundEventForBlock(blockId,action){
   if(action!=='break'&&action!=='place'&&action!=='step')return null;
   const soundType=BLOCK_SOUND_TYPES[blockId];
   return soundType?`block.${soundType}.${action}`:null;
+}
+export function blockSoundPlayback(blockId,action){
+  if(action!=='break'&&action!=='place'&&action!=='step')return null;
+  const soundType=BLOCK_SOUND_TYPES[blockId],profile=BLOCK_SOUND_TYPE_PROFILES[soundType];if(!profile)return null;
+  return action==='step'
+    ?Object.freeze({volume:profile.volume*.15,playbackRate:profile.pitch})
+    :Object.freeze({volume:(profile.volume+1)/2,playbackRate:profile.pitch*.8});
 }
 export function vanillaSoundObjectUrl(variant){return new URL(`../原版Minecraft音频文件/${variant.objectPath}`,import.meta.url).href;}
 
@@ -183,8 +199,7 @@ export function playToolSecondaryActionSound(kind,options){
 }
 
 export function playBlockSound(blockId,action,options={}){
-  const eventName=soundEventForBlock(blockId,action);
-  if(!eventName)return Promise.resolve({played:false,reason:'unknown-block-sound',blockId,action});
-  const defaults=action==='step'?{volume:.15}:action==='place'?{volume:1,playbackRate:.8}:{volume:1};
+  const eventName=soundEventForBlock(blockId,action),defaults=blockSoundPlayback(blockId,action);
+  if(!eventName||!defaults)return Promise.resolve({played:false,reason:'unknown-block-sound',blockId,action});
   return playVanillaSoundEvent(eventName,{...defaults,...options});
 }
