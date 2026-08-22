@@ -57,6 +57,8 @@ Survival breaking short grass:
 - failure: no item;
 - creative: no drop through the existing creative mining rule.
 
+Short grass keeps source hardness `0`. The shared mining rule now maps zero-hardness blocks to the engine's minimum survival break duration instead of incorrectly falling back to hardness `1`; negative hardness remains unbreakable. Browser acceptance waits for the pointer-lock control adapter to become active before emitting the first mining input so the test measures gameplay rather than the focus-transition frame.
+
 Fortune changes are deferred until the enchantment system exists. Shears / short-grass item acquisition are also outside this slice, so short grass is not inserted into historical starter inventory slots.
 
 ## Bone meal
