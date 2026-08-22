@@ -14,7 +14,9 @@ export const BLOCK = Object.freeze({
   IRON_ORE:19,GLASS:20,FURNACE:21,
   // Player-created states are append-only and intentionally outside terrain generation.
   FARMLAND:24,DIRT_PATH:25,STRIPPED_OAK_LOG:26,
-  COAL_ORE:27
+  COAL_ORE:27,
+  FARMLAND_MOISTURE_1:28,FARMLAND_MOISTURE_2:29,FARMLAND_MOISTURE_3:30,FARMLAND_MOISTURE_4:31,FARMLAND_MOISTURE_5:32,FARMLAND_MOISTURE_6:33,FARMLAND_MOISTURE_7:34,
+  WHEAT_AGE_0:35,WHEAT_AGE_1:36,WHEAT_AGE_2:37,WHEAT_AGE_3:38,WHEAT_AGE_4:39,WHEAT_AGE_5:40,WHEAT_AGE_6:41,WHEAT_AGE_7:42
 });
 
 export const BLOCKS = {
@@ -50,6 +52,16 @@ export const BLOCKS = {
   // direct canonical texture so the 4x4 terrain atlas does not need resizing.
   27:{name:'煤矿石',solid:true,hardness:3,tiles:[15,15,15],drops:'coal',requires:'pickaxe',effectiveTool:'pickaxe',minToolTier:'wood'}
 };
+
+BLOCKS[BLOCK.FARMLAND].farmlandMoisture=0;
+for(let moisture=1;moisture<=7;moisture++){
+  const id=BLOCK[`FARMLAND_MOISTURE_${moisture}`];
+  BLOCKS[id]={name:`耕地（湿润度 ${moisture}）`,solid:true,hardness:.6,tiles:[2,2,2],drops:'block:2',effectiveTool:'shovel',fullCube:false,farmlandMoisture:moisture};
+}
+for(let age=0;age<=7;age++){
+  const id=BLOCK[`WHEAT_AGE_${age}`];
+  BLOCKS[id]={name:age===7?'成熟小麦':`小麦（生长 ${age}/7）`,solid:false,transparent:true,hardness:.1,tiles:[0,0,0],drops:'wheat_seeds',fullCube:false,crop:'wheat',cropAge:age};
+}
 
 for(const id of BED_BLOCK_IDS){
   const meta=bedBlockMeta(id);

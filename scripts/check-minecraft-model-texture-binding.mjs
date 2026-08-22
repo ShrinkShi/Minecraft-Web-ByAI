@@ -19,11 +19,11 @@ assert.equal(resolver.manifest.minecraftVersion,'1.20.1');
 assert.equal(resolver.manifest.sourceKind,'directory');
 assert.equal(resolver.manifest.sourceRoot,'MC原版素材assets');
 assert.equal('sourceArchiveSha256' in resolver.manifest,false);
-assert.deepEqual(resolver.manifest.closure,{blockstates:10,models:46,textures:18,metadata:0});
-assert.equal(resolver.textureCount,18);
+assert.deepEqual(resolver.manifest.closure,{blockstates:12,models:58,textures:28,metadata:0});
+assert.equal(resolver.textureCount,28);
 assert.deepEqual(resolver.atlas,{
   path:'model-texture-atlas.png',
-  sha256:'9b9d2837806b361e9f03454e1ca8ff25c5ce24e7784c8737e42be93b2c805ead',
+  sha256:'b8ccd8f5273ab896386ddd1e541419488b89b341748c520521d18fcf59d2658b',
   width:128,
   height:128,
   gutterPx:1,
@@ -40,17 +40,20 @@ assert.equal(resolver.hasTexture('minecraft:block/furnace_front'),true);
 assert.equal(resolver.hasTexture('minecraft:block/furnace_front_on'),true);
 assert.equal(resolver.hasTexture('minecraft:block/furnace_side'),true);
 assert.equal(resolver.hasTexture('minecraft:block/furnace_top'),true);
+assert.equal(resolver.hasTexture('minecraft:block/farmland'),true);
+assert.equal(resolver.hasTexture('minecraft:block/farmland_moist'),true);
+assert.equal(resolver.hasTexture('minecraft:block/wheat_stage7'),true);
 assert.equal(resolver.hasTexture('minecraft:block/not_imported'),false);
 assert.deepEqual(resolver.requireRegion('block/glass'),{
-  u0:0.1484375,
+  u0:0.4296875,
   v0:0.1484375,
-  u1:0.2734375,
+  u1:0.5546875,
   v1:0.2734375
 });
 assert.deepEqual(resolver.requireRegion('block/furnace_front'),{
-  u0:0.5703125,
+  u0:0.8515625,
   v0:0.0078125,
-  u1:0.6953125,
+  u1:0.9765625,
   v1:0.1328125
 });
 assert.equal(resolver.requireTextureRecord('block/furnace_front').canonical,'assets/minecraft/textures/block/furnace_front.png');
@@ -106,7 +109,7 @@ const loaded=await loadMinecraftModelAtlasResolver({
   }
 });
 assert.equal(requestedUrl,'./assets/model-textures/model-texture-atlas.json');
-assert.equal(loaded.textureCount,18);
+assert.equal(loaded.textureCount,28);
 assert.deepEqual(loaded.requireRegion('block/iron_ore'),resolver.requireRegion('block/iron_ore'));
 await assert.rejects(
   ()=>loadMinecraftModelAtlasResolver({fetchImpl:async()=>({ok:false,status:404,json:async()=>({})})}),

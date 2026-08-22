@@ -61,6 +61,8 @@ const RECORDS=Object.freeze({
   'item.coal':supplied('item-texture',`${CANONICAL_ITEM_ROOT}/coal.png`,{minecraftVersion:'1.20.1',directCanonical:true}),
   'item.apple':supplied('item-texture',`${CANONICAL_ITEM_ROOT}/apple.png`,{minecraftVersion:'1.20.1',directCanonical:true}),
   'item.bread':supplied('item-texture',`${CANONICAL_ITEM_ROOT}/bread.png`,{minecraftVersion:'1.20.1',directCanonical:true}),
+  'item.wheat_seeds':supplied('item-texture',`${CANONICAL_ITEM_ROOT}/wheat_seeds.png`,{minecraftVersion:'1.20.1',directCanonical:true}),
+  'item.wheat':supplied('item-texture',`${CANONICAL_ITEM_ROOT}/wheat.png`,{minecraftVersion:'1.20.1',directCanonical:true}),
   'item.cooked_beef':supplied('item-texture',`${CANONICAL_ITEM_ROOT}/cooked_beef.png`,{minecraftVersion:'1.20.1',directCanonical:true}),
   'item.cooked_mutton':supplied('item-texture',`${CANONICAL_ITEM_ROOT}/cooked_mutton.png`,{minecraftVersion:'1.20.1',directCanonical:true}),
   'item.cooked_porkchop':supplied('item-texture',`${CANONICAL_ITEM_ROOT}/cooked_porkchop.png`,{minecraftVersion:'1.20.1',directCanonical:true}),

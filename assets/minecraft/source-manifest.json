@@ -5,6 +5,11 @@
       "sha256": "bd75337fe8f663e3c88e5f2490a7217d60925ff7f0001f98656b037441ecdb98",
       "source": "MC原版素材assets/minecraft/blockstates/crafting_table.json"
     },
+    "blockstates/farmland.json": {
+      "bytes": 580,
+      "sha256": "687e967014b2e153d148603fa4f6bd6f068ca2f33dd0c81535e02f22483a4476",
+      "source": "MC原版素材assets/minecraft/blockstates/farmland.json"
+    },
     "blockstates/furnace.json": {
       "bytes": 760,
       "sha256": "aedb43571027a5dea15ba9cbfc05f0327af3048de70b72c3cd67c851839bb284",
@@ -50,6 +55,11 @@
       "sha256": "6eb66f347e7de8f032f8ccc7d4f79c26bfee9f8ab27dff74bccca43b3a76c418",
       "source": "MC原版素材assets/minecraft/blockstates/torch.json"
     },
+    "blockstates/wheat.json": {
+      "bytes": 566,
+      "sha256": "787dc13c2149a133ebe4d4626b33396ec804ebf293a150dd8dab3eea65e02d57",
+      "source": "MC原版素材assets/minecraft/blockstates/wheat.json"
+    },
     "models/block/block.json": {
       "bytes": 997,
       "sha256": "3ef6c442f1ab55d2a57fa58e28bb831268159052659f12b453b637b31ded1da8",
@@ -59,6 +69,11 @@
       "bytes": 412,
       "sha256": "98e1ff48fd72ed2a820ae4237e6d5193e0cd5ab6abd2338493c7bbbff130dea1",
       "source": "MC原版素材assets/minecraft/models/block/crafting_table.json"
+    },
+    "models/block/crop.json": {
+      "bytes": 1263,
+      "sha256": "d078de149252e74ddbfa19c80300f9e627a44913266664a1b08dd25d3f558f18",
+      "source": "MC原版素材assets/minecraft/models/block/crop.json"
     },
     "models/block/cube.json": {
       "bytes": 584,
@@ -114,6 +129,16 @@
       "bytes": 689,
       "sha256": "f2c1ee24bda1b102b1f669c133a8ad22b505c231908e93849cebd111ab589e6b",
       "source": "MC原版素材assets/minecraft/models/block/door_top_right_open.json"
+    },
+    "models/block/farmland.json": {
+      "bytes": 146,
+      "sha256": "80f80627231950bc4f70a7b8298143486c36d7e33cce3eb2ea955ff5d69cd86b",
+      "source": "MC原版素材assets/minecraft/models/block/farmland.json"
+    },
+    "models/block/farmland_moist.json": {
+      "bytes": 152,
+      "sha256": "7b50f32ffcd56759dd6741dc0029c955e2c66798d473856b006f8defd5b931c3",
+      "source": "MC原版素材assets/minecraft/models/block/farmland_moist.json"
     },
     "models/block/fence_post.json": {
       "bytes": 731,
@@ -270,6 +295,11 @@
       "sha256": "962dc154fd3337d6b7e165e2b734e171c4b3595c2b838a5da1e01f5bdcdcae3b",
       "source": "MC原版素材assets/minecraft/models/block/stairs.json"
     },
+    "models/block/template_farmland.json": {
+      "bytes": 762,
+      "sha256": "c22a5fd68ca86e44e594f40d2836e132e88c389309951d0309c509d06e51b606",
+      "source": "MC原版素材assets/minecraft/models/block/template_farmland.json"
+    },
     "models/block/template_torch.json": {
       "bytes": 974,
       "sha256": "fa52aef75bf526bbd918386e19f05442ad613976a8381367a2ec719796bfe235",
@@ -279,6 +309,46 @@
       "bytes": 106,
       "sha256": "834b8a24a98d2a2c3505de5a33a734fb327cd036086abd2f9f8141c2d309ba89",
       "source": "MC原版素材assets/minecraft/models/block/torch.json"
+    },
+    "models/block/wheat_stage0.json": {
+      "bytes": 102,
+      "sha256": "0392a48dd5af33d9ec5d3ecb218ea563ab6619a274312e227319c869ac888b85",
+      "source": "MC原版素材assets/minecraft/models/block/wheat_stage0.json"
+    },
+    "models/block/wheat_stage1.json": {
+      "bytes": 102,
+      "sha256": "b5ea965dcc1191883d9f921699c78a983b7cfe9f8a469d2f520aa0f414979e45",
+      "source": "MC原版素材assets/minecraft/models/block/wheat_stage1.json"
+    },
+    "models/block/wheat_stage2.json": {
+      "bytes": 102,
+      "sha256": "ba8d5e4d0e9af61a7bb4799745d6c0d8286286337467c7544c4223bb591afdff",
+      "source": "MC原版素材assets/minecraft/models/block/wheat_stage2.json"
+    },
+    "models/block/wheat_stage3.json": {
+      "bytes": 102,
+      "sha256": "b2ddaf7d8af2c81d17aea7ad42a3c670fead994a4df5658621ef5fbaf4cc6426",
+      "source": "MC原版素材assets/minecraft/models/block/wheat_stage3.json"
+    },
+    "models/block/wheat_stage4.json": {
+      "bytes": 102,
+      "sha256": "ea5f2e558735defc0c65d861eccf3c4e4ccf4c9c46988824585af590d9eabfe8",
+      "source": "MC原版素材assets/minecraft/models/block/wheat_stage4.json"
+    },
+    "models/block/wheat_stage5.json": {
+      "bytes": 102,
+      "sha256": "2cb8f32a7ce58e080d736a918d20f82d58e272e9cbde882c9acb36e09b69e4df",
+      "source": "MC原版素材assets/minecraft/models/block/wheat_stage5.json"
+    },
+    "models/block/wheat_stage6.json": {
+      "bytes": 102,
+      "sha256": "34af49ba0e94704030bd2f263c80183f416bb986c32aba1dfee58a7d580fdc6a",
+      "source": "MC原版素材assets/minecraft/models/block/wheat_stage6.json"
+    },
+    "models/block/wheat_stage7.json": {
+      "bytes": 102,
+      "sha256": "06f1a84cc9bfd1505ea2fc2c96090f46279c3c79845bbd0e0e41245109cae8b9",
+      "source": "MC原版素材assets/minecraft/models/block/wheat_stage7.json"
     },
     "models/item/stick.json": {
       "bytes": 99,
@@ -551,6 +621,7 @@
   "modelRuntimeClosure": {
     "blockstates": [
       "blockstates/crafting_table.json",
+      "blockstates/farmland.json",
       "blockstates/furnace.json",
       "blockstates/glass.json",
       "blockstates/grass_block.json",
@@ -559,15 +630,17 @@
       "blockstates/oak_fence.json",
       "blockstates/oak_slab.json",
       "blockstates/oak_stairs.json",
-      "blockstates/torch.json"
+      "blockstates/torch.json",
+      "blockstates/wheat.json"
     ],
     "counts": {
-      "blockstates": 10,
-      "models": 46
+      "blockstates": 12,
+      "models": 58
     },
     "models": [
       "models/block/block.json",
       "models/block/crafting_table.json",
+      "models/block/crop.json",
       "models/block/cube.json",
       "models/block/cube_all.json",
       "models/block/cube_bottom_top.json",
@@ -579,6 +652,8 @@
       "models/block/door_top_left_open.json",
       "models/block/door_top_right.json",
       "models/block/door_top_right_open.json",
+      "models/block/farmland.json",
+      "models/block/farmland_moist.json",
       "models/block/fence_post.json",
       "models/block/fence_side.json",
       "models/block/furnace.json",
@@ -610,11 +685,21 @@
       "models/block/slab.json",
       "models/block/slab_top.json",
       "models/block/stairs.json",
+      "models/block/template_farmland.json",
       "models/block/template_torch.json",
-      "models/block/torch.json"
+      "models/block/torch.json",
+      "models/block/wheat_stage0.json",
+      "models/block/wheat_stage1.json",
+      "models/block/wheat_stage2.json",
+      "models/block/wheat_stage3.json",
+      "models/block/wheat_stage4.json",
+      "models/block/wheat_stage5.json",
+      "models/block/wheat_stage6.json",
+      "models/block/wheat_stage7.json"
     ],
     "roots": [
       "minecraft:crafting_table",
+      "minecraft:farmland",
       "minecraft:furnace",
       "minecraft:glass",
       "minecraft:grass_block",
@@ -623,7 +708,8 @@
       "minecraft:oak_fence",
       "minecraft:oak_slab",
       "minecraft:oak_stairs",
-      "minecraft:torch"
+      "minecraft:torch",
+      "minecraft:wheat"
     ]
   },
   "sourceKind": "directory",
