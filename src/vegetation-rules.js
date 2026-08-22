@@ -31,6 +31,9 @@ export function boneMealGrassCandidateOffsets(random=Math.random,{attempts=BONE_
   if(!Number.isInteger(maxRadius)||maxRadius<0||maxRadius>16)throw new RangeError('maxRadius must be an integer between 0 and 16');
   const offsets=[];
   for(let index=0;index<attempts;index++){
+    // Java's grass bonemeal walk starts at the clicked surface before wandering.
+    // Keep that useful invariant even though the wider phase-1.1 spread is simplified.
+    if(index===0){offsets.push({dx:0,dz:0});continue;}
     const radius=Math.min(maxRadius,1+Math.floor(index/32));
     const width=radius*2+1;
     const dx=Math.floor(unitRandom(random)*width)-radius;
