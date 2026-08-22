@@ -82,7 +82,8 @@ for(const required of [
   'textures/item/stick.png','textures/item/wooden_pickaxe.png','textures/item/stone_pickaxe.png','textures/item/raw_iron.png','textures/item/iron_ingot.png',
   'textures/entity/bed/red.png','models/block/grass_block.json','models/block/crafting_table.json',
   'blockstates/furnace.json','models/block/furnace.json','models/block/furnace_on.json','models/block/orientable.json','models/block/orientable_with_bottom.json',
-  'blockstates/farmland.json','models/block/farmland.json','models/block/farmland_moist.json','blockstates/wheat.json','models/block/wheat_stage0.json','models/block/wheat_stage7.json'
+  'blockstates/farmland.json','models/block/farmland.json','models/block/farmland_moist.json','blockstates/wheat.json','models/block/wheat_stage0.json','models/block/wheat_stage7.json',
+  'blockstates/grass.json','models/block/grass.json','models/block/tinted_cross.json'
 ])assert.ok(source.files[required],`${required} must be traceable to the canonical extracted source directory`);
 
 assert.deepEqual(runtime.tintProfile.grass,[145,189,89]);

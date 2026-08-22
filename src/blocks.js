@@ -70,7 +70,7 @@ BLOCKS[BLOCK.SHORT_GRASS]={
   vegetationKind:'short_grass',
   // Until biome colormaps land, source-model tintindex 0 uses one explicit
   // fallback grass tint instead of silently pretending biome-correct color.
-  tint:[.57,.74,.35]
+  tint:[145/255,189/255,89/255]
 };
 
 for(const id of BED_BLOCK_IDS){

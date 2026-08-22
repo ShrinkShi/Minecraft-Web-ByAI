@@ -29,7 +29,7 @@ const runtime=await compileMinecraftModelRuntime({
 });
 
 assert.equal(assertMinecraftModelRuntime(runtime),runtime);
-assert.deepEqual(runtime.blockIds,[BLOCK.CRAFTING_TABLE,BLOCK.IRON_ORE,BLOCK.GLASS,BLOCK.FURNACE,BLOCK.FARMLAND,BLOCK.FARMLAND_MOISTURE_1,BLOCK.FARMLAND_MOISTURE_2,BLOCK.FARMLAND_MOISTURE_3,BLOCK.FARMLAND_MOISTURE_4,BLOCK.FARMLAND_MOISTURE_5,BLOCK.FARMLAND_MOISTURE_6,BLOCK.FARMLAND_MOISTURE_7,BLOCK.WHEAT_AGE_0,BLOCK.WHEAT_AGE_1,BLOCK.WHEAT_AGE_2,BLOCK.WHEAT_AGE_3,BLOCK.WHEAT_AGE_4,BLOCK.WHEAT_AGE_5,BLOCK.WHEAT_AGE_6,BLOCK.WHEAT_AGE_7]);
+assert.deepEqual(runtime.blockIds,[BLOCK.CRAFTING_TABLE,BLOCK.IRON_ORE,BLOCK.GLASS,BLOCK.FURNACE,BLOCK.FARMLAND,BLOCK.FARMLAND_MOISTURE_1,BLOCK.FARMLAND_MOISTURE_2,BLOCK.FARMLAND_MOISTURE_3,BLOCK.FARMLAND_MOISTURE_4,BLOCK.FARMLAND_MOISTURE_5,BLOCK.FARMLAND_MOISTURE_6,BLOCK.FARMLAND_MOISTURE_7,BLOCK.WHEAT_AGE_0,BLOCK.WHEAT_AGE_1,BLOCK.WHEAT_AGE_2,BLOCK.WHEAT_AGE_3,BLOCK.WHEAT_AGE_4,BLOCK.WHEAT_AGE_5,BLOCK.WHEAT_AGE_6,BLOCK.WHEAT_AGE_7,BLOCK.SHORT_GRASS]);
 const crafting=minecraftModelTemplate(runtime,BLOCK.CRAFTING_TABLE);
 assert.equal(crafting.blockstate,'minecraft:crafting_table');
 assert.equal(crafting.renderLayer,'opaque');
@@ -82,6 +82,17 @@ assert.equal(modelReads.get('minecraft:block/orientable'),1);
 assert.equal(modelReads.get('minecraft:block/orientable_with_bottom'),1);
 assert.equal(modelReads.get('minecraft:block/block'),1,'shared base model must remain cached after furnace parent resolution');
 
+const shortGrass=minecraftModelTemplate(runtime,BLOCK.SHORT_GRASS);
+assert.equal(shortGrass.blockstate,'minecraft:grass');
+assert.equal(shortGrass.renderLayer,'cutout');
+assert.equal(shortGrass.parts.length,1);
+assert.equal(shortGrass.parts[0].alternatives.models[0].modelId,'minecraft:block/grass');
+assert.equal(shortGrass.parts[0].alternatives.models[0].model.faces.length,4);
+assert.ok(shortGrass.parts[0].alternatives.models[0].model.faces.every(face=>face.tintIndex===0),'canonical tinted_cross faces must preserve tintindex 0');
+assert.equal(blockstateReads.get('minecraft:grass'),1);
+assert.equal(modelReads.get('minecraft:block/grass'),1);
+assert.equal(modelReads.get('minecraft:block/tinted_cross'),1);
+
 const first=instantiateMinecraftModelTemplate(crafting,3,40,-2);
 const second=instantiateMinecraftModelTemplate(crafting,3,40,-2);
 assert.equal(first.length,1);
@@ -127,4 +138,4 @@ assert.equal(minecraftModelLayerForTexture('minecraft:block/stone',instantiateMi
 assert.throws(()=>assertMinecraftModelRuntime({...runtime,format:99}),/format must be/);
 assert.rejects(()=>compileMinecraftModelRuntime({loadBlockstate:async()=>null,loadModel:async()=>null}),/missing Minecraft blockstate/);
 
-console.log('Minecraft interpreted-model preload/cache/template selection runtime + iron ore/glass/furnace roots: PASS');
+console.log('Minecraft interpreted-model preload/cache/template selection runtime + iron ore/glass/furnace/grass roots: PASS');
