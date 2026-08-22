@@ -3,29 +3,33 @@ import {BLOCK,CHUNK_SIZE,WORLD_HEIGHT} from '../src/blocks.js';
 import {SUPPORTED_TERRAIN_GENERATOR_VERSIONS,TERRAIN_GENERATOR_VERSION,normalizeTerrainGeneratorVersion,hashTerrainSeed,terrainParameters,terrainChunkIndex,createTerrainGenerator} from '../src/terrain-generator.js';
 
 function fnv1a(bytes){let hash=2166136261>>>0;for(const byte of bytes){hash^=byte;hash=Math.imul(hash,16777619);}return hash>>>0;}
-function normalizeV1(bytes){const copy=bytes.slice();for(let i=0;i<copy.length;i++)if(copy[i]===BLOCK.IRON_ORE||copy[i]===BLOCK.COAL_ORE)copy[i]=BLOCK.STONE;return copy;}
-function normalizeV2(bytes){const copy=bytes.slice();for(let i=0;i<copy.length;i++)if(copy[i]===BLOCK.COAL_ORE)copy[i]=BLOCK.STONE;return copy;}
+function normalizeV1(bytes){const copy=bytes.slice();for(let i=0;i<copy.length;i++)if(copy[i]===BLOCK.IRON_ORE||copy[i]===BLOCK.COAL_ORE)copy[i]=BLOCK.STONE;else if(copy[i]===BLOCK.SHORT_GRASS)copy[i]=BLOCK.AIR;return copy;}
+function normalizeV2(bytes){const copy=bytes.slice();for(let i=0;i<copy.length;i++)if(copy[i]===BLOCK.COAL_ORE)copy[i]=BLOCK.STONE;else if(copy[i]===BLOCK.SHORT_GRASS)copy[i]=BLOCK.AIR;return copy;}
+function normalizeV3(bytes){const copy=bytes.slice();for(let i=0;i<copy.length;i++)if(copy[i]===BLOCK.SHORT_GRASS)copy[i]=BLOCK.AIR;return copy;}
 function blockCounts(bytes){const counts={};for(const id of bytes)counts[id]=(counts[id]||0)+1;return counts;}
 function assertGolden({seed,prompt,cx,cz,seedHash,params,checksum,v2Checksum,counts,sum}){
-  const generator=createTerrainGenerator({seed,prompt}),chunk=generator.generateChunk(cx,cz),legacy=normalizeV1(chunk),v2=normalizeV2(chunk),previous=createTerrainGenerator({seed,prompt,version:2}).generateChunk(cx,cz);
+  const generator=createTerrainGenerator({seed,prompt}),chunk=generator.generateChunk(cx,cz),legacy=normalizeV1(chunk),v2=normalizeV2(chunk),v3=normalizeV3(chunk),previousV2=createTerrainGenerator({seed,prompt,version:2}).generateChunk(cx,cz),previousV3=createTerrainGenerator({seed,prompt,version:3}).generateChunk(cx,cz);
   assert.equal(generator.seedHash,seedHash);
   assert.deepEqual(generator.parameters,params);
   assert.equal(chunk.length,CHUNK_SIZE*CHUNK_SIZE*WORLD_HEIGHT);
-  assert.equal(fnv1a(legacy),checksum,`v3 ore injection changed legacy terrain bytes for ${seed} / ${prompt} / ${cx},${cz}`);
-  assert.equal(fnv1a(v2),v2Checksum,`v3 coal injection changed v2 terrain bytes for ${seed} / ${prompt} / ${cx},${cz}`);
-  assert.equal(fnv1a(previous),v2Checksum,`explicit v2 generator drifted for ${seed} / ${prompt} / ${cx},${cz}`);
-  assert.deepEqual(v2,previous,`normalizing v3 coal must reproduce the exact v2 chunk for ${seed} / ${prompt} / ${cx},${cz}`);
+  assert.equal(fnv1a(legacy),checksum,`v4 vegetation changed pre-ore legacy terrain bytes for ${seed} / ${prompt} / ${cx},${cz}`);
+  assert.equal(fnv1a(v2),v2Checksum,`v4 vegetation changed v2 terrain bytes for ${seed} / ${prompt} / ${cx},${cz}`);
+  assert.equal(fnv1a(previousV2),v2Checksum,`explicit v2 generator drifted for ${seed} / ${prompt} / ${cx},${cz}`);
+  assert.deepEqual(v2,previousV2,`normalizing v4 coal/grass must reproduce the exact v2 chunk for ${seed} / ${prompt} / ${cx},${cz}`);
+  assert.deepEqual(v3,previousV3,`normalizing v4 short grass must reproduce the exact v3 chunk for ${seed} / ${prompt} / ${cx},${cz}`);
   assert.deepEqual(blockCounts(legacy),counts);
   assert.equal(legacy.reduce((total,id)=>total+id,0),sum);
-  return{generator,chunk};
+  return{generator,chunk,previousV3};
 }
 
-assert.equal(TERRAIN_GENERATOR_VERSION,3);
-assert.deepEqual(SUPPORTED_TERRAIN_GENERATOR_VERSIONS,[2,3]);
-assert.equal(normalizeTerrainGeneratorVersion(),3);
+assert.equal(TERRAIN_GENERATOR_VERSION,4);
+assert.deepEqual(SUPPORTED_TERRAIN_GENERATOR_VERSIONS,[2,3,4]);
+assert.equal(normalizeTerrainGeneratorVersion(),4);
 assert.equal(normalizeTerrainGeneratorVersion(2),2);
+assert.equal(normalizeTerrainGeneratorVersion(3),3);
+assert.equal(normalizeTerrainGeneratorVersion(4),4);
 assert.throws(()=>normalizeTerrainGeneratorVersion(1),/unsupported terrain generator version/);
-assert.throws(()=>normalizeTerrainGeneratorVersion(4),/unsupported terrain generator version/);
+assert.throws(()=>normalizeTerrainGeneratorVersion(5),/unsupported terrain generator version/);
 assert.equal(hashTerrainSeed('ShrinkCraft-2026'),2382936635);
 assert.equal(hashTerrainSeed('golden-seed'),1950149494);
 assert.equal(hashTerrainSeed(''),hashTerrainSeed('1'),'legacy empty seed falls back to "1"');
@@ -58,18 +62,21 @@ const desertResult=assertGolden({
 });
 
 const goldenResults=[defaultResult,seaResult,forestResult,desertResult];
-let ironCount=0,coalCount=0;
+let ironCount=0,coalCount=0,shortGrassCount=0;
 for(const {chunk} of goldenResults){
   for(const id of chunk){
     if(id===BLOCK.IRON_ORE)ironCount++;
     else if(id===BLOCK.COAL_ORE)coalCount++;
+    else if(id===BLOCK.SHORT_GRASS)shortGrassCount++;
   }
 }
-assert.ok(ironCount>0,'terrain generator v3 golden set must retain deterministic iron ore');
-assert.ok(coalCount>0,'terrain generator v3 golden set must contain deterministic coal ore');
+assert.ok(ironCount>0,'terrain generator v4 golden set must retain deterministic iron ore');
+assert.ok(coalCount>0,'terrain generator v4 golden set must retain deterministic coal ore');
+assert.ok(shortGrassCount>0,'terrain generator v4 golden set must contain deterministic short grass');
+for(const {previousV3} of goldenResults)assert.equal(previousV3.includes(BLOCK.SHORT_GRASS),false,'explicit v3 terrain must never gain v4 short grass');
 
 const sample=createTerrainGenerator({seed:'golden-seed',prompt:'mountain forest'}),sampleChunk=sample.generateChunk(2,-1);
-let checkedIron=0,checkedCoal=0;
+let checkedIron=0,checkedCoal=0,checkedShortGrass=0;
 for(let y=0;y<WORLD_HEIGHT;y++)for(let lz=0;lz<CHUNK_SIZE;lz++)for(let lx=0;lx<CHUNK_SIZE;lx++){
   const id=sampleChunk[terrainChunkIndex(lx,y,lz)],wx=2*CHUNK_SIZE+lx,wz=-CHUNK_SIZE+lz,top=sample.heightAt(wx,wz);
   if(id===BLOCK.IRON_ORE){
@@ -83,10 +90,17 @@ for(let y=0;y<WORLD_HEIGHT;y++)for(let lz=0;lz<CHUNK_SIZE;lz++)for(let lx=0;lx<C
     assert.equal(sample.isCoalOre(wx,y,wz,top),true);
     checkedCoal++;
   }
+  if(id===BLOCK.SHORT_GRASS){
+    assert.equal(y,top+1,'terrain v4 short grass must occupy the cell above the deterministic surface');
+    assert.equal(sampleChunk[terrainChunkIndex(lx,y-1,lz)],BLOCK.GRASS,'terrain v4 short grass must be supported by grass block');
+    assert.equal(sample.isShortGrassDecoration(wx,y,wz),true);
+    checkedShortGrass++;
+  }
 }
 assert.ok(checkedIron>0,'representative mountain chunk must retain iron generation');
 assert.ok(checkedCoal>0,'representative mountain chunk must exercise coal generation');
-assert.deepEqual(sample.generateChunk(2,-1),sampleChunk,'same seed/prompt/chunk must regenerate byte-identical v3 terrain');
+assert.ok(checkedShortGrass>0,'representative mountain chunk must exercise short grass generation');
+assert.deepEqual(sample.generateChunk(2,-1),sampleChunk,'same seed/prompt/chunk must regenerate byte-identical v4 terrain');
 
 const a=createTerrainGenerator({seed:'A',prompt:'海'}),b=createTerrainGenerator({seed:'B',prompt:'mountain forest'}),aBefore=fnv1a(a.generateChunk(0,0));
 b.generateChunk(3,-4);
@@ -101,4 +115,4 @@ assert.throws(()=>createTerrainGenerator().generateChunk(.5,0),/chunk coordinate
 assert.throws(()=>createTerrainGenerator().generateChunk(0,NaN),/chunk coordinates must be integers/);
 assert.throws(()=>createTerrainGenerator().isIronOre(.5,10,0,20),/coordinates/);
 assert.throws(()=>createTerrainGenerator().isCoalOre(0,10,NaN,20),/coordinates/);
-console.log('shared deterministic terrain generator v3 + v2 byte compatibility + iron/coal ore: PASS');
+console.log('shared deterministic terrain generator v4 + v2/v3 byte compatibility + iron/coal/short grass: PASS');
