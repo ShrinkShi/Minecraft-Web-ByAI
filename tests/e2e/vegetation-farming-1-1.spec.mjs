@@ -21,6 +21,10 @@ async function lockPointer(page){
   const canvas=page.locator('#game-canvas');
   await canvas.click({position:{x:8,y:8}});
   await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.id||null),{timeout:5_000}).toBe('game-canvas');
+  // pointerlockchange is followed by the frame-driven control-adapter sync. Wait
+  // for two animation frames so the first real use/mining input is not emitted
+  // into the deliberate gameplayEnabled=false transition window.
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   return canvas;
 }
 

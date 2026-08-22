@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {BLOCK,CHUNK_SIZE} from '../src/blocks.js';
 import {SingleplayerVegetationRuntime} from '../src/singleplayer-vegetation-runtime.js';
+import {MIN_BREAK_DURATION_MS,miningDurationMs} from '../src/mining-rules.js';
 import {
   BONE_MEAL_GRASS_ATTEMPTS,
   BONE_MEAL_GRASS_MAX_RADIUS,
@@ -13,6 +14,7 @@ import {
 } from '../src/vegetation-rules.js';
 
 assert.equal(SHORT_GRASS_SEED_CHANCE,1/8);
+assert.equal(miningDurationMs(BLOCK.SHORT_GRASS,null,'survival'),MIN_BREAK_DURATION_MS,'zero-hardness short grass must use the minimum break duration instead of falling back to hardness 1');
 assert.deepEqual(rollShortGrassDrops(()=>0),[{id:'wheat_seeds',count:1}]);
 assert.deepEqual(rollShortGrassDrops(()=>SHORT_GRASS_SEED_CHANCE-.000001),[{id:'wheat_seeds',count:1}]);
 assert.deepEqual(rollShortGrassDrops(()=>SHORT_GRASS_SEED_CHANCE),[]);

@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {createSingleplayerWorld} from './helpers/world-flow.mjs';
 
-const FARMING_MODEL_BLOCK_IDS=[9,19,20,21,24,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42];
+const FARMING_MODEL_BLOCK_IDS=[9,19,20,21,24,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43];
 
 async function runCommand(page,text){
   await page.evaluate(()=>window.dispatchEvent(new KeyboardEvent('keydown',{code:'Slash',bubbles:true})));
