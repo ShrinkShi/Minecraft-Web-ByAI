@@ -5,14 +5,41 @@ export const STEVE_RIGHT_ARM_UVS=Object.freeze(minecraftEntityCuboidUvRects(40,1
 export const STEVE_RIGHT_ARM_SLEEVE_UVS=Object.freeze(minecraftEntityCuboidUvRects(40,32,4,12,4));
 export const STEVE_RIGHT_ARM_BASE_FRONT=Object.freeze(STEVE_RIGHT_ARM_UVS.front);
 export const STEVE_RIGHT_ARM_SLEEVE_FRONT=Object.freeze(STEVE_RIGHT_ARM_SLEEVE_UVS.front);
+export const FIRST_PERSON_VIEWMODEL_FOV=70;
 export const FIRST_PERSON_ATTACK_DURATION=.28;
 export const FIRST_PERSON_USE_DURATION=.38;
 export const FIRST_PERSON_RIGHT_ARM_LAYOUT=Object.freeze({
-  baseCenterY:.39,
-  sleeveCenterY:.403,
-  itemAnchorY:.77,
-  rotationZ:Math.PI
+  width:.20,
+  height:.60,
+  depth:.20,
+  sleeveWidth:.215,
+  sleeveHeight:.615,
+  sleeveDepth:.215,
+  baseCenterY:.30,
+  sleeveCenterY:.3075,
+  wristY:.60,
+  itemAnchorY:.03,
+  rotationZ:Math.PI,
+  skinRotationZ:Math.PI
 });
+
+const transform=(position,rotation,scale=1)=>Object.freeze({position:Object.freeze(position),rotation:Object.freeze(rotation),scale});
+export const FIRST_PERSON_ITEM_TRANSFORMS=Object.freeze({
+  block:transform([-.02,.035,-.09],[.22,-.52,.10],.92),
+  tool:transform([.005,.02,-.055],[.04,-.18,-.12],1.05),
+  food:transform([.01,.025,-.06],[.02,-.10,.06],1),
+  flat:transform([.005,.02,-.055],[.02,-.12,0],1),
+  empty:transform([0,0,0],[0,0,0],1)
+});
+
+export function firstPersonItemKind(itemId,def){
+  if(!def)return'empty';
+  if(def.blockId)return'block';
+  if(!def.texture)return'empty';
+  if(def.food)return'food';
+  if(def.tool||/(?:^|_)(?:pickaxe|sword|axe|shovel|hoe)$/.test(String(itemId||'')))return'tool';
+  return'flat';
+}
 
 export function minecraftSkinCropCss(rect,{scale=17,skinSize=STEVE_SKIN_SIZE}={}){
   if(!Array.isArray(rect)||rect.length!==4||!rect.every(Number.isFinite))throw new TypeError('skin crop rect must contain four finite numbers');
@@ -25,5 +52,16 @@ export function minecraftSkinCropCss(rect,{scale=17,skinSize=STEVE_SKIN_SIZE}={}
 export function firstPersonActionPose({attackRemaining=0,useRemaining=0}={}){
   const attack=Math.max(0,Math.min(1,1-(Number(attackRemaining)||0)/FIRST_PERSON_ATTACK_DURATION)),use=Math.max(0,Math.min(1,1-(Number(useRemaining)||0)/FIRST_PERSON_USE_DURATION));
   const swing=attackRemaining>0?Math.sin(attack*Math.PI):0,useLift=useRemaining>0?Math.sin(use*Math.PI):0;
-  return Object.freeze({x:.58-.24*swing,y:-.38-.12*swing+.14*useLift,z:-1.12+.13*swing,rotX:-.18-1.05*swing+.52*useLift,rotY:-.08-.34*swing,rotZ:-.42+.62*swing-.16*useLift,itemRotX:-.25-.9*swing+.65*useLift,itemRotZ:-.58+.85*swing});
+  return Object.freeze({
+    x:.56-.13*swing,y:-.47-.06*swing+.07*useLift,z:-1.10+.05*swing,
+    rotX:-.04,rotY:-.02,rotZ:-.04,
+    shoulderRotX:-.16-.92*swing+.38*useLift,
+    shoulderRotY:-.06-.22*swing,
+    shoulderRotZ:.55+.34*swing-.08*useLift,
+    wristRotX:.04+.32*useLift,
+    wristRotY:0,
+    wristRotZ:-.08+.10*swing,
+    itemRotX:-.08-.20*swing+.42*useLift,
+    itemRotZ:-.05+.16*swing
+  });
 }
