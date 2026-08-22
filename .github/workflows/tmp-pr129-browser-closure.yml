@@ -1,0 +1,106 @@
+name: Temporary PR129 browser closure
+
+on:
+  push:
+    branches:
+      - feature/vegetation-farming-1-1
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Apply reviewed closure fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, expected=1):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              actual = text.count(old)
+              if actual != expected:
+                  raise SystemExit(f'{path}: expected {expected} occurrences, found {actual}: {old!r}')
+              p.write_text(text.replace(old, new), encoding='utf-8')
+
+          old_ids = 'const FARMING_MODEL_BLOCK_IDS=[9,19,20,21,24,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42];'
+          new_ids = 'const FARMING_MODEL_BLOCK_IDS=[9,19,20,21,24,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43];'
+          for path in [
+              'tests/e2e/furnace-content.spec.mjs',
+              'tests/e2e/glass-runtime.spec.mjs',
+              'tests/e2e/interpreted-model-runtime.spec.mjs',
+          ]:
+              replace(path, old_ids, new_ids)
+
+          replace(
+              'tests/e2e/hunger-food.spec.mjs',
+              'toEqual({version:9,terrainVersion:3,hunger:0,saturation:0,hasExhaustion:true,hasTimer:true})',
+              'toEqual({version:9,terrainVersion:4,hunger:0,saturation:0,hasExhaustion:true,hasTimer:true})',
+          )
+
+          replace(
+              'tests/e2e/minecraft-assets.spec.mjs',
+              "closure:{blockstates:12,models:58,textures:28,metadata:0}",
+              "closure:{blockstates:13,models:60,textures:29,metadata:0}",
+          )
+          replace(
+              'tests/e2e/minecraft-assets.spec.mjs',
+              "sha256:'b8ccd8f5273ab896386ddd1e541419488b89b341748c520521d18fcf59d2658b'",
+              "sha256:'d3770949b24633637dd68c7a96a92217b4d46265b5bbef3ea965831eeb04fd31'",
+          )
+          replace(
+              'tests/e2e/minecraft-assets.spec.mjs',
+              'expect(Object.keys(modelManifest.textures)).toHaveLength(28);',
+              "expect(Object.keys(modelManifest.textures)).toHaveLength(29);expect(modelManifest.textures['minecraft:block/short_grass']).toBeTruthy();",
+          )
+
+          smoke = Path('tests/e2e/smoke.spec.mjs')
+          text = smoke.read_text(encoding='utf-8')
+          count = text.count('terrainVersion:3')
+          if count != 4:
+              raise SystemExit(f'smoke.spec.mjs: expected 4 fresh-world terrainVersion:3 assertions, found {count}')
+          text = text.replace('terrainVersion:3', 'terrainVersion:4')
+          text = text.replace('terrain-v3 world snapshot', 'terrain-v4 world snapshot')
+          smoke.write_text(text, encoding='utf-8')
+
+          replace(
+              'tests/e2e/vegetation-farming-1-1.spec.mjs',
+              "  await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.id||null),{timeout:5_000}).toBe('game-canvas');\n  return canvas;",
+              "  await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.id||null),{timeout:5_000}).toBe('game-canvas');\n  // pointerlockchange is followed by the frame-driven control-adapter sync. Wait\n  // for two animation frames so the first real use/mining input is not emitted\n  // into the deliberate gameplayEnabled=false transition window.\n  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));\n  return canvas;",
+          )
+
+          replace(
+              'src/mining-rules.js',
+              "const block=blockDef(blockId);if(mode==='creative')return CREATIVE_BREAK_DURATION_MS;if(mode==='adventure'||mode==='spectator')return Infinity;const hardness=Number.isFinite(block.hardness)&&block.hardness>0?block.hardness:1;return Math.max(MIN_BREAK_DURATION_MS,hardness*BASE_HARDNESS_DURATION_MS/miningToolMultiplier(blockId,itemId));",
+              "const block=blockDef(blockId);if(mode==='creative')return CREATIVE_BREAK_DURATION_MS;if(mode==='adventure'||mode==='spectator')return Infinity;const rawHardness=Number.isFinite(block.hardness)?block.hardness:1;if(rawHardness<0)return Infinity;return Math.max(MIN_BREAK_DURATION_MS,rawHardness*BASE_HARDNESS_DURATION_MS/miningToolMultiplier(blockId,itemId));",
+          )
+
+          check = Path('scripts/check-vegetation-farming-1-1.mjs')
+          text = check.read_text(encoding='utf-8')
+          anchor = "import {SingleplayerVegetationRuntime} from '../src/singleplayer-vegetation-runtime.js';\n"
+          if text.count(anchor) != 1:
+              raise SystemExit('vegetation check import anchor drifted')
+          text = text.replace(anchor, anchor + "import {MIN_BREAK_DURATION_MS,miningDurationMs} from '../src/mining-rules.js';\n")
+          anchor2 = "assert.equal(SHORT_GRASS_SEED_CHANCE,1/8);\n"
+          if text.count(anchor2) != 1:
+              raise SystemExit('vegetation check assertion anchor drifted')
+          text = text.replace(anchor2, anchor2 + "assert.equal(miningDurationMs(BLOCK.SHORT_GRASS,null,'survival'),MIN_BREAK_DURATION_MS,'zero-hardness short grass must use the minimum break duration instead of falling back to hardness 1');\n")
+          check.write_text(text, encoding='utf-8')
+          PY
+
+          rm .github/workflows/tmp-pr129-browser-closure.yml
+          git diff --check
+          git status --short
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/mining-rules.js scripts/check-vegetation-farming-1-1.mjs tests/e2e/furnace-content.spec.mjs tests/e2e/glass-runtime.spec.mjs tests/e2e/hunger-food.spec.mjs tests/e2e/interpreted-model-runtime.spec.mjs tests/e2e/minecraft-assets.spec.mjs tests/e2e/smoke.spec.mjs tests/e2e/vegetation-farming-1-1.spec.mjs .github/workflows/tmp-pr129-browser-closure.yml
+          git diff --cached --check
+          git commit -m "test: close vegetation farming browser regressions"
+          git push origin HEAD:feature/vegetation-farming-1-1
