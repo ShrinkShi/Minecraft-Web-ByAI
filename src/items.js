@@ -33,6 +33,8 @@ export const ITEMS={
   coal:textured('煤炭',64,'item.coal'),
   apple:textured('苹果',64,'item.apple',{food:{nutrition:4,saturationModifier:.3}}),
   bread:textured('面包',64,'item.bread',{food:{nutrition:5,saturationModifier:.6}}),
+  wheat_seeds:textured('小麦种子',64,'item.wheat_seeds',{plantKind:'wheat'}),
+  wheat:textured('小麦',64,'item.wheat'),
   bed:{name:'床',stack:1,placeKind:'bed',itemPreview:'bed-model',entityAssetKey:'entity.bed.red'},
   leather_helmet:textured('皮革帽子',1,'item.leather_helmet',{armorSlot:'head',armorPoints:1,durability:55}),
   leather_chestplate:textured('皮革外套',1,'item.leather_chestplate',{armorSlot:'chest',armorPoints:3,durability:80}),

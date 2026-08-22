@@ -11,4 +11,6 @@ MINECRAFT_MODEL_ACCEPTANCE_BLOCKS = (
     "minecraft:grass_block",
     "minecraft:crafting_table",
     "minecraft:furnace",
+    "minecraft:farmland",
+    "minecraft:wheat",
 )

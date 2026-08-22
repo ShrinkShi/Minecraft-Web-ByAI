@@ -17,8 +17,8 @@ function emitMiningHit(target){
 }
 
 export class SingleplayerMiningController{
-  constructor({aim,getMode,getSelectedStack,breakTarget,spawnDrop,damageSelected,onProgress=()=>{},onHit=()=>{},onBreak=()=>{}}={}){
-    this.aim=callback(aim,'aim');this.getMode=callback(getMode,'getMode');this.getSelectedStack=callback(getSelectedStack,'getSelectedStack');this.breakTarget=callback(breakTarget,'breakTarget');this.spawnDrop=callback(spawnDrop,'spawnDrop');this.damageSelected=callback(damageSelected,'damageSelected');this.onProgress=callback(onProgress,'onProgress');this.onHit=callback(onHit,'onHit');this.onBreak=callback(onBreak,'onBreak');
+  constructor({aim,getMode,getSelectedStack,breakTarget,spawnDrop,damageSelected,resolveDrops=null,onProgress=()=>{},onHit=()=>{},onBreak=()=>{}}={}){
+    this.aim=callback(aim,'aim');this.getMode=callback(getMode,'getMode');this.getSelectedStack=callback(getSelectedStack,'getSelectedStack');this.breakTarget=callback(breakTarget,'breakTarget');this.spawnDrop=callback(spawnDrop,'spawnDrop');this.damageSelected=callback(damageSelected,'damageSelected');this.resolveDrops=resolveDrops===null?(({block})=>block?.drops?[{id:block.drops,count:1}]:[]):callback(resolveDrops,'resolveDrops');this.onProgress=callback(onProgress,'onProgress');this.onHit=callback(onHit,'onHit');this.onBreak=callback(onBreak,'onBreak');
     this.held=false;this.startedAt=0;this.lastAt=0;this.lastHitAt=-Infinity;this.hasStepped=false;this.target=null;this.key=null;this.progress=0;
   }
 
@@ -41,7 +41,7 @@ export class SingleplayerMiningController{
     if(this.progress<1-COMPLETION_EPSILON)return this.snapshot();
     const block=BLOCKS[aimed.id],broken=cloneTarget(aimed),removed=!!this.breakTarget(broken);let harvested=false,wear=null;
     if(removed){
-      if(mode!=='creative'&&canHarvestBlock(broken.id,selectedId)&&block?.drops){this.spawnDrop({id:block.drops,count:1},broken);harvested=true;}
+      if(mode!=='creative'&&canHarvestBlock(broken.id,selectedId)){const resolved=this.resolveDrops({target:broken,block,selected:selected?{...selected}:null});if(!Array.isArray(resolved))throw new TypeError('resolveDrops must return an array');for(const stack of resolved){if(!stack||typeof stack.id!=='string'||!Number.isInteger(stack.count)||stack.count<1)throw new TypeError('resolved mining drops must contain string id and positive integer count');this.spawnDrop({id:stack.id,count:stack.count},broken);}harvested=resolved.length>0;}
       if(mode!=='creative'&&isDamageableKnownItem(selectedId))wear=this.damageSelected(selectedId,1);
       this.onBreak({target:broken,block,selected:selected?{...selected}:null,harvested,wear});
     }
