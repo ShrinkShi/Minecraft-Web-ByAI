@@ -53,7 +53,7 @@ replace_once('src/blocks.js',"tint:[.57,.74,.35]","tint:[145/255,189/255,89/255]
 
 asset='scripts/check-asset-manifest.mjs'
 replace_count(asset,"'item.wheat','item.cooked_beef'","'item.wheat','item.bone_meal','item.cooked_beef'",3)
-replace_count(asset,"'wheat','cooked_beef'","'wheat','bone_meal','cooked_beef'",1)
+replace_count(asset,"'wheat','cooked_beef'","'wheat','bone_meal','cooked_beef'",2)
 replace_once(asset,
 "(?:wooden_sword|stone_sword|bow|iron_hoe|iron_helmet|iron_chestplate|iron_leggings|iron_boots|coal|apple|bread|wheat_seeds|wheat|cooked_beef|cooked_mutton|cooked_porkchop|cooked_chicken)",
 "(?:wooden_sword|stone_sword|bow|iron_hoe|iron_helmet|iron_chestplate|iron_leggings|iron_boots|coal|apple|bread|wheat_seeds|wheat|bone_meal|cooked_beef|cooked_mutton|cooked_porkchop|cooked_chicken)")
