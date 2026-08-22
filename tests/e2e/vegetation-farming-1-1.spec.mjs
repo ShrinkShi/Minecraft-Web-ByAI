@@ -84,3 +84,27 @@ test('bone meal advances wheat and spreads short grass through the real secondar
   expect(errors.pageErrors).toEqual([]);
   expect(errors.consoleErrors).toEqual([]);
 });
+
+test('failed bone meal use keeps the survival stack intact',async({page})=>{
+  const errors=collectBrowserErrors(page);
+  await page.goto('/?e2e=1');
+  await createSingleplayerWorld(page,{name:'CI Bone Meal No Consume',seed:'ci-bone-meal-no-consume-2026',mode:'survival',prompt:'平原'});
+  await runCommand(page,'/give bone_meal 1');
+  await moveInventoryItemToHotbar(page,'骨粉');
+
+  const selected=page.locator('#hotbar [data-hotbar-index="0"]');
+  await expect(selected).toHaveAttribute('title','骨粉');
+  await expect(selected.locator('img[alt="骨粉"]')).toHaveCount(1);
+
+  const stone=await page.evaluate(blockId=>globalThis.__minecraftE2E.prepareSingleplayerMiningTarget(blockId),BLOCK.STONE);
+  expect(stone).toBeTruthy();
+  const canvas=await lockPointer(page);
+  await canvas.dispatchEvent('mousedown',{button:2,bubbles:true});
+  await expect(page.locator('#toast')).toContainText('这里无法使用骨粉');
+  await expect.poll(()=>page.evaluate(({x,y,z})=>globalThis.__minecraftE2E.worldBlock(x,y,z),stone)).toBe(BLOCK.STONE);
+  await expect(selected.locator('img[alt="骨粉"]')).toHaveCount(1);
+  await expect(selected.locator('.slot-count')).toHaveText('');
+
+  expect(errors.pageErrors).toEqual([]);
+  expect(errors.consoleErrors).toEqual([]);
+});
