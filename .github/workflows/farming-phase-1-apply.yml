@@ -66,7 +66,7 @@ jobs:
           rm tools/apply-farming-phase-1.py tools/run-farming-bootstrap-v2.py .github/workflows/farming-phase-1-apply.yml
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -- src/blocks.js src/items.js src/asset-manifest.js src/recipes.js src/minecraft-model-registry.js src/singleplayer-mining-controller.js src/main.js tools/minecraft_model_acceptance.py scripts/check-asset-manifest.mjs scripts/check-minecraft-runtime-assets.mjs assets/minecraft/blockstates assets/minecraft/models/block assets/minecraft/source-manifest.json assets/minecraft/runtime-manifest.json assets/model-textures/model-texture-atlas.png assets/model-textures/model-texture-atlas.json tools/apply-farming-phase-1.py tools/run-farming-bootstrap-v2.py .github/workflows/farming-phase-1-apply.yml
+          git add -- src/blocks.js src/items.js src/asset-manifest.js src/recipes.js src/minecraft-model-registry.js src/singleplayer-mining-controller.js src/main.js tools/minecraft_model_acceptance.py scripts/check-asset-manifest.mjs scripts/check-minecraft-runtime-assets.mjs scripts/check-minecraft-model-runtime.mjs scripts/check-minecraft-model-texture-binding.mjs assets/minecraft/blockstates assets/minecraft/models/block assets/minecraft/source-manifest.json assets/minecraft/runtime-manifest.json assets/model-textures/model-texture-atlas.png assets/model-textures/model-texture-atlas.json tools/apply-farming-phase-1.py tools/run-farming-bootstrap-v2.py .github/workflows/farming-phase-1-apply.yml
           git diff --cached --check
           git commit -m "feat: integrate wheat farming phase one"
           git push origin HEAD:feature/farming-phase-1
