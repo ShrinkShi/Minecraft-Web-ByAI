@@ -1,6 +1,8 @@
 import {test,expect} from '@playwright/test';
 import {createSingleplayerWorld} from './helpers/world-flow.mjs';
 
+const FARMING_MODEL_BLOCK_IDS=[9,19,20,21,24,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42];
+
 async function runCommand(page,text){
   await page.evaluate(()=>window.dispatchEvent(new KeyboardEvent('keydown',{code:'Slash',bubbles:true})));
   await expect(page.locator('#chat-input-wrap')).not.toHaveClass(/hidden/);
@@ -66,29 +68,15 @@ test('source-backed glass uses translucent Worker mesh, culls shared faces, and 
     renderer.handleWorkerMessage(ready);
     const meshes=renderer.makeChunkMeshes(message.interpreted,0,0),glassMesh=meshes?.translucent||null;
     const state={
-      readyBlockIds:[...ready.blockIds],
-      legacyOpaqueEmpty:message.opaque.empty,
-      interpretedOpaqueEmpty:message.interpreted.opaque.empty,
-      cutoutEmpty:message.interpreted.cutout.empty,
-      translucentFaces:message.interpreted.translucent.faceCount,
-      translucentVertices:message.interpreted.translucent.vertexCount,
-      translucentIndexBytes:message.interpreted.translucent.indices?.byteLength??0,
-      meshName:glassMesh?.name||null,
-      transparent:glassMesh?.material?.transparent??null,
-      opacity:glassMesh?.material?.opacity??null,
-      depthWrite:glassMesh?.material?.depthWrite??null,
-      renderOrder:glassMesh?.renderOrder??null,
-      sharedMaterial:glassMesh?.material===renderer.materials.translucent,
-      assetKey:glassMesh?.material?.map?.userData?.assetKey||null,
-      childCount:scene.children.length,
-      itemTexture:itemsModule.ITEMS['block:20']?.texture||null,
-      itemPreview:itemsModule.ITEMS['block:20']?.blockPreview||null
+      readyBlockIds:[...ready.blockIds],legacyOpaqueEmpty:message.opaque.empty,interpretedOpaqueEmpty:message.interpreted.opaque.empty,cutoutEmpty:message.interpreted.cutout.empty,
+      translucentFaces:message.interpreted.translucent.faceCount,translucentVertices:message.interpreted.translucent.vertexCount,translucentIndexBytes:message.interpreted.translucent.indices?.byteLength??0,
+      meshName:glassMesh?.name||null,transparent:glassMesh?.material?.transparent??null,opacity:glassMesh?.material?.opacity??null,depthWrite:glassMesh?.material?.depthWrite??null,renderOrder:glassMesh?.renderOrder??null,
+      sharedMaterial:glassMesh?.material===renderer.materials.translucent,assetKey:glassMesh?.material?.map?.userData?.assetKey||null,childCount:scene.children.length,itemTexture:itemsModule.ITEMS['block:20']?.texture||null,itemPreview:itemsModule.ITEMS['block:20']?.blockPreview||null
     };
-    renderer.disposeChunkMeshes(meshes);state.childrenAfterChunkDispose=scene.children.length;renderer.dispose();
-    return state;
+    renderer.disposeChunkMeshes(meshes);state.childrenAfterChunkDispose=scene.children.length;renderer.dispose();return state;
   });
 
-  expect(renderState.readyBlockIds).toEqual([9,19,20,21]);
+  expect(renderState.readyBlockIds).toEqual(FARMING_MODEL_BLOCK_IDS);
   expect(renderState.legacyOpaqueEmpty).toBe(true);
   expect(renderState.interpretedOpaqueEmpty).toBe(true);
   expect(renderState.cutoutEmpty).toBe(true);
