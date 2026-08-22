@@ -1,7 +1,7 @@
 import {BLOCK,CHUNK_SIZE,WORLD_HEIGHT} from './blocks.js';
 
-export const TERRAIN_GENERATOR_VERSION=3;
-export const SUPPORTED_TERRAIN_GENERATOR_VERSIONS=Object.freeze([2,3]);
+export const TERRAIN_GENERATOR_VERSION=4;
+export const SUPPORTED_TERRAIN_GENERATOR_VERSIONS=Object.freeze([2,3,4]);
 const DEFAULT_SEED='1';
 const DEFAULT_PROMPT='';
 const FNV_OFFSET=2166136261>>>0;
@@ -20,6 +20,8 @@ const COAL_VEIN_CHANCE=.07;
 const COAL_FILL_CHANCE=.28;
 const COAL_VEIN_SALT=0x0c0a1;
 const COAL_FILL_SALT=0x51ad;
+const SHORT_GRASS_SURFACE_CHANCE=.18;
+const SHORT_GRASS_SALT=0x61a55;
 
 export function hashTerrainSeed(value=DEFAULT_SEED){
   const text=String(value||DEFAULT_SEED);let hash=FNV_OFFSET;
@@ -89,6 +91,7 @@ export function createTerrainGenerator({seed=DEFAULT_SEED,prompt=DEFAULT_PROMPT,
     if(vein>=COAL_VEIN_CHANCE)return false;
     return hash3(x,y,z,COAL_FILL_SALT)<COAL_FILL_CHANCE;
   };
+  const isShortGrassDecoration=(x,y,z)=>version>=4&&hash3(x,y,z,SHORT_GRASS_SALT)<SHORT_GRASS_SURFACE_CHANCE;
   const set=(chunk,x,y,z,id)=>{if(x>=0&&x<CHUNK_SIZE&&z>=0&&z<CHUNK_SIZE&&y>=0&&y<WORLD_HEIGHT)chunk[terrainChunkIndex(x,y,z)]=id;};
   const tree=(chunk,lx,base,lz)=>{
     for(let y=0;y<4;y++)set(chunk,lx,base+y,lz,BLOCK.LOG);
@@ -113,9 +116,10 @@ export function createTerrainGenerator({seed=DEFAULT_SEED,prompt=DEFAULT_PROMPT,
       }
       for(let y=top+1;y<=parameters.sea;y++)set(chunk,lx,y,lz,BLOCK.WATER);
       if(top>parameters.sea+1&&chunk[terrainChunkIndex(lx,top,lz)]===BLOCK.GRASS&&hash2(wx*7,wz*7)<parameters.forest&&lx>2&&lx<13&&lz>2&&lz<13)tree(chunk,lx,top+1,lz);
+      if(version>=4&&top>parameters.sea+1&&top+1<WORLD_HEIGHT&&chunk[terrainChunkIndex(lx,top,lz)]===BLOCK.GRASS&&chunk[terrainChunkIndex(lx,top+1,lz)]===BLOCK.AIR&&isShortGrassDecoration(wx,top+1,wz))set(chunk,lx,top+1,lz,BLOCK.SHORT_GRASS);
     }
     return chunk;
   };
 
-  return Object.freeze({version,seedHash,parameters:Object.freeze({...parameters}),hash2,hash3,valueNoise,fbm,heightAt,isIronOre,isCoalOre,generateChunk});
+  return Object.freeze({version,seedHash,parameters:Object.freeze({...parameters}),hash2,hash3,valueNoise,fbm,heightAt,isIronOre,isCoalOre,isShortGrassDecoration,generateChunk});
 }

@@ -20,6 +20,11 @@
       "sha256": "1dbff97d8ac074c330024db2f2acc93eea26ffad0cd33e2f0442ca6e5145e9d5",
       "source": "MC原版素材assets/minecraft/blockstates/glass.json"
     },
+    "blockstates/grass.json": {
+      "bytes": 78,
+      "sha256": "eb860ec8e498bc4c6b9756c3e7a0c5592fbcba7d86c80c4aa8ecac41eaa4ae4e",
+      "source": "MC原版素材assets/minecraft/blockstates/grass.json"
+    },
     "blockstates/grass_block.json": {
       "bytes": 435,
       "sha256": "f428a88833a320ceae681bd4ce88dee75307b2517864c4b1a72e5f995071d1cb",
@@ -165,6 +170,11 @@
       "sha256": "7ed800415aa94222ad48aabe11c0effe5874414b724f7ceea06a3fb7fbad6f7e",
       "source": "MC原版素材assets/minecraft/models/block/glass.json"
     },
+    "models/block/grass.json": {
+      "bytes": 104,
+      "sha256": "079badaebfeeccd9919a9d02cfacac4cb49fd2dad9de1f5bc37479d396e875d1",
+      "source": "MC原版素材assets/minecraft/models/block/grass.json"
+    },
     "models/block/grass_block.json": {
       "bytes": 1543,
       "sha256": "fdea6afda5fa7d47241f181b56879e6807efc2b18a119133e3a871c411bf661a",
@@ -304,6 +314,11 @@
       "bytes": 974,
       "sha256": "fa52aef75bf526bbd918386e19f05442ad613976a8381367a2ec719796bfe235",
       "source": "MC原版素材assets/minecraft/models/block/template_torch.json"
+    },
+    "models/block/tinted_cross.json": {
+      "bytes": 948,
+      "sha256": "f3b9e4830f62d4bc38f473700aa6878fb390a8118e0cdbf1e61016630433c1f9",
+      "source": "MC原版素材assets/minecraft/models/block/tinted_cross.json"
     },
     "models/block/torch.json": {
       "bytes": 106,
@@ -624,6 +639,7 @@
       "blockstates/farmland.json",
       "blockstates/furnace.json",
       "blockstates/glass.json",
+      "blockstates/grass.json",
       "blockstates/grass_block.json",
       "blockstates/iron_ore.json",
       "blockstates/oak_door.json",
@@ -634,8 +650,8 @@
       "blockstates/wheat.json"
     ],
     "counts": {
-      "blockstates": 12,
-      "models": 58
+      "blockstates": 13,
+      "models": 60
     },
     "models": [
       "models/block/block.json",
@@ -659,6 +675,7 @@
       "models/block/furnace.json",
       "models/block/furnace_on.json",
       "models/block/glass.json",
+      "models/block/grass.json",
       "models/block/grass_block.json",
       "models/block/grass_block_snow.json",
       "models/block/inner_stairs.json",
@@ -687,6 +704,7 @@
       "models/block/stairs.json",
       "models/block/template_farmland.json",
       "models/block/template_torch.json",
+      "models/block/tinted_cross.json",
       "models/block/torch.json",
       "models/block/wheat_stage0.json",
       "models/block/wheat_stage1.json",
@@ -702,6 +720,7 @@
       "minecraft:farmland",
       "minecraft:furnace",
       "minecraft:glass",
+      "minecraft:grass",
       "minecraft:grass_block",
       "minecraft:iron_ore",
       "minecraft:oak_door",

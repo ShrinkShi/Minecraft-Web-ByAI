@@ -57,6 +57,7 @@ export const ITEMS={
   feather:textured('羽毛',64,'item.feather',{color:0xf1f1ed}),
   rotten_flesh:textured('腐肉',64,'item.rotten_flesh',{color:0x8d613a,food:{nutrition:4,saturationModifier:.1}}),
   bone:textured('骨头',64,'item.bone',{color:0xe8e2d3}),
+  bone_meal:textured('骨粉',64,'item.bone_meal',{useKind:'bone_meal'}),
   arrow:textured('箭',64,'item.arrow',{color:0xb8a17d}),
   gunpowder:textured('火药',64,'item.gunpowder',{color:0x646b60}),
   string:textured('线',64,'item.string',{color:0xe3e1dc})

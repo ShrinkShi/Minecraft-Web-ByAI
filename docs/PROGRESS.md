@@ -8,95 +8,102 @@
 
 当前 merged `main`：
 
-`408a4a57c68453ec38ccab1e5dcee2e3760eb82b`
+`2ba90bd77f510ade4c771a17e3a06b1e2597271f`
 
-main 已合并到 PR #127。#127 完成 hunger / saturation / exhaustion / natural regeneration / starvation 核心、第一批可食物品与熟肉 Furnace progression，并把单机存档 schema 提升到 v9，同时保持 terrainVersion 从 schema v8 开始必填的兼容边界。
+merged main 已包含：
 
-## 当前进行中：PR #128 Farming Phase 1
+- PR #128 Wheat Farming Phase 1：farmland moisture 0..7、wheat age 0..7、种植/生长/成熟收获、canonical crop model/item、wheat → bread；
+- PR #130 presentation repair：缩小第一人称手臂、70° viewmodel FOV、shoulder→wrist 持物层级，以及 Inventory/Workbench 打开时隐藏世界 HUD/viewmodel 的模态表现。
 
-分支：`feature/farming-phase-1`
+`docs/PROJECT_BASELINE.md` 只描述 merged main；当前未合并开发内容单独记录在下面。
 
-基线：`main 408a4a57c68453ec38ccab1e5dcee2e3760eb82b`
+## 当前进行中：PR #129 Vegetation / Farming Phase 1.1
 
-本 PR 保持 Draft，最终只认 exact-head CI。
+分支：`feature/vegetation-farming-1-1`
+
+基线：当前 `main 2ba90bd77f510ade4c771a17e3a06b1e2597271f`
+
+本 PR 保持 Draft，最终只认 **exact-head CI**。
 
 ### 已实现
 
-- 保留 `FARMLAND=24` 为 moisture 0；append-only 增加 moisture 1..7（28..34）；
-- append-only 增加 wheat age 0..7（35..42）；
-- farmland / wheat 全部走现有 canonical Java 1.20.1 blockstate/model interpreter，不新增手绘 crop geometry；
-- wheat 使用 cutout render layer；
-- canonical model closure 扩到 12 blockstates / 58 models / 28 textures，tracked atlas 为确定性 128×128；
-- 旧 4×4 terrain atlas 保持 byte-stable；
-- 新增 direct-canonical `wheat_seeds` / `wheat` item texture；
-- 新增 3× wheat 横排 → bread Workbench recipe；
-- `SingleplayerFarmingRuntime` 只跟踪 sparse edited farming cells，不扫描整个 voxel world；
-- 10 秒 farming tick；水源半径 4 / 非 clear weather 使 farmland 回到 moisture 7；无水逐级干燥；
-- moisture 0 且无作物的 farmland 回 dirt；
-- wheat 0..7 逐级生长；当前 phase-1 growth chance 为 moist 0.45 / dry 0.20；
-- 生存右键种植只在 world mutation 成功后消费 1 粒种子；创造不消费；
-- mining controller 增加可选 `resolveDrops` 扩展点，普通方块仍保持历史默认单 stack drop；
-- immature wheat 掉 1 seed；mature wheat 掉 1 wheat + 0..3 seeds；
-- 成熟作物失去 farmland 支撑时仍走成熟掉落表；creative support removal 不生成掉落；
-- farming state 直接通过已有 sparse world edits 持久化，因此 save schema 继续保持 v9；
-- multiplayer farming 继续禁用，直到 planting/random tick/drop/inventory 都由 server authority 接管。
+- append-only 新增 `BLOCK.SHORT_GRASS=43`，继续保持历史 block IDs 不移动；
+- 使用 Java 1.20.1 canonical `minecraft:grass` blockstate/model/texture 作为该版本资源命名下的矮草来源；
+- 矮草走 interpreted Minecraft model 的 cutout/tint 路径；当前 biome colormap 尚未实现，因此使用显式 fallback grass tint，而不是伪称 biome-correct；
+- terrain generator 升级到 **v4**，仅 v4 新世界获得 deterministic short-grass surface decoration；
+- 显式 terrain v2 / v3 路径继续保留，旧本地世界按已持久化版本生成，不被 v4 植被注入改变；
+- multiplayer 继续要求 exact-current terrain version，因此升级后 v3 peer 不与 v4 server 混跑；
+- survival 破坏矮草按基础 **1/8** 概率掉落 1 粒 `wheat_seeds`，从而关闭 Phase 1 第一粒种子只能 `/give` 的 bootstrap 缺口；
+- 新增 direct-canonical Java 1.20.1 `bone_meal` item texture；
+- 新增 shapeless `bone → 3 bone_meal` recipe；
+- 对未成熟 wheat 使用骨粉时推进 **2..5** 个 age，最多到 age 7；成熟 wheat 不发生 mutation；
+- 对 grass block 使用骨粉时，在受限半径/尝试次数内寻找合法 grass surface，并生成 short grass；
+- survival 只有在骨粉实际改变世界后才消费 1 个；失败/no-space/invalid target 不消费；creative 成功使用不消费；spectator/adventure 不执行该 mutation；
+- short grass 失去 grass support 时会被移除；survival 按同一 seed drop rule 结算，creative 不产生 seed drop；
+- `CREATIVE_START` 保持历史顺序不变；singleplayer save schema 保持 v9；
+- multiplayer 骨粉/vegetation farming mutation 继续不做 client-side 假权威，等待 server-owned action/inventory/world transaction。
 
-### 已关闭的 integration findings
+### 兼容性边界
 
-1. **asset-manifest bootstrap anchor**：同一 canonical item list 在审计文件存在 3 个合同位置，bootstrap 从错误的 single-anchor 假设改为显式 3 处更新。
-2. **model runtime registry golden**：interpreted block ID golden 从旧 `[9,19,20,21]` 扩展到 farmland moisture / wheat age 的全部 opt-in IDs。
-3. **model atlas golden**：闭包从 10/46/18 更新为确定性 12/58/28，同时更新 atlas SHA、glass/furnace region 和 texture-count contracts。
-4. **support-break drops**：最初实现会把任何失去支撑的 wheat 固定降级成 1 seed；已改为 survival 使用该 crop 的真实 phase-1 drop resolver，creative 不产掉落。
-5. **mode wiring**：farming runtime 现显式读取 player mode，避免 support-break 路径绕过 creative no-drop semantics。
+- merged main 当前仍是 terrain v3；只有 #129 合并后新世界默认才进入 terrain v4；
+- v4 只增加 surface short grass decoration，不重新定义 v2/v3 的 iron/coal/height/tree 内容；
+- singleplayer `terrainVersion` 仍从 schema v8 开始必填；schema v9 规则不变；
+- 旧 terrain v2/v3 local saves 继续显式 pin；不把它们静默升级成 v4；
+- current 64-high deterministic browser worldgen 仍不是 Java 1.20.1 exact biome/cave/feature placement；
+- grass bone-meal spread 是 phase-1.1 有界近似，不声明 vanilla random-walk / flower biome table parity；
+- short-grass seed drop 当前是基础无 Fortune 情况；Fortune/exact loot-table RNG 尚未进入统一 loot system。
 
-集成 bootstrap 已在干净工作树中通过完整 auto-discovered logic/server/Worker suite、canonical model closure/atlas build 和 farming model boundary，并已自删除；真实集成 commit 为 `05b0d13d822bdb6d9c33a8d8fc86cd3421e4418a`。之后又追加浏览器 farming E2E 与文档，因此最终合并仍需重新以最新 HEAD 跑全部正式门。
+## 验证覆盖
 
-## 浏览器验证
+### Pure / runtime
 
-`tests/e2e/farming-phase-1.spec.mjs` 覆盖：
+`scripts/check-vegetation-farming-1-1.mjs` 覆盖：
 
-1. survival `/give wheat_seeds 2`；
-2. 真实 Inventory → hotbar；
-3. 对 raycast 命中的 farmland 执行真实 secondary-action planting；
-4. 成功后种子 2→1；
-5. world cell 进入 wheat age 0；
-6. 确定性 farming tick 推进到 age 7；
-7. 实际 primary mining 破坏 mature wheat；
-8. ground drop 被玩家拾取后 Inventory 中出现 wheat；
+1. 1/8 short-grass seed boundary；
+2. bone-meal wheat 2..5 growth 与 age-7 cap；
+3. grass candidate 半径/尝试次数边界；
+4. invalid random contract；
+5. SingleplayerVegetationRuntime wheat mutation；
+6. grass → short grass spread；
+7. support removal → short-grass removal/drop；
+8. creative no-drop boundary。
+
+现有 terrain / server world-info / singleplayer terrain-version / model-runtime / model-atlas / asset-manifest goldens 同步升级到 terrain v4 / short-grass canonical closure。
+
+### Browser
+
+`tests/e2e/vegetation-farming-1-1.spec.mjs` 覆盖真实页面路径：
+
+1. survival 创建世界；
+2. deterministic 1/8 命中条件下真实 primary mining 破坏 short grass；
+3. ground drop pickup 后 Inventory 出现 wheat seeds；
+4. `/give bone_meal 2` → Inventory → hotbar；
+5. 真实 secondary-action 对 wheat age 0 使用骨粉并推进到 age 2；
+6. 成功后 survival bone meal 2→1；
+7. 对 grass 使用第二个 bone meal；
+8. 世界出现 short grass，最后一个骨粉被消费；
 9. 页面无 pageerror / console error。
 
-## 兼容性与 parity 边界
+### 正式门禁
 
-- `PROJECT_BASELINE.md` 只记录 merged main，目前只到 #127；
-- block IDs append-only，不改历史 ID；
-- `CREATIVE_START` 顺序不变；
-- terrain generator v2/v3 与 save schema v9 规则不变；
-- farming 不新增独立持久化 schema；
-- natural short-grass → wheat seeds acquisition 尚未实现，第一粒种子当前需 `/give`；
-- exact Java random-tick/growth formula、light/neighbor growth-speed、farmland trampling、exact seed RNG/Fortune、bone meal、其它 crops 尚未实现；
-- multiplayer farming 不做 client-side fake authority。
-
-详细合同见 `docs/FARMING_PHASE_1.md`。
-
-## 当前最终门禁
+最终合并前必须同时满足：
 
 1. exact final HEAD Node syntax；
 2. 全部 auto-discovered logic/server/Worker regressions；
-3. farming pure/runtime regression；
-4. canonical Minecraft asset source audit；
-5. farming Chromium E2E；
-6. Chromium 1/2 + 2/2 全绿；
-7. PR `behind_by=0`；
-8. 无 review / review-thread / conversation-comment blocker；
-9. final diff 自审后才转 Ready / squash merge。
+3. vegetation/farming 1.1 pure/runtime regressions；
+4. Minecraft asset source audit + deterministic model atlas/runtime provenance；
+5. Chromium 1/2 + 2/2 全绿；
+6. `behind_by=0`；
+7. 无 review / review-thread / conversation-comment blocker；
+8. final diff 自审后才转 Ready / squash merge。
 
 ## 后续连续开发顺序
 
-1. **Vegetation / Farming phase 1.1**：short grass、自然 seed acquisition、bone meal 基础；
-2. **Hunger phase 2**：use-duration/eating animation、status effects、difficulty/gamerule boundary、server-authoritative hunger；
-3. **Registry breadth**：stone variants、wood species、slab/stair/fence/door 等通用 families；
-4. **Worldgen**：biomes → caves/aquifers → ores/features → structures；
-5. server-authoritative PvE/XP 与 durable persistence。
+1. **Hunger Phase 2**：food use-duration / eating animation、status-effect foundation、difficulty/gamerule boundary；随后把 hunger/eating 推进到 server authority；
+2. **Registry breadth**：stone variants、wood species、slab/stair/fence/door 等通用 families；
+3. **Worldgen**：biomes → caves/aquifers → ores/features → structures；
+4. **Server gameplay breadth**：server-authoritative PvE/XP、durable world/block-entity persistence；
+5. 后续 farming：farmland trampling、exact crop random tick/light/neighbor formula、Fortune/loot tables、其它 crops/breeding。
 
 ## 工程规则
 
@@ -104,4 +111,4 @@ main 已合并到 PR #127。#127 完成 hunger / saturation / exhaustion / natur
 - source asset availability ≠ runtime implementation；
 - gameplay pure rules、browser presentation、server authority 分层；
 - persistence / terrain version / starter slots / network state 都是兼容性表面；
-- 不通过降低测试或静默 client authority 来换绿色门禁。
+- 不通过降低测试、静默升级旧存档或 client-side fake authority 来换绿色门禁。

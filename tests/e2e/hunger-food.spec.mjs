@@ -52,7 +52,7 @@ test('singleplayer food consumes into Java-style hunger state and persists schem
 
   await key(page,'Escape');
   await expect(page.locator('#pause-menu')).toHaveClass(/active/);
-  await expect.poll(async()=>{const record=(await savedWorlds(page)).find(world=>world.name==='CI Hunger Food');if(!record)return null;return{version:record.version,terrainVersion:record.terrainVersion,hunger:record.player?.hunger,saturation:record.player?.saturation,hasExhaustion:Number.isFinite(record.player?.exhaustion),hasTimer:Number.isFinite(record.player?.foodTickTimer)};},{timeout:10_000}).toEqual({version:9,terrainVersion:3,hunger:0,saturation:0,hasExhaustion:true,hasTimer:true});
+  await expect.poll(async()=>{const record=(await savedWorlds(page)).find(world=>world.name==='CI Hunger Food');if(!record)return null;return{version:record.version,terrainVersion:record.terrainVersion,hunger:record.player?.hunger,saturation:record.player?.saturation,hasExhaustion:Number.isFinite(record.player?.exhaustion),hasTimer:Number.isFinite(record.player?.foodTickTimer)};},{timeout:10_000}).toEqual({version:9,terrainVersion:4,hunger:0,saturation:0,hasExhaustion:true,hasTimer:true});
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });
