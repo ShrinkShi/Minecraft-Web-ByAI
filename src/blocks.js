@@ -16,7 +16,10 @@ export const BLOCK = Object.freeze({
   FARMLAND:24,DIRT_PATH:25,STRIPPED_OAK_LOG:26,
   COAL_ORE:27,
   FARMLAND_MOISTURE_1:28,FARMLAND_MOISTURE_2:29,FARMLAND_MOISTURE_3:30,FARMLAND_MOISTURE_4:31,FARMLAND_MOISTURE_5:32,FARMLAND_MOISTURE_6:33,FARMLAND_MOISTURE_7:34,
-  WHEAT_AGE_0:35,WHEAT_AGE_1:36,WHEAT_AGE_2:37,WHEAT_AGE_3:38,WHEAT_AGE_4:39,WHEAT_AGE_5:40,WHEAT_AGE_6:41,WHEAT_AGE_7:42
+  WHEAT_AGE_0:35,WHEAT_AGE_1:36,WHEAT_AGE_2:37,WHEAT_AGE_3:38,WHEAT_AGE_4:39,WHEAT_AGE_5:40,WHEAT_AGE_6:41,WHEAT_AGE_7:42,
+  // Java 1.20.1 names this block resource `minecraft:grass`; the later
+  // `short_grass` registry name is intentionally not used for source lookup.
+  SHORT_GRASS:43
 });
 
 export const BLOCKS = {
@@ -62,6 +65,13 @@ for(let age=0;age<=7;age++){
   const id=BLOCK[`WHEAT_AGE_${age}`];
   BLOCKS[id]={name:age===7?'成熟小麦':`小麦（生长 ${age}/7）`,solid:false,transparent:true,hardness:.1,tiles:[0,0,0],drops:'wheat_seeds',fullCube:false,crop:'wheat',cropAge:age};
 }
+BLOCKS[BLOCK.SHORT_GRASS]={
+  name:'矮草',solid:false,transparent:true,hardness:0,tiles:[0,0,0],drops:null,fullCube:false,
+  vegetationKind:'short_grass',
+  // Until biome colormaps land, source-model tintindex 0 uses one explicit
+  // fallback grass tint instead of silently pretending biome-correct color.
+  tint:[.57,.74,.35]
+};
 
 for(const id of BED_BLOCK_IDS){
   const meta=bedBlockMeta(id);
