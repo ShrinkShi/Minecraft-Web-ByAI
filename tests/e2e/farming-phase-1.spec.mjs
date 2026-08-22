@@ -64,9 +64,12 @@ test('singleplayer wheat can be planted, grown and harvested through the real br
   await canvas.dispatchEvent('mouseup',{button:0,bubbles:true});
   await expect.poll(()=>page.evaluate(({x,y,z})=>globalThis.__minecraftE2E.worldBlock(x,y,z),harvestTarget),{timeout:3_000}).toBe(BLOCK.AIR);
 
+  // Local pickup is deliberately hotbar-first. The failure artifact from the
+  // first acceptance run showed wheat already present in the inventory-panel
+  // hotbar while the old locator searched only the 27-slot main grid.
   await page.waitForTimeout(1_200);
   await key(page,'KeyE');
-  await expect(page.locator('#inventory-grid [data-inv-index]').filter({has:page.locator('img[alt="小麦"]')}).first()).toBeVisible({timeout:4_000});
+  await expect(page.locator('#inventory [data-inv-index]').filter({has:page.locator('img[alt="小麦"]')}).first()).toBeVisible({timeout:4_000});
   await key(page,'Escape');
 
   expect(pageErrors).toEqual([]);
