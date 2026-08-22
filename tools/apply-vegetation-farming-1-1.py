@@ -64,7 +64,7 @@ replace_once(asset,
 runtime_assets='scripts/check-minecraft-runtime-assets.mjs'
 replace_once(runtime_assets,
 "'blockstates/farmland.json','models/block/farmland.json','models/block/farmland_moist.json','blockstates/wheat.json','models/block/wheat_stage0.json','models/block/wheat_stage7.json'",
-"'blockstates/farmland.json','models/block/farmland.json','models/block/farmland_moist.json','blockstates/wheat.json','models/block/wheat_stage0.json','models/block/wheat_stage7.json',\n  'blockstates/grass.json','models/block/grass.json','models/block/tinted_cross.json','textures/block/grass.png'")
+"'blockstates/farmland.json','models/block/farmland.json','models/block/farmland_moist.json','blockstates/wheat.json','models/block/wheat_stage0.json','models/block/wheat_stage7.json',\n  'blockstates/grass.json','models/block/grass.json','models/block/tinted_cross.json'")
 
 model_runtime='scripts/check-minecraft-model-runtime.mjs'
 replace_once(model_runtime,
