@@ -1,4 +1,4 @@
-import {wheatAgeFromBlock,wheatBlockForAge} from './farming-rules.js';
+import {wheatAge,wheatBlockForAge} from './farming-rules.js';
 
 export const SHORT_GRASS_SEED_CHANCE=1/8;
 export const BONE_MEAL_WHEAT_MIN_GROWTH=2;
@@ -18,7 +18,7 @@ export function rollShortGrassDrops(random=Math.random){
 }
 
 export function boneMealWheatResult(blockId,random=Math.random){
-  const fromAge=wheatAgeFromBlock(blockId);
+  const fromAge=wheatAge(blockId);
   if(fromAge===null||fromAge>=7)return null;
   const span=BONE_MEAL_WHEAT_MAX_GROWTH-BONE_MEAL_WHEAT_MIN_GROWTH+1;
   const growth=BONE_MEAL_WHEAT_MIN_GROWTH+Math.floor(unitRandom(random)*span);
