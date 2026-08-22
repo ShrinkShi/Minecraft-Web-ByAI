@@ -2,7 +2,23 @@
 
 ## [Unreleased]
 
-> 2026-08-22 merged baseline: `main 3961c7ff6f59dcb5d08542c8a99a8f0b36dfbf29` includes PR #126. PR #127 is the active unmerged hunger / food delivery. Merged facts live in `docs/PROJECT_BASELINE.md`; projected parity in `docs/MINECRAFT_1_20_1_FEATURE_MATRIX.md`.
+> 2026-08-22 merged baseline: `main 408a4a57c68453ec38ccab1e5dcee2e3760eb82b` includes PR #127. PR #128 is the active unmerged wheat-farming delivery. Merged facts live in `docs/PROJECT_BASELINE.md`; active-slice details live in `docs/FARMING_PHASE_1.md`.
+
+### 2026-08-22 — PR #128 wheat farming phase one
+
+- 保留历史 `FARMLAND=24` 为 moisture 0，并 append-only 增加 farmland moisture 1..7（28..34）与 wheat age 0..7（35..42），不重排已有 block ID。
+- farmland / wheat 全部接入现有 Java 1.20.1 blockstate/model interpreter；wheat 使用 cutout layer，不引入手绘 crop geometry。
+- canonical model closure 扩展到 12 blockstates / 58 models / 28 textures，确定性 model atlas 为 128×128；旧 4×4 terrain atlas byte-stable。
+- 新增 direct-canonical `wheat_seeds` / `wheat` item textures 与 3× wheat → bread Workbench recipe。
+- 新增 `SingleplayerFarmingRuntime`：只追踪 sparse edited farming cells；10 秒 farming tick；水源半径 4 / 非 clear weather 湿润，缺水逐级干燥，空 dry farmland 回 dirt。
+- wheat age 0..7 逐级生长；当前 phase-1 growth chance 为 moist 0.45 / dry 0.20，不声明 exact Java random-tick/light/neighbor growth parity。
+- survival secondary-action 在 mutation 成功后才消费 seed；creative 不消费；invalid target 不消费。
+- singleplayer mining 增加可选 `resolveDrops` 扩展点；普通方块保持历史默认掉落。immature wheat 掉 1 seed，mature wheat 掉 1 wheat + 0..3 seeds。
+- 修复支撑破坏语义：成熟 wheat 因 farmland 消失时仍走成熟 drop table；creative support removal 不产生掉落。
+- farming state 继续复用 sparse world edits，singleplayer save schema 保持 v9；terrain v2/v3、terrainVersion-since-v8、`CREATIVE_START` 均不变。
+- multiplayer farming 继续明确禁用 client-side competing truth，等待 server-owned planting/random ticks/drops/inventory transactions。
+- 新增 pure/runtime farming regression、canonical model/asset goldens 与 Chromium planting/growth/harvest acceptance。
+- natural short-grass seed acquisition、bone meal、farmland trampling、exact seed RNG/Fortune、其它 crops 仍属于后续切片。
 
 ### 2026-08-22 — PR #127 hunger / food survival core
 
@@ -69,7 +85,7 @@
 - Inventory/Equipment/Crafting/Workbench/Furnace/durability/bed/death/oxygen/weather/XP/hunger-food slices;
 - current 8 mobs with source textures and compatible reconstructed geometry;
 - real Node authoritative multiplayer covering movement/world/mining/placement/items/Inventory/Equipment/Crafting/Workbench/Furnace/chat/commands/PvP;
-- strict overall Java 1.20.1 parity planning estimate remains about 35% because registry/worldgen/farming/redstone/dimensions/enchanting/brewing/status effects remain large gaps。
+- strict overall Java 1.20.1 parity planning estimate remains about 35% because registry/worldgen/farming breadth/redstone/dimensions/enchanting/brewing/status effects remain large gaps。
 
 ## [0.3.0] - 2026-08-11
 
