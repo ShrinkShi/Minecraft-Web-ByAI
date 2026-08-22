@@ -11,9 +11,9 @@ function decodeEdit(cx,cz,index){
 }
 
 export class SingleplayerFarmingRuntime{
-  constructor({world,getWeather=()=> 'clear',onChanged=()=>{},onDrop=()=>{},random=Math.random}={}){
+  constructor({world,getMode=()=> 'survival',getWeather=()=> 'clear',onChanged=()=>{},onDrop=()=>{},random=Math.random}={}){
     if(!world||typeof world.getBlock!=='function'||typeof world.setBlock!=='function'||typeof world.exportEdits!=='function')throw new TypeError('farming runtime requires a voxel world');
-    this.world=world;this.getWeather=callback(getWeather,'getWeather');this.onChanged=callback(onChanged,'onChanged');this.onDrop=callback(onDrop,'onDrop');this.random=callback(random,'random');this.accumulator=0;this.tracked=new Set();this.disposed=false;this.restoreTrackedEdits();
+    this.world=world;this.getMode=callback(getMode,'getMode');this.getWeather=callback(getWeather,'getWeather');this.onChanged=callback(onChanged,'onChanged');this.onDrop=callback(onDrop,'onDrop');this.random=callback(random,'random');this.accumulator=0;this.tracked=new Set();this.disposed=false;this.restoreTrackedEdits();
   }
 
   restoreTrackedEdits(){
@@ -24,11 +24,16 @@ export class SingleplayerFarmingRuntime{
     }
   }
 
+  emitCropDrops(blockId,target){
+    if(this.getMode()==='creative')return 0;
+    const stacks=this.dropsForBlock(blockId);for(const stack of stacks)this.onDrop(stack,{...target,sourceBlockId:blockId});return stacks.length;
+  }
+
   observeEdit(event){
     if(this.disposed||!event)return false;const position=decodeEdit(event.cx,event.cz,event.index),positionKey=key(position.x,position.y,position.z),id=Number(event.id);
     if(isFarmlandBlock(id)||isWheatCropBlock(id))this.tracked.add(positionKey);else this.tracked.delete(positionKey);
     if(!isFarmlandBlock(id)&&isWheatCropBlock(this.world.getBlock(position.x,position.y+1,position.z))){
-      const cropId=this.world.getBlock(position.x,position.y+1,position.z);if(this.world.setBlock(position.x,position.y+1,position.z,BLOCK.AIR)){this.onDrop({id:'wheat_seeds',count:1},{x:position.x,y:position.y+1,z:position.z,sourceBlockId:cropId});this.onChanged();}
+      const cropId=this.world.getBlock(position.x,position.y+1,position.z);if(this.world.setBlock(position.x,position.y+1,position.z,BLOCK.AIR)){this.emitCropDrops(cropId,{x:position.x,y:position.y+1,z:position.z});this.onChanged();}
     }
     return true;
   }
@@ -60,7 +65,7 @@ export class SingleplayerFarmingRuntime{
         continue;
       }
       if(isWheatCropBlock(id)){
-        const below=this.world.getBlock(x,y-1,z);if(!isFarmlandBlock(below)){if(this.world.setBlock(x,y,z,BLOCK.AIR)){this.onDrop({id:'wheat_seeds',count:1},{x,y,z,sourceBlockId:id});changed=true;this.onChanged();}continue;}
+        const below=this.world.getBlock(x,y-1,z);if(!isFarmlandBlock(below)){if(this.world.setBlock(x,y,z,BLOCK.AIR)){this.emitCropDrops(id,{x,y,z});changed=true;this.onChanged();}continue;}
         const next=nextWheatBlock(id,below,random);if(next!==id&&this.world.setBlock(x,y,z,next)){changed=true;this.onChanged();}
         continue;
       }
