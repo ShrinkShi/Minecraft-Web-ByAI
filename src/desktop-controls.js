@@ -4,8 +4,12 @@ import {pointerLookIntent} from './pointer-look-rules.js';
 import {publishFirstPersonAction} from './first-person-action-channel.js';
 
 const MOVEMENT_CODES=new Set(['KeyW','KeyA','KeyS','KeyD']);
-const BUTTON_CODES=new Map([['Space','jump'],['ShiftLeft','sneak'],['ShiftRight','sneak'],['KeyR','sprint']]);
-export const DESKTOP_SPRINT_HOLD_CODE='KeyR';
+const BUTTON_CODES=new Map([['Space','jump'],['ShiftLeft','sneak'],['ShiftRight','sneak'],['ControlLeft','sprint'],['ControlRight','sprint']]);
+export const DESKTOP_SPRINT_HOLD_CODE='ControlLeft';
+export const DESKTOP_SPRINT_HOLD_CODES=Object.freeze(['ControlLeft','ControlRight']);
+// Ctrl still participates in browser-reserved chords (notably Ctrl+W), but while
+// gameplay is active the immersive shell suppresses the browser action and this
+// adapter is allowed to use the physical Ctrl key as the Minecraft sprint hold.
 export const DESKTOP_BROWSER_RESERVED_CODES=Object.freeze(['ControlLeft','ControlRight','Tab']);
 export const desktopButtonForCode=code=>BUTTON_CODES.get(code)||null;
 
