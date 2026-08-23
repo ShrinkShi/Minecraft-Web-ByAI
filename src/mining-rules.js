@@ -17,7 +17,7 @@ export function miningToolMultiplier(blockId,itemId=null){
 export function canHarvestBlock(blockId,itemId=null){return toolMeetsBlockRequirement(toolFor(itemId),blockDef(blockId));}
 
 export function miningDurationMs(blockId,itemId=null,mode='survival'){
-  const block=blockDef(blockId);if(mode==='creative')return CREATIVE_BREAK_DURATION_MS;if(mode==='adventure'||mode==='spectator')return Infinity;const hardness=Number.isFinite(block.hardness)&&block.hardness>0?block.hardness:1;return Math.max(MIN_BREAK_DURATION_MS,hardness*BASE_HARDNESS_DURATION_MS/miningToolMultiplier(blockId,itemId));
+  const block=blockDef(blockId);if(mode==='creative')return CREATIVE_BREAK_DURATION_MS;if(mode==='adventure'||mode==='spectator')return Infinity;const rawHardness=Number.isFinite(block.hardness)?block.hardness:1;if(rawHardness<0)return Infinity;return Math.max(MIN_BREAK_DURATION_MS,rawHardness*BASE_HARDNESS_DURATION_MS/miningToolMultiplier(blockId,itemId));
 }
 
 export function miningProgressDelta(blockId,itemId,dtSeconds,mode='survival'){

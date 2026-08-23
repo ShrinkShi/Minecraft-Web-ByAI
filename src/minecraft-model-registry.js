@@ -35,7 +35,10 @@ export const MINECRAFT_MODEL_BLOCK_REGISTRY=Object.freeze({
   [BLOCK.WHEAT_AGE_4]:descriptor('minecraft:wheat',{state:{age:'4'},renderLayer:'cutout'}),
   [BLOCK.WHEAT_AGE_5]:descriptor('minecraft:wheat',{state:{age:'5'},renderLayer:'cutout'}),
   [BLOCK.WHEAT_AGE_6]:descriptor('minecraft:wheat',{state:{age:'6'},renderLayer:'cutout'}),
-  [BLOCK.WHEAT_AGE_7]:descriptor('minecraft:wheat',{state:{age:'7'},renderLayer:'cutout'})
+  [BLOCK.WHEAT_AGE_7]:descriptor('minecraft:wheat',{state:{age:'7'},renderLayer:'cutout'}),
+  // Java 1.20.1 canonical resource name is minecraft:grass. The model inherits
+  // tinted_cross, so BLOCKS[SHORT_GRASS].tint supplies the current non-biome fallback.
+  [BLOCK.SHORT_GRASS]:descriptor('minecraft:grass',{renderLayer:'cutout'})
 });
 
 export function minecraftModelBlockDescriptor(blockId){

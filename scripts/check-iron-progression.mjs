@@ -46,8 +46,10 @@ const wood=authoritativeBreak('wooden_pickaxe');assert.equal(wood.result.drop,nu
 const stone=authoritativeBreak('stone_pickaxe');assert.equal(stone.result.drop?.itemId,'raw_iron');assert.equal(stone.result.drop?.count,1);assert.equal(stone.result.drop?.blockId,BLOCK.IRON_ORE);assert.equal(stone.drops.length,1);assert.equal(stone.drops[0].itemId,'raw_iron');
 const iron=authoritativeBreak('iron_pickaxe');assert.equal(iron.result.drop?.itemId,'raw_iron');assert.equal(iron.drops.length,1);assert.ok(iron.ticks<stone.ticks,'authoritative iron pickaxe must complete the same iron-ore break in fewer server ticks than stone');
 
-assert.equal(TERRAIN_GENERATOR_VERSION,3);const terrain=createTerrainGenerator({seed:'iron-progression',prompt:'平原'});let ores=0;
+assert.equal(TERRAIN_GENERATOR_VERSION,4);const terrain=createTerrainGenerator({seed:'iron-progression',prompt:'平原'});let ores=0;
 for(let cx=-2;cx<=2;cx++)for(let cz=-2;cz<=2;cz++){const chunk=terrain.generateChunk(cx,cz);for(const id of chunk)if(id===BLOCK.IRON_ORE)ores++;}
-assert.ok(ores>0,'shared terrain v3 must generate reachable iron ore in a representative area');
+assert.ok(ores>0,'shared current terrain v4 must retain reachable iron ore in a representative area');
+const terrainV3=createTerrainGenerator({seed:'iron-progression',prompt:'平原',version:3});let v3Ores=0;for(let cx=-2;cx<=2;cx++)for(let cz=-2;cz<=2;cz++)for(const id of terrainV3.generateChunk(cx,cz))if(id===BLOCK.IRON_ORE)v3Ores++;
+assert.equal(v3Ores,ores,'terrain v4 vegetation decoration may not change deterministic iron ore placement');
 
-console.log('stone pickaxe -> iron harvest -> furnace iron ingot -> source-backed iron pickaxe progression contract: PASS');
+console.log('stone pickaxe -> iron harvest -> furnace iron ingot -> source-backed iron pickaxe progression contract across current terrain v4 / explicit v3: PASS');

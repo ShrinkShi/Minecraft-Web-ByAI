@@ -19,11 +19,11 @@ assert.equal(resolver.manifest.minecraftVersion,'1.20.1');
 assert.equal(resolver.manifest.sourceKind,'directory');
 assert.equal(resolver.manifest.sourceRoot,'MC原版素材assets');
 assert.equal('sourceArchiveSha256' in resolver.manifest,false);
-assert.deepEqual(resolver.manifest.closure,{blockstates:12,models:58,textures:28,metadata:0});
-assert.equal(resolver.textureCount,28);
+assert.deepEqual(resolver.manifest.closure,{blockstates:13,models:60,textures:29,metadata:0});
+assert.equal(resolver.textureCount,29);
 assert.deepEqual(resolver.atlas,{
   path:'model-texture-atlas.png',
-  sha256:'b8ccd8f5273ab896386ddd1e541419488b89b341748c520521d18fcf59d2658b',
+  sha256:'d3770949b24633637dd68c7a96a92217b4d46265b5bbef3ea965831eeb04fd31',
   width:128,
   height:128,
   gutterPx:1,
@@ -42,6 +42,7 @@ assert.equal(resolver.hasTexture('minecraft:block/furnace_side'),true);
 assert.equal(resolver.hasTexture('minecraft:block/furnace_top'),true);
 assert.equal(resolver.hasTexture('minecraft:block/farmland'),true);
 assert.equal(resolver.hasTexture('minecraft:block/farmland_moist'),true);
+assert.equal(resolver.hasTexture('minecraft:block/grass'),true);
 assert.equal(resolver.hasTexture('minecraft:block/wheat_stage7'),true);
 assert.equal(resolver.hasTexture('minecraft:block/not_imported'),false);
 assert.deepEqual(resolver.requireRegion('block/glass'),{
@@ -56,8 +57,16 @@ assert.deepEqual(resolver.requireRegion('block/furnace_front'),{
   u1:0.9765625,
   v1:0.1328125
 });
+assert.deepEqual(resolver.requireRegion('block/grass'),{
+  u0:0.5703125,
+  v0:0.1484375,
+  u1:0.6953125,
+  v1:0.2734375
+});
 assert.equal(resolver.requireTextureRecord('block/furnace_front').canonical,'assets/minecraft/textures/block/furnace_front.png');
 assert.equal(resolver.requireTextureRecord('block/furnace_front').source,'MC原版素材assets/minecraft/textures/block/furnace_front.png');
+assert.equal(resolver.requireTextureRecord('block/grass').canonical,'assets/minecraft/textures/block/grass.png');
+assert.equal(resolver.requireTextureRecord('block/grass').source,'MC原版素材assets/minecraft/textures/block/grass.png');
 assert.equal(resolver.requireTextureRecord('block/torch').canonical,'assets/minecraft/textures/block/torch.png');
 assert.throws(()=>resolver.requireRegion('block/not_imported'),/not present in the tracked atlas/);
 assert.throws(()=>resolver.hasTexture('../glass'),/resource path/);
@@ -79,6 +88,7 @@ const runtimeBinding=createMinecraftModelTextureBinding(resolver,{resolveLayer:m
 assert.equal(runtimeBinding('block/glass',{tag:'face'},{blockId:20,renderLayer:'translucent',textureLayers:{}}).layer,'translucent');
 assert.equal(runtimeBinding('block/iron_ore',{tag:'face'},{blockId:19,renderLayer:'opaque',textureLayers:{}}).layer,'opaque');
 assert.equal(runtimeBinding('block/furnace_front',{tag:'face'},{blockId:21,renderLayer:'opaque',textureLayers:{}}).layer,'opaque');
+assert.equal(runtimeBinding('block/grass',{tag:'face'},{blockId:43,renderLayer:'cutout',textureLayers:{}}).layer,'cutout');
 assert.equal(runtimeBinding('block/glass',{tag:'face'},{blockId:20,renderLayer:'opaque',textureLayers:{'minecraft:block/glass':'cutout'}}).layer,'cutout');
 
 const model={faces:[{
@@ -109,7 +119,7 @@ const loaded=await loadMinecraftModelAtlasResolver({
   }
 });
 assert.equal(requestedUrl,'./assets/model-textures/model-texture-atlas.json');
-assert.equal(loaded.textureCount,28);
+assert.equal(loaded.textureCount,29);
 assert.deepEqual(loaded.requireRegion('block/iron_ore'),resolver.requireRegion('block/iron_ore'));
 await assert.rejects(
   ()=>loadMinecraftModelAtlasResolver({fetchImpl:async()=>({ok:false,status:404,json:async()=>({})})}),
@@ -183,4 +193,4 @@ const badArchiveSha=structuredClone(legacyArchive);
 badArchiveSha.sourceArchiveSha256='not-a-sha';
 assert.throws(()=>normalizeMinecraftModelAtlasManifest(badArchiveSha),/sourceArchiveSha256 must be a lowercase SHA-256/);
 
-console.log('tracked Minecraft model atlas manifest + furnace directory provenance + strict texture binding resolver: PASS');
+console.log('tracked Minecraft model atlas manifest + grass/furnace directory provenance + strict texture binding resolver: PASS');

@@ -8,19 +8,19 @@ assert.equal(ASSET_MANIFEST_VERSION,2);
 for(const key of [
   'terrain.block_atlas','block.model_atlas','block.iron_ore','block.coal_ore','block.white_wool','block.glass','block.stripped_oak_log','block.stripped_oak_log_top',
   'item.stick','item.wooden_pickaxe','item.stone_pickaxe','item.wooden_sword','item.stone_sword','item.bow','item.iron_hoe','item.iron_pickaxe','item.raw_iron',
-  'item.iron_helmet','item.iron_chestplate','item.iron_leggings','item.iron_boots','item.coal','item.apple','item.bread','item.wheat_seeds','item.wheat','item.cooked_beef','item.cooked_mutton','item.cooked_porkchop','item.cooked_chicken',
+  'item.iron_helmet','item.iron_chestplate','item.iron_leggings','item.iron_boots','item.coal','item.apple','item.bread','item.wheat_seeds','item.wheat','item.bone_meal','item.cooked_beef','item.cooked_mutton','item.cooked_porkchop','item.cooked_chicken',
   'item.leather_helmet','item.leather_chestplate','item.leather_leggings','item.leather_boots','item.raw_beef','item.leather','item.raw_mutton',
   'item.raw_porkchop','item.raw_chicken','item.feather','item.rotten_flesh','item.bone','item.arrow','item.gunpowder','item.string',
   'entity.bed.red','entity.cow','entity.sheep','entity.sheep_fur','entity.pig','entity.chicken','entity.zombie','entity.skeleton','entity.creeper','entity.spider','entity.player.steve',
   'gui.crafting_table_panel','metadata.minecraft_runtime','metadata.minecraft_model_atlas','metadata.minecraft_player'
 ])assert.ok(ASSET_KEYS.includes(key),`${key} must be declared`);
 
-const DIRECT_CANONICAL_KEYS=new Set(['item.wooden_sword','item.stone_sword','item.bow','item.iron_hoe','item.iron_helmet','item.iron_chestplate','item.iron_leggings','item.iron_boots','item.coal','item.apple','item.bread','item.wheat_seeds','item.wheat','item.cooked_beef','item.cooked_mutton','item.cooked_porkchop','item.cooked_chicken','block.white_wool','block.stripped_oak_log','block.stripped_oak_log_top','gui.crafting_table_panel']);
+const DIRECT_CANONICAL_KEYS=new Set(['item.wooden_sword','item.stone_sword','item.bow','item.iron_hoe','item.iron_helmet','item.iron_chestplate','item.iron_leggings','item.iron_boots','item.coal','item.apple','item.bread','item.wheat_seeds','item.wheat','item.bone_meal','item.cooked_beef','item.cooked_mutton','item.cooked_porkchop','item.cooked_chicken','block.white_wool','block.stripped_oak_log','block.stripped_oak_log_top','gui.crafting_table_panel']);
 for(const key of ASSET_KEYS){
   const record=assetRecord(key);assert.ok(record,`${key} must resolve to a manifest record`);assert.equal(record.source,ASSET_SOURCE.USER_SUPPLIED,`${key} must resolve from the user-supplied original Minecraft source assets`);
   if(DIRECT_CANONICAL_KEYS.has(key)){
     assert.equal(record.directCanonical,true,`${key} must explicitly declare direct canonical usage`);
-    if(key.startsWith('item.'))assert.match(record.url,/^\.\/MC原版素材assets\/minecraft\/textures\/item\/(?:wooden_sword|stone_sword|bow|iron_hoe|iron_helmet|iron_chestplate|iron_leggings|iron_boots|coal|apple|bread|wheat_seeds|wheat|cooked_beef|cooked_mutton|cooked_porkchop|cooked_chicken)\.png$/,`${key} must stay on the audited canonical item path`);
+    if(key.startsWith('item.'))assert.match(record.url,/^\.\/MC原版素材assets\/minecraft\/textures\/item\/(?:wooden_sword|stone_sword|bow|iron_hoe|iron_helmet|iron_chestplate|iron_leggings|iron_boots|coal|apple|bread|wheat_seeds|wheat|bone_meal|cooked_beef|cooked_mutton|cooked_porkchop|cooked_chicken)\.png$/,`${key} must stay on the audited canonical item path`);
     else if(key.startsWith('block.'))assert.match(record.url,/^\.\/MC原版素材assets\/minecraft\/textures\/block\/(?:stripped_oak_log(?:_top)?|white_wool)\.png$/,`${key} must stay on the audited canonical block path`);
     else assert.match(record.url,/^\.\/MC原版素材assets\/minecraft\/textures\/gui\/container\/crafting_table\.png$/,`${key} must stay on the audited canonical GUI path`);
   }else{
@@ -82,7 +82,7 @@ assert.equal(assetUrl('entity.spider'),'./assets/minecraft/textures/entity/spide
 assert.equal(assetUrl('entity.player.steve'),'./assets/minecraft/textures/entity/player/wide/steve.png');
 assert.throws(()=>assetRecord(''),TypeError);
 
-for(const itemId of ['stick','wooden_pickaxe','stone_pickaxe','wooden_sword','stone_sword','iron_hoe','iron_pickaxe','iron_helmet','iron_chestplate','iron_leggings','iron_boots','coal','apple','bread','wheat_seeds','wheat','cooked_beef','cooked_mutton','cooked_porkchop','cooked_chicken','leather_helmet','leather_chestplate','leather_leggings','leather_boots','raw_beef','leather','raw_mutton','raw_porkchop','raw_chicken','feather','rotten_flesh','bone','arrow','gunpowder','string']){
+for(const itemId of ['stick','wooden_pickaxe','stone_pickaxe','wooden_sword','stone_sword','iron_hoe','iron_pickaxe','iron_helmet','iron_chestplate','iron_leggings','iron_boots','coal','apple','bread','wheat_seeds','wheat','bone_meal','cooked_beef','cooked_mutton','cooked_porkchop','cooked_chicken','leather_helmet','leather_chestplate','leather_leggings','leather_boots','raw_beef','leather','raw_mutton','raw_porkchop','raw_chicken','feather','rotten_flesh','bone','arrow','gunpowder','string']){
   const item=ITEMS[itemId];assert.ok(item?.assetKey,`${itemId} must use a logical asset key`);assert.equal(item.texture,requireAssetUrl(item.assetKey),`${itemId} must resolve through asset manifest`);
 }
 assert.equal(ITEMS['block:20'].assetKey,'block.glass');
@@ -95,7 +95,8 @@ assert.equal(ITEMS.white_wool.texture,requireAssetUrl('block.white_wool'));
 assert.equal(ITEMS.white_wool.tile,undefined);
 assert.equal(ITEMS.coal.assetKey,'item.coal');
 assert.equal(ITEMS.coal.texture,requireAssetUrl('item.coal'));
-for(const itemId of ['apple','bread','wheat_seeds','wheat','cooked_beef','cooked_mutton','cooked_porkchop','cooked_chicken']){assert.equal(ITEMS[itemId].assetKey,`item.${itemId}`);assert.equal(ITEMS[itemId].texture,requireAssetUrl(`item.${itemId}`));assert.equal(assetRecord(`item.${itemId}`).directCanonical,true);}
+for(const itemId of ['apple','bread','wheat_seeds','wheat','bone_meal','cooked_beef','cooked_mutton','cooked_porkchop','cooked_chicken']){assert.equal(ITEMS[itemId].assetKey,`item.${itemId}`);assert.equal(ITEMS[itemId].texture,requireAssetUrl(`item.${itemId}`));assert.equal(assetRecord(`item.${itemId}`).directCanonical,true);}
+assert.equal(ITEMS.bone_meal.useKind,'bone_meal');
 assert.equal(ITEMS.bed.entityAssetKey,'entity.bed.red');
 assert.equal(ITEMS.bed.itemPreview,'bed-model');
 assert.equal(ITEMS.bed.texture,undefined,'bed item may not fall back to hand-drawn or third-party flat artwork');
@@ -113,7 +114,7 @@ assert.equal(snapshot['item.wooden_sword'].directCanonical,true);
 assert.equal(snapshot['item.stone_sword'].directCanonical,true);
 assert.equal(snapshot['item.bow'].directCanonical,true);
 assert.equal(snapshot['item.iron_hoe'].directCanonical,true);
-for(const key of ['item.iron_helmet','item.iron_chestplate','item.iron_leggings','item.iron_boots','item.coal','item.apple','item.bread','item.wheat_seeds','item.wheat','item.cooked_beef','item.cooked_mutton','item.cooked_porkchop','item.cooked_chicken'])assert.equal(snapshot[key].directCanonical,true);
+for(const key of ['item.iron_helmet','item.iron_chestplate','item.iron_leggings','item.iron_boots','item.coal','item.apple','item.bread','item.wheat_seeds','item.wheat','item.bone_meal','item.cooked_beef','item.cooked_mutton','item.cooked_porkchop','item.cooked_chicken'])assert.equal(snapshot[key].directCanonical,true);
 assert.equal(snapshot['block.white_wool'].directCanonical,true);
 assert.equal(snapshot['block.stripped_oak_log'].directCanonical,true);
 assert.equal(snapshot['block.stripped_oak_log_top'].directCanonical,true);
