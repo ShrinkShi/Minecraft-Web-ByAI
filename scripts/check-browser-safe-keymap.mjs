@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
-import {DESKTOP_BROWSER_RESERVED_CODES,DESKTOP_SPRINT_HOLD_CODE,desktopButtonForCode} from '../src/desktop-controls.js';
+import {DESKTOP_BROWSER_RESERVED_CODES,DESKTOP_SPRINT_HOLD_CODE,DESKTOP_SPRINT_HOLD_CODES,desktopButtonForCode} from '../src/desktop-controls.js';
 
-assert.equal(DESKTOP_SPRINT_HOLD_CODE,'KeyR');
-assert.equal(desktopButtonForCode('KeyR'),'sprint');
-assert.equal(desktopButtonForCode('ControlLeft'),null,'Ctrl must not be a gameplay sprint hold key because Ctrl+W is browser-reserved');
-assert.equal(desktopButtonForCode('ControlRight'),null);
+assert.equal(DESKTOP_SPRINT_HOLD_CODE,'ControlLeft');
+assert.deepEqual(DESKTOP_SPRINT_HOLD_CODES,['ControlLeft','ControlRight']);
+assert.equal(desktopButtonForCode('KeyR'),null,'legacy R sprint binding must stay removed');
+assert.equal(desktopButtonForCode('ControlLeft'),'sprint');
+assert.equal(desktopButtonForCode('ControlRight'),'sprint');
 assert.equal(desktopButtonForCode('ShiftLeft'),'sneak');
 assert.equal(desktopButtonForCode('Space'),'jump');
 assert.ok(DESKTOP_BROWSER_RESERVED_CODES.includes('Tab'));
