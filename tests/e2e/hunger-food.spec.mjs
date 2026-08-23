@@ -36,21 +36,24 @@ test('singleplayer food requires an interruptible 1.6 second use and persists sc
   await canvas.click({position:{x:8,y:8}});
   await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.id||null),{timeout:5_000}).toBe('game-canvas');
 
-  // First hold: observe real progress, then release early. Nothing may be consumed later.
+  // First hold: observe any real intermediate render frame, then release before
+  // completion. Do not key this to a fixed Playwright delay: under a saturated CI
+  // runner the browser main thread may legitimately resume after the 1.6 s wall-clock
+  // deadline, in which case completing on that frame is correct product behaviour.
   await rightDown(canvas);
-  await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E.foodUse()),{timeout:2_000}).toMatchObject({active:true,itemId:'bread'});
-  await page.waitForTimeout(700);
+  await expect.poll(()=>page.evaluate(()=>{const use=globalThis.__minecraftE2E.foodUse();return !!use?.active&&use.progress>0&&use.progress<1;}),{timeout:2_000,intervals:[16,32,50,80]}).toBe(true);
   const midUse=await page.evaluate(()=>({use:globalThis.__minecraftE2E.foodUse(),stack:globalThis.__minecraftE2E.selectedStack(),vitals:globalThis.__minecraftE2E.playerVitals(),view:globalThis.__minecraftE2E.firstPersonViewModel()}));
   expect(midUse.use.active).toBeTruthy();
-  expect(midUse.use.progress).toBeGreaterThan(.2);
-  expect(midUse.use.progress).toBeLessThan(.8);
+  expect(midUse.use.progress).toBeGreaterThan(0);
+  expect(midUse.use.progress).toBeLessThan(1);
   expect(midUse.stack).toMatchObject({id:'bread',count:2});
   expect(midUse.vitals).toMatchObject({food:10,saturation:0});
   expect(midUse.view).toMatchObject({itemId:'bread',itemKind:'food',foodUseActive:true,foodUseItemId:'bread'});
-  expect(midUse.view.foodUseProgress).toBeGreaterThan(.2);
+  expect(midUse.view.foodUseProgress).toBeGreaterThan(0);
+  expect(midUse.view.foodUseProgress).toBeLessThan(1);
   await rightUp(canvas);
   await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E.foodUse())).toMatchObject({active:false,reason:'released'});
-  await page.waitForTimeout(1_100);
+  await page.waitForTimeout(1_700);
   expect(await page.evaluate(()=>globalThis.__minecraftE2E.selectedStack())).toMatchObject({id:'bread',count:2});
   expect(await page.evaluate(()=>globalThis.__minecraftE2E.playerVitals())).toMatchObject({food:10,saturation:0});
 
