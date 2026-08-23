@@ -3,12 +3,11 @@ import {ensureChatCommandCompletion} from './chat-command-completion.js';
 import {publishFirstPersonAction} from './first-person-action-channel.js';
 
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
-const actionName=name=>name==='use'?'secondary':name;
 
 export class MobileControls{
   constructor(bus,{onProfile=()=>{}}={}){
     this.bus=bus;this.onProfile=onProfile;this.source='touch';this.root=document.querySelector('#mobile-controls');this.joystick=document.querySelector('#mobile-joystick');this.knob=document.querySelector('#mobile-joystick-knob');this.lookZone=document.querySelector('#mobile-look-zone');
-    this.profile={mobile:false,orientation:'landscape'};this.gameplayEnabled=false;this.movePointer=null;this.lookPointer=null;this.lookLast=null;this.holds=new Map();this.toggles={sprint:false,sneak:false};
+    this.profile={mobile:false,orientation:'landscape'};this.gameplayEnabled=false;this.movePointer=null;this.lookPointer=null;this.lookLast=null;this.holds=new Map();this.secondaryPointers=new Set();this.toggles={sprint:false,sneak:false};
     ensureChatCommandCompletion();this.bind();this.stopWatch=watchDeviceProfile(profile=>{this.profile=profile;this.onProfile(profile);this.sync();});
   }
 
@@ -20,9 +19,9 @@ export class MobileControls{
       if(e.pointerId===this.movePointer)this.updateJoystick(e);
       if(e.pointerId===this.lookPointer&&this.lookLast){const dx=e.clientX-this.lookLast.x,dy=e.clientY-this.lookLast.y;this.lookLast={x:e.clientX,y:e.clientY};this.bus.look(this.source,-dx*.0026,-dy*.0026);}
     },{passive:false});
-    const release=e=>{if(e.pointerId===this.movePointer){this.movePointer=null;this.resetMove();}if(e.pointerId===this.lookPointer){this.lookPointer=null;this.lookLast=null;}const hold=this.holds.get(e.pointerId);if(hold){this.holds.delete(e.pointerId);this.bus.setButton(this.source,hold,false);}};
+    const release=e=>{if(e.pointerId===this.movePointer){this.movePointer=null;this.resetMove();}if(e.pointerId===this.lookPointer){this.lookPointer=null;this.lookLast=null;}const hold=this.holds.get(e.pointerId);if(hold){this.holds.delete(e.pointerId);this.bus.setButton(this.source,hold,false);}if(this.secondaryPointers.delete(e.pointerId)&&this.secondaryPointers.size===0)this.bus.setSecondary(this.source,false);};
     window.addEventListener('pointerup',release);window.addEventListener('pointercancel',release);
-    for(const button of this.root.querySelectorAll('[data-mobile-action]'))button.addEventListener('pointerdown',e=>{if(!this.interactive())return;e.preventDefault();e.stopPropagation();const action=button.dataset.mobileAction;if(action==='use')publishFirstPersonAction('use');this.bus.action(this.source,actionName(action));});
+    for(const button of this.root.querySelectorAll('[data-mobile-action]'))button.addEventListener('pointerdown',e=>{if(!this.interactive())return;e.preventDefault();e.stopPropagation();const action=button.dataset.mobileAction;if(action==='use'){publishFirstPersonAction('use');this.secondaryPointers.add(e.pointerId);this.bus.setSecondary(this.source,true);return;}this.bus.action(this.source,action);});
     for(const button of this.root.querySelectorAll('[data-mobile-hold]'))button.addEventListener('pointerdown',e=>{if(!this.interactive())return;e.preventDefault();e.stopPropagation();const raw=button.dataset.mobileHold,name=raw==='attack'?'primary':raw;if(raw==='attack')publishFirstPersonAction('attack');this.holds.set(e.pointerId,name);this.bus.setButton(this.source,name,true);});
     for(const button of this.root.querySelectorAll('[data-mobile-toggle]'))button.addEventListener('pointerdown',e=>{if(!this.interactive())return;e.preventDefault();e.stopPropagation();const name=button.dataset.mobileToggle,next=!this.toggles[name];this.toggles[name]=next;button.classList.toggle('active',next);button.setAttribute('aria-pressed',String(next));this.bus.setButton(this.source,name,next);});
   }
@@ -30,8 +29,8 @@ export class MobileControls{
   interactive(){return !!this.profile.mobile&&this.profile.orientation==='landscape'&&this.gameplayEnabled;}
   updateJoystick(e){const rect=this.joystick?.getBoundingClientRect();if(!rect)return;const cx=rect.left+rect.width/2,cy=rect.top+rect.height/2,radius=Math.max(24,Math.min(rect.width,rect.height)*.36),rawX=e.clientX-cx,rawY=e.clientY-cy,length=Math.hypot(rawX,rawY)||1,scale=Math.min(1,radius/length),dx=rawX*scale,dy=rawY*scale,nx=clamp(dx/radius,-1,1),ny=clamp(dy/radius,-1,1);if(this.knob)this.knob.style.transform=`translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px))`;this.bus.setMove(this.source,nx,-ny);}
   resetMove(){if(this.knob)this.knob.style.transform='translate(-50%,-50%)';this.bus.setMove(this.source,0,0);}
-  reset(){this.movePointer=null;this.lookPointer=null;this.lookLast=null;this.bus.resetSource(this.source);this.holds.clear();for(const name of Object.keys(this.toggles))this.toggles[name]=false;for(const button of this.root?.querySelectorAll('[data-mobile-toggle]')||[]){button.classList.remove('active');button.setAttribute('aria-pressed','false');}}
+  reset(){this.movePointer=null;this.lookPointer=null;this.lookLast=null;this.secondaryPointers.clear();this.bus.resetSource(this.source);this.holds.clear();for(const name of Object.keys(this.toggles))this.toggles[name]=false;for(const button of this.root?.querySelectorAll('[data-mobile-toggle]')||[]){button.classList.remove('active');button.setAttribute('aria-pressed','false');}}
   setGameplayEnabled(enabled){const next=!!enabled;if(next===this.gameplayEnabled)return;this.gameplayEnabled=next;if(!next)this.reset();this.sync();}
-  sync(){if(!this.root)return;const visible=this.interactive();this.root.classList.toggle('hidden',!visible);this.root.setAttribute('aria-hidden',String(!visible));if(!visible&&(this.movePointer!==null||this.lookPointer!==null||this.holds.size))this.reset();}
+  sync(){if(!this.root)return;const visible=this.interactive();this.root.classList.toggle('hidden',!visible);this.root.setAttribute('aria-hidden',String(!visible));if(!visible&&(this.movePointer!==null||this.lookPointer!==null||this.holds.size||this.secondaryPointers.size))this.reset();}
   dispose(){this.stopWatch?.();this.reset();}
 }
