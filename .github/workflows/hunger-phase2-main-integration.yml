@@ -1,3 +1,4 @@
+# Bootstrap is self-deleting after a successful integration run.
 name: Hunger phase 2 main integration
 
 on:
