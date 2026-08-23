@@ -20,6 +20,16 @@ const profile={nutrition:5,saturationModifier:.6};
   assert(states.some(state=>state.active&&state.progress>0));assert.equal(states.at(-1).active,false);
 }
 {
+  // Physics/render dt may be clipped to 50 ms under a slow browser. Food use is a
+  // real-time interaction and must still complete after 1.6 wall-clock seconds.
+  let clock=100,completeCalls=0;
+  const runtime=new SingleplayerFoodUseRuntime({getMode:()=> 'survival',getSelectedStack:()=>({id:'bread',count:1}),canStart:()=>true,complete:()=>{completeCalls++;return{consumed:true};},now:()=>clock});
+  assert.equal(runtime.start('bread',profile).started,true);
+  clock+=.8;assert.equal(runtime.update(.05).completed,false);assert.equal(runtime.snapshot().progress,.5);assert.equal(completeCalls,0);
+  clock+=.79;assert.equal(runtime.update(.05).completed,false);assert(runtime.snapshot().progress>.99);assert.equal(completeCalls,0);
+  clock+=.01;assert.equal(runtime.update(.05).completed,true);assert.equal(completeCalls,1);
+}
+{
   let selected={id:'bread',count:1},mode='survival',completeCalls=0;
   const runtime=new SingleplayerFoodUseRuntime({getMode:()=>mode,getSelectedStack:()=>selected,canStart:()=>true,complete:()=>{completeCalls++;return{consumed:true};}});
   runtime.start('bread',profile);selected={id:'apple',count:1};assert.equal(runtime.update(.1).reason,'item-changed');assert.equal(completeCalls,0);
