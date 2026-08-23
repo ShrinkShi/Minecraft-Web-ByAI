@@ -36,7 +36,8 @@ export function planPlayerMotionStep({
   const stepDt=Math.min(nonNegative(dt,'dt'),PLAYER_MAX_STEP_DT),angle=finite(yaw,'yaw'),input=normalizeControlState(control),current=velocity3(velocity),isFlying=bool(flying,'flying'),isGrounded=bool(grounded,'grounded'),reportedCoverage=coverage(swimCoverage);
   walkSpeed=positiveSpeed(walkSpeed,'walkSpeed');sprintSpeed=positiveSpeed(sprintSpeed,'sprintSpeed');const water=isFlying?0:reportedCoverage;
   const swim=stepSwimming({velocityY:current.y,coverage:water,dt:stepDt,up:input.jump,down:input.sneak});
-  const baseSpeed=swim.active?walkSpeed:(input.sprint?sprintSpeed:walkSpeed),sneakFactor=swim.active?1:(input.sneak?PLAYER_SNEAK_SPEED_FACTOR:1),speed=baseSpeed*sneakFactor*swim.speedMultiplier;
+  const sprinting=!swim.active&&input.sprint&&input.forward>0&&!input.sneak;
+  const baseSpeed=swim.active?walkSpeed:(sprinting?sprintSpeed:walkSpeed),sneakFactor=swim.active?1:(input.sneak?PLAYER_SNEAK_SPEED_FACTOR:1),speed=baseSpeed*sneakFactor*swim.speedMultiplier;
   const moveAmount=Math.min(1,Math.hypot(input.forward,input.side));let inputX=0,inputZ=0;
   if(moveAmount>0){
     const horizontal=horizontalMoveFromYaw(angle,{side:input.side,forward:input.forward}),length=Math.hypot(horizontal.x,horizontal.z);
