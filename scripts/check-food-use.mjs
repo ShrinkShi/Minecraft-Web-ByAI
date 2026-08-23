@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import {FOOD_USE_DURATION_SECONDS,beginFoodUse,createFoodUseState,stepFoodUse} from '../src/food-use-rules.js';
 import {SingleplayerFoodUseRuntime} from '../src/singleplayer-food-use-runtime.js';
 
+const near=(actual,expected,epsilon=1e-9)=>assert(Math.abs(actual-expected)<=epsilon,`expected ${actual} to be within ${epsilon} of ${expected}`);
+
 assert.equal(FOOD_USE_DURATION_SECONDS,1.6);
 assert.deepEqual(createFoodUseState(),{active:false,itemId:null,elapsed:0,duration:1.6,progress:0});
 assert.deepEqual(beginFoodUse('bread'),{active:true,itemId:'bread',elapsed:0,duration:1.6,progress:0});
-let stepped=stepFoodUse(beginFoodUse('bread'),.8);assert.equal(stepped.completed,false);assert.equal(stepped.state.active,true);assert.equal(stepped.state.elapsed,.8);assert.equal(stepped.state.progress,.5);
+let stepped=stepFoodUse(beginFoodUse('bread'),.8);assert.equal(stepped.completed,false);assert.equal(stepped.state.active,true);assert.equal(stepped.state.elapsed,.8);near(stepped.state.progress,.5);
 stepped=stepFoodUse(stepped.state,.8);assert.equal(stepped.completed,true);assert.equal(stepped.state.active,false);assert.equal(stepped.state.progress,0);
 assert.throws(()=>beginFoodUse(''),/non-empty string/);assert.throws(()=>stepFoodUse(beginFoodUse('bread'),-1),/0 to 60/);
 
@@ -25,7 +27,7 @@ const profile={nutrition:5,saturationModifier:.6};
   let clock=100,completeCalls=0;
   const runtime=new SingleplayerFoodUseRuntime({getMode:()=> 'survival',getSelectedStack:()=>({id:'bread',count:1}),canStart:()=>true,complete:()=>{completeCalls++;return{consumed:true};},now:()=>clock});
   assert.equal(runtime.start('bread',profile).started,true);
-  clock+=.8;assert.equal(runtime.update(.05).completed,false);assert.equal(runtime.snapshot().progress,.5);assert.equal(completeCalls,0);
+  clock+=.8;assert.equal(runtime.update(.05).completed,false);near(runtime.snapshot().progress,.5);assert.equal(completeCalls,0);
   clock+=.79;assert.equal(runtime.update(.05).completed,false);assert(runtime.snapshot().progress>.99);assert.equal(completeCalls,0);
   clock+=.01;assert.equal(runtime.update(.05).completed,true);assert.equal(completeCalls,1);
 }
