@@ -1,33 +1,37 @@
-const clamp01=value=>Math.max(0,Math.min(1,Number(value)||0));
+export const WALK_LEG_SWING_RADIANS=.62;
+export const WALK_ARM_SWING_RADIANS=.52;
+export const RUN_LEG_SWING_RADIANS=1.05;
+export const RUN_ARM_SWING_RADIANS=.92;
+export const RUN_BODY_LEAN_RADIANS=.20;
 
-export const PLAYER_WALK_CYCLE_RATE=9.5;
-export const PLAYER_SPRINT_CYCLE_RATE=13.5;
-export const PLAYER_WALK_LEG_SWING=.62;
-export const PLAYER_SPRINT_LEG_SWING=1.04;
-export const PLAYER_WALK_ARM_SWING=.52;
-export const PLAYER_SPRINT_ARM_SWING=.86;
+const clamp01=value=>Math.max(0,Math.min(1,value));
+const finite=(value,label)=>{if(typeof value!=='number'||!Number.isFinite(value))throw new TypeError(`${label} must be a finite number`);return value;};
 
-export function playerLocomotionPose({phase=0,moving=0,sprint=false}={}){
-  const amount=clamp01(moving),p=Number.isFinite(phase)?phase:0,run=!!sprint;
-  const step=Math.sin(p),counter=Math.sin(p+Math.PI),doubleStep=Math.sin(p*2),impact=Math.abs(Math.sin(p));
-  const legAmplitude=(run?PLAYER_SPRINT_LEG_SWING:PLAYER_WALK_LEG_SWING)*amount;
-  const armAmplitude=(run?PLAYER_SPRINT_ARM_SWING:PLAYER_WALK_ARM_SWING)*amount;
-  const bodyLean=(run?-.21:-.035)*amount;
-  const bodyBob=(run?.055:.025)*impact*amount;
-  const bodyRoll=(run?.045:.018)*doubleStep*amount;
-  const shoulderYaw=(run?.055:.025)*counter*amount;
+export function playerLocomotionPose({phase=0,speed=0,sprint=false}={}){
+  phase=finite(phase,'phase');speed=Math.max(0,finite(speed,'speed'));const running=!!sprint&&speed>.1;
+  const referenceSpeed=running?5.6:4.3,moving=clamp01(speed/referenceSpeed);
+  if(moving<=.01)return Object.freeze({moving:0,running:false,phaseSpeed:0,leftArmPitch:0,rightArmPitch:0,leftLegPitch:0,rightLegPitch:0,bodyPitch:0,bodyYaw:0,bobY:0,swayX:0});
+
+  const stride=Math.sin(phase),doubleStep=Math.cos(phase*2),phaseSpeed=running?13.5:Math.min(10.5,4+speed*1.55);
+  const legAmplitude=(running?RUN_LEG_SWING_RADIANS:WALK_LEG_SWING_RADIANS)*moving;
+  const armAmplitude=(running?RUN_ARM_SWING_RADIANS:WALK_ARM_SWING_RADIANS)*moving;
+  const runKick=running?Math.sin(phase*2)*.08*moving:0;
+  const bodyPitch=running?-RUN_BODY_LEAN_RADIANS*moving:0;
+  const bodyYaw=(running?.075:.035)*stride*moving;
+  const bobY=(running?.045:.018)*(1-doubleStep)*.5*moving;
+  const swayX=(running?.018:.010)*Math.sin(phase)*moving;
+
   return Object.freeze({
-    leftLegX:step*legAmplitude,
-    rightLegX:counter*legAmplitude,
-    leftArmX:counter*armAmplitude,
-    rightArmX:step*armAmplitude,
-    leftLegZ:(run?.045:.018)*counter*amount,
-    rightLegZ:(run?.045:.018)*step*amount,
-    torsoX:bodyLean,
-    torsoZ:bodyRoll,
-    rootY:bodyBob,
-    rootZ:run?-.025*amount:0,
-    shoulderYaw,
-    cycleRate:run?PLAYER_SPRINT_CYCLE_RATE:PLAYER_WALK_CYCLE_RATE
+    moving,
+    running,
+    phaseSpeed,
+    leftArmPitch:-stride*armAmplitude,
+    rightArmPitch:stride*armAmplitude,
+    leftLegPitch:stride*legAmplitude-runKick,
+    rightLegPitch:-stride*legAmplitude-runKick,
+    bodyPitch,
+    bodyYaw,
+    bobY,
+    swayX
   });
 }
