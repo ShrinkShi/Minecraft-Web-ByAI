@@ -49,19 +49,19 @@ export function minecraftSkinCropCss(rect,{scale=17,skinSize=STEVE_SKIN_SIZE}={}
   return Object.freeze({width:`${(u1-u0)*scale}px`,height:`${(v1-v0)*scale}px`,backgroundSize:`${skinSize*scale}px ${skinSize*scale}px`,backgroundPosition:`-${u0*scale}px -${v0*scale}px`});
 }
 
-export function firstPersonActionPose({attackRemaining=0,useRemaining=0}={}){
-  const attack=Math.max(0,Math.min(1,1-(Number(attackRemaining)||0)/FIRST_PERSON_ATTACK_DURATION)),use=Math.max(0,Math.min(1,1-(Number(useRemaining)||0)/FIRST_PERSON_USE_DURATION));
-  const swing=attackRemaining>0?Math.sin(attack*Math.PI):0,useLift=useRemaining>0?Math.sin(use*Math.PI):0;
+export function firstPersonActionPose({attackRemaining=0,useRemaining=0,foodUseActive=false,foodUseProgress=0}={}){
+  const attack=Math.max(0,Math.min(1,1-(Number(attackRemaining)||0)/FIRST_PERSON_ATTACK_DURATION)),use=Math.max(0,Math.min(1,1-(Number(useRemaining)||0)/FIRST_PERSON_USE_DURATION)),foodProgress=Math.max(0,Math.min(1,Number(foodUseProgress)||0));
+  const swing=attackRemaining>0?Math.sin(attack*Math.PI):0,pulseUse=useRemaining>0?Math.sin(use*Math.PI):0,foodRaise=foodUseActive?Math.min(1,foodProgress/.12):0,foodBob=foodUseActive?Math.sin(foodProgress*Math.PI*8)*foodRaise:0,useLift=Math.max(pulseUse,foodRaise);
   return Object.freeze({
-    x:.56-.13*swing,y:-.47-.06*swing+.07*useLift,z:-1.10+.05*swing,
+    x:.56-.13*swing-.08*foodRaise,y:-.47-.06*swing+.07*pulseUse+.16*foodRaise+.025*foodBob,z:-1.10+.05*swing+.11*foodRaise,
     rotX:-.04,rotY:-.02,rotZ:-.04,
-    shoulderRotX:-.16-.92*swing+.38*useLift,
-    shoulderRotY:-.06-.22*swing,
+    shoulderRotX:-.16-.92*swing+.38*pulseUse+.48*foodRaise,
+    shoulderRotY:-.06-.22*swing-.10*foodRaise,
     shoulderRotZ:.55+.34*swing-.08*useLift,
-    wristRotX:.04+.32*useLift,
-    wristRotY:0,
-    wristRotZ:-.08+.10*swing,
-    itemRotX:-.08-.20*swing+.42*useLift,
-    itemRotZ:-.05+.16*swing
+    wristRotX:.04+.32*pulseUse+.72*foodRaise+.08*foodBob,
+    wristRotY:-.10*foodRaise,
+    wristRotZ:-.08+.10*swing-.10*foodRaise,
+    itemRotX:-.08-.20*swing+.42*pulseUse+.72*foodRaise+.10*foodBob,
+    itemRotZ:-.05+.16*swing-.14*foodRaise
   });
 }

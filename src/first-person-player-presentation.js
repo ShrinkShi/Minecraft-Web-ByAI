@@ -38,7 +38,7 @@ export class FirstPersonViewModel{
     const sleeve=new THREE.Mesh(new THREE.BoxGeometry(layout.sleeveWidth,layout.sleeveHeight,layout.sleeveDepth),skinMaterials(skin,STEVE_RIGHT_ARM_SLEEVE_UVS,{transparent:true}));sleeve.position.y=layout.sleeveCenterY;sleeve.rotation.z=layout.skinRotationZ;sleeve.name='first-person-arm-sleeve';this.armGroup.add(sleeve);this.sleeve=sleeve;
     this.wristPivot=new THREE.Group();this.wristPivot.name='first-person-wrist';this.wristPivot.position.set(0,layout.wristY,0);this.armGroup.add(this.wristPivot);
     this.itemAnchor=new THREE.Group();this.itemAnchor.name='first-person-held-item';this.wristPivot.add(this.itemAnchor);
-    this.itemVisual=null;this.itemId=null;this.itemKind='empty';this.attackRemaining=0;this.useRemaining=0;this.visible=false;this.disposed=false;this.resize(globalThis.innerWidth||1280,globalThis.innerHeight||720);this.applyPose();
+    this.itemVisual=null;this.itemId=null;this.itemKind='empty';this.attackRemaining=0;this.useRemaining=0;this.foodUseActive=false;this.foodUseProgress=0;this.foodUseItemId=null;this.visible=false;this.disposed=false;this.resize(globalThis.innerWidth||1280,globalThis.innerHeight||720);this.applyPose();
   }
 
   resize(width,height){if(this.disposed)return;const w=Math.max(1,Number(width)||1),h=Math.max(1,Number(height)||1);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();}
@@ -49,8 +49,11 @@ export class FirstPersonViewModel{
   }
   triggerAttack(){this.attackRemaining=FIRST_PERSON_ATTACK_DURATION;}
   triggerUse(){this.useRemaining=FIRST_PERSON_USE_DURATION;}
+  setFoodUseState(value={}){
+    if(this.disposed)return false;const active=!!value?.active,itemId=active&&typeof value.itemId==='string'?value.itemId:null,progress=active&&Number.isFinite(Number(value.progress))?Math.max(0,Math.min(1,Number(value.progress))):0;this.foodUseActive=active&&!!itemId;this.foodUseItemId=this.foodUseActive?itemId:null;this.foodUseProgress=this.foodUseActive?progress:0;return this.foodUseActive;
+  }
   applyPose(){
-    const pose=firstPersonActionPose({attackRemaining:this.attackRemaining,useRemaining:this.useRemaining}),item=FIRST_PERSON_ITEM_TRANSFORMS[this.itemKind]||FIRST_PERSON_ITEM_TRANSFORMS.flat;
+    const foodUseActive=this.foodUseActive&&this.foodUseItemId===this.itemId&&this.itemKind==='food',pose=firstPersonActionPose({attackRemaining:this.attackRemaining,useRemaining:this.useRemaining,foodUseActive,foodUseProgress:this.foodUseProgress}),item=FIRST_PERSON_ITEM_TRANSFORMS[this.itemKind]||FIRST_PERSON_ITEM_TRANSFORMS.flat;
     this.root.position.set(pose.x,pose.y,pose.z);this.root.rotation.set(pose.rotX,pose.rotY,pose.rotZ);
     this.armPivot.rotation.set(pose.shoulderRotX,pose.shoulderRotY,pose.shoulderRotZ);
     this.wristPivot.rotation.set(pose.wristRotX,pose.wristRotY,pose.wristRotZ);
@@ -59,7 +62,7 @@ export class FirstPersonViewModel{
   update(dt,{visible=true,itemId=null}={}){if(this.disposed)return;this.visible=!!visible;this.setItem(itemId);if(Number.isFinite(dt)&&dt>0){this.attackRemaining=Math.max(0,this.attackRemaining-dt);this.useRemaining=Math.max(0,this.useRemaining-dt);}this.applyPose();}
   render(renderer){if(this.disposed||!this.visible||!renderer)return;const autoClear=renderer.autoClear;renderer.autoClear=false;renderer.clearDepth();renderer.render(this.scene,this.camera);renderer.autoClear=autoClear;}
   snapshot(){
-    const layout=FIRST_PERSON_RIGHT_ARM_LAYOUT;return Object.freeze({visible:this.visible,itemId:this.itemId,itemKind:this.itemKind,attackRemaining:this.attackRemaining,useRemaining:this.useRemaining,cameraFov:this.camera.fov,armGeometry:'BoxGeometry',sleeveGeometry:'BoxGeometry',itemGeometry:this.itemVisual?'3d':null,itemMeshGeometry:this.itemVisual?(this.itemKind==='block'?'BoxGeometry':'PlaneGeometry'):null,armSize:Object.freeze([layout.width,layout.height,layout.depth]),rootPosition:Object.freeze(this.root.position.toArray()),rootRotation:Object.freeze([this.root.rotation.x,this.root.rotation.y,this.root.rotation.z]),shoulderRotation:Object.freeze([this.armPivot.rotation.x,this.armPivot.rotation.y,this.armPivot.rotation.z]),wristPosition:Object.freeze(this.wristPivot.position.toArray()),itemLocalPosition:Object.freeze(this.itemAnchor.position.toArray()),hierarchy:Object.freeze({armParent:this.armGroup.parent?.name||null,wristParent:this.wristPivot.parent?.name||null,itemParent:this.itemAnchor.parent?.name||null}),armDirection:'shoulder-to-centre'});
+    const layout=FIRST_PERSON_RIGHT_ARM_LAYOUT;return Object.freeze({visible:this.visible,itemId:this.itemId,itemKind:this.itemKind,attackRemaining:this.attackRemaining,useRemaining:this.useRemaining,foodUseActive:this.foodUseActive&&this.foodUseItemId===this.itemId,foodUseProgress:this.foodUseProgress,foodUseItemId:this.foodUseItemId,cameraFov:this.camera.fov,armGeometry:'BoxGeometry',sleeveGeometry:'BoxGeometry',itemGeometry:this.itemVisual?'3d':null,itemMeshGeometry:this.itemVisual?(this.itemKind==='block'?'BoxGeometry':'PlaneGeometry'):null,armSize:Object.freeze([layout.width,layout.height,layout.depth]),rootPosition:Object.freeze(this.root.position.toArray()),rootRotation:Object.freeze([this.root.rotation.x,this.root.rotation.y,this.root.rotation.z]),shoulderRotation:Object.freeze([this.armPivot.rotation.x,this.armPivot.rotation.y,this.armPivot.rotation.z]),wristPosition:Object.freeze(this.wristPivot.position.toArray()),itemLocalPosition:Object.freeze(this.itemAnchor.position.toArray()),hierarchy:Object.freeze({armParent:this.armGroup.parent?.name||null,wristParent:this.wristPivot.parent?.name||null,itemParent:this.itemAnchor.parent?.name||null}),armDirection:'shoulder-to-centre'});
   }
   dispose(){if(this.disposed)return false;disposeObject(this.root);this.scene.clear();this.itemVisual=null;this.disposed=true;return true;}
 }

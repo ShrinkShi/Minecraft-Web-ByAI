@@ -43,9 +43,9 @@ export class DesktopControls{
     this.onMouseDown=e=>{
       if(!this.gameplayEnabled)return;
       if(e.button===0){publishFirstPersonAction('attack');this.bus.setButton(this.source,'primary',true);}
-      else if(e.button===2){publishFirstPersonAction('use');this.bus.action(this.source,'secondary');}
+      else if(e.button===2){publishFirstPersonAction('use');this.bus.setSecondary(this.source,true);}
     };
-    this.onMouseUp=e=>{if(e.button===0)this.bus.setButton(this.source,'primary',false);};
+    this.onMouseUp=e=>{if(e.button===0)this.bus.setButton(this.source,'primary',false);else if(e.button===2)this.bus.setSecondary(this.source,false);};
     this.onWheel=e=>{if(!this.gameplayEnabled)return;this.bus.action(this.source,'hotbar-step',{step:e.deltaY>0?1:-1});};
     this.onCanvasClick=()=>this.bus.action(this.source,'focus');
     this.onWindowBlur=()=>{this.pointerMoveReady=false;this.reset();};

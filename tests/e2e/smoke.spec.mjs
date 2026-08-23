@@ -39,7 +39,7 @@ async function lockPointerAndLook(page,{movementX=0,movementY=0}={}){
   await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.id||null),{timeout:5_000,message:'canvas should own pointer lock before mouse interaction'}).toBe('game-canvas');
   await page.evaluate(({movementX,movementY})=>{const event=new MouseEvent('mousemove',{bubbles:true});Object.defineProperty(event,'movementX',{value:movementX});Object.defineProperty(event,'movementY',{value:movementY});document.dispatchEvent(event);},{movementX,movementY});
 }
-async function rightClickCanvas(page){await page.locator('#game-canvas').dispatchEvent('mousedown',{button:2,bubbles:true});}
+async function rightClickCanvas(page){const canvas=page.locator('#game-canvas');await canvas.dispatchEvent('mousedown',{button:2,bubbles:true});await canvas.dispatchEvent('mouseup',{button:2,bubbles:true});}
 async function placeBedWithRealAim(page){
   const candidates=[];for(const pitch of [-.45,-.65,-.85])for(const yaw of [0,Math.PI/2,Math.PI,-Math.PI/2])candidates.push([yaw,pitch]);
   for(const [yaw,pitch] of candidates){await page.evaluate(({yaw,pitch})=>globalThis.__minecraftE2E?.setLook(yaw,pitch),{yaw,pitch});await page.waitForTimeout(80);await rightClickCanvas(page);await page.waitForTimeout(120);if(((await page.locator('#toast').textContent())||'').includes('放置 床'))return;}
