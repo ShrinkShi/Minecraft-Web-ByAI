@@ -167,7 +167,7 @@ function addExperience(value){
 }
 
 function handleMobDeath({type,position}){
-  if(sessionKind!=='singleplayer'||!drops||!experienceOrbs||!position)return;const origin=new THREE.Vector3(position.x,position.y+.45,position.z+.5);for(const stack of rollMobLoot(type))drops.spawn(stack.id,stack.count,origin.clone());const xp=rollMobXp(type);if(xp>0)experienceOrbs.spawn(xp,origin.clone().add(new THREE.Vector3(0,.18,0)));
+  if(sessionKind!=='singleplayer'||!drops||!experienceOrbs||!position)return;const origin=new THREE.Vector3(position.x,position.y+.45,position.z);for(const stack of rollMobLoot(type))drops.spawn(stack.id,stack.count,origin.clone());const xp=rollMobXp(type);if(xp>0)experienceOrbs.spawn(xp,origin.clone().add(new THREE.Vector3(0,.18,0)));
 }
 
 async function startWorld(){
