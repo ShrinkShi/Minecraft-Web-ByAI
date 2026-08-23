@@ -27,6 +27,10 @@ async function lockPointer(page){
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   return canvas;
 }
+async function rightClick(canvas){
+  await canvas.dispatchEvent('mousedown',{button:2,bubbles:true});
+  await canvas.dispatchEvent('mouseup',{button:2,bubbles:true});
+}
 
 function collectBrowserErrors(page){
   const pageErrors=[],consoleErrors=[];
@@ -72,7 +76,7 @@ test('bone meal advances wheat and spreads short grass through the real secondar
   const wheat=await page.evaluate(blockId=>globalThis.__minecraftE2E.prepareSingleplayerMiningTarget(blockId),BLOCK.WHEAT_AGE_0);
   expect(wheat).toBeTruthy();
   const canvas=await lockPointer(page);
-  await canvas.dispatchEvent('mousedown',{button:2,bubbles:true});
+  await rightClick(canvas);
   await expect(page.locator('#toast')).toContainText('催熟 小麦 0→2');
   await expect.poll(()=>page.evaluate(({x,y,z})=>globalThis.__minecraftE2E.worldBlock(x,y,z),wheat)).toBe(BLOCK.WHEAT_AGE_2);
   await expect(selected.locator('.slot-count')).toHaveText('');
@@ -80,7 +84,7 @@ test('bone meal advances wheat and spreads short grass through the real secondar
   expect(await page.evaluate(()=>globalThis.__minecraftE2E.setVegetationRandom(.5))).toBe(true);
   const grass=await page.evaluate(blockId=>globalThis.__minecraftE2E.prepareSingleplayerMiningTarget(blockId),BLOCK.GRASS);
   expect(grass).toBeTruthy();
-  await canvas.dispatchEvent('mousedown',{button:2,bubbles:true});
+  await rightClick(canvas);
   await expect(page.locator('#toast')).toContainText('催生 矮草');
   await expect.poll(()=>page.evaluate(({x,y,z})=>globalThis.__minecraftE2E.worldBlock(x,y+1,z),grass),{timeout:2_000}).toBe(BLOCK.SHORT_GRASS);
   await expect(selected.locator('img[alt="骨粉"]')).toHaveCount(0);
@@ -103,7 +107,7 @@ test('failed bone meal use keeps the survival stack intact',async({page})=>{
   const stone=await page.evaluate(blockId=>globalThis.__minecraftE2E.prepareSingleplayerMiningTarget(blockId),BLOCK.STONE);
   expect(stone).toBeTruthy();
   const canvas=await lockPointer(page);
-  await canvas.dispatchEvent('mousedown',{button:2,bubbles:true});
+  await rightClick(canvas);
   await expect(page.locator('#toast')).toContainText('这里无法使用骨粉');
   await expect.poll(()=>page.evaluate(({x,y,z})=>globalThis.__minecraftE2E.worldBlock(x,y,z),stone)).toBe(BLOCK.STONE);
   await expect(selected.locator('img[alt="骨粉"]')).toHaveCount(1);
