@@ -1,0 +1,107 @@
+name: Apply player feedback integration
+
+on:
+  push:
+    branches: [feature/player-motion-mining-feedback]
+    paths:
+      - .github/workflows/apply-player-feedback-integration.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feature/player-motion-mining-feedback
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Patch shared crack and explosion presentation
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path=Path('src/asset-manifest.js')
+          text=path.read_text()
+          old="const CANONICAL_GUI_ROOT='./MC原版素材assets/minecraft/textures/gui/container';\nconst RECORDS=Object.freeze({"
+          new="const CANONICAL_GUI_ROOT='./MC原版素材assets/minecraft/textures/gui/container';\nconst DESTROY_STAGE_RECORDS=Object.fromEntries(Array.from({length:10},(_,stage)=>[`block.destroy_stage_${stage}`,supplied('block-texture',`${CANONICAL_BLOCK_ROOT}/destroy_stage_${stage}.png`,{minecraftVersion:'1.20.1',directCanonical:true})]));\nconst RECORDS=Object.freeze({"
+          assert old in text
+          text=text.replace(old,new,1)
+          old="  'block.stripped_oak_log_top':supplied('block-texture',`${CANONICAL_BLOCK_ROOT}/stripped_oak_log_top.png`,{minecraftVersion:'1.20.1',directCanonical:true}),\n\n  'item.stick'"
+          new="  'block.stripped_oak_log_top':supplied('block-texture',`${CANONICAL_BLOCK_ROOT}/stripped_oak_log_top.png`,{minecraftVersion:'1.20.1',directCanonical:true}),\n  ...DESTROY_STAGE_RECORDS,\n\n  'item.stick'"
+          assert old in text
+          path.write_text(text.replace(old,new,1))
+
+          path=Path('src/client-gameplay-runtime.js')
+          text=path.read_text()
+          text=text.replace("import {itemForBlock} from './items.js';", "import {explosionDropForBlock} from './explosion-drop-rules.js';\nimport {MiningCrackOverlay} from './mining-crack-overlay.js';")
+          text=text.replace("constructor({world,player,inventory,equipment,drops,experienceOrbs,projectiles,explosions,passiveMobs,hostileMobs,weatherSystem,jadeInspector=null,vanillaBlockAudio=null}){\n    Object.assign(this,{world,player,inventory,equipment,drops,experienceOrbs,projectiles,explosions,passiveMobs,hostileMobs,weatherSystem,jadeInspector,vanillaBlockAudio});", "constructor({world,player,inventory,equipment,drops,experienceOrbs,projectiles,explosions,passiveMobs,hostileMobs,weatherSystem,miningCracks,jadeInspector=null,vanillaBlockAudio=null}){\n    Object.assign(this,{world,player,inventory,equipment,drops,experienceOrbs,projectiles,explosions,passiveMobs,hostileMobs,weatherSystem,miningCracks,jadeInspector,vanillaBlockAudio});")
+          text=text.replace("this.vanillaBlockAudio?.dispose();this.jadeInspector?.dispose();this.weatherSystem?.dispose();", "this.vanillaBlockAudio?.dispose();this.miningCracks?.dispose();this.jadeInspector?.dispose();this.weatherSystem?.dispose();")
+          text=text.replace("let world=null,player=null,inventory=null,equipment=null,drops=null,experienceOrbs=null,projectiles=null,explosions=null,passiveMobs=null,hostileMobs=null,weatherSystem=null,jadeInspector=null,vanillaBlockAudio=null;", "let world=null,player=null,inventory=null,equipment=null,drops=null,experienceOrbs=null,projectiles=null,explosions=null,passiveMobs=null,hostileMobs=null,weatherSystem=null,miningCracks=null,jadeInspector=null,vanillaBlockAudio=null;")
+          old="    drops=new DropSystem(scene,world,inventory,onInventoryPickup);experienceOrbs=new ExperienceOrbSystem(scene,world,onExperience);weatherSystem=new WeatherSystem(scene);weatherSystem.setWeather(weather);\n    projectiles=new ProjectileSystem"
+          new="    drops=new DropSystem(scene,world,inventory,onInventoryPickup);experienceOrbs=new ExperienceOrbSystem(scene,world,onExperience);weatherSystem=new WeatherSystem(scene);weatherSystem.setWeather(weather);miningCracks=new MiningCrackOverlay(scene);\n    projectiles=new ProjectileSystem"
+          assert old in text
+          text=text.replace(old,new,1)
+          text=text.replace("const itemId=itemForBlock(event?.id);", "const itemId=explosionDropForBlock(event?.id);")
+          text=text.replace("return new ClientGameplayRuntime({world,player,inventory,equipment,drops,experienceOrbs,projectiles,explosions,passiveMobs,hostileMobs,weatherSystem,jadeInspector,vanillaBlockAudio});", "return new ClientGameplayRuntime({world,player,inventory,equipment,drops,experienceOrbs,projectiles,explosions,passiveMobs,hostileMobs,weatherSystem,miningCracks,jadeInspector,vanillaBlockAudio});")
+          text=text.replace("}catch(error){safeDispose(vanillaBlockAudio);safeDispose(jadeInspector);", "}catch(error){safeDispose(vanillaBlockAudio);safeDispose(miningCracks);safeDispose(jadeInspector);")
+          path.write_text(text)
+
+          path=Path('src/multiplayer-gameplay-adapter.js')
+          text=path.read_text()
+          text=text.replace("import {MiningCrackOverlay} from './mining-crack-overlay.js';\n","")
+          text=text.replace("let remotePlayers=null,miningCracks=null,releaseSecondary=null", "let remotePlayers=null,miningCracks=runtime.miningCracks,releaseSecondary=null")
+          text=text.replace("    miningCracks=new MiningCrackOverlay(scene);remotePlayers=new RemotePlayerSystem", "    remotePlayers=new RemotePlayerSystem")
+          text=text.replace("releaseCommandSender?.();miningCracks?.dispose();if(itemEntitiesAttached)", "releaseCommandSender?.();if(itemEntitiesAttached)")
+          text=text.replace("releaseCommandSender=null;miningCracks?.dispose();miningCracks=null;if(itemEntitiesAttached)", "releaseCommandSender=null;if(itemEntitiesAttached)")
+          path.write_text(text)
+          PY
+          cat > src/mining-crack-overlay.js <<'EOF'
+          import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
+          import {requireAssetUrl} from './asset-manifest.js';
+          import {subscribeMultiplayerMiningProgress} from './multiplayer-mining-progress-channel.js';
+          import {subscribeSingleplayerMiningProgress} from './singleplayer-mining-progress-channel.js';
+          import {MINING_CRACK_STAGE_COUNT,miningCrackStage,miningCrackTarget} from './mining-crack-rules.js';
+
+          function sceneLike(value){if(!value||typeof value!=='object'||typeof value.add!=='function'||typeof value.remove!=='function')throw new TypeError('mining crack overlay requires a scene');return value;}
+          function loadCrackTexture(stage){const texture=new THREE.TextureLoader().load(requireAssetUrl(`block.destroy_stage_${stage}`));texture.name=`block.destroy_stage_${stage}`;texture.userData.assetKey=texture.name;texture.magFilter=THREE.NearestFilter;texture.minFilter=THREE.NearestFilter;texture.generateMipmaps=false;texture.colorSpace=THREE.SRGBColorSpace;return texture;}
+
+          export class MiningCrackOverlay{
+            constructor(scene){
+              this.scene=sceneLike(scene);this.textures=Array.from({length:MINING_CRACK_STAGE_COUNT},(_,stage)=>loadCrackTexture(stage));
+              this.geometry=new THREE.BoxGeometry(1.012,1.012,1.012);this.material=new THREE.MeshBasicMaterial({map:this.textures[0],transparent:true,alphaTest:.02,depthTest:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4});
+              this.mesh=new THREE.Mesh(this.geometry,this.material);this.mesh.visible=false;this.mesh.renderOrder=20;this.mesh.frustumCulled=false;this.scene.add(this.mesh);this.current=null;this.disposed=false;
+              this.releases=[subscribeMultiplayerMiningProgress(state=>this.apply(state)),subscribeSingleplayerMiningProgress(state=>this.apply(state))];
+            }
+
+            apply(state){
+              if(this.disposed)return null;if(!state?.active)return this.hide();const stage=miningCrackStage(state.progress);if(stage===null)return this.hide();const target=miningCrackTarget(state.target);
+              if(this.current?.stage!==stage)this.material.map=this.textures[stage];this.mesh.position.set(target.x+.5,target.y+.5,target.z+.5);this.mesh.visible=true;
+              this.current=Object.freeze({visible:true,stage,progress:state.progress,tick:state.tick??null,target});return this.snapshot();
+            }
+
+            hide(){if(this.disposed)return null;this.mesh.visible=false;this.current=null;return this.snapshot();}
+            snapshot(){if(!this.current)return Object.freeze({visible:false,stage:null,progress:0,tick:null,target:null});return Object.freeze({...this.current,target:Object.freeze({...this.current.target})});}
+            dispose(){if(this.disposed)return false;this.disposed=true;for(const release of this.releases)release?.();this.releases.length=0;this.scene.remove(this.mesh);this.mesh.visible=false;this.geometry.dispose();this.material.dispose();for(const texture of this.textures)texture.dispose();this.current=null;return true;}
+          }
+          EOF
+      - name: Verify syntax and logic
+        shell: bash
+        run: |
+          npm install --omit=dev --ignore-scripts --no-audit --no-fund --no-package-lock
+          for file in src/*.js; do node --check "$file"; done
+          for file in scripts/*.mjs; do node --check "$file"; done
+          npm run test:logic
+      - name: Commit integration and self-delete
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/asset-manifest.js src/client-gameplay-runtime.js src/multiplayer-gameplay-adapter.js src/mining-crack-overlay.js
+          git rm .github/workflows/apply-player-feedback-integration.yml
+          git commit -m "feat: unify mining crack presentation"
+          git push origin HEAD:feature/player-motion-mining-feedback
