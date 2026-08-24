@@ -13,7 +13,7 @@ import {MultiplayerMovementSession} from '../src/multiplayer-movement-session.js
 
 class FakeSocket{constructor(){this.protocol=MULTIPLAYER_SUBPROTOCOL;this.readyState=0;this.sent=[];this.closed=[];this.listeners=new Map();}addEventListener(type,listener){const list=this.listeners.get(type)||[];list.push(listener);this.listeners.set(type,list);}emit(type,event={}){for(const listener of this.listeners.get(type)||[])listener(event);}open(){this.readyState=1;this.emit('open',{});}message(value){this.emit('message',{data:JSON.stringify(value)});}send(value){this.sent.push(value);}close(code=1000,reason=''){this.closed.push({code,reason});this.readyState=3;this.emit('close',{code,reason});}}
 const info=session=>encodeServerWorldInfo({session,worldId:'remote-buffer-world',terrainVersion:TERRAIN_GENERATOR_VERSION,seed:'seed',prompt:'平原',tickRate:20});
-const self=session=>encodeServerPlayerSnapshot({session,tick:0,position:{x:.5,y:25.001,z:.5},velocity:{x:0,y:0,z:0},yaw:0,pitch:0,mode:'survival',grounded:true,swimCoverage:0,voided:false});
+const self=session=>encodeServerPlayerSnapshot({session,tick:0,position:{x:.5,y:25.001,z:.5},velocity:{x:0,y:0,z:0},yaw:0,pitch:0,mode:'survival',flying:false,grounded:true,swimCoverage:0,voided:false});
 const inventory=session=>encodeServerInventorySnapshot({session,revision:0,mode:'survival',slots:Array(36).fill(null),cursor:null});
 const equipment=session=>encodeServerEquipmentSnapshot({session,revision:0,slots:{head:null,chest:null,legs:null,feet:null}});
 const crafting=session=>encodeServerPlayerCraftingSnapshot({session,revision:0,size:2,slots:[null,null,null,null],result:null});
