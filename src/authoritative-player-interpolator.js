@@ -31,6 +31,7 @@ function normalizeSnapshot(snapshot){
     yaw:normalizePlayerYaw(finite(snapshot.yaw,'snapshot yaw')),
     pitch:pitch(snapshot.pitch),
     mode,
+    flying:boolean(snapshot.flying,'snapshot flying'),
     grounded:boolean(snapshot.grounded,'snapshot grounded'),
     swimCoverage:coverage(snapshot.swimCoverage),
     voided:boolean(snapshot.voided,'snapshot voided')
@@ -61,7 +62,7 @@ export class AuthoritativePlayerInterpolator{
   step(dt){
     dt=finite(dt,'interpolation dt');if(dt<0)throw new RangeError('interpolation dt must be non-negative');if(!this.display||!this.target||!this.from)return null;
     this.elapsed=Math.min(this.interval,this.elapsed+dt);const t=this.interval===0?1:Math.min(1,this.elapsed/this.interval),target=this.target,from=this.from;
-    this.display={session:target.session,tick:target.tick,position:lerpVector(from.position,target.position,t),velocity:lerpVector(from.velocity,target.velocity,t),yaw:lerpYaw(from.yaw,target.yaw,t),pitch:lerp(from.pitch,target.pitch,t),mode:target.mode,grounded:target.grounded,swimCoverage:target.swimCoverage,voided:target.voided};
+    this.display={session:target.session,tick:target.tick,position:lerpVector(from.position,target.position,t),velocity:lerpVector(from.velocity,target.velocity,t),yaw:lerpYaw(from.yaw,target.yaw,t),pitch:lerp(from.pitch,target.pitch,t),mode:target.mode,flying:target.flying,grounded:target.grounded,swimCoverage:target.swimCoverage,voided:target.voided};
     return cloneState(this.display);
   }
 }
