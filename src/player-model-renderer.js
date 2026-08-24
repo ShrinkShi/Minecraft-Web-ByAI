@@ -2,6 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.m
 import {requireAssetUrl} from './asset-manifest.js';
 import {PLAYER_MODEL_SCALE,PLAYER_MODEL_SPEC,normalizePlayerVisualInput,playerModelUvRects} from './player-model-specs.js';
 import {playerAttackArmPitch,playerUseArmPitch} from './player-presentation-rules.js';
+import {playerLocomotionPose} from './player-locomotion-rules.js';
 
 const PIXEL=1/16;
 const FACE_ORDER=['right','left','top','bottom','front','back'];
@@ -69,17 +70,17 @@ export class PlayerModelFactory{
     if(!visual?.root||!visual?.parts)return false;if(!Number.isFinite(dt)||dt<0)throw new RangeError('player visual dt must be a non-negative finite number');
     const state=visual.state,pose=normalizePlayerVisualInput(input),parts=visual.parts;
     state.primaryPulse=Math.max(0,state.primaryPulse-dt);state.useRemaining=Math.max(0,state.useRemaining-dt);state.deathProgress=approach(state.deathProgress,pose.dead?1:0,dt*3.6);
-    const moving=Math.min(1,pose.speed/(pose.sprint?5.6:4.3)),phaseSpeed=pose.sprint?13:Math.min(11,4+pose.speed*1.65);if(moving>.01)state.walkPhase=(state.walkPhase+dt*phaseSpeed)%(Math.PI*2);
-    const swing=Math.sin(state.walkPhase)*(pose.sprint ? .82 : .58)*moving;
+    let gait=playerLocomotionPose({phase:state.walkPhase,speed:pose.speed,sprint:pose.sprint});
+    if(gait.moving>.01){state.walkPhase=(state.walkPhase+dt*gait.phaseSpeed)%(Math.PI*2);gait=playerLocomotionPose({phase:state.walkPhase,speed:pose.speed,sprint:pose.sprint});}
     for(const part of Object.values(parts))part.rotation.set(0,0,0);
     parts.head.rotation.x=pose.headPitch;parts.head.rotation.y=pose.headYaw;
-    parts.leftArm.rotation.x=-swing;parts.rightArm.rotation.x=swing;parts.leftLeg.rotation.x=swing;parts.rightLeg.rotation.x=-swing;
+    parts.leftArm.rotation.x=gait.leftArmPitch;parts.rightArm.rotation.x=gait.rightArmPitch;parts.leftLeg.rotation.x=gait.leftLegPitch;parts.rightLeg.rotation.x=gait.rightLegPitch;
     const attacking=pose.primary||state.primaryPulse>0;if(attacking)state.actionPhase=(state.actionPhase+dt*14)%(Math.PI*2);else state.actionPhase=0;
     if(attacking){parts.rightArm.rotation.x=playerAttackArmPitch(state.actionPhase);parts.rightArm.rotation.z=-.08;}
     if(state.useRemaining>0){parts.rightArm.rotation.x=playerUseArmPitch(state.useRemaining);parts.rightArm.rotation.y=-.28;parts.rightArm.rotation.z=-.12;}
-    visual.modelRoot.rotation.x=pose.sprint&&moving>.15?-.12:0;
+    visual.modelRoot.rotation.set(gait.bodyPitch,gait.bodyYaw,0);visual.modelRoot.position.set(gait.swayX,gait.bobY,0);
     const death=easeOutCubic(state.deathProgress);visual.poseRoot.rotation.set(0,0,-Math.PI/2*death);visual.poseRoot.position.set(0,.08*death,0);
-    visual.root.userData.animation=Object.freeze({speed:pose.speed,sprint:pose.sprint,primary:attacking,use:state.useRemaining>0,dead:pose.dead,deathProgress:state.deathProgress,headYaw:pose.headYaw,headPitch:pose.headPitch});
+    visual.root.userData.animation=Object.freeze({speed:pose.speed,sprint:gait.running,primary:attacking,use:state.useRemaining>0,dead:pose.dead,deathProgress:state.deathProgress,headYaw:pose.headYaw,headPitch:pose.headPitch,walkPhase:state.walkPhase,bobY:gait.bobY,bodyPitch:gait.bodyPitch});
     return true;
   }
 
