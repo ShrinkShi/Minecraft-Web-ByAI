@@ -21,9 +21,11 @@ export class MultiplayerInputBridge{
   flushControl(){if(!this.isReady()||!this.pendingControl||sameControl(this.sentControl,this.pendingControl))return null;const frame=encodePlayerControlFrame(this.pendingControl,this.controlSeq);this.transport.sendInput('control',frame);this.controlSeq=nextNetworkSequence(this.controlSeq);this.sentControl=normalizeControlState(this.pendingControl);return frame;}
   flush(){if(!this.isReady())return{view:null,control:null};return{view:this.flushView(),control:this.flushControl()};}
   sendReferencedAction(kind,view=this.viewProvider()){if(kind!=='use'&&kind!=='drop'&&kind!=='attack')throw new RangeError('referenced multiplayer action must be use, drop, or attack');if(!this.isReady())return null;this.setView(view);const viewResult=this.flushView();if(!viewResult)throw new Error('unable to establish authoritative action view');const frame=encodePlayerActionFrame({kind,viewSeq:viewResult.sequence},this.actionSeq);this.transport.sendInput('action',frame);this.actionSeq=nextNetworkSequence(this.actionSeq);return{frame,view:viewResult};}
+  sendPayloadlessAction(kind){if(kind!=='respawn'&&kind!=='flight-toggle')throw new RangeError('payloadless multiplayer action must be respawn or flight-toggle');if(!this.isReady())return null;const frame=encodePlayerActionFrame({kind},this.actionSeq);this.transport.sendInput('action',frame);this.actionSeq=nextNetworkSequence(this.actionSeq);return frame;}
   sendUse(view){return this.sendReferencedAction('use',view);}
   sendDrop(view){return this.sendReferencedAction('drop',view);}
   sendAttack(view){return this.sendReferencedAction('attack',view);}
-  sendRespawn(){if(!this.isReady())return null;const frame=encodePlayerActionFrame({kind:'respawn'},this.actionSeq);this.transport.sendInput('action',frame);this.actionSeq=nextNetworkSequence(this.actionSeq);return frame;}
+  sendRespawn(){return this.sendPayloadlessAction('respawn');}
+  sendFlightToggle(){return this.sendPayloadlessAction('flight-toggle');}
   sendHotbarSelect(slot){if(!this.isReady())return null;const frame=encodePlayerActionFrame({kind:'hotbar-select',slot},this.actionSeq);this.transport.sendInput('action',frame);this.actionSeq=nextNetworkSequence(this.actionSeq);return frame;}
 }
