@@ -1,6 +1,7 @@
 import {BLOCKS} from './blocks.js';
 import {itemDurability} from './item-stack.js';
 import {canHarvestBlock,miningProgressDelta} from './mining-rules.js';
+import {publishSingleplayerMiningProgress} from './singleplayer-mining-progress-channel.js';
 
 export const MAX_SINGLEPLAYER_MINING_DT=.05;
 export const MAX_SINGLEPLAYER_MINING_START_SKEW_MS=50;
@@ -22,8 +23,12 @@ export class SingleplayerMiningController{
     this.held=false;this.startedAt=0;this.lastAt=0;this.lastHitAt=-Infinity;this.hasStepped=false;this.target=null;this.key=null;this.progress=0;
   }
 
-  start(now){now=finite(now,'mining start time');this.held=true;this.startedAt=now;this.lastAt=now;this.lastHitAt=-Infinity;this.hasStepped=false;this.target=null;this.key=null;this.progress=0;this.onProgress(0);return this.snapshot();}
-  cancel(){this.held=false;this.startedAt=0;this.lastAt=0;this.lastHitAt=-Infinity;this.hasStepped=false;this.target=null;this.key=null;this.progress=0;this.onProgress(0);return this.snapshot();}
+  emitProgress(value){
+    const target=this.target?cloneTarget(this.target):null;this.onProgress(value,target);
+    const active=!!target&&value>0&&value<1;publishSingleplayerMiningProgress(active?{active:true,progress:value,target}:{active:false,progress:0,target:null});return value;
+  }
+  start(now){now=finite(now,'mining start time');this.held=true;this.startedAt=now;this.lastAt=now;this.lastHitAt=-Infinity;this.hasStepped=false;this.target=null;this.key=null;this.progress=0;this.emitProgress(0);return this.snapshot();}
+  cancel(){this.held=false;this.startedAt=0;this.lastAt=0;this.lastHitAt=-Infinity;this.hasStepped=false;this.target=null;this.key=null;this.progress=0;this.emitProgress(0);return this.snapshot();}
 
   step(now){
     now=finite(now,'mining time');const mode=this.getMode();
@@ -34,9 +39,9 @@ export class SingleplayerMiningController{
       else throw new RangeError('mining time must be monotonic');
     }
     const dtSeconds=Math.min(MAX_SINGLEPLAYER_MINING_DT,(now-this.lastAt)/1000);this.lastAt=now;this.hasStepped=true;const aimed=this.aim();
-    if(!aimed){this.target=null;this.key=null;this.startedAt=now;this.lastHitAt=-Infinity;this.progress=0;this.onProgress(0);return this.snapshot();}
+    if(!aimed){this.target=null;this.key=null;this.startedAt=now;this.lastHitAt=-Infinity;this.progress=0;this.emitProgress(0);return this.snapshot();}
     const selected=this.getSelectedStack(),selectedId=selected?.id??null,nextKey=targetKey(aimed),sameTarget=nextKey===this.key;this.target=cloneTarget(aimed);this.key=nextKey;if(!sameTarget){this.startedAt=now;this.lastHitAt=-Infinity;this.progress=0;}
-    this.progress=Math.min(1,this.progress+miningProgressDelta(aimed.id,selectedId,dtSeconds,mode));this.onProgress(this.progress);
+    this.progress=Math.min(1,this.progress+miningProgressDelta(aimed.id,selectedId,dtSeconds,mode));this.emitProgress(this.progress);
     if(mode!=='creative'&&now-this.lastHitAt>=SINGLEPLAYER_MINING_HIT_INTERVAL_MS){const hit=cloneTarget(aimed);this.lastHitAt=now;this.onHit({target:hit,block:BLOCKS[aimed.id],selected:selected?{...selected}:null,progress:this.progress});emitMiningHit(hit);}
     if(this.progress<1-COMPLETION_EPSILON)return this.snapshot();
     const block=BLOCKS[aimed.id],broken=cloneTarget(aimed),removed=!!this.breakTarget(broken);let harvested=false,wear=null;
@@ -45,7 +50,7 @@ export class SingleplayerMiningController{
       if(mode!=='creative'&&isDamageableKnownItem(selectedId))wear=this.damageSelected(selectedId,1);
       this.onBreak({target:broken,block,selected:selected?{...selected}:null,harvested,wear});
     }
-    this.target=null;this.key=null;this.startedAt=now;this.lastHitAt=-Infinity;this.progress=0;this.onProgress(0);return Object.freeze({...this.snapshot(),completed:removed,harvested,wear});
+    this.target=null;this.key=null;this.startedAt=now;this.lastHitAt=-Infinity;this.progress=0;this.emitProgress(0);return Object.freeze({...this.snapshot(),completed:removed,harvested,wear});
   }
 
   snapshot(){return Object.freeze({held:this.held,startedAt:this.startedAt,lastAt:this.lastAt,target:this.target?Object.freeze(cloneTarget(this.target)):null,progress:this.progress});}
