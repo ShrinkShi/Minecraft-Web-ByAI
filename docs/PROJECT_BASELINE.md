@@ -1,52 +1,74 @@
-# Project Baseline — 2026-08-22
+# Project Baseline — 2026-08-24
 
 This document records **merged `main` only**. Open PR work is excluded from merged facts.
 
 ## Authority
 
 - Branch: `main`
-- Commit: `2ba90bd77f510ade4c771a17e3a06b1e2597271f`
-- Includes merged PR #128 (wheat farming phase one) and PR #130 (first-person / Workbench presentation repair). PR #129 remains open and is not counted as merged.
+- Commit: `69749b6e19ee3f7ecb4aa62e6e96a82a6d6a87cc`
+- Includes merged work through PR #131.
 - Development line: `v0.4.0-dev`.
-- Strict Minecraft Java 1.20.1 gameplay/content parity remains a planning estimate of about **35%**. Engine, resource and authority foundations are materially further along than registry/content breadth.
+- Strict Minecraft Java 1.20.1 gameplay/content parity remains a planning estimate of about **35%**. Engine, resource and multiplayer-authority foundations are materially further along than registry/content breadth.
 
 ## Browser / rendering / UI
 
-- Shared desktop/mobile runtime with unified control intents.
-- Pointer Lock desktop controls, landscape mobile controls and F5 first/third-person views.
-- Source-backed Steve first-person arm/sleeve and articulated wide-Steve third-person model.
-- PR #130 reduced the oversized first-person arm, aligned the viewmodel camera to 70°, and changed the hierarchy to shoulder → arm → wrist → held item. Textured non-block items use transparent planar presentation while block items remain 3D previews.
-- PR #130 also makes Inventory/Workbench act as real modal presentation surfaces: world crosshair, Jade overlay, HP/hunger/XP/hotbar, oxygen, break meter and first-person viewmodel are hidden while the container is visible and restored when it closes.
-- 16×16×64 compact voxel chunks, terrain/mesh Workers, Transferable paths, bounded streaming/unload/disposal and chunk-level merged geometry.
-- Generic Minecraft blockstate/model interpretation is live for selected roots: parent/texture inheritance, variants/multipart, rotations, uvlock/cull/tint metadata and opaque/cutout/translucent chunk batching.
-- Workbench uses canonical Java 1.20.1 `textures/gui/container/crafting_table.png` with fixed 352×332 source-layout coordinates.
-- HUD includes HP, armor, hunger, oxygen and XP foundations.
+Merged main provides:
+
+- shared desktop/mobile runtime with unified control intents;
+- Pointer Lock desktop controls, landscape mobile controls and F5 first/third-person views;
+- source-backed Steve first-person arm/sleeve and articulated wide-Steve third-person model;
+- 70° first-person viewmodel camera with shoulder → arm → wrist → held-item hierarchy;
+- transparent planar presentation for ordinary textured items and 3D previews for block items;
+- Inventory/Workbench modal presentation that hides world crosshair, Jade, HP/hunger/XP/hotbar, oxygen, break meter and first-person viewmodel while the container is open;
+- canonical Java 1.20.1 Workbench texture/layout;
+- compact voxel chunks, terrain/mesh Workers, bounded chunk streaming/unload/disposal and merged geometry;
+- selected-root Minecraft blockstate/model interpretation with parent/texture inheritance, variants/multipart, rotations, uvlock/cull/tint metadata and opaque/cutout/translucent batching.
+
+The merged desktop sprint contract before PR #133 still contains the historical temporary direct sprint binding; PR #133 is intentionally excluded from this baseline.
 
 ## World / persistence
 
-Merged gameplay families include grass/dirt/stone/sand, oak plank/log/leaves, water, crafting table, cobblestone, red bed, iron ore, coal ore, glass, furnace, farmland moisture 0..7, wheat age 0..7, dirt path and stripped oak log.
+Merged gameplay families include grass/dirt/stone/sand, oak plank/log/leaves, water, crafting table, cobblestone, red bed, iron ore, coal ore, glass, furnace, farmland moisture 0..7, wheat age 0..7, dirt path, stripped oak log and short grass.
 
-World generation on merged main remains deterministic simplified browser/server fBm terrain with surface layers, sea/water, oak trees and simplified underground iron/coal ore. **Merged main still uses terrain generator v3.** Terrain v2 remains an explicit singleplayer compatibility path for pre-#126 local saves.
+Current merged terrain generator is **v4**:
 
-Singleplayer save schema is **v9**. `terrainVersion` remains required from schema v8 onward; later schema upgrades do not move that compatibility boundary. Java biome/climate/caves/aquifers/features/structures, expanded vertical range, Nether and End remain unimplemented.
+- v2 remains the explicit pre-coal singleplayer compatibility path;
+- v3 adds deterministic coal while preserving the v2 compatibility contract;
+- v4 adds deterministic short-grass surface decoration for new/current worlds;
+- old persisted worlds stay pinned to their recorded terrain version rather than being silently reinterpreted;
+- multiplayer requires the exact current terrain version and does not allow mixed generator versions.
+
+Singleplayer save schema remains **v9**. `terrainVersion` is required from schema v8 onward; the later hunger schema bump did not move that compatibility boundary.
+
+Java biome/climate generation, caves/aquifers, broad features/structures, full vertical range, Nether and End remain unimplemented.
 
 ## Farming / food / processing
 
-PR #128 is merged and provides the first playable wheat loop:
+Merged main now contains the first natural wheat progression loop:
 
-- append-only farmland moisture 0..7 and wheat age 0..7 states;
-- source-backed Java 1.20.1 farmland/wheat blockstate/model interpretation;
-- canonical `wheat_seeds` and `wheat` item textures;
-- hoe-created farmland, irrigation/rain hydration, drying and empty dry farmland returning to dirt;
-- survival seed planting only after successful world mutation; creative does not consume seed;
-- simplified 10-second farming tick and wet/dry growth chances;
-- immature wheat seed return and mature wheat + seed harvest loop;
-- 3-wide wheat → bread Workbench recipe;
-- farming state persisted through existing sparse world edits, with save schema remaining v9.
+- farmland moisture 0..7 and wheat age 0..7;
+- source-backed farmland/wheat blockstate and model interpretation;
+- hoe-created farmland, nearby-water/weather hydration, drying and empty dry farmland returning to dirt;
+- survival seed planting after successful mutation only; creative planting does not consume seed;
+- simplified farming tick/growth probabilities rather than exact Java random-tick/light/neighbor formulas;
+- immature/mature wheat harvest and seed recycling;
+- wheat → bread Workbench recipe;
+- deterministic short grass in terrain v4;
+- base short-grass wheat-seed acquisition;
+- bone → 3 bone meal;
+- singleplayer bone meal advances wheat and spreads short grass under the current simplified rules.
 
-Natural short-grass seed acquisition and bone meal are **not merged in this baseline**; those belong to open PR #129.
+Merged food/hunger support includes food, saturation, exhaustion and food timer; apple, bread, raw meats, cooked meats and rotten flesh; natural regeneration/starvation; raw iron and meat Furnace recipes; coal as 1600-tick fuel.
 
-Merged food/process support also includes explicit food/saturation/exhaustion state, natural regeneration/starvation, apple/bread/raw meats/cooked meats/rotten flesh, four meat Furnace recipes, raw iron smelting and coal as 1600-tick fuel.
+PR #131 replaced instantaneous singleplayer eating with a held, interruptible use action:
+
+- food use duration is 1.6 seconds;
+- desktop right mouse and mobile Use expose press/release edges through the held-secondary channel;
+- food and inventory mutations commit only after uninterrupted completion;
+- release, control loss, modal/pause state, hotbar change, drop, primary attack, mode change or held-item change cancels without consuming;
+- first-person viewmodel receives continuous eating progress;
+- low browser FPS does not stretch the 1.6-second action because duration uses monotonic wall-clock compensation;
+- multiplayer held-secondary press routes to the existing authoritative `use` action, but multiplayer hunger/eating state itself remains disabled until the server owns the complete transaction.
 
 ## Items, crafting and progression
 
@@ -62,29 +84,30 @@ Merged main has:
 - leather and iron armor with durability and Java-style damage-dependent armor mitigation;
 - till / strip / flatten in singleplayer and authoritative multiplayer;
 - item-instance durability for implemented tools/weapons;
-- current food and wheat farming items/recipes described above.
+- the current food/farming items described above.
 
 The current stone→iron chain is:
 
 `stone pickaxe → iron ore → raw iron → Furnace → iron ingot → iron pickaxe / axe / shovel / sword / hoe / iron armor`
 
-`CREATIVE_START` remains intentionally stable; later progression content is registered/obtainable without silently shifting historical starter slots.
+`CREATIVE_START` remains intentionally stable. Later progression content is registered/obtainable without silently shifting historical bootstrap slots.
 
-## Hunger / survival / PvE
+## Survival / combat / PvE
 
-Merged singleplayer hunger state includes:
+Merged singleplayer survival includes:
 
-- food, saturation, exhaustion and food timer;
-- exhaustion over 4 drains saturation before food, at most one threshold per tick;
-- sprint/swim/jump/sprint-jump/attack/damage exhaustion hooks;
-- survival sprint blocked at food <= 6;
-- saturated fast regeneration and food>=18 normal regeneration;
-- current fixed Normal-style starvation floor of 1 HP because difficulty/gamerule configuration is absent;
-- immediate right-click food consumption; full food prevents consumption.
+- HP, hurt cooldown, knockback, death/respawn and recoverable item/XP drops;
+- armor mitigation and durability wear;
+- food/saturation/exhaustion and hunger-driven sprint gate at food <= 6;
+- saturated fast regeneration, food>=18 normal regeneration and the current fixed Normal-style 1 HP starvation floor;
+- timed/interruptible food use from PR #131;
+- oxygen/drowning and simplified swimming;
+- time/weather, bed sleep/respawn and singleplayer XP;
+- persistent singleplayer Furnace processing.
 
-Other merged survival slices include HP/damage/hurt cooldown/knockback, death/respawn, recoverable item/XP drops, `/spawnpoint`, bed sleep/respawn, oxygen/drowning, simplified swimming, time/weather, singleplayer XP and Furnace processing.
+Current mobs are cow, sheep, pig, chicken, zombie, skeleton, creeper and spider. Their PvE remains simplified and client/singleplayer-owned; server-authoritative PvE is still absent.
 
-Current mobs: cow, sheep, pig, chicken, zombie, skeleton, creeper and spider. Their PvE remains simplified and client/singleplayer-owned; server-authoritative PvE is still absent.
+Food status effects such as raw-chicken/rotten-flesh Hunger are not implemented because a generic status-effect system is absent.
 
 ## Multiplayer authority
 
@@ -104,13 +127,15 @@ The Node WebSocket runtime currently owns:
 - chat and controlled commands;
 - PvP HP/melee/armor mitigation/knockback/death drops/respawn.
 
-The server does **not** yet own hunger/eating, farming, mobs/PvE/projectiles/explosions, XP/levels or durable world persistence. Client-side multiplayer hunger/farming is deliberately not faked.
+The server does **not** yet own hunger/eating state, farming/random ticks/bone meal, mobs/PvE/projectiles/explosions, XP/levels or durable world persistence. Client-side competing truth remains deliberately disabled for those missing multiplayer domains.
 
 ## Original Minecraft resources / audio
 
-The project tracks Java 1.20.1 client textures/models plus the separately supplied sound-object corpus under `原版Minecraft音频文件/`. Resource availability alone is not counted as runtime implementation.
+The repository tracks the extracted Java 1.20.1 client resource tree under `MC原版素材assets/` and the separately imported sound-object corpus under `原版Minecraft音频文件/`. Resource availability alone is not counted as runtime parity.
 
-Merged source-backed audio includes current till/strip/flatten, common block/material break/place/step families, local footsteps, mining hits and an ambient/hurt/death baseline for the current mob set. Full `sounds.json`, true positional/HRTF audio, remote replicated SFX and music parity remain incomplete.
+Merged source-backed audio includes current till/strip/flatten actions, common block/material break/place/step families, local footsteps, mining hits and ambient/hurt/death baseline events for the current mob set.
+
+Full `sounds.json` event coverage, true positional/HRTF audio, remote replicated SFX and music scheduling remain incomplete.
 
 ## Quality baseline
 
@@ -127,6 +152,6 @@ A green older head never validates a newer head.
 
 ## Active delivery after this baseline
 
-PR #129, `feature/vegetation-farming-1-1`, is the current open delivery and is intentionally excluded from merged facts. It adds short grass, deterministic terrain-v4 vegetation for new worlds, natural wheat-seed acquisition and a first bone-meal path while preserving explicit v2/v3 local terrain compatibility and refusing client-side multiplayer farming authority.
+PR #133, `feature/presentation-mining-creative-foundation`, is the current open delivery and is intentionally excluded from merged facts. It targets player locomotion/presentation, desktop Ctrl+W + double-W sprint input, canonical mining crack presentation and corrected explosion drop semantics.
 
-Nearest planned work after #129: Hunger phase 2 (use duration/eating animation, status effects and difficulty/gamerule boundaries, then server hunger authority), followed by broad registry families, biome/cave/feature worldgen and server-owned PvE/XP/persistence.
+The broader Creative overhaul remains a separate planned PR after #133 rather than being mixed into this baseline or current presentation/mining slice.
