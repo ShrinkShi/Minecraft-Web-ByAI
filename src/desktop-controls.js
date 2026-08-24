@@ -4,10 +4,12 @@ import {pointerLookIntent} from './pointer-look-rules.js';
 import {publishFirstPersonAction} from './first-person-action-channel.js';
 
 const MOVEMENT_CODES=new Set(['KeyW','KeyA','KeyS','KeyD']);
-const BUTTON_CODES=new Map([['Space','jump'],['ShiftLeft','sneak'],['ShiftRight','sneak'],['KeyR','sprint']]);
-export const DESKTOP_SPRINT_HOLD_CODE='KeyR';
+const BUTTON_CODES=new Map([['Space','jump'],['ShiftLeft','sneak'],['ShiftRight','sneak']]);
+const SPRINT_HOLD_CODES=new Set(['ControlLeft','ControlRight']);
+export const DESKTOP_SPRINT_HOLD_CODE='ControlLeft';
+export const DESKTOP_SPRINT_HOLD_CODES=Object.freeze([...SPRINT_HOLD_CODES]);
 export const DESKTOP_BROWSER_RESERVED_CODES=Object.freeze(['ControlLeft','ControlRight','Tab']);
-export const desktopButtonForCode=code=>BUTTON_CODES.get(code)||null;
+export const desktopButtonForCode=code=>BUTTON_CODES.get(code)||(SPRINT_HOLD_CODES.has(code)?'sprint':null);
 
 export class DesktopControls{
   constructor(canvas,bus){
@@ -18,9 +20,9 @@ export class DesktopControls{
     this.onKeyDown=e=>{
       const code=e.code;
       if(code==='Tab'&&this.gameplayEnabled){e.preventDefault();return;}
-      if((MOVEMENT_CODES.has(code)||BUTTON_CODES.has(code))&&this.gameplayEnabled){
+      if((MOVEMENT_CODES.has(code)||BUTTON_CODES.has(code)||SPRINT_HOLD_CODES.has(code))&&this.gameplayEnabled){
         if(code==='KeyW'&&!e.repeat)this.forwardSprint.press(Number.isFinite(e.timeStamp)?e.timeStamp:performance.now());
-        this.keys.add(code);this.syncContinuous();if(code==='Space')e.preventDefault();
+        this.keys.add(code);this.syncContinuous();if(code==='Space'||SPRINT_HOLD_CODES.has(code))e.preventDefault();
       }
       if(e.repeat)return;
       let handled=false;
@@ -33,7 +35,7 @@ export class DesktopControls{
       else if(/^Digit[1-9]$/.test(code))handled=!!this.bus.action(this.source,'hotbar-select',{index:Number(code.slice(-1))-1});
       if(handled)e.preventDefault();
     };
-    this.onKeyUp=e=>{if(MOVEMENT_CODES.has(e.code)||BUTTON_CODES.has(e.code)){this.keys.delete(e.code);if(e.code==='KeyW')this.forwardSprint.release();this.syncContinuous();}};
+    this.onKeyUp=e=>{if(MOVEMENT_CODES.has(e.code)||BUTTON_CODES.has(e.code)||SPRINT_HOLD_CODES.has(e.code)){this.keys.delete(e.code);if(e.code==='KeyW')this.forwardSprint.release();this.syncContinuous();}};
     this.onMouseMove=e=>{
       if(!this.gameplayEnabled||document.pointerLockElement!==this.canvas)return;
       if(!this.pointerMoveReady){this.pointerMoveReady=true;return;}
@@ -54,11 +56,11 @@ export class DesktopControls{
 
   syncContinuous(){
     const forward=(this.keys.has('KeyW')?1:0)-(this.keys.has('KeyS')?1:0),side=(this.keys.has('KeyD')?1:0)-(this.keys.has('KeyA')?1:0);this.bus.setMove(this.source,side,forward);
-    for(const name of ['jump','sneak','sprint']){
-      let pressed=name==='sprint'&&this.forwardSprint.active&&this.keys.has('KeyW');
-      for(const [code,button] of BUTTON_CODES)if(button===name&&this.keys.has(code)){pressed=true;break;}
-      this.bus.setButton(this.source,name,pressed);
-    }
+    this.bus.setButton(this.source,'jump',this.keys.has('Space'));
+    this.bus.setButton(this.source,'sneak',this.keys.has('ShiftLeft')||this.keys.has('ShiftRight'));
+    const ctrlSprint=this.keys.has('KeyW')&&(this.keys.has('ControlLeft')||this.keys.has('ControlRight'));
+    const doubleTapSprint=this.forwardSprint.active&&this.keys.has('KeyW');
+    this.bus.setButton(this.source,'sprint',ctrlSprint||doubleTapSprint);
   }
 
   reset(){this.keys.clear();this.forwardSprint.reset();this.bus.resetSource(this.source);}

@@ -2,7 +2,43 @@
 
 ## [Unreleased]
 
-> 2026-08-22 merged baseline: `main 408a4a57c68453ec38ccab1e5dcee2e3760eb82b` includes PR #127. PR #128 is the active unmerged wheat-farming delivery. Merged facts live in `docs/PROJECT_BASELINE.md`; active-slice details live in `docs/FARMING_PHASE_1.md`.
+> 2026-08-24 merged baseline: `main 69749b6e19ee3f7ecb4aa62e6e96a82a6d6a87cc` includes PR #131. PR #133 is the active unmerged presentation/mining delivery. Merged facts live in `docs/PROJECT_BASELINE.md`; active-slice details live in `docs/PRESENTATION_MINING_FOUNDATION.md`.
+
+### 2026-08-24 — PR #133 presentation / mining foundation (active Draft)
+
+- 第一人称右手 neutral anchor 轻微向右下调整，不改变既有 attack/use/food-use action hierarchy。
+- 新增 pure walk/sprint locomotion pose；第三人称 Steve 的 sprint 使用更大 stride、arm swing、body lean、bob/sway，不再与 walk 共用单一正弦摆动。
+- desktop sprint 改为 Ctrl+W 或 double-W；移除历史临时 R sprint binding。沉浸式外壳在支持 Keyboard Lock 的浏览器锁定 W/左右 Ctrl，并继续拦截 Ctrl/Meta+W。
+- active sprint 统一要求 forward、非 sneak、非 swimming，并继续受 survival food>6 限制；movement speed、第三人称 gait、jump exhaustion 与 movement exhaustion 使用同一有效条件。
+- singleplayer mining 新增 presentation progress channel，cancel/target loss/mode restriction/completion 都显式清理状态。
+- mining crack overlay 改为直接使用 Java 1.20.1 canonical `destroy_stage_0..9.png`，singleplayer 与 multiplayer 共用一个 runtime-owned overlay/lifecycle，移除程序生成 crack texture 与 multiplayer duplicate overlay。
+- local explosion destruction 改走 block drop metadata：当前 grass→dirt、stone→cobblestone，glass/water 无 drop；仍不声明完整 Java loot-table/explosion-decay parity。
+- 新增/扩展 desktop sprint、immersive browser shortcut、player motion/gait、singleplayer crack channel、canonical crack asset、explosion drop 回归。
+- save schema v9、terrain generator v4、block/item IDs、`CREATIVE_START`、multiplayer wire schema 均不变。
+
+### 2026-08-23 — PR #131 timed interruptible food use (merged)
+
+- 将单机食物使用从 press-edge 即时消费升级为 **1.6 s** held / interruptible action。
+- desktop right mouse 与 mobile Use 都暴露真实 secondary press/release 生命周期；held-secondary 不进入 multiplayer movement wire snapshot。
+- release、失去 gameplay control、pause/container、hotbar change、drop、primary attack、mode/item change 都会取消，且不消费物品。
+- completion 才一次性提交 hunger/saturation 与 selected-stack consume；低 FPS 使用 monotonic wall-clock compensation，不把 1.6 s 动作拉长。
+- first-person viewmodel 在整个动作期间获得 continuous food-use progress。
+- multiplayer held-secondary press 重新路由到既有 authoritative use action；multiplayer hunger/eating transaction 仍未 server-owned，因此不在客户端伪造。
+- save schema 保持 v9，terrainVersion 保持 v4。
+
+### 2026-08-22/23 — PR #129 vegetation farming phase 1.1 (merged)
+
+- terrain generator 升级到 v4，为新/current-v4 worlds 加入 deterministic short grass；显式 v2/v3 local compatibility path 保持不变。
+- short grass 使用 canonical Java 1.20.1 blockstate/model/texture，并提供基础 1/8 wheat-seed acquisition path。
+- 新增 canonical bone meal、bone→3 bone meal shapeless recipe；singleplayer bone meal 可推进 wheat 2..5 ages，并在有效 grass surfaces 周围扩散 short grass。
+- survival 只有成功改变世界才消耗 bone meal；creative 不消费。
+- multiplayer farming/bone meal 继续等待 server-owned transaction，不允许 client-side competing truth。
+
+### 2026-08-22 — PR #130 first-person / Workbench presentation repair (merged)
+
+- 缩小第一人称右臂，viewmodel camera 调整为 70°，建立 shoulder→arm→wrist→held-item hierarchy，持有物锚定到 wrist。
+- held-item presentation 区分 block/tool/food/flat；普通纹理物品使用透明双面平面，方块保留 3D preview。
+- Inventory/Workbench 打开时隐藏 world crosshair、Jade、HP/hunger/XP/hotbar、oxygen、break meter 与 first-person viewmodel，并直接以 DOM modal hidden state 为真值，避免 stale presentation flag。
 
 ### 2026-08-22 — PR #128 wheat farming phase one
 

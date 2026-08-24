@@ -53,7 +53,7 @@ export function firstPersonActionPose({attackRemaining=0,useRemaining=0,foodUseA
   const attack=Math.max(0,Math.min(1,1-(Number(attackRemaining)||0)/FIRST_PERSON_ATTACK_DURATION)),use=Math.max(0,Math.min(1,1-(Number(useRemaining)||0)/FIRST_PERSON_USE_DURATION)),foodProgress=Math.max(0,Math.min(1,Number(foodUseProgress)||0));
   const swing=attackRemaining>0?Math.sin(attack*Math.PI):0,pulseUse=useRemaining>0?Math.sin(use*Math.PI):0,foodRaise=foodUseActive?Math.min(1,foodProgress/.12):0,foodBob=foodUseActive?Math.sin(foodProgress*Math.PI*8)*foodRaise:0,useLift=Math.max(pulseUse,foodRaise);
   return Object.freeze({
-    x:.56-.13*swing-.08*foodRaise,y:-.47-.06*swing+.07*pulseUse+.16*foodRaise+.025*foodBob,z:-1.10+.05*swing+.11*foodRaise,
+    x:.61-.13*swing-.08*foodRaise,y:-.52-.06*swing+.07*pulseUse+.16*foodRaise+.025*foodBob,z:-1.10+.05*swing+.11*foodRaise,
     rotX:-.04,rotY:-.02,rotZ:-.04,
     shoulderRotX:-.16-.92*swing+.38*pulseUse+.48*foodRaise,
     shoulderRotY:-.06-.22*swing-.10*foodRaise,

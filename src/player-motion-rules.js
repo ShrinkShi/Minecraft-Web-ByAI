@@ -21,6 +21,12 @@ function velocity3(value){
 }
 function coverage(value){value=finite(value,'swimCoverage');if(value<0||value>1)throw new RangeError('swimCoverage must be between 0 and 1');return value;}
 function positiveSpeed(value,label){value=finite(value,label);if(value<=0)throw new RangeError(`${label} must be > 0`);return value;}
+function sprintActive(input,swimActive){return !swimActive&&input.sprint&&input.forward>0&&!input.sneak;}
+
+export function playerSprintActive(control,{swimActive=false}={}){
+  if(typeof swimActive!=='boolean')throw new TypeError('swimActive must be boolean');
+  return sprintActive(normalizeControlState(control),swimActive);
+}
 
 export function planPlayerMotionStep({
   dt,
@@ -36,7 +42,8 @@ export function planPlayerMotionStep({
   const stepDt=Math.min(nonNegative(dt,'dt'),PLAYER_MAX_STEP_DT),angle=finite(yaw,'yaw'),input=normalizeControlState(control),current=velocity3(velocity),isFlying=bool(flying,'flying'),isGrounded=bool(grounded,'grounded'),reportedCoverage=coverage(swimCoverage);
   walkSpeed=positiveSpeed(walkSpeed,'walkSpeed');sprintSpeed=positiveSpeed(sprintSpeed,'sprintSpeed');const water=isFlying?0:reportedCoverage;
   const swim=stepSwimming({velocityY:current.y,coverage:water,dt:stepDt,up:input.jump,down:input.sneak});
-  const baseSpeed=swim.active?walkSpeed:(input.sprint?sprintSpeed:walkSpeed),sneakFactor=swim.active?1:(input.sneak?PLAYER_SNEAK_SPEED_FACTOR:1),speed=baseSpeed*sneakFactor*swim.speedMultiplier;
+  const sprinting=sprintActive(input,swim.active);
+  const baseSpeed=swim.active?walkSpeed:(sprinting?sprintSpeed:walkSpeed),sneakFactor=swim.active?1:(input.sneak?PLAYER_SNEAK_SPEED_FACTOR:1),speed=baseSpeed*sneakFactor*swim.speedMultiplier;
   const moveAmount=Math.min(1,Math.hypot(input.forward,input.side));let inputX=0,inputZ=0;
   if(moveAmount>0){
     const horizontal=horizontalMoveFromYaw(angle,{side:input.side,forward:input.forward}),length=Math.hypot(horizontal.x,horizontal.z);
@@ -45,7 +52,7 @@ export function planPlayerMotionStep({
 
   if(isFlying){
     const vertical=((input.jump?1:0)-(input.sneak?1:0))*PLAYER_FLIGHT_VERTICAL_SPEED*stepDt;
-    return{dt:stepDt,swimActive:false,speed,displacement:{x:inputX,y:vertical,z:inputZ},velocity:{x:0,y:0,z:0},horizontalDrag:1};
+    return{dt:stepDt,swimActive:false,sprinting,speed,displacement:{x:inputX,y:vertical,z:inputZ},velocity:{x:0,y:0,z:0},horizontalDrag:1};
   }
 
   let velocityY=swim.active?swim.velocityY:current.y-PLAYER_GRAVITY*stepDt;
@@ -54,6 +61,7 @@ export function planPlayerMotionStep({
   return{
     dt:stepDt,
     swimActive:swim.active,
+    sprinting,
     speed,
     displacement:{x:inputX+current.x*stepDt,y:velocityY*stepDt,z:inputZ+current.z*stepDt},
     velocity:{x:current.x,y:velocityY,z:current.z},

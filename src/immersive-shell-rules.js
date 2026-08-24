@@ -1,6 +1,6 @@
 export const GAMEPLAY_KEY_LOCK_CODES=Object.freeze([
-  'KeyW','KeyA','KeyS','KeyD','KeyE','KeyQ','KeyR','KeyT','Slash','Space','Tab','F3','F5',
-  'ShiftLeft','ShiftRight','Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9'
+  'KeyW','KeyA','KeyS','KeyD','KeyE','KeyQ','KeyT','Slash','Space','Tab','F3','F5',
+  'ControlLeft','ControlRight','ShiftLeft','ShiftRight','Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9'
 ]);
 
 function editableTarget(target){
