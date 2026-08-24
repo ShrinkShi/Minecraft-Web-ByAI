@@ -2,6 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.m
 import {BLOCKS} from './blocks.js';
 import {applyDamage,knockbackDirection} from './combat.js';
 import {normalizeControlState,registerControlActionInterceptor} from './control-intents.js';
+import {normalizeFlyingForMode,toggleCreativeFlightState} from './creative-flight-rules.js';
 import {lookDirectionFromYawPitch} from './player-orientation-rules.js';
 import {planPlayerMotionStep,playerSprintActive} from './player-motion-rules.js';
 import {addHungerExhaustion,attackExhaustion,canSprintWithHunger,consumeFood,createHungerState,damageExhaustion,jumpExhaustion,movementExhaustion,stepHunger as stepHungerRules} from './hunger-rules.js';
@@ -37,7 +38,9 @@ export class PlayerController{
   setControlState(state){const previousPrimary=this.controlState.primary;this.controlState=normalizeControlState(state);if(this.controlState.primary&&!previousPrimary)this.triggerPrimaryAnimation();}
   clearControlState(){this.controlState=normalizeControlState();}
   applyLookIntent(yawDelta,pitchDelta){if(!Number.isFinite(yawDelta)||!Number.isFinite(pitchDelta))return;this.setLook(this.yaw+yawDelta,this.pitch+pitchDelta);}
-  setMode(mode){this.mode=mode;this.flying=mode==='creative'||mode==='spectator';if(this.flying)this.swimCoverage=0;}
+  setMode(mode){const changed=this.mode!==mode;this.mode=mode;if(mode==='spectator')this.flying=true;else if(mode!=='creative'||changed)this.flying=false;if(this.flying)this.swimCoverage=0;return this.mode;}
+  setFlying(flying){this.flying=normalizeFlyingForMode(this.mode,flying);if(this.flying){this.swimCoverage=0;this.velocity.y=0;}return this.flying;}
+  toggleCreativeFlight(){const result=toggleCreativeFlightState(this.mode,this.flying);if(result.changed)this.setFlying(result.flying);return result;}
   cycleView(){this.viewMode=(this.viewMode+1)%3;this.syncCamera();return this.viewMode;}
   triggerPrimaryAnimation(){return this.playerModelFactory?.triggerPrimary(this.avatarVisual)??false;}
   triggerUseAnimation(){return this.playerModelFactory?.triggerUse(this.avatarVisual)??false;}
