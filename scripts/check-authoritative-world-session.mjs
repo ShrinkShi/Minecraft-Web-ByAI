@@ -13,7 +13,7 @@ const ORIGIN='http://localhost:4173';
 const timeout=(ms,label)=>new Promise((_,reject)=>setTimeout(()=>reject(new Error(`timeout waiting for ${label}`)),ms));
 const near=(actual,expected,epsilon=1e-9,label='value')=>assert.ok(Math.abs(actual-expected)<=epsilon,`${label}: expected ${expected}, got ${actual}`);
 const neutralControl={version:1,side:0,forward:0,jump:false,sneak:false,sprint:false,primary:false,sequence:0};
-const inputState=(session,control=neutralControl,view=null)=>({session,control,view,selectedSlot:0,pendingActionCount:0,retainedViewCount:view?1:0});
+const inputState=(session,control=neutralControl,view=null)=>({session,control,view,selectedSlot:0,flightToggleSequence:null,pendingActionCount:0,retainedViewCount:view?1:0});
 
 assert.equal(AUTHORITATIVE_WORLD_TICK_MS,50);
 
@@ -35,7 +35,7 @@ const joinCopy=pure.snapshot('pure-1');joinCopy.position.x=999;assert.equal(pure
 assert.deepEqual(pure.tickOnce(),[{session:'pure-1',stepped:false,sent:false,reason:'input-unavailable'}],'missing transport input pauses only that session rather than inventing client input');assert.equal(pure.snapshot('pure-1').tick,0);
 pureInputs.set('pure-1',inputState('pure-1'));let tickResult=pure.tickOnce()[0];assert.equal(tickResult.reason,'snapshot-sent');assert.equal(tickResult.snapshot.tick,1);assert.equal(tickResult.snapshot.grounded,true);assert.equal(pureSnapshots.at(-1).snapshot.tick,1);
 pureInputs.set('pure-1',inputState('pure-1',{...neutralControl,forward:1,sequence:1},{yaw:Math.PI/2,pitch:0,sequence:1}));tickResult=pure.tickOnce()[0];assert.equal(tickResult.snapshot.tick,2);near(tickResult.snapshot.position.x,33.5-4.3*.05,1e-9,'terrain-backed +90 yaw W movement');near(tickResult.snapshot.position.z,-16.5,1e-9,'terrain-backed +90 yaw W z');
-assert.equal(pure.setMode('pure-1','creative').flying,true);assert.throws(()=>pure.setMode('pure-1','builder'),/unsupported authoritative/);assert.throws(()=>pure.setMode('missing','survival'),/unknown authoritative/);
+assert.equal(pure.setMode('pure-1','creative').flying,false,'creative mode starts grounded until a flight-toggle intent is accepted');assert.equal(pure.setMode('pure-1','creative').flying,false,'reapplying creative mode preserves grounded creative state');assert.equal(pure.setMode('pure-1','spectator').flying,true,'spectator remains forced-flying');assert.equal(pure.setMode('pure-1','creative').flying,false,'entering creative from spectator must not inherit spectator flight');assert.throws(()=>pure.setMode('pure-1','builder'),/unsupported authoritative/);assert.throws(()=>pure.setMode('missing','survival'),/unknown authoritative/);
 
 assert.equal(pure.start(),true);assert.equal(pure.running,true);assert.equal(typeof timerCallback,'function');assert.equal(pure.start(),false,'double start must not create a second scheduler');const beforeTimerTick=pure.snapshot('pure-1').tick;timerCallback();assert.equal(pure.snapshot('pure-1').tick,(beforeTimerTick+1)>>>0);assert.equal(pure.stop(),true);assert.deepEqual(clearedTimer,{id:77});assert.equal(pure.running,false);assert.equal(pure.stop(),false);
 
@@ -72,4 +72,4 @@ try{
   socket.close(1000,'test complete');await waitUntil(()=>!authoritative.hasSession(welcome.session),'real websocket close removes authoritative player');assert.equal(authoritative.sessionCount,0);
 }finally{authoritative.close();await server.close();}
 
-console.log('terrain-backed authoritative world session + real websocket tick/snapshot loop: PASS');
+console.log('terrain-backed authoritative world session + grounded creative mode + real websocket tick/snapshot loop: PASS');
