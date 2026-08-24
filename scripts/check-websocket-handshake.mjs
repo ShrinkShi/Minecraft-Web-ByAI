@@ -35,13 +35,13 @@ class FakeSocket{
 
 const snapshotState=(session,tick,overrides={})=>({session,tick,position:{x:1,y:64,z:2},velocity:{x:0,y:0,z:0},yaw:.25,pitch:-.1,mode:'survival',flying:false,grounded:true,swimCoverage:0,voided:false,...overrides});
 
-assert.equal(MULTIPLAYER_HANDSHAKE_VERSION,3);assert.equal(MULTIPLAYER_SUBPROTOCOL,'minecraft-web-v3');assert.ok(SERVER_REJECT_CODES.includes('protocol-mismatch'));
+assert.equal(MULTIPLAYER_HANDSHAKE_VERSION,4);assert.equal(MULTIPLAYER_SUBPROTOCOL,'minecraft-web-v4');assert.ok(SERVER_REJECT_CODES.includes('protocol-mismatch'));
 assert.deepEqual(encodeClientHello(),{v:MULTIPLAYER_HANDSHAKE_VERSION,kind:'hello'});assert.deepEqual(decodeClientHello({v:MULTIPLAYER_HANDSHAKE_VERSION,kind:'hello'}),{version:MULTIPLAYER_HANDSHAKE_VERSION,kind:'hello'});
 assert.deepEqual(encodeServerWelcome('session-1'),{v:MULTIPLAYER_HANDSHAKE_VERSION,kind:'welcome',session:'session-1'});assert.deepEqual(encodeServerReject('server-full'),{v:MULTIPLAYER_HANDSHAKE_VERSION,kind:'reject',code:'server-full'});
 assert.deepEqual(decodeServerHandshake({v:MULTIPLAYER_HANDSHAKE_VERSION,kind:'welcome',session:'session-1'}),{version:MULTIPLAYER_HANDSHAKE_VERSION,kind:'welcome',session:'session-1'});
 assert.deepEqual(decodeServerHandshake({v:MULTIPLAYER_HANDSHAKE_VERSION,kind:'reject',code:'policy'}),{version:MULTIPLAYER_HANDSHAKE_VERSION,kind:'reject',code:'policy'});
-assert.equal(isCompatibleServerHandshake({v:MULTIPLAYER_HANDSHAKE_VERSION,kind:'welcome',session:'ok'}),true);assert.equal(isCompatibleServerHandshake({v:2,kind:'welcome',session:'legacy-v2'}),false);
-assert.throws(()=>decodeClientHello({v:2,kind:'hello'}),/unsupported multiplayer handshake version/);assert.throws(()=>decodeServerHandshake({v:2,kind:'welcome',session:'legacy-v2'}),/unsupported multiplayer handshake version/);
+assert.equal(isCompatibleServerHandshake({v:MULTIPLAYER_HANDSHAKE_VERSION,kind:'welcome',session:'ok'}),true);assert.equal(isCompatibleServerHandshake({v:3,kind:'welcome',session:'legacy-v3'}),false);
+assert.throws(()=>decodeClientHello({v:3,kind:'hello'}),/unsupported multiplayer handshake version/);assert.throws(()=>decodeServerHandshake({v:3,kind:'welcome',session:'legacy-v3'}),/unsupported multiplayer handshake version/);
 assert.throws(()=>decodeClientHello({v:MULTIPLAYER_HANDSHAKE_VERSION,kind:'hello',token:'secret'}),/unexpected fields/);assert.throws(()=>decodeServerHandshake({v:MULTIPLAYER_HANDSHAKE_VERSION,kind:'welcome',session:'ok',device:'mobile'}),/unexpected fields/);assert.throws(()=>encodeServerReject('database-error'),/unsupported server reject code/);
 
 assert.equal(normalizeWebSocketUrl('wss://example.com/game'),'wss://example.com/game');
@@ -91,4 +91,4 @@ timeoutClient.connect('wss://example.com');timeoutSocket.open();assert.equal(typ
 const closeSocket=new FakeSocket('wss://example.com',MULTIPLAYER_SUBPROTOCOL),closeClient=new MultiplayerWebSocketClient({socketFactory:()=>closeSocket});closeClient.connect('wss://example.com');closeSocket.open();closeSocket.message(encodeServerWelcome('close-session'));closeClient.close();assert.equal(closeClient.state,'closed');assert.equal(closeClient.session,null);assert.equal(closeSocket.closed.at(-1).code,1000);
 
 assert.throws(()=>new MultiplayerWebSocketClient({socketFactory:null}),/socketFactory/);assert.throws(()=>new MultiplayerWebSocketClient({onPlayerSnapshot:null}),/onPlayerSnapshot/);assert.throws(()=>new MultiplayerWebSocketClient({socketFactory:()=>new FakeSocket('x'),handshakeTimeoutMs:100}),/250 to 60000/);
-console.log('strict websocket v3 hello/welcome + authoritative flight snapshot transport contracts: PASS');
+console.log('strict websocket v4 hello/welcome + authoritative flight snapshot transport contracts: PASS');
