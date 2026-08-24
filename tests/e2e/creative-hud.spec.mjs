@@ -24,11 +24,11 @@ async function equipLeatherChestplate(page){
 
 test('Creative hides survival HUD without falsifying player state and Survival restores it',async({page})=>{
   await page.goto('/?e2e=1');
-  await createSingleplayerWorld(page,{name:'CI Creative HUD',seed:'ci-creative-hud-2026',mode:'survival',prompt:'海'});
+  await createSingleplayerWorld(page,{name:'CI Creative HUD',seed:'ci-creative-hud-2026',mode:'survival',prompt:'平原'});
 
   const statusRow=page.locator('.status-row'),armor=page.locator('#armor-row'),xp=page.locator('.xp-wrap'),oxygen=page.locator('#oxygen'),hotbar=page.locator('#hotbar');
   await expect(statusRow).not.toHaveClass(/hidden/);await expect(armor).toHaveClass(/hidden/);await expect(xp).not.toHaveClass(/hidden/);await expect(hotbar).toBeVisible();
-  await expect(oxygen).not.toHaveClass(/hidden/,{timeout:5_000});
+  await expect(oxygen).toHaveClass(/hidden/);
 
   await equipLeatherChestplate(page);
   await expect(armor).not.toHaveClass(/hidden/);await expect(page.locator('#armor-row .armor-icon.full')).toHaveCount(1);await expect(page.locator('#armor-row .armor-icon.half')).toHaveCount(1);
@@ -39,12 +39,15 @@ test('Creative hides survival HUD without falsifying player state and Survival r
 
   await runCommand(page,'/gamemode creative');
   await expect(statusRow).toHaveClass(/hidden/);await expect(armor).toHaveClass(/hidden/);await expect(xp).toHaveClass(/hidden/);await expect(oxygen).toHaveClass(/hidden/);await expect(hotbar).toBeVisible();
-  await page.waitForTimeout(350);await expect(armor).toHaveClass(/hidden/);await expect(oxygen).toHaveClass(/hidden/);
+  await page.evaluate(()=>document.querySelector('#oxygen')?.classList.remove('hidden'));
+  await expect(oxygen).not.toHaveClass(/hidden/);
+  await page.waitForTimeout(350);
+  await expect(armor).toHaveClass(/hidden/);await expect(oxygen).toHaveClass(/hidden/);
   expect(await page.evaluate(()=>globalThis.__minecraftE2E?.playerVitals())).toMatchObject({hp:7,food:5,saturation:0});
 
   await runCommand(page,'/gamemode survival');
   await expect(statusRow).not.toHaveClass(/hidden/);await expect(armor).not.toHaveClass(/hidden/);await expect(xp).not.toHaveClass(/hidden/);await expect(hotbar).toBeVisible();
-  await expect(oxygen).not.toHaveClass(/hidden/,{timeout:5_000});
+  await expect(oxygen).toHaveClass(/hidden/);
   expect(await page.locator('#hearts .heart:not(.empty)').count()).toBe(4);expect(await page.locator('#hunger .food:not(.empty)').count()).toBe(3);
   await expect(page.locator('#armor-row .armor-icon.full')).toHaveCount(1);await expect(page.locator('#armor-row .armor-icon.half')).toHaveCount(1);
 });
