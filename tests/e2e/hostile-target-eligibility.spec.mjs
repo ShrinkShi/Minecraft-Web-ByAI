@@ -6,12 +6,12 @@ test('hostile mobs target survival/adventure but drop creative/spectator targets
   await page.goto('/');
   const result=await page.evaluate(async threeUrl=>{
     const [{HostileMobSystem},{BLOCK},THREE]=await Promise.all([import('/src/hostile-mobs.js'),import('/src/blocks.js'),import(threeUrl)]);
-    const world={highestSolid:()=>0,getBlock:()=>BLOCK.STONE};
-    const player={mode:'survival',position:new THREE.Vector3(.5,1,.5),eye:1.62};
+    const world={highestSolid:()=>1,getBlock:()=>BLOCK.STONE};
+    const player={mode:'survival',position:new THREE.Vector3(.5,2,.5),eye:1.62};
     const simulate=({type='zombie',mode='survival',x=1.5,pushX=0,pushZ=0,fuse=0,fuseWasActive=false,attackTimer=0}={})=>{
       const scene=new THREE.Scene(),events={hits:0,projectiles:0,explosions:0,primes:0};
       const system=new HostileMobSystem(scene,world,{maxEntities:2,onPlayerHit:()=>events.hits++,onProjectile:()=>events.projectiles++,onExplosion:()=>events.explosions++,onFuseStart:()=>events.primes++});
-      player.mode=mode;const record=system.spawn(type,{x,y:1,z:.5});record.components.pushX=pushX;record.components.pushZ=pushZ;record.components.fuse=fuse;record.components.fuseWasActive=fuseWasActive;record.components.attackTimer=attackTimer;
+      player.mode=mode;const record=system.spawn(type,{x,y:2,z:.5});record.components.pushX=pushX;record.components.pushZ=pushZ;record.components.fuse=fuse;record.components.fuseWasActive=fuseWasActive;record.components.attackTimer=attackTimer;
       const before=system.store.getPosition(record.id)?.x??null;system.moveAndAttack(record,.1,player);const state=system.store.has(record.id)?record.components:null,position=system.store.getPosition(record.id),snapshot={...events,beforeX:before,afterX:position?.x??null,exists:system.store.has(record.id),fuse:state?.fuse??null,fuseWasActive:state?.fuseWasActive??null,pushX:state?.pushX??null};system.dispose();return snapshot;
     };
     return{
