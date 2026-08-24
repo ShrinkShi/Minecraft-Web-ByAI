@@ -39,8 +39,7 @@ test('Creative hides survival HUD without falsifying player state and Survival r
 
   await runCommand(page,'/gamemode creative');
   await expect(statusRow).toHaveClass(/hidden/);await expect(armor).toHaveClass(/hidden/);await expect(xp).toHaveClass(/hidden/);await expect(oxygen).toHaveClass(/hidden/);await expect(hotbar).toBeVisible();
-  await page.evaluate(()=>document.querySelector('#oxygen')?.classList.remove('hidden'));
-  await expect(oxygen).not.toHaveClass(/hidden/);
+  expect(await page.evaluate(()=>{const node=document.querySelector('#oxygen');if(!node)return false;node.classList.remove('hidden');return !node.classList.contains('hidden');})).toBe(true);
   await page.waitForTimeout(350);
   await expect(armor).toHaveClass(/hidden/);await expect(oxygen).toHaveClass(/hidden/);
   expect(await page.evaluate(()=>globalThis.__minecraftE2E?.playerVitals())).toMatchObject({hp:7,food:5,saturation:0});
