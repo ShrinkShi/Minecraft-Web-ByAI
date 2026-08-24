@@ -37,8 +37,8 @@ export class ControlIntentBus{
   }
   recompute(){
     let side=0,forward=0;const buttons=new Set();for(const source of this.sources.values()){side+=source.side;forward+=source.forward;for(const name of source.buttons)buttons.add(name);}
-    const next=normalizeControlState({side,forward,...Object.fromEntries(CONTINUOUS_CONTROLS.map(name=>[name,buttons.has(name)]))}),previous=this.state,primaryChanged=next.primary!==previous.primary,buttonChanges=CONTINUOUS_CONTROLS.filter(name=>next[name]!==previous[name]);
-    if(!sameState(previous,next)){this.state=next;this.sequence++;this.callbacks.onState?.({...next,sequence:this.sequence});for(const name of buttonChanges)this.callbacks.onButtonChange?.({name,pressed:next[name],sequence:this.sequence,version:CONTROL_INTENT_VERSION});}
+    const next=normalizeControlState({side,forward,...Object.fromEntries(CONTINUOUS_CONTROLS.map(name=>[name,buttons.has(name)]))}),previous=this.state,primaryChanged=next.primary!==previous.primary;
+    if(!sameState(previous,next)){this.state=next;this.sequence++;this.callbacks.onState?.({...next,sequence:this.sequence});}
     if(primaryChanged){const event={sequence:this.sequence,version:CONTROL_INTENT_VERSION};let intercepted=false;for(const interceptor of [...primaryInterceptors]){const result=interceptor(next.primary,event);if(result!==undefined){intercepted=true;break;}}if(!intercepted)this.callbacks.onPrimary?.(next.primary,event);}
     return this.snapshot();
   }
