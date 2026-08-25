@@ -5,8 +5,8 @@ This document records **merged `main` only**. Open PR work is excluded from merg
 ## Authority
 
 - Branch: `main`
-- Commit: `d3de76d31a8d35b3dd50516845abe51d9fabc318`
-- Includes merged work through PR #133.
+- Commit: `ad12dd143263628aac856a1538d6093a7614dae3`
+- Includes merged work through PR #134.
 - Development line: `v0.4.0-dev`.
 - Strict Minecraft Java 1.20.1 gameplay/content parity remains a planning estimate of about **35%**. Engine, resource and multiplayer-authority foundations are materially further along than registry/content breadth.
 
@@ -27,11 +27,30 @@ Merged main provides:
 - compact voxel chunks, terrain/mesh Workers, bounded chunk streaming/unload/disposal and merged geometry;
 - selected-root Minecraft blockstate/model interpretation with parent/texture inheritance, variants/multipart, rotations, uvlock/cull/tint metadata and opaque/cutout/translucent batching.
 
-Creative-specific HUD/catalog behavior being developed in PR #134 is intentionally excluded from this merged baseline.
+PR #134 adds merged mode-aware Creative presentation:
+
+- Creative/Spectator hide survival-only hearts/hunger, armor, XP and oxygen while retaining the hotbar;
+- underlying HP/hunger/armor/XP/oxygen gameplay values are not falsified to achieve that presentation;
+- Creative inventory is a categorized/searchable registry-backed catalog rather than an expansion of `CREATIVE_START`;
+- Survival equipment/2×2 crafting/27-slot main presentation is removed from Creative layout/hit-testing while the real nine-slot hotbar remains available.
+
+## Creative mode
+
+Merged Creative behavior now includes:
+
+- Creative enters grounded instead of permanently flying;
+- double-Jump toggles Creative flight through the shared desktop/mobile Jump edge detector;
+- Spectator remains forced-flying; Survival/Adventure remain non-flying;
+- hostile player target eligibility is limited to Survival/Adventure, so Creative/Spectator are not acquired/maintained as hostile targets;
+- Creeper fuse clears when its player target becomes ineligible while physical knockback decay continues;
+- the live Creative catalog derives from `ITEMS`, supports category and name/ID search, and writes selections to the real inventory cursor;
+- historical `CREATIVE_START` ordering and starter-slot mapping remain unchanged.
+
+The implementation does not claim complete Java 1.20.1 Creative tabs/search tags, operator tabs, saved hotbars, full registry breadth or complete Creative command parity.
 
 ## Mining / block destruction presentation
 
-PR #133 is merged and establishes:
+PR #133 remains the merged mining-presentation foundation:
 
 - singleplayer mining progress published through a presentation-only channel;
 - singleplayer and multiplayer sharing one runtime-owned mining crack overlay;
@@ -53,7 +72,7 @@ Current merged terrain generator is **v4**:
 - old persisted worlds stay pinned to their recorded terrain version rather than being silently reinterpreted;
 - multiplayer requires the exact current terrain version and does not allow mixed generator versions.
 
-Singleplayer save schema remains **v9**. `terrainVersion` is required from schema v8 onward.
+Singleplayer save schema remains **v9**. `terrainVersion` is required from schema v8 onward. PR #134 did not add Creative `flying` as a new persistent save field; player mode remains the persistence boundary and runtime flight is normalized by mode rules.
 
 Java biome/climate generation, caves/aquifers, broad features/structures, full vertical range, Nether and End remain unimplemented.
 
@@ -77,6 +96,8 @@ Merged food/hunger support includes food, saturation, exhaustion and food timer;
 
 Singleplayer eating is a held, interruptible 1.6-second action. Release, control/modal loss, hotbar/item/mode change, drop or primary attack cancels without consuming. Multiplayer hunger/eating state remains disabled until the server owns the complete transaction.
 
+Food status effects such as raw-chicken/rotten-flesh Hunger remain unimplemented because a generic status-effect system is absent. Difficulty/gamerule-specific hunger behavior is also not yet modeled beyond the current fixed Normal-style starvation floor/natural-regeneration rules.
+
 ## Items, crafting and progression
 
 Merged main has:
@@ -97,7 +118,7 @@ The current stone→iron chain is:
 
 `stone pickaxe → iron ore → raw iron → Furnace → iron ingot → iron pickaxe / axe / shovel / sword / hoe / iron armor`
 
-`CREATIVE_START` remains intentionally stable. Later progression content is registered/obtainable without silently shifting historical bootstrap slots. The categorized/searchable Creative registry catalog in PR #134 is not yet a merged fact.
+`CREATIVE_START` remains intentionally stable. Later progression content is registered/obtainable without silently shifting historical bootstrap slots. Creative catalog breadth follows the live `ITEMS` registry and is therefore separate from the historical starter list.
 
 ## Survival / combat / PvE
 
@@ -112,9 +133,7 @@ Merged singleplayer survival includes:
 - time/weather, bed sleep/respawn and singleplayer XP;
 - persistent singleplayer Furnace processing.
 
-Current mobs are cow, sheep, pig, chicken, zombie, skeleton, creeper and spider. Their PvE remains simplified and client/singleplayer-owned; server-authoritative PvE is still absent. Creative hostile-target exclusion being developed in PR #134 is not included here.
-
-Food status effects such as raw-chicken/rotten-flesh Hunger remain unimplemented because a generic status-effect system is absent.
+Current mobs are cow, sheep, pig, chicken, zombie, skeleton, creeper and spider. Their PvE remains simplified and client/singleplayer-owned; server-authoritative PvE is still absent. PR #134 does, however, make local hostile targeting mode-aware so Creative/Spectator players are not valid proactive hostile targets.
 
 ## Multiplayer authority
 
@@ -132,11 +151,15 @@ The merged Node WebSocket runtime owns:
 - 2×2 crafting and transient 3×3 Workbench;
 - Furnace container/process runtime;
 - chat and controlled commands;
-- PvP HP/melee/armor mitigation/knockback/death drops/respawn.
+- PvP HP/melee/armor mitigation/knockback/death drops/respawn;
+- Creative flight intent/state ownership;
+- Creative item creation through inventory transaction protocol **v2** `creative-pick`.
+
+For `creative-pick`, the client submits only `itemId`; server mode/dead/registry/revision/replay checks determine validity, server-side registry metadata determines `maxStack`, and the server owns cursor/revision mutation and replication.
+
+Because PR #134 expanded inventory transaction semantics incompatibly, the merged handshake/subprotocol is **v4 / `minecraft-web-v4`**. Legacy v3 peers are rejected rather than silently treated as compatible.
 
 The merged server does **not** yet own hunger/eating state, farming/random ticks/bone meal, mobs/PvE/projectiles/explosions, XP/levels or durable world persistence. Client-side competing truth remains deliberately disabled for those missing multiplayer domains.
-
-PR #134 changes Creative flight/item-creation multiplayer wire semantics; those protocol changes are intentionally excluded until that PR merges.
 
 ## Original Minecraft resources / audio
 
@@ -157,10 +180,17 @@ Repository quality is exact-head based:
 5. browser integration where Three.js/CSS/WebAudio/HTTP boundaries matter;
 6. final base-drift and review-surface checks.
 
+PR #134 final head `e2dd61ae5603839ed4590f2a58121a4aad296a13` passed Repository quality run #1212: static checks, Chromium 1/2 and Chromium 2/2 all succeeded. It was `behind_by=0` with no reviews, review threads or PR comments before squash merge.
+
 A green older head never validates a newer head.
 
-## Active delivery after this baseline
+## Next planned delivery
 
-PR #134, branch `feature/creative-mode-overhaul`, is the active Draft delivery and is intentionally excluded from merged facts. It targets grounded-by-default Creative flight with double-Jump toggle, Creative/Spectator HUD rules, hostile target exclusion, a registry-backed searchable/categorized Creative catalog and server-authoritative multiplayer Creative item creation.
+The next continuous development slice is Hunger follow-up:
 
-See `docs/CREATIVE_MODE_OVERHAUL.md` for that active delivery once the document lands on the PR branch.
+- food status effects, starting with raw chicken / rotten flesh Hunger semantics and a reusable status-effect foundation;
+- difficulty / gamerule boundary for starvation and natural regeneration behavior;
+- server-authoritative multiplayer hunger/use state and transactions;
+- preservation of current singleplayer save v9 and 1.6-second held/cancelable food-use behavior unless an actual persistence change requires a schema bump.
+
+Registry breadth, broader worldgen, server-authoritative PvE/XP/persistence and farming depth remain subsequent planned slices.
