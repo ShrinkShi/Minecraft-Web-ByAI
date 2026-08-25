@@ -14,7 +14,7 @@ async function rightDown(canvas){await canvas.dispatchEvent('mousedown',{button:
 async function rightUp(canvas){await canvas.dispatchEvent('mouseup',{button:2,bubbles:true});}
 async function savedWorlds(page){return page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('minecraft-web-by-ai',1);request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,tx=db.transaction('worlds','readonly'),getAll=tx.objectStore('worlds').getAll();getAll.onerror=()=>reject(getAll.error);getAll.onsuccess=()=>{const value=getAll.result;db.close();resolve(value);};};}));}
 
-test('singleplayer food requires an interruptible 1.6 second use and persists schema v9',async({page})=>{
+test('singleplayer food requires an interruptible 1.6 second use and persists schema v10',async({page})=>{
   const pageErrors=[],consoleErrors=[];
   page.on('pageerror',error=>pageErrors.push(error.message));
   page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
@@ -84,7 +84,7 @@ test('singleplayer food requires an interruptible 1.6 second use and persists sc
 
   await key(page,'Escape');
   await expect(page.locator('#pause-menu')).toHaveClass(/active/);
-  await expect.poll(async()=>{const record=(await savedWorlds(page)).find(world=>world.name==='CI Hunger Food');if(!record)return null;return{version:record.version,terrainVersion:record.terrainVersion,hunger:record.player?.hunger,saturation:record.player?.saturation,hasExhaustion:Number.isFinite(record.player?.exhaustion),hasTimer:Number.isFinite(record.player?.foodTickTimer)};},{timeout:10_000}).toEqual({version:9,terrainVersion:4,hunger:0,saturation:0,hasExhaustion:true,hasTimer:true});
+  await expect.poll(async()=>{const record=(await savedWorlds(page)).find(world=>world.name==='CI Hunger Food');if(!record)return null;return{version:record.version,terrainVersion:record.terrainVersion,hunger:record.player?.hunger,saturation:record.player?.saturation,hasExhaustion:Number.isFinite(record.player?.exhaustion),hasTimer:Number.isFinite(record.player?.foodTickTimer),hasEffects:Array.isArray(record.player?.statusEffects)};},{timeout:10_000}).toEqual({version:10,terrainVersion:4,hunger:0,saturation:0,hasExhaustion:true,hasTimer:true,hasEffects:true});
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });
