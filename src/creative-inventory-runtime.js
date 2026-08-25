@@ -24,6 +24,7 @@ function renderItems(state){
 }
 
 function renderCatalog(state){renderTabs(state);renderItems(state);}
+function clearCatalog(state){state.tabs.textContent='';state.grid.textContent='';state.summary.textContent='';}
 
 function pickCatalogItem(state,itemId){
   if(state.mode!=='creative')return false;const entry=CREATIVE_CATALOG_ITEMS.find(candidate=>candidate.id===itemId);if(!entry)return false;
@@ -36,14 +37,14 @@ function pickCatalogItem(state,itemId){
 function install(ui){
   if(!ui?.inventory)return null;const documentRef=ui.inventory.ownerDocument||globalThis.document,panel=ui.inventory.querySelector?.('.inventory-panel');if(!documentRef||!panel)return null;ensureStylesheet(documentRef);
   const title=panel.querySelector('.inventory-title'),survivalTop=panel.querySelector('.inventory-top');if(!title||!survivalTop||!ui.invGrid||!ui.invHotbar||typeof ui.makeIcon!=='function')return null;
-  const root=createElement(documentRef,'div','creative-catalog hidden');root.dataset.creativeCatalog='1';const toolbar=createElement(documentRef,'div','creative-catalog-toolbar'),tabs=createElement(documentRef,'div','creative-catalog-tabs'),search=createElement(documentRef,'input','creative-catalog-search'),summary=createElement(documentRef,'span','creative-catalog-summary'),grid=createElement(documentRef,'div','creative-catalog-grid');search.type='search';search.placeholder='搜索物品名称或 ID';search.autocomplete='off';search.spellcheck=false;search.setAttribute('aria-label','搜索创造物品');toolbar.append(tabs,search,summary);root.append(toolbar,grid);title.after(root);
+  const root=createElement(documentRef,'div','creative-catalog hidden');root.style.display='none';root.dataset.creativeCatalog='1';const toolbar=createElement(documentRef,'div','creative-catalog-toolbar'),tabs=createElement(documentRef,'div','creative-catalog-tabs'),search=createElement(documentRef,'input','creative-catalog-search'),summary=createElement(documentRef,'span','creative-catalog-summary'),grid=createElement(documentRef,'div','creative-catalog-grid');search.type='search';search.placeholder='搜索物品名称或 ID';search.autocomplete='off';search.spellcheck=false;search.setAttribute('aria-label','搜索创造物品');toolbar.append(tabs,search,summary);root.append(toolbar,grid);title.after(root);
   const state={ui,document:documentRef,root,title,survivalTop,tabs,search,summary,grid,mode:null,category:'all',query:'',applied:false};STATE_BY_UI.set(ui,state);
   tabs.addEventListener('click',event=>{const button=event.target.closest?.('[data-creative-category]');if(!button||!tabs.contains(button))return;state.category=button.dataset.creativeCategory||'all';renderCatalog(state);});
   search.addEventListener('input',()=>{state.query=search.value;renderItems(state);});search.addEventListener('keydown',event=>event.stopPropagation());
   grid.addEventListener('click',event=>{const button=event.target.closest?.('[data-creative-item]');if(!button||!grid.contains(button))return;event.preventDefault();pickCatalogItem(state,button.dataset.creativeItem);});
-  renderCatalog(state);return state;
+  return state;
 }
 
 export function applyCreativeInventoryModePresentation(ui,mode){
-  const state=STATE_BY_UI.get(ui)||install(ui);if(!state)return false;const creative=mode==='creative';if(state.applied&&state.mode===mode)return creative;state.mode=mode;state.applied=true;state.root.classList.toggle('hidden',!creative);state.survivalTop.classList.toggle('hidden',creative);state.ui.invGrid.classList.toggle('hidden',creative);state.title.textContent=creative?'创造物品栏':'物品栏';state.ui.invHotbar.classList.toggle('creative-inventory-hotbar',creative);if(creative)renderCatalog(state);return creative;
+  const state=STATE_BY_UI.get(ui)||install(ui);if(!state)return false;const creative=mode==='creative';if(state.applied&&state.mode===mode)return creative;state.mode=mode;state.applied=true;state.root.classList.toggle('hidden',!creative);state.root.style.display=creative?'':'none';state.survivalTop.classList.toggle('hidden',creative);state.survivalTop.style.display=creative?'none':'';state.ui.invGrid.classList.toggle('hidden',creative);state.ui.invGrid.style.display=creative?'none':'';state.title.textContent=creative?'创造物品栏':'物品栏';state.ui.invHotbar.classList.toggle('creative-inventory-hotbar',creative);if(creative)renderCatalog(state);else clearCatalog(state);return creative;
 }
