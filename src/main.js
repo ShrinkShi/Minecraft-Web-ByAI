@@ -97,7 +97,6 @@ async function respawnAtPreferredPoint(){
   if(respawnPoint&&world){await world.ensureReadyAround(respawnPoint.x,respawnPoint.z,1);const custom=preferredRespawn();if(custom&&player?.respawnAt(custom))return{custom:true,position:custom};}
   if(world)await world.ensureReadyAround(0,0,0);player?.respawn(0,0);return{custom:false,position:player?{x:player.position.x,y:player.position.y,z:player.position.z}:null};
 }
-
 function disposeWorld(){
   running=false;clearPlayerInput();const movement=multiplayerMovement;multiplayerMovement=null;multiplayerStarting=false;singleplayerFoodUse?.dispose();singleplayerFoodUse=null;publishFirstPersonUseState({active:false});singleplayerVegetation?.dispose();singleplayerVegetation=null;singleplayerFarming?.dispose();singleplayerFarming=null;singleplayerFurnace?.dispose();singleplayerFurnace=null;sessionKind=null;try{movement?.close(1000,'leaving multiplayer world');}catch(error){console.warn('关闭多人连接失败',error);}deathState=null;deathScreen.hide();document.exitPointerLock?.();ui.closeChat();ui.inventory.classList.add('hidden');ui.workbench.classList.add('hidden');resetOxygen();ui.setBreak(0);
   gameplayRuntime?.dispose();gameplayRuntime=null;
@@ -198,7 +197,7 @@ async function startWorld(){
 }
 
 function multiplayerStateText(state,detail){
-  if(state==='connecting')return'正在建立 WebSocket 连接...';if(state==='handshaking')return'正在进行 minecraft-web-v3 协议握手...';if(state==='synchronizing')return'正在同步服务器世界信息与权威出生状态...';if(state==='ready')return'协议同步完成，正在生成服务器世界...';if(state==='failed')return`连接失败：${detail||'未知错误'}`;if(state==='closed')return`连接已关闭${detail?.reason?`：${detail.reason}`:''}`;return'未连接';
+  if(state==='connecting')return'正在建立 WebSocket 连接...';if(state==='handshaking')return'正在进行 minecraft-web-v4 协议握手...';if(state==='synchronizing')return'正在同步服务器世界信息与权威出生状态...';if(state==='ready')return'协议同步完成，正在生成服务器世界...';if(state==='failed')return`连接失败：${detail||'未知错误'}`;if(state==='closed')return`连接已关闭${detail?.reason?`：${detail.reason}`:''}`;return'未连接';
 }
 function handleMultiplayerState(movement,{state,detail}={}){
   if(movement!==multiplayerMovement)return;const failed=state==='failed'||state==='closed';ui.setMultiplayerStatus(multiplayerStateText(state,detail),{error:failed});if(failed){multiplayerStarting=false;if(sessionKind==='multiplayer'&&running)queueMicrotask(()=>disconnectMultiplayerToMenu(movement,state==='failed'?'服务器连接发生协议/网络错误':'服务器已断开连接'));}
