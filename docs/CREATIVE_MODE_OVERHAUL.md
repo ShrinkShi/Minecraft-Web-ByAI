@@ -1,6 +1,6 @@
 # Creative Mode Overhaul
 
-Status: PR #134 active Draft on top of merged `main d3de76d31a8d35b3dd50516845abe51d9fabc318`.
+Status: **merged** via PR #134 into `main ad12dd143263628aac856a1538d6093a7614dae3` on 2026-08-25.
 
 This delivery separates Creative presentation, flight, targeting and item creation from historical bootstrap inventory behavior. It does not claim full Minecraft Java 1.20.1 Creative parity.
 
@@ -11,7 +11,7 @@ This delivery separates Creative presentation, flight, targeting and item creati
 - Entering Creative no longer forces permanent flight.
 - A double Jump press toggles Creative flight; desktop Space and mobile Jump feed the same edge detector.
 - Spectator remains forced-flying; Survival and Adventure remain non-flying.
-- Multiplayer clients send only a flight-toggle intent. The server owns the resulting `flying` state and sends it back in the authoritative self snapshot.
+- Multiplayer clients send only a `flight-toggle` intent. The server owns the resulting `flying` state and sends it back in the authoritative self snapshot.
 
 ### HUD
 
@@ -29,11 +29,11 @@ This delivery separates Creative presentation, flight, targeting and item creati
 
 ### Creative catalog
 
-- `CREATIVE_START` remains the historical bootstrap compatibility surface and is not expanded into a fake full Creative inventory.
+- `CREATIVE_START` remains the historical bootstrap compatibility surface and was not expanded into a fake full Creative inventory.
 - The live Creative catalog is derived from the current `ITEMS` registry.
 - Current catalog categories are building, tools, combat, food, nature, materials and misc, plus an all-items view.
 - Search matches registered item names and IDs.
-- The Creative inventory presentation hides the Survival equipment/2x2-crafting/main-inventory region, shows the catalog, and keeps the real nine-slot hotbar.
+- The Creative inventory presentation hides the Survival equipment/2×2-crafting/main-inventory region, shows the catalog, and keeps the real nine-slot hotbar.
 - Catalog selection creates/replaces the real carried cursor stack; normal inventory slot transactions then place/swap that stack.
 
 ## Multiplayer Creative item authority
@@ -61,7 +61,7 @@ Because transaction semantics changed incompatibly, the multiplayer handshake/su
 
 ## Compatibility boundaries
 
-This PR intentionally preserves:
+PR #134 preserves:
 
 - existing block IDs;
 - existing item IDs;
@@ -71,7 +71,7 @@ This PR intentionally preserves:
 
 Flight is not added to the singleplayer save schema as a new persistent field. The player mode remains the persistence boundary; runtime flight state is normalized from mode rules.
 
-## Validation
+## Validation and merge gate
 
 The delivery is covered by pure/runtime and browser tests for:
 
@@ -86,7 +86,7 @@ The delivery is covered by pure/runtime and browser tests for:
 - singleplayer browser catalog search/category/cursor/hotbar behavior;
 - multiplayer browser catalog-to-server inventory round trip.
 
-Final merge remains gated on the exact PR head passing Node/static logic and both Chromium shards, with no base drift or unresolved review/comment blockers.
+Final PR head `e2dd61ae5603839ed4590f2a58121a4aad296a13` passed Repository quality run #1212: static checks, Chromium 1/2 and Chromium 2/2 all succeeded. The branch was `behind_by=0` with no reviews, review threads or PR comments before squash merge.
 
 ## Explicit non-goals
 
