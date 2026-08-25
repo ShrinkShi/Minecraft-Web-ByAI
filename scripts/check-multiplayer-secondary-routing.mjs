@@ -2,30 +2,30 @@ import assert from 'node:assert/strict';
 import {ControlIntentBus,registerControlActionInterceptor,registerControlPrimaryInterceptor,registerControlSecondaryInterceptor} from '../src/control-intents.js';
 import {installMultiplayerSecondaryRouting} from '../src/multiplayer-secondary-routing.js';
 
-const calls=[],drops=[],attacks=[];let fallback=0,primaryFallback=0,secondaryFallback=0;
+const calls=[],releases=[],drops=[],attacks=[];let fallback=0,primaryFallback=0,secondaryFallback=0;
 const runtime={player:{mode:'creative',yaw:.75,pitch:-.25}};
-const movement={ready:true,sendUse(view){calls.push({...view});return{frame:true};},sendDrop(view){drops.push({...view});return{frame:true};},sendAttack(view){attacks.push({...view});return{frame:true};}};
+const movement={ready:true,sendUse(view){calls.push({...view});return{frame:true};},sendUseRelease(){releases.push('release');return{frame:true};},sendDrop(view){drops.push({...view});return{frame:true};},sendAttack(view){attacks.push({...view});return{frame:true};}};
 const bus=new ControlIntentBus({onAction:intent=>{fallback++;return`fallback:${intent.name}`;},onPrimary:()=>{primaryFallback++;},onSecondary:()=>{secondaryFallback++;}});
 const release=installMultiplayerSecondaryRouting({runtime,movement});
 
 bus.setButton('mouse','primary',true);assert.deepEqual(attacks,[{yaw:.75,pitch:-.25}]);bus.setButton('mouse','primary',true);assert.equal(attacks.length,1,'held primary must not enqueue repeated attacks');bus.setButton('mouse','primary',false);assert.equal(attacks.length,1,'primary release must not attack');assert.equal(primaryFallback,0,'multiplayer primary changes must bypass local fallback while scoped routing is installed');
-bus.setSecondary('mouse',true);assert.deepEqual(calls,[{yaw:.75,pitch:-.25}]);assert.equal(secondaryFallback,0,'creative held-secondary must bypass local fallback');bus.setSecondary('mouse',true);assert.equal(calls.length,1,'held secondary must not enqueue repeated uses');bus.setSecondary('mouse',false);assert.equal(calls.length,1,'secondary release must not send another use');
+bus.setSecondary('mouse',true);assert.deepEqual(calls,[{yaw:.75,pitch:-.25}]);assert.equal(secondaryFallback,0,'creative held-secondary must bypass local fallback');bus.setSecondary('mouse',true);assert.equal(calls.length,1,'held secondary must not enqueue repeated uses');bus.setSecondary('mouse',false);assert.equal(calls.length,1,'secondary release must not send another use');assert.equal(releases.length,1,'secondary release must emit exactly one authoritative use-release');bus.setSecondary('mouse',false);assert.equal(releases.length,1,'repeated secondary release must not emit duplicate use-release actions');
 assert.equal(bus.action('keyboard','drop'),true);assert.deepEqual(drops,[{yaw:.75,pitch:-.25}]);assert.equal(fallback,0,'multiplayer drop must bypass legacy unsupported fallback');
 assert.equal(bus.action('keyboard','inventory'),'fallback:inventory');assert.equal(fallback,1,'unrelated actions must fall through unchanged');
 
 runtime.player.mode='survival';runtime.player.yaw=.2;runtime.player.pitch=.1;
 bus.setButton('mouse','primary',true);assert.deepEqual(attacks[1],{yaw:.2,pitch:.1},'survival primary press must use the current authoritative view');bus.setButton('mouse','primary',false);
 assert.equal(bus.action('keyboard','drop'),true);assert.deepEqual(drops[1],{yaw:.2,pitch:.1},'survival multiplayer drop remains server-authoritative');
-bus.setSecondary('mouse',true);assert.deepEqual(calls[1],{yaw:.2,pitch:.1},'survival held-secondary must use the authoritative server route');bus.setSecondary('mouse',false);assert.equal(calls.length,2);
+bus.setSecondary('mouse',true);assert.deepEqual(calls[1],{yaw:.2,pitch:.1},'survival held-secondary must use the authoritative server route');bus.setSecondary('mouse',false);assert.equal(calls.length,2);assert.equal(releases.length,2,'survival secondary release must reach the authoritative server route');
 
-runtime.player.mode='spectator';bus.setButton('mouse','primary',true);assert.equal(attacks.length,2,'spectator must not emit server attack actions');bus.setButton('mouse','primary',false);assert.equal(bus.action('keyboard','drop'),false);assert.equal(drops.length,2,'spectator must not emit server drop actions');bus.setSecondary('mouse',true);bus.setSecondary('mouse',false);assert.equal(calls.length,2,'spectator must not emit server use actions');
+runtime.player.mode='spectator';bus.setButton('mouse','primary',true);assert.equal(attacks.length,2,'spectator must not emit server attack actions');bus.setButton('mouse','primary',false);assert.equal(bus.action('keyboard','drop'),false);assert.equal(drops.length,2,'spectator must not emit server drop actions');bus.setSecondary('mouse',true);bus.setSecondary('mouse',false);assert.equal(calls.length,2,'spectator must not emit server use actions');assert.equal(releases.length,3,'spectator release still clears any server-held use state after a mode transition');
 
-runtime.player.mode='creative';movement.ready=false;bus.setButton('mouse','primary',true);assert.equal(attacks.length,2,'unready transport must not emit server attack actions');bus.setButton('mouse','primary',false);bus.setSecondary('mouse',true);bus.setSecondary('mouse',false);assert.equal(bus.action('keyboard','drop'),false);assert.equal(fallback,1,'an unavailable multiplayer transport must be handled without re-running local actions');assert.equal(calls.length,2);assert.equal(drops.length,2);
+runtime.player.mode='creative';movement.ready=false;bus.setButton('mouse','primary',true);assert.equal(attacks.length,2,'unready transport must not emit server attack actions');bus.setButton('mouse','primary',false);bus.setSecondary('mouse',true);bus.setSecondary('mouse',false);assert.equal(bus.action('keyboard','drop'),false);assert.equal(fallback,1,'an unavailable multiplayer transport must be handled without re-running local actions');assert.equal(calls.length,2);assert.equal(releases.length,3,'unready transport must not emit use-release actions');assert.equal(drops.length,2);
 
-movement.ready=true;runtime.player.yaw=-1.5;runtime.player.pitch=.4;bus.setSecondary('touch',true);assert.deepEqual(calls[2],{yaw:-1.5,pitch:.4},'routing must snapshot the current local view when held use is emitted');bus.setSecondary('touch',false);
+movement.ready=true;runtime.player.yaw=-1.5;runtime.player.pitch=.4;bus.setSecondary('touch',true);assert.deepEqual(calls[2],{yaw:-1.5,pitch:.4},'routing must snapshot the current local view when held use is emitted');bus.setSecondary('touch',false);assert.equal(releases.length,4,'touch release uses the same authoritative use-release path');
 assert.equal(release(),true);assert.equal(release(),false,'routing cleanup must be idempotent');
 bus.setButton('mouse','primary',true);bus.setButton('mouse','primary',false);assert.equal(primaryFallback,2,'disposing multiplayer routing must restore the original primary callback');
-bus.setSecondary('mouse',true);bus.setSecondary('mouse',false);assert.equal(secondaryFallback,2,'disposing multiplayer routing must restore secondary press/release callbacks');
+bus.setSecondary('mouse',true);bus.setSecondary('mouse',false);assert.equal(secondaryFallback,2,'disposing multiplayer routing must restore secondary press/release callbacks');assert.equal(releases.length,4,'disposed routing must no longer emit authoritative use-release actions');
 assert.equal(bus.action('keyboard','drop'),'fallback:drop');assert.equal(fallback,2,'disposing multiplayer routing must restore legacy drop handling too');
 
 let first=0,second=0;const releaseFirst=registerControlActionInterceptor(()=>{first++;return undefined;}),releaseSecond=registerControlActionInterceptor(intent=>{if(intent.name==='secondary'){second++;return'handled';}return undefined;});assert.equal(bus.action('mouse','secondary'),'handled');assert.equal(first,1);assert.equal(second,1);releaseFirst();releaseSecond();
@@ -34,4 +34,4 @@ let secondaryFirst=0,secondarySecond=0;const releaseSecondaryFirst=registerContr
 
 assert.throws(()=>registerControlActionInterceptor(null),/interceptor/);assert.throws(()=>registerControlPrimaryInterceptor(null),/interceptor/);assert.throws(()=>registerControlSecondaryInterceptor(null),/interceptor/);assert.throws(()=>installMultiplayerSecondaryRouting({runtime:{player:{mode:'creative',yaw:0,pitch:0}},movement:{}}),/sendUse/);assert.throws(()=>installMultiplayerSecondaryRouting({runtime:{player:{mode:'creative',yaw:0,pitch:0}},movement:{sendUse(){}}}),/sendDrop/);assert.throws(()=>installMultiplayerSecondaryRouting({runtime:{player:{mode:'creative',yaw:0,pitch:0}},movement:{sendUse(){},sendDrop(){}}}),/sendAttack/);
 
-console.log('scoped multiplayer held-secondary + drop + authoritative attack routing lifecycle: PASS');
+console.log('scoped multiplayer held-secondary press/release + drop + authoritative attack routing lifecycle: PASS');
