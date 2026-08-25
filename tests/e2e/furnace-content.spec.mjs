@@ -50,6 +50,7 @@ test('furnace uses interpreted original model art and source-backed inventory pr
   const furnacePreview=page.locator('#inventory .block-item-icon[data-item-id="block:21"]').first();await expect(furnacePreview).toBeVisible();await expectRenderedBlockItem(furnacePreview);
   await key(page,'Escape');await expect(page.locator('#inventory')).toHaveClass(/hidden/);
 
+  await runCommand(page,'/gamemode survival');
   await runCommand(page,'/give iron_ingot 1');await key(page,'KeyE');const ingotSlot=page.locator('#inventory [data-inv-index]').filter({has:page.locator('img.item-icon[src*="assets/items/iron_ingot.png"]')}).first();await expect(ingotSlot).toBeVisible();await expect(ingotSlot).toHaveAttribute('title','铁锭');
   expect(pageErrors).toEqual([]);expect(consoleErrors).toEqual([]);
 });
