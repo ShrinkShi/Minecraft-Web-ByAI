@@ -1,12 +1,12 @@
 import {assertClientSessionId} from './client-input-envelope.js';
 import {normalizePlayerYaw,PLAYER_VIEW_MAX_PITCH} from './player-view-frame.js';
 
-export const SERVER_PLAYER_SNAPSHOT_VERSION=1;
+export const SERVER_PLAYER_SNAPSHOT_VERSION=2;
 export const SERVER_PLAYER_SNAPSHOT_KIND='player-snapshot';
 export const SERVER_PLAYER_SNAPSHOT_MODES=Object.freeze(['survival','adventure','creative','spectator']);
 const MODE_SET=new Set(SERVER_PLAYER_SNAPSHOT_MODES);
 const MAX_UINT32=0xffffffff;
-const SNAPSHOT_KEYS=Object.freeze(['grounded','kind','mode','pitch','position','session','swimCoverage','tick','v','velocity','voided','yaw']);
+const SNAPSHOT_KEYS=Object.freeze(['flying','grounded','kind','mode','pitch','position','session','swimCoverage','tick','v','velocity','voided','yaw']);
 
 function object(value,label){if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError(`${label} must be an object`);return value;}
 function finite(value,label){if(typeof value!=='number'||!Number.isFinite(value))throw new TypeError(`${label} must be a finite number`);return value;}
@@ -32,6 +32,7 @@ export function encodeServerPlayerSnapshot(snapshot){
     yaw:normalizePlayerYaw(snapshot.yaw),
     pitch:pitch(snapshot.pitch),
     mode:mode(snapshot.mode),
+    flying:boolean(snapshot.flying,'player snapshot flying'),
     grounded:boolean(snapshot.grounded,'player snapshot grounded'),
     swimCoverage:coverage(snapshot.swimCoverage),
     voided:boolean(snapshot.voided,'player snapshot voided')
@@ -53,6 +54,7 @@ export function decodeServerPlayerSnapshot(snapshot,{expectedSession=null}={}){
     yaw:canonicalYaw(snapshot.yaw),
     pitch:pitch(snapshot.pitch),
     mode:mode(snapshot.mode),
+    flying:boolean(snapshot.flying,'player snapshot flying'),
     grounded:boolean(snapshot.grounded,'player snapshot grounded'),
     swimCoverage:coverage(snapshot.swimCoverage),
     voided:boolean(snapshot.voided,'player snapshot voided')

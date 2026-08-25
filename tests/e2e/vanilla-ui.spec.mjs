@@ -1,5 +1,13 @@
 import {test,expect} from '@playwright/test';
 
+async function runCommand(page,text){
+  await page.evaluate(()=>window.dispatchEvent(new KeyboardEvent('keydown',{code:'Slash',bubbles:true})));
+  await expect(page.locator('#chat-input-wrap')).not.toHaveClass(/hidden/);
+  await page.locator('#chat-input').fill(text);
+  await page.locator('#chat-input').press('Enter');
+  await expect(page.locator('#chat-input-wrap')).toHaveClass(/hidden/);
+}
+
 test('source-backed Java 1.20.1 HUD inventory block/bed icons and Steve preview render in the live browser',async({page})=>{
   const pageErrors=[],consoleErrors=[];
   page.on('pageerror',error=>pageErrors.push(error.message));
@@ -44,9 +52,15 @@ test('source-backed Java 1.20.1 HUD inventory block/bed icons and Steve preview 
   expect(hotbarPixels).toBeGreaterThan(300);
   expect(await hotbar.locator(':scope > .hotbar-slot').first().evaluate(el=>getComputedStyle(el).backgroundImage)).toContain('hotbar-slot-0.png');
 
+  // The Creative catalog has its own acceptance test. Switch modes without rebuilding
+  // inventory so this test continues to own the survival-layout/player-preview contract
+  // while retaining the historical Creative starter stacks used for block/bed icon checks.
+  await runCommand(page,'/gamemode survival');
   await page.keyboard.press('e');
   const inventory=page.locator('#inventory'),panel=inventory.locator('.inventory-panel');
   await expect(inventory).not.toHaveClass(/hidden/);
+  await expect(inventory.locator('[data-creative-catalog]')).toHaveClass(/hidden/);
+  await expect(inventory.locator('.inventory-top')).not.toHaveClass(/hidden/);
   expect(await panel.evaluate(el=>getComputedStyle(el).backgroundImage)).toContain('inventory-panel.png');
   const panelRect=await panel.boundingBox();
   expect(panelRect?.width).toBeCloseTo(352,0);

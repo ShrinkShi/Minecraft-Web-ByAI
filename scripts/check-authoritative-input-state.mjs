@@ -10,7 +10,7 @@ const decoded=(kind,payload,packetSeq=0)=>decodeClientInputEnvelope(encodeClient
 assert.equal(DEFAULT_VIEW_HISTORY_LIMIT,64);assert.equal(DEFAULT_ACTION_QUEUE_LIMIT,64);
 
 const state=new ServerPlayerInputState(session,{viewHistoryLimit:3,actionQueueLimit:2});
-assert.deepEqual(state.snapshot(),{session,control:null,view:null,selectedSlot:0,pendingActionCount:0,retainedViewCount:0});
+assert.deepEqual(state.snapshot(),{session,control:null,view:null,selectedSlot:0,flightToggleSequence:null,pendingActionCount:0,retainedViewCount:0});
 
 const control10=encodePlayerControlFrame({side:.25,forward:.75,jump:true,sneak:false,sprint:true,primary:false},10);
 assert.equal(state.apply(decoded('control',control10)).accepted,true);assert.equal(state.snapshot().control.sequence,10);assert.equal(state.snapshot().control.forward,.75);
@@ -41,6 +41,9 @@ assert.equal(state.apply(decoded('action',use33,10)).accepted,true);assert.equal
 assert.equal(state.snapshot().pendingActionCount,2);assert.equal(state.drainActions().length,2);assert.equal(state.snapshot().pendingActionCount,0);assert.deepEqual(state.drainActions(),[]);
 assert.throws(()=>state.drainActions(-1),/non-negative integer/);
 
+const flight36=encodePlayerActionFrame({kind:'flight-toggle'},36);assert.deepEqual(state.apply(decoded('action',flight36,13)),{accepted:true,reason:'flight-toggle-updated',sequence:36});snapshot=state.snapshot();assert.equal(snapshot.flightToggleSequence,36);assert.equal(snapshot.pendingActionCount,0,'flight toggle is state input, not a queued world/combat interaction');assert.deepEqual(state.drainActions(),[]);
+const replayFlight36=encodePlayerActionFrame({kind:'flight-toggle'},36);assert.deepEqual(state.apply(decoded('action',replayFlight36,14)),{accepted:false,reason:'stale-action-sequence'});assert.equal(state.snapshot().flightToggleSequence,36,'replayed flight toggle must not mutate authoritative input state');
+
 const other=decodeClientInputEnvelope(encodeClientInputEnvelope({session:'other-session',packetSeq:0,kind:'view',payload:encodePlayerViewFrame({yaw:0,pitch:0},1)}));
 assert.deepEqual(state.apply(other),{accepted:false,reason:'session-mismatch'});
 assert.throws(()=>new ServerPlayerInputState('',{}),/session/);assert.throws(()=>new ServerPlayerInputState(session,{viewHistoryLimit:0}),/1 to 4096/);assert.throws(()=>new ServerPlayerInputState(session,{actionQueueLimit:4097}),/1 to 4096/);
@@ -49,4 +52,4 @@ const wrapping=new ServerPlayerInputState('wrap-session');
 const wrapMessage=(sequence,packetSeq)=>decodeClientInputEnvelope(encodeClientInputEnvelope({session:'wrap-session',packetSeq,kind:'view',payload:encodePlayerViewFrame({yaw:0,pitch:0},sequence)}));
 assert.equal(wrapping.apply(wrapMessage(0xffffffff,0)).accepted,true);assert.equal(wrapping.apply(wrapMessage(0,1)).accepted,true,'inner semantic sequence gate accepts uint32 wraparound');assert.equal(wrapping.snapshot().view.sequence,0);
 
-console.log('authoritative per-session input state + inner replay guards: PASS');
+console.log('authoritative per-session input state + inner replay guards + creative flight toggle state: PASS');

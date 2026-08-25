@@ -2,6 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.m
 import {BLOCKS} from './blocks.js';
 import {applyDamage,knockbackDirection} from './combat.js';
 import {normalizeControlState,registerControlActionInterceptor} from './control-intents.js';
+import {CreativeFlightToggleDetector,normalizeFlyingForMode,toggleCreativeFlightState} from './creative-flight-rules.js';
 import {lookDirectionFromYawPitch} from './player-orientation-rules.js';
 import {planPlayerMotionStep,playerSprintActive} from './player-motion-rules.js';
 import {addHungerExhaustion,attackExhaustion,canSprintWithHunger,consumeFood,createHungerState,damageExhaustion,jumpExhaustion,movementExhaustion,stepHunger as stepHungerRules} from './hunger-rules.js';
@@ -24,6 +25,7 @@ export class PlayerController{
     this.yaw=0;this.pitch=0;this.controlState=normalizeControlState();this.grounded=false;this.flying=false;this.viewMode=0;this.swimCoverage=0;
     this.mode='survival';this.hp=20;this.hunger=20;this.saturation=5;this.exhaustion=0;this.foodTickTimer=0;this.hurtUntil=-Infinity;
     this.eye=PLAYER_EYE_HEIGHT;this.height=PLAYER_COLLISION_HEIGHT;this.radius=PLAYER_COLLISION_RADIUS;this.walk=4.3;this.sprint=5.6;
+    this.flightToggleDetector=new CreativeFlightToggleDetector();this.flightToggleHandler=null;
     this.playerModelFactory=null;this.avatarVisual=null;this.visualDead=false;this.avatar=this.createAvatar();
     this.releaseVisualActionInterceptor=registerControlActionInterceptor(intent=>{if(intent?.name==='secondary')this.triggerUseAnimation();});
   }
@@ -34,10 +36,14 @@ export class PlayerController{
     const root=this.avatarVisual.root;root.userData.transient=true;root.userData.localPlayer=true;root.visible=false;this.scene.add(root);return root;
   }
 
-  setControlState(state){const previousPrimary=this.controlState.primary;this.controlState=normalizeControlState(state);if(this.controlState.primary&&!previousPrimary)this.triggerPrimaryAnimation();}
+  setControlState(state){const previousPrimary=this.controlState.primary,previousJump=this.controlState.jump;this.controlState=normalizeControlState(state);if(this.controlState.primary&&!previousPrimary)this.triggerPrimaryAnimation();if(this.controlState.jump&&!previousJump){const now=globalThis.performance?.now?.()??Date.now(),decision=this.flightToggleDetector.press(now,this.mode);if(decision.toggle)this.requestFlightToggle();}}
   clearControlState(){this.controlState=normalizeControlState();}
+  setFlightToggleHandler(handler=null){if(handler!==null&&typeof handler!=='function')throw new TypeError('flight toggle handler must be a function or null');this.flightToggleHandler=handler;return this;}
+  requestFlightToggle(){return this.flightToggleHandler?this.flightToggleHandler():this.toggleCreativeFlight();}
   applyLookIntent(yawDelta,pitchDelta){if(!Number.isFinite(yawDelta)||!Number.isFinite(pitchDelta))return;this.setLook(this.yaw+yawDelta,this.pitch+pitchDelta);}
-  setMode(mode){this.mode=mode;this.flying=mode==='creative'||mode==='spectator';if(this.flying)this.swimCoverage=0;}
+  setMode(mode){const changed=this.mode!==mode;this.mode=mode;if(changed)this.flightToggleDetector.reset();if(mode==='spectator')this.flying=true;else if(mode!=='creative'||changed)this.flying=false;if(this.flying)this.swimCoverage=0;return this.mode;}
+  setFlying(flying){this.flying=normalizeFlyingForMode(this.mode,flying);if(this.flying){this.swimCoverage=0;this.velocity.y=0;}return this.flying;}
+  toggleCreativeFlight(){const result=toggleCreativeFlightState(this.mode,this.flying);if(result.changed)this.setFlying(result.flying);return result;}
   cycleView(){this.viewMode=(this.viewMode+1)%3;this.syncCamera();return this.viewMode;}
   triggerPrimaryAnimation(){return this.playerModelFactory?.triggerPrimary(this.avatarVisual)??false;}
   triggerUseAnimation(){return this.playerModelFactory?.triggerUse(this.avatarVisual)??false;}
@@ -139,5 +145,5 @@ export class PlayerController{
     if(this.canvas)this.canvas.dataset.viewMode=String(this.viewMode);
   }
 
-  dispose(){if(this.canvas)delete this.canvas.dataset.viewMode;this.releaseVisualActionInterceptor?.();this.releaseVisualActionInterceptor=null;if(this.avatar)this.scene?.remove(this.avatar);this.avatar=null;this.avatarVisual=null;this.playerModelFactory?.dispose();this.playerModelFactory=null;}
+  dispose(){if(this.canvas)delete this.canvas.dataset.viewMode;this.releaseVisualActionInterceptor?.();this.releaseVisualActionInterceptor=null;this.flightToggleHandler=null;if(this.avatar)this.scene?.remove(this.avatar);this.avatar=null;this.avatarVisual=null;this.playerModelFactory?.dispose();this.playerModelFactory=null;}
 }

@@ -5,7 +5,7 @@ const close=(actual,expected,epsilon=1e-10,label='value')=>assert.ok(Math.abs(ac
 const floorEnvironment={isSolidBlock:(_x,y)=>y<=0,isLiquidBlock:()=>false};
 const control=(overrides={})=>({version:1,side:0,forward:0,jump:false,sneak:false,sprint:false,primary:false,sequence:1,...overrides});
 const view=(yaw=0,pitch=0)=>({yaw,pitch,sequence:1});
-const input=(session,controlState=null,viewState=null)=>({session,control:controlState,view:viewState,selectedSlot:0,pendingActionCount:0,retainedViewCount:viewState?1:0});
+const input=(session,controlState=null,viewState=null,extras={})=>({session,control:controlState,view:viewState,selectedSlot:0,pendingActionCount:0,retainedViewCount:viewState?1:0,...extras});
 
 assert.equal(SERVER_PLAYER_TICK_RATE,20);assert.equal(SERVER_PLAYER_TICK_DT,.05);assert.deepEqual(SERVER_PLAYER_MODES,['survival','adventure','creative','spectator']);
 
@@ -27,10 +27,10 @@ const wallEnvironment={isSolidBlock:(x,y)=>y<=0||(x===1&&y>=1&&y<=2),isLiquidBlo
 
 const waterEnvironment={isSolidBlock:()=>false,isLiquidBlock:()=>true};const waterSim=new ServerPlayerSimulation(waterEnvironment);waterSim.addSession('swimmer',{position:{x:.5,y:5,z:.5}});const swimmer=waterSim.step('swimmer',input('swimmer',control({forward:1}),view()));assert.equal(swimmer.swimCoverage,1);close(swimmer.position.z,.5-(4.3*.5*.05),1e-10,'full water coverage halves horizontal walking speed');assert.ok(swimmer.velocity.y>0,'full water applies buoyancy through shared swim rules');assert.ok(swimmer.position.y>5);
 
-const creativeSim=new ServerPlayerSimulation(wallEnvironment);creativeSim.addSession('creative',{position:{x:.5,y:1.001,z:.5},mode:'creative'});const creative=creativeSim.step('creative',input('creative',control({side:1,jump:true}),view()));assert.equal(creative.flying,true);close(creative.position.x,.5,1e-12,'creative flight still respects solid collision');close(creative.position.y,1.001+7*.05);assert.deepEqual(creative.velocity,{x:0,y:0,z:0});
+const creativeSim=new ServerPlayerSimulation(wallEnvironment);const creativeInitial=creativeSim.addSession('creative',{position:{x:.5,y:1.001,z:.5},mode:'creative'});assert.equal(creativeInitial.flying,false,'creative starts grounded until an explicit flight toggle');const creative=creativeSim.step('creative',input('creative',control({side:1,jump:true}),view(),{flightToggleSequence:1}));assert.equal(creative.flying,true);close(creative.position.x,.5,1e-12,'creative flight still respects solid collision');close(creative.position.y,1.001+7*.05);assert.deepEqual(creative.velocity,{x:0,y:0,z:0});
 const spectatorSim=new ServerPlayerSimulation(wallEnvironment);spectatorSim.addSession('spectator',{position:{x:.5,y:1.001,z:.5},mode:'spectator'});const spectator=spectatorSim.step('spectator',input('spectator',control({side:1,jump:true}),view()));assert.equal(spectator.flying,true);assert.ok(spectator.position.x>.5,'spectator bypasses solid collision');close(spectator.position.y,1.001+7*.05);
 
-const modeSim=new ServerPlayerSimulation(floorEnvironment);modeSim.addSession('mode',{position:{x:.5,y:1.001,z:.5}});assert.equal(modeSim.setMode('mode','creative').flying,true);assert.equal(modeSim.setMode('mode','survival').flying,false);assert.throws(()=>modeSim.setMode('mode','builder'),/unsupported server player mode/);
+const modeSim=new ServerPlayerSimulation(floorEnvironment);modeSim.addSession('mode',{position:{x:.5,y:1.001,z:.5}});assert.equal(modeSim.setMode('mode','creative').flying,false);assert.equal(modeSim.setFlying('mode',true).flying,true);assert.equal(modeSim.setMode('mode','survival').flying,false);assert.throws(()=>modeSim.setMode('mode','builder'),/unsupported server player mode/);
 
 const voidSim=new ServerPlayerSimulation({isSolidBlock:()=>false,isLiquidBlock:()=>false});voidSim.addSession('void',{position:{x:0,y:-10.01,z:0}});assert.equal(voidSim.step('void').voided,true,'simulation reports void boundary but does not invent health/death authority');
 

@@ -23,7 +23,7 @@ function distanceSquared(a,b){const x=a.x-b.x,y=a.y-b.y,z=a.z-b.z;return x*x+y*y
 function normalizeSnapshot(snapshot){
   snapshot=object(snapshot,'decoded authoritative player snapshot');
   const mode=String(snapshot.mode||'');if(!['survival','adventure','creative','spectator'].includes(mode))throw new RangeError(`unsupported authoritative player mode: ${mode}`);
-  return{
+  const normalized={
     session:assertClientSessionId(snapshot.session),
     tick:assertNetworkSequence(snapshot.tick,'authoritative player snapshot tick'),
     position:vector(snapshot.position,'snapshot position'),
@@ -35,6 +35,8 @@ function normalizeSnapshot(snapshot){
     swimCoverage:coverage(snapshot.swimCoverage),
     voided:boolean(snapshot.voided,'snapshot voided')
   };
+  if(Object.prototype.hasOwnProperty.call(snapshot,'flying'))normalized.flying=boolean(snapshot.flying,'snapshot flying');
+  return normalized;
 }
 
 export class AuthoritativePlayerInterpolator{
@@ -61,7 +63,8 @@ export class AuthoritativePlayerInterpolator{
   step(dt){
     dt=finite(dt,'interpolation dt');if(dt<0)throw new RangeError('interpolation dt must be non-negative');if(!this.display||!this.target||!this.from)return null;
     this.elapsed=Math.min(this.interval,this.elapsed+dt);const t=this.interval===0?1:Math.min(1,this.elapsed/this.interval),target=this.target,from=this.from;
-    this.display={session:target.session,tick:target.tick,position:lerpVector(from.position,target.position,t),velocity:lerpVector(from.velocity,target.velocity,t),yaw:lerpYaw(from.yaw,target.yaw,t),pitch:lerp(from.pitch,target.pitch,t),mode:target.mode,grounded:target.grounded,swimCoverage:target.swimCoverage,voided:target.voided};
-    return cloneState(this.display);
+    const display={session:target.session,tick:target.tick,position:lerpVector(from.position,target.position,t),velocity:lerpVector(from.velocity,target.velocity,t),yaw:lerpYaw(from.yaw,target.yaw,t),pitch:lerp(from.pitch,target.pitch,t),mode:target.mode,grounded:target.grounded,swimCoverage:target.swimCoverage,voided:target.voided};
+    if(Object.prototype.hasOwnProperty.call(target,'flying'))display.flying=target.flying;
+    this.display=display;return cloneState(this.display);
   }
 }

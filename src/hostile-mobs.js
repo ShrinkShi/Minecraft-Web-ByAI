@@ -8,6 +8,7 @@ import {bedSleepCheckPointFromRespawn} from './bed-rules.js';
 import {SLEEP_MONSTER_HORIZONTAL,firstSleepBlocker} from './sleep-safety-rules.js';
 import {animateMobVisual,applyMobVisualState,bindMobVisual,createMobModelTemplate,disposeMobModelResources,disposeMobVisualInstance} from './mob-model-renderer.js';
 import {DAYLIGHT_BURN_DAMAGE,MOB_HURT_FLASH_SECONDS,creeperFuseVisual,mobHitVisual,stepDaylightBurn,undeadExposedToDaylight} from './combat-mob-presentation-rules.js';
+import {canHostileMobTargetPlayer,clearHostileMobTargetState} from './hostile-target-rules.js';
 
 const tempA=new THREE.Vector3(),tempB=new THREE.Vector3(),SPAWN_GROUND=new Set([BLOCK.GRASS,BLOCK.DIRT,BLOCK.STONE,BLOCK.SAND,BLOCK.COBBLESTONE]);
 const nextAmbientDelay=()=>7+Math.random()*9;
@@ -79,8 +80,10 @@ export class HostileMobSystem{
 
   moveAndAttack(record,dt,player){
     const def=HOSTILE_MOBS[record.type],state=record.components,position=this.store.getPosition(record.id);if(!def||!position)return;state.attackTimer=Math.max(0,state.attackTimer-dt);state.hurtPulse=Math.max(0,state.hurtPulse-dt);
-    const toX=player.position.x-position.x,toZ=player.position.z-position.z,planar=Math.hypot(toX,toZ),vertical=Math.abs(player.position.y-position.y);if(this.updateFuse(record,def,state,position,planar,vertical,dt))return;
-    let{vx,vz}=this.desiredVelocity(def,state,position,player,planar,vertical,dt);const pushDrag=Math.exp(-8*dt);state.pushX*=pushDrag;state.pushZ*=pushDrag;const length=Math.hypot(vx,vz);
+    const targetable=canHostileMobTargetPlayer(player);let toX=0,toZ=0,planar=Infinity,vertical=Infinity,vx=state.pushX,vz=state.pushZ;
+    if(targetable){toX=player.position.x-position.x;toZ=player.position.z-position.z;planar=Math.hypot(toX,toZ);vertical=Math.abs(player.position.y-position.y);if(this.updateFuse(record,def,state,position,planar,vertical,dt))return;({vx,vz}=this.desiredVelocity(def,state,position,player,planar,vertical,dt));}
+    else clearHostileMobTargetState(state);
+    const pushDrag=Math.exp(-8*dt);state.pushX*=pushDrag;state.pushZ*=pushDrag;const length=Math.hypot(vx,vz);
     if(length>0){
       const maxSpeed=def.speed+4.5,scale=length>maxSpeed?maxSpeed/length:1,nx=position.x+vx*scale*dt,nz=position.z+vz*scale*dt,nextY=this.world.highestSolid(nx,nz)+1,ground=this.world.getBlock(Math.floor(nx),Math.floor(nextY-1),Math.floor(nz));
       if(nextY>1&&ground!==BLOCK.WATER){
@@ -89,7 +92,7 @@ export class HostileMobSystem{
         else if(rise<=1.05&&drop<=2){position.x=nx;position.y=nextY;position.z=nz;this.store.setPosition(record.id,position);}
       }
     }
-    const visual=this.visuals.get(record.id);if(visual){visual.userData.mobSpeed=Math.min(1,length/Math.max(def.speed,.001));if((def.attackStyle==='ranged'||def.attackStyle==='fuse')&&planar>.01)visual.rotation.y=Math.atan2(toX,toZ)+Math.PI;else if(length>0)visual.rotation.y=Math.atan2(vx,vz)+Math.PI;}this.attack(record,def,state,position,player,planar,vertical);
+    const visual=this.visuals.get(record.id);if(visual){visual.userData.mobSpeed=Math.min(1,length/Math.max(def.speed,.001));if(targetable&&(def.attackStyle==='ranged'||def.attackStyle==='fuse')&&planar>.01)visual.rotation.y=Math.atan2(toX,toZ)+Math.PI;else if(length>0)visual.rotation.y=Math.atan2(vx,vz)+Math.PI;}if(targetable)this.attack(record,def,state,position,player,planar,vertical);
   }
 
   tick(dt,player,gameTime,{weather='clear'}={}){

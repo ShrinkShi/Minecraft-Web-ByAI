@@ -70,8 +70,8 @@ try{
   const welcome=await handshake(socket);
   assert.deepEqual(welcome,{v:MULTIPLAYER_HANDSHAKE_VERSION,kind:'welcome',session:'test-session-1'});await waitUntil(()=>readyEvents.length===1,'server ready callback');assert.equal(readyEvents[0].session,'test-session-1');assert.equal(readyEvents[0].origin,ORIGIN);assert.equal(readyEvents[0].inputState.pendingActionCount,0);assert.equal(server.sessionCount,1);
 
-  const snapshotState={session:welcome.session,tick:7,position:{x:.5,y:64.001,z:-2},velocity:{x:0,y:-1.2,z:0},yaw:.4,pitch:-.2,mode:'survival',grounded:false,swimCoverage:0,voided:false};
-  const snapshotMessage=nextJson(socket),sentSnapshot=server.sendPlayerSnapshot(welcome.session,snapshotState);assert.ok(sentSnapshot);assert.equal(sentSnapshot.kind,'player-snapshot');assert.equal(sentSnapshot.tick,7);const receivedSnapshot=decodeServerPlayerSnapshot(await snapshotMessage,{expectedSession:welcome.session});assert.equal(receivedSnapshot.tick,7);assert.deepEqual(receivedSnapshot.position,snapshotState.position);near(receivedSnapshot.yaw,.4,'real websocket snapshot yaw');
+  const snapshotState={session:welcome.session,tick:7,position:{x:.5,y:64.001,z:-2},velocity:{x:0,y:-1.2,z:0},yaw:.4,pitch:-.2,mode:'survival',flying:false,grounded:false,swimCoverage:0,voided:false};
+  const snapshotMessage=nextJson(socket),sentSnapshot=server.sendPlayerSnapshot(welcome.session,snapshotState);assert.ok(sentSnapshot);assert.equal(sentSnapshot.kind,'player-snapshot');assert.equal(sentSnapshot.tick,7);assert.equal(sentSnapshot.flying,false);const receivedSnapshot=decodeServerPlayerSnapshot(await snapshotMessage,{expectedSession:welcome.session});assert.equal(receivedSnapshot.tick,7);assert.equal(receivedSnapshot.flying,false);assert.deepEqual(receivedSnapshot.position,snapshotState.position);near(receivedSnapshot.yaw,.4,'real websocket snapshot yaw');
   assert.throws(()=>server.sendPlayerSnapshot(welcome.session,{...snapshotState,session:'other-session'}),/must match target session/);assert.equal(server.sendPlayerSnapshot('missing-session',{...snapshotState,session:'missing-session'}),null);
 
   const control=encodePlayerControlFrame({side:.2,forward:.8,jump:false,sneak:false,sprint:true,primary:false},10),view=encodePlayerViewFrame({yaw:.4,pitch:-.2},11),action=encodePlayerActionFrame({kind:'use',viewSeq:11},12);
@@ -115,4 +115,4 @@ try{
   await server.close();
 }
 
-console.log('real Node websocket v2 + authoritative input and player snapshot downlink integration: PASS');
+console.log('real Node websocket v3 + authoritative input and player snapshot v2 downlink integration: PASS');

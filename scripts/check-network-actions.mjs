@@ -3,18 +3,23 @@ import {
   PLAYER_ACTION_FRAME_VERSION,
   PLAYER_GAMEPLAY_ACTIONS,
   actionRequiresView,
+  actionHasNoPayload,
   encodePlayerActionFrame,
   decodePlayerActionFrame,
   isCompatibleActionFrame
 } from '../src/player-action-frame.js';
 
-assert.equal(PLAYER_ACTION_FRAME_VERSION,1);
-assert.deepEqual(PLAYER_GAMEPLAY_ACTIONS,['use','drop','attack','respawn','hotbar-select']);
+assert.equal(PLAYER_ACTION_FRAME_VERSION,2);
+assert.deepEqual(PLAYER_GAMEPLAY_ACTIONS,['use','drop','attack','respawn','hotbar-select','flight-toggle']);
 assert.equal(actionRequiresView('use'),true);
 assert.equal(actionRequiresView('drop'),true);
 assert.equal(actionRequiresView('attack'),true);
 assert.equal(actionRequiresView('respawn'),false);
 assert.equal(actionRequiresView('hotbar-select'),false);
+assert.equal(actionRequiresView('flight-toggle'),false);
+assert.equal(actionHasNoPayload('respawn'),true);
+assert.equal(actionHasNoPayload('flight-toggle'),true);
+assert.equal(actionHasNoPayload('use'),false);
 
 const desktopUse=encodePlayerActionFrame({kind:'use',viewSeq:72},73);
 const touchUse=encodePlayerActionFrame({kind:'use',viewSeq:72},73);
@@ -44,21 +49,28 @@ assert.deepEqual(Object.keys(select).sort(),['kind','seq','slot','v']);
 assert.deepEqual(decodePlayerActionFrame(select),{kind:'hotbar-select',sequence:85,slot:8});
 assert.equal(isCompatibleActionFrame(select),true);
 
+const flightToggle=encodePlayerActionFrame({kind:'flight-toggle'},86);
+assert.deepEqual(flightToggle,{v:PLAYER_ACTION_FRAME_VERSION,seq:86,kind:'flight-toggle'});
+assert.deepEqual(decodePlayerActionFrame(flightToggle),{kind:'flight-toggle',sequence:86});
+assert.equal(actionRequiresView(flightToggle.kind),false,'creative flight toggle is a server-owned state transition and has no client target/view payload');
+assert.equal(isCompatibleActionFrame(flightToggle),true);
+
 assert.throws(()=>encodePlayerActionFrame({kind:'use',viewSeq:1},-1),/uint32/);
 assert.throws(()=>encodePlayerActionFrame({kind:'use',viewSeq:-1},1),/view sequence/);
 assert.throws(()=>encodePlayerActionFrame({kind:'hotbar-select',slot:'3'},1),/integer from 0 to 8/);
 assert.throws(()=>encodePlayerActionFrame({kind:'hotbar-select',slot:9},1),/integer from 0 to 8/);
 assert.throws(()=>encodePlayerActionFrame({kind:'inventory'},1),/unsupported player gameplay action/);
 assert.throws(()=>encodePlayerActionFrame({kind:'chat'},1),/unsupported player gameplay action/);
-assert.throws(()=>encodePlayerActionFrame({kind:'use',viewSeq:1,target:{x:1,y:2,z:3}},2),/unexpected fields/,'client target hints are not authoritative in v1');
-assert.throws(()=>encodePlayerActionFrame({kind:'attack',viewSeq:1,target:'s:other'},2),/unexpected fields/,'client player target hints are not authoritative in v1');
+assert.throws(()=>encodePlayerActionFrame({kind:'use',viewSeq:1,target:{x:1,y:2,z:3}},2),/unexpected fields/,'client target hints are not authoritative');
+assert.throws(()=>encodePlayerActionFrame({kind:'attack',viewSeq:1,target:'s:other'},2),/unexpected fields/,'client player target hints are not authoritative');
 assert.throws(()=>encodePlayerActionFrame({kind:'respawn',viewSeq:1},2),/unexpected fields/,'respawn must not carry a stale referenced view');
-assert.throws(()=>decodePlayerActionFrame({...desktopUse,v:2}),/unsupported player action frame version/);
+assert.throws(()=>encodePlayerActionFrame({kind:'flight-toggle',viewSeq:1},2),/unexpected fields/,'flight toggle must not carry a stale referenced view');
+assert.throws(()=>decodePlayerActionFrame({...desktopUse,v:1}),/unsupported player action frame version/);
 assert.throws(()=>decodePlayerActionFrame({...desktopUse,viewSeq:'72'}),/view sequence/);
 assert.throws(()=>decodePlayerActionFrame({...desktopUse,source:'desktop'}),/unexpected fields/);
 assert.throws(()=>decodePlayerActionFrame({...desktopUse,target:{x:0,y:0,z:0}}),/unexpected fields/);
-assert.throws(()=>decodePlayerActionFrame({v:1,seq:1,kind:'pause'}),/unsupported player gameplay action/);
+assert.throws(()=>decodePlayerActionFrame({v:PLAYER_ACTION_FRAME_VERSION,seq:1,kind:'pause'}),/unsupported player gameplay action/);
 assert.equal(isCompatibleActionFrame({}),false);
 assert.equal(isCompatibleActionFrame({...select,device:'mobile'}),false);
 
-console.log('strict platform-neutral gameplay action wire contracts: PASS');
+console.log('strict platform-neutral gameplay action wire contracts + creative flight toggle: PASS');

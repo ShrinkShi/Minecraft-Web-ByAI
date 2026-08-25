@@ -3,7 +3,7 @@ import WebSocket from 'ws';
 import {HOTBAR_START} from '../src/inventory-layout.js';
 import {MULTIPLAYER_SUBPROTOCOL,encodeClientHello} from '../src/multiplayer-handshake.js';
 import {decodeServerInventorySnapshot,SERVER_INVENTORY_SNAPSHOT_KIND} from '../src/server-inventory-snapshot.js';
-import {decodeInventoryTransactionResult,encodeInventoryTransactionRequest,INVENTORY_TRANSACTION_RESULT_KIND} from '../src/inventory-transaction-wire.js';
+import {decodeInventoryTransactionResult,encodeInventoryTransactionRequest,INVENTORY_TRANSACTION_PROTOCOL_VERSION,INVENTORY_TRANSACTION_RESULT_KIND} from '../src/inventory-transaction-wire.js';
 import {createAuthoritativeServerRuntime} from '../server/runtime.mjs';
 
 const ORIGIN='http://localhost:4173';
@@ -21,11 +21,15 @@ try{
 
   const pick=encodeInventoryTransactionRequest({session,requestId:0,expectedRevision:0,action:{type:'slot-click',slot:HOTBAR_START,button:0,shift:false}});socket.send(JSON.stringify(pick));
   const changed=decodeServerInventorySnapshot(await nextKind(messages,SERVER_INVENTORY_SNAPSHOT_KIND,'changed inventory snapshot'),{expectedSession:session});assert.equal(changed.revision,1);assert.equal(changed.slots[HOTBAR_START],null);assert.deepEqual(changed.cursor,{id:'block:1',count:64});
-  const pickResult=decodeInventoryTransactionResult(await nextKind(messages,INVENTORY_TRANSACTION_RESULT_KIND,'picked-up transaction result'),{expectedSession:session});assert.deepEqual(pickResult,{v:1,kind:INVENTORY_TRANSACTION_RESULT_KIND,session,requestId:0,ok:true,code:'picked-up',revision:1});
+  const pickResult=decodeInventoryTransactionResult(await nextKind(messages,INVENTORY_TRANSACTION_RESULT_KIND,'picked-up transaction result'),{expectedSession:session});assert.deepEqual(pickResult,{v:INVENTORY_TRANSACTION_PROTOCOL_VERSION,kind:INVENTORY_TRANSACTION_RESULT_KIND,session,requestId:0,ok:true,code:'picked-up',revision:1});
 
-  const stale=encodeInventoryTransactionRequest({session,requestId:1,expectedRevision:0,action:{type:'return-cursor'}});socket.send(JSON.stringify(stale));const staleResult=decodeInventoryTransactionResult(await nextKind(messages,INVENTORY_TRANSACTION_RESULT_KIND,'stale transaction result'),{expectedSession:session});assert.equal(staleResult.requestId,1);assert.equal(staleResult.ok,false);assert.equal(staleResult.code,'stale-revision');assert.equal(staleResult.revision,1);const authoritative=runtime.inventories.snapshot(session);assert.equal(authoritative.revision,1);assert.deepEqual(authoritative.cursor,{id:'block:1',count:64},'stale request must not mutate authoritative cursor');
+  const creativePick=encodeInventoryTransactionRequest({session,requestId:1,expectedRevision:1,action:{type:'creative-pick',itemId:'wooden_pickaxe'}});socket.send(JSON.stringify(creativePick));const creativeSnapshot=decodeServerInventorySnapshot(await nextKind(messages,SERVER_INVENTORY_SNAPSHOT_KIND,'creative pick snapshot'),{expectedSession:session});assert.equal(creativeSnapshot.revision,2);assert.deepEqual(creativeSnapshot.cursor,{id:'wooden_pickaxe',count:1});assert.equal(creativeSnapshot.slots[HOTBAR_START],null,'creative pick only replaces the carried cursor');const creativeResult=decodeInventoryTransactionResult(await nextKind(messages,INVENTORY_TRANSACTION_RESULT_KIND,'creative pick result'),{expectedSession:session});assert.equal(creativeResult.requestId,1);assert.equal(creativeResult.ok,true);assert.equal(creativeResult.code,'creative-picked');assert.equal(creativeResult.revision,2);
+
+  const unknownPick=encodeInventoryTransactionRequest({session,requestId:2,expectedRevision:2,action:{type:'creative-pick',itemId:'missing:item'}});socket.send(JSON.stringify(unknownPick));const unknownResult=decodeInventoryTransactionResult(await nextKind(messages,INVENTORY_TRANSACTION_RESULT_KIND,'unknown creative pick result'),{expectedSession:session});assert.equal(unknownResult.requestId,2);assert.equal(unknownResult.ok,false);assert.equal(unknownResult.code,'unknown-item');assert.equal(unknownResult.revision,2);assert.deepEqual(runtime.inventories.snapshot(session).cursor,{id:'wooden_pickaxe',count:1});
+
+  const stale=encodeInventoryTransactionRequest({session,requestId:3,expectedRevision:1,action:{type:'return-cursor'}});socket.send(JSON.stringify(stale));const staleResult=decodeInventoryTransactionResult(await nextKind(messages,INVENTORY_TRANSACTION_RESULT_KIND,'stale transaction result'),{expectedSession:session});assert.equal(staleResult.requestId,3);assert.equal(staleResult.ok,false);assert.equal(staleResult.code,'stale-revision');assert.equal(staleResult.revision,2);const authoritative=runtime.inventories.snapshot(session);assert.equal(authoritative.revision,2);assert.deepEqual(authoritative.cursor,{id:'wooden_pickaxe',count:1},'stale request must not mutate authoritative cursor');
 
   const replayClose=closeEvent(socket,'inventory transaction replay close');socket.send(JSON.stringify(stale));const replay=await replayClose;assert.equal(replay.code,1008);assert.match(replay.reason,/stale or duplicate inventory transaction request/);assert.deepEqual(errors,[]);
 }finally{if(socket?.readyState===WebSocket.OPEN)socket.terminate();await runtime.stop();}
 
-console.log('real WebSocket inventory transaction revision guard + replay rejection: PASS');
+console.log('real WebSocket inventory transaction revision guard + authoritative creative pick + replay rejection: PASS');

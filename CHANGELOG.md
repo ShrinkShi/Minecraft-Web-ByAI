@@ -2,9 +2,22 @@
 
 ## [Unreleased]
 
-> 2026-08-24 merged baseline: `main 69749b6e19ee3f7ecb4aa62e6e96a82a6d6a87cc` includes PR #131. PR #133 is the active unmerged presentation/mining delivery. Merged facts live in `docs/PROJECT_BASELINE.md`; active-slice details live in `docs/PRESENTATION_MINING_FOUNDATION.md`.
+> 2026-08-25 merged baseline: `main d3de76d31a8d35b3dd50516845abe51d9fabc318` includes PR #133. PR #134 is the active Draft Creative-mode overhaul. Merged facts live in `docs/PROJECT_BASELINE.md`; active-slice details live in `docs/CREATIVE_MODE_OVERHAUL.md`.
 
-### 2026-08-24 — PR #133 presentation / mining foundation (active Draft)
+### 2026-08-25 — PR #134 Creative mode overhaul (active Draft)
+
+- Creative 不再进入模式即永久飞行；desktop Space 与 mobile Jump 共用同一 rising-edge detector，double-Jump 切换 Creative flight，Spectator 继续 forced-flying。
+- multiplayer flight 只发送 `flight-toggle` intent；服务器持有 `flying` 真值并通过 self-authoritative snapshot 复制，客户端不建立 competing truth。
+- Creative/Spectator HUD 隐藏 hearts/hunger、armor、XP、oxygen，只保留 hotbar；底层 HP/hunger/armor/XP/oxygen gameplay state 不因 presentation 被伪造或重置。
+- hostile target eligibility 收紧为 Survival/Adventure；Creative/Spectator 不再被追击、近战或作为骷髅射击目标，Creeper 在目标失效时清空 fuse，同时保留 knockback 衰减等物理状态。
+- Creative inventory 从当前 `ITEMS` registry 派生分类/搜索 catalog，不扩展或重排历史 `CREATIVE_START`；Creative UI 隐藏 Survival equipment/2×2 crafting/27-slot main 区并保留真实 9-slot hotbar。
+- singleplayer catalog selection 写入真实 cursor；multiplayer 使用 server-owned inventory transaction v2 `creative-pick`，客户端只提交 `itemId`，server 校验 mode/dead/registry/revision/replay 并按 `maxStack()` 创建 authoritative cursor。
+- inventory transaction action semantics 扩展不兼容，因此 multiplayer handshake/subprotocol 升级为 **v4 / `minecraft-web-v4`**，legacy v3 不伪装兼容。
+- 新增 pure/runtime、real WebSocket 与 Chromium 回归，覆盖 flight、HUD、hostile target、catalog、server Creative pick 以及真实 browser catalog→server inventory round trip。
+- block/item IDs、singleplayer save schema v9、terrain generator v4、历史 `CREATIVE_START` ordering/slot mapping 保持不变。
+- PR 只有在最终 exact-head static 与两片 Chromium 全绿、base 无漂移且 review/comment surface 无 blocker 后才可合并。
+
+### 2026-08-24 — PR #133 presentation / mining foundation (merged)
 
 - 第一人称右手 neutral anchor 轻微向右下调整，不改变既有 attack/use/food-use action hierarchy。
 - 新增 pure walk/sprint locomotion pose；第三人称 Steve 的 sprint 使用更大 stride、arm swing、body lean、bob/sway，不再与 walk 共用单一正弦摆动。
