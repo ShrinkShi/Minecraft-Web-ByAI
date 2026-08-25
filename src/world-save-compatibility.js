@@ -2,7 +2,7 @@ import {SUPPORTED_TERRAIN_GENERATOR_VERSIONS,TERRAIN_GENERATOR_VERSION,normalize
 
 export const LEGACY_UNVERSIONED_TERRAIN_GENERATOR_VERSION=2;
 export const TERRAIN_VERSIONED_SAVE_MIN_VERSION=8;
-export const SINGLEPLAYER_SAVE_VERSION=9;
+export const SINGLEPLAYER_SAVE_VERSION=10;
 
 export function resolveSingleplayerTerrainVersion(record=null){
   if(record===null||record===undefined)return TERRAIN_GENERATOR_VERSION;
