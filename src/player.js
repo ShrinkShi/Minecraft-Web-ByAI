@@ -76,7 +76,7 @@ export class PlayerController{
   addExhaustion(amount){if(this.mode!=='survival')return this.hungerState();return this.applyHungerState(addHungerExhaustion(this.hungerState(),amount));}
   recordAttackExhaustion(){return this.addExhaustion(attackExhaustion());}
   eat(profile){const result=consumeFood(this.hungerState(),profile);if(!result.consumed)return result;this.applyHungerState(result.state);let committed=null;const commitStatusEffects=()=>committed??(committed=this.applyFoodStatusEffects(profile));return Object.freeze({...result,commitStatusEffects});}
-  stepHunger(dt){const result=stepHungerRules(this.hungerState(),{dt,hp:this.hp,maxHp:20,mode:this.mode});this.applyHungerState(result.state);if(result.heal>0)this.hp=Math.min(20,this.hp+result.heal);if(result.damage>0){this.hp=Math.max(0,this.hp-result.damage);if(this.hp<=0)this.setDeathVisual(true);}return result;}
+  stepHunger(dt){const effects=this.stepStatusEffects(dt),result=stepHungerRules(this.hungerState(),{dt,hp:this.hp,maxHp:20,mode:this.mode});this.applyHungerState(result.state);if(result.heal>0)this.hp=Math.min(20,this.hp+result.heal);if(result.damage>0){this.hp=Math.max(0,this.hp-result.damage);if(this.hp<=0)this.setDeathVisual(true);}return Object.freeze({...result,changed:result.changed||effects.changed,statusEffects:effects});}
 
   takeDamage(amount,now,source=null){
     if(this.mode==='creative'||this.mode==='spectator')return{applied:false,damage:0,hp:this.hp,dead:false};
