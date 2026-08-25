@@ -1,3 +1,5 @@
+import {normalizeFoodStatusEffects} from './status-effect-rules.js';
+
 export const MAX_FOOD_LEVEL=20;
 export const MAX_SATURATION=20;
 export const MAX_EXHAUSTION=40;
@@ -40,7 +42,8 @@ export function normalizeFoodProfile(value){
   if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError('food profile must be an object');
   const nutrition=finite(value.nutrition,'food nutrition');if(!Number.isInteger(nutrition)||nutrition<0||nutrition>MAX_FOOD_LEVEL)throw new RangeError('food nutrition must be an integer from 0 to 20');
   const saturationModifier=finite(value.saturationModifier,'food saturation modifier');if(saturationModifier<0||saturationModifier>2)throw new RangeError('food saturation modifier must be from 0 to 2');
-  return Object.freeze({nutrition,saturationModifier,alwaysEdible:!!value.alwaysEdible});
+  const effects=normalizeFoodStatusEffects(value.effects);
+  return Object.freeze({nutrition,saturationModifier,alwaysEdible:!!value.alwaysEdible,effects});
 }
 
 export function consumeFood(value,profile){
