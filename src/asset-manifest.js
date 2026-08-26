@@ -28,6 +28,13 @@ const GUI_RECORDS=Object.fromEntries(Object.entries(GUI_FILES).map(([key,file])=
 const CANONICAL_ITEM_ROOT='./MC原版素材assets/minecraft/textures/item';
 const CANONICAL_BLOCK_ROOT='./MC原版素材assets/minecraft/textures/block';
 const CANONICAL_GUI_ROOT='./MC原版素材assets/minecraft/textures/gui/container';
+export const REGISTRY_BREADTH_BLOCK_TEXTURES=Object.freeze([
+  'oak_planks','granite','diorite','andesite','spruce_planks','birch_planks','jungle_planks','acacia_planks','dark_oak_planks','mangrove_planks','cherry_planks'
+]);
+const REGISTRY_BREADTH_BLOCK_RECORDS=Object.fromEntries(REGISTRY_BREADTH_BLOCK_TEXTURES.map(name=>[
+  `block.${name}`,
+  supplied('block-texture',`${CANONICAL_BLOCK_ROOT}/${name}.png`,{minecraftVersion:'1.20.1',directCanonical:true})
+]));
 const RECORDS=Object.freeze({
   'terrain.block_atlas':supplied('texture-atlas','./assets/textures/atlas.png',{minecraftVersion:'1.20.1'}),
   'block.model_atlas':supplied('texture-atlas','./assets/model-textures/model-texture-atlas.png',{minecraftVersion:'1.20.1'}),
@@ -40,6 +47,7 @@ const RECORDS=Object.freeze({
   'block.furnace_front':supplied('block-texture','./assets/items/furnace_front.png',{minecraftVersion:'1.20.1'}),
   'block.stripped_oak_log':supplied('block-texture',`${CANONICAL_BLOCK_ROOT}/stripped_oak_log.png`,{minecraftVersion:'1.20.1',directCanonical:true}),
   'block.stripped_oak_log_top':supplied('block-texture',`${CANONICAL_BLOCK_ROOT}/stripped_oak_log_top.png`,{minecraftVersion:'1.20.1',directCanonical:true}),
+  ...REGISTRY_BREADTH_BLOCK_RECORDS,
 
   'item.stick':supplied('item-texture','./assets/items/stick.png'),
   'item.wooden_pickaxe':supplied('item-texture','./assets/items/wooden_pickaxe.png'),
