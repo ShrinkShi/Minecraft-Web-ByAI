@@ -8,6 +8,7 @@ import {planPlayerMotionStep,playerSprintActive} from './player-motion-rules.js'
 import {addHungerExhaustion,attackExhaustion,canSprintWithHunger,consumeFood,createHungerState,damageExhaustion,jumpExhaustion,movementExhaustion,stepHunger as stepHungerRules} from './hunger-rules.js';
 import {applyStatusEffect as applyStatusEffectRule,normalizeStatusEffects,rollFoodStatusEffects,stepStatusEffects as stepStatusEffectRules} from './status-effect-rules.js';
 import {PlayerModelFactory} from './player-model-renderer.js';
+import {publishPlayerDamage} from './player-damage-channel.js';
 import {
   PLAYER_COLLISION_RADIUS,
   PLAYER_COLLISION_HEIGHT,
@@ -76,12 +77,12 @@ export class PlayerController{
   addExhaustion(amount){if(this.mode!=='survival')return this.hungerState();return this.applyHungerState(addHungerExhaustion(this.hungerState(),amount));}
   recordAttackExhaustion(){return this.addExhaustion(attackExhaustion());}
   eat(profile){const result=consumeFood(this.hungerState(),profile);if(!result.consumed)return result;this.applyHungerState(result.state);let committed=null;const commitStatusEffects=()=>committed??(committed=this.applyFoodStatusEffects(profile));return Object.freeze({...result,commitStatusEffects});}
-  stepHunger(dt){const effects=this.stepStatusEffects(dt),result=stepHungerRules(this.hungerState(),{dt,hp:this.hp,maxHp:20,mode:this.mode});this.applyHungerState(result.state);if(result.heal>0)this.hp=Math.min(20,this.hp+result.heal);if(result.damage>0){this.hp=Math.max(0,this.hp-result.damage);if(this.hp<=0)this.setDeathVisual(true);}return Object.freeze({...result,changed:result.changed||effects.changed,statusEffects:effects});}
+  stepHunger(dt){const effects=this.stepStatusEffects(dt),result=stepHungerRules(this.hungerState(),{dt,hp:this.hp,maxHp:20,mode:this.mode});this.applyHungerState(result.state);if(result.heal>0)this.hp=Math.min(20,this.hp+result.heal);if(result.damage>0){this.hp=Math.max(0,this.hp-result.damage);publishPlayerDamage({damage:result.damage,hp:this.hp,dead:this.hp<=0,cause:'hunger'});if(this.hp<=0)this.setDeathVisual(true);}return Object.freeze({...result,changed:result.changed||effects.changed,statusEffects:effects});}
 
   takeDamage(amount,now,source=null){
     if(this.mode==='creative'||this.mode==='spectator')return{applied:false,damage:0,hp:this.hp,dead:false};
     const result=applyDamage(this,amount,now,{maxHp:20});
-    if(result.applied)this.addExhaustion(damageExhaustion());
+    if(result.applied){this.addExhaustion(damageExhaustion());publishPlayerDamage({damage:result.damage,hp:result.hp,dead:result.dead,source,cause:'combat'});}
     if(result.applied&&source&&Number.isFinite(source.x)&&Number.isFinite(source.z))this.knockbackFrom(source.x,source.z,.52,.24);
     if(result.dead)this.setDeathVisual(true);
     return result;
@@ -132,8 +133,9 @@ export class PlayerController{
 
   updateVisual(dt){
     if(!this.avatarVisual||!this.playerModelFactory)return false;
-    let speed=Math.hypot(this.velocity.x,this.velocity.z);if(this.flying&&speed<.01)speed=Math.hypot(this.controlState.side,this.controlState.forward)*(this.controlState.sprint?this.sprint:this.walk);
-    const sprinting=canSprintWithHunger(this.hunger,this.mode)&&playerSprintActive(this.controlState,{swimActive:this.swimCoverage>0})&&speed>.1;
+    const inputAmount=Math.min(1,Math.hypot(this.controlState.side,this.controlState.forward));
+    const sprinting=canSprintWithHunger(this.hunger,this.mode)&&playerSprintActive(this.controlState,{swimActive:this.swimCoverage>0})&&inputAmount>.01;
+    let speed=inputAmount*(sprinting?this.sprint:this.walk);if(this.controlState.sneak&&!this.flying&&this.swimCoverage<=0)speed*=.35;if(this.swimCoverage>0&&!this.flying)speed*=.55;
     return this.playerModelFactory.animate(this.avatarVisual,dt,{speed,sprint:sprinting,primary:this.controlState.primary,dead:this.visualDead||this.hp<=0,headPitch:-this.pitch,headYaw:0});
   }
 

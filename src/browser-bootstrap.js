@@ -5,6 +5,7 @@ import {installWorldSelection} from './world-selection.js';
 import {installInventoryPlayerPreview} from './inventory-player-preview.js';
 import {installImmersiveGameShell} from './immersive-game-shell.js';
 import {installGameOptions} from './game-options-ui.js';
+import {installPlayerDamageFeedback} from './player-damage-feedback-ui.js';
 import './furnace-ui.js';
 import './main.js';
 
@@ -15,7 +16,9 @@ installWorldSelection();
 const inventoryPreview=installInventoryPlayerPreview();
 installImmersiveGameShell(document.querySelector('#game-canvas'));
 const gameOptions=installGameOptions();
+const playerDamageFeedback=installPlayerDamageFeedback();
 if(globalThis.__minecraftE2E){
   if(inventoryPreview)globalThis.__minecraftE2E.inventoryPlayerPreview=()=>inventoryPreview.snapshot();
   globalThis.__minecraftE2E.gameOptions=gameOptions;
+  globalThis.__minecraftE2E.playerDamageFeedback=playerDamageFeedback;
 }
