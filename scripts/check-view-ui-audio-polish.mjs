@@ -19,7 +19,8 @@ assert.equal(FIRST_PERSON_RIGHT_ARM_LAYOUT.rotationZ,Math.PI,'right arm cuboid m
 assert.equal(firstPersonItemKind('block:20',{blockId:20,texture:'glass'}),'block');
 assert.equal(firstPersonItemKind('wooden_pickaxe',{texture:'pickaxe',tool:{kind:'pickaxe'}}),'tool');
 assert.equal(firstPersonItemKind('apple',{texture:'apple',food:{nutrition:4}}),'food');
-assert.ok(Math.abs(FIRST_PERSON_ITEM_TRANSFORMS.tool.position[1])<.1,'held tool transform must remain local to the wrist rather than using shoulder-space coordinates');
+const toolLocalOffset=FIRST_PERSON_ITEM_TRANSFORMS.tool.position;
+assert.ok(Math.max(...toolLocalOffset.map(Math.abs))<FIRST_PERSON_RIGHT_ARM_LAYOUT.wristY,'held tool transform must remain arm-scale wrist-local rather than using shoulder-space coordinates');
 
 const workbench=vanillaWorkbenchAssetContract();
 assert.match(workbench.panel,/MC原版素材assets\/minecraft\/textures\/gui\/container\/crafting_table\.png$/);
