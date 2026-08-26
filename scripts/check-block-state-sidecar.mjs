@@ -97,6 +97,7 @@ assert.equal(reconciled.reconcileChunk('missing',blockIds),0);
 
 assert.throws(()=>new BlockStateSidecar({'0,0':[[0,BLOCK.LOG,'axis=north']]}),/log\.axis must be one of/);
 assert.throws(()=>new BlockStateSidecar({'0,0':[[0,BLOCK.STONE,'axis=x']]}),/does not define mutable/);
+assert.throws(()=>new BlockStateSidecar({'0,0':[[0,BLOCK.LOG,'axis=x'],[0,BLOCK.LOG,'axis=y']]}),/duplicate cell index: 0/);
 assert.throws(()=>states.set('',0,BLOCK.LOG,{axis:'x'}),/chunk key/);
 assert.throws(()=>states.set('0,0',-1,BLOCK.LOG,{axis:'x'}),/non-negative/);
 assert.throws(()=>blockIdentity(256),/0\.\.255/);
