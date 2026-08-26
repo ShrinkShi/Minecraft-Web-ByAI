@@ -21,7 +21,7 @@ async function leaveSingleplayerWorld(page){
   await expect(page.locator('#hud')).toHaveClass(/hidden/);
 }
 
-const FARMING_MODEL_BLOCK_IDS=[9,19,20,21,24,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43];
+const MODEL_RUNTIME_BLOCK_IDS=[5,9,19,20,21,24,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53];
 
 test('furnace uses interpreted original model art and source-backed inventory presentation',async({page})=>{
   const pageErrors=[],consoleErrors=[];page.on('pageerror',error=>pageErrors.push(error.message));page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
@@ -43,7 +43,7 @@ test('furnace uses interpreted original model art and source-backed inventory pr
     };
   });
 
-  expect(runtimeState.blockId).toBe(21);expect(runtimeState.readyBlockIds).toEqual(FARMING_MODEL_BLOCK_IDS);expect(runtimeState.legacyOpaqueEmpty).toBeTruthy();expect(runtimeState.opaqueFaces).toBe(6);expect(runtimeState.opaqueVertices).toBe(24);expect(runtimeState.opaqueIndexBytes).toBe(36*4);expect(runtimeState.cutoutEmpty).toBeTruthy();expect(runtimeState.translucentEmpty).toBeTruthy();
+  expect(runtimeState.blockId).toBe(21);expect(runtimeState.readyBlockIds).toEqual(MODEL_RUNTIME_BLOCK_IDS);expect(runtimeState.legacyOpaqueEmpty).toBeTruthy();expect(runtimeState.opaqueFaces).toBe(6);expect(runtimeState.opaqueVertices).toBe(24);expect(runtimeState.opaqueIndexBytes).toBe(36*4);expect(runtimeState.cutoutEmpty).toBeTruthy();expect(runtimeState.translucentEmpty).toBeTruthy();
   expect(runtimeState.preview).toBe('source-faces');expect(runtimeState.faces).toEqual({top:'./assets/items/furnace_top.png',left:'./assets/items/furnace_side.png',right:'./assets/items/furnace_front.png'});expect(runtimeState.ingotTexture).toBe('./assets/items/iron_ingot.png');
 
   await createSingleplayerWorld(page,{name:'CI Furnace Content',seed:'ci-furnace-content-2026',mode:'creative',prompt:'平原'});await key(page,'KeyE');await expect(page.locator('#inventory')).not.toHaveClass(/hidden/);
