@@ -6,7 +6,7 @@
 
 项目处于 `v0.4.0-dev`。严格按 Minecraft Java 1.20.1 完整玩法/内容口径，整体完成度仍保守维持约 **35%**。浏览器渲染/资源管线、单机生存基础和 authoritative multiplayer 骨架已形成，当前主要缺口转向 registry breadth、原版 worldgen、redstone、dimensions、enchanting/brewing、广泛 status effects、server-authoritative PvE/XP/persistence 与更深 farming parity。
 
-当前 merged `main`：`6a56c33d79c074f95f2be750f9d25ec246766b1b`，已包含 PR #136 `feat: complete hunger status effects and multiplayer authority`。
+当前 merged `main`：`7dafe9f23700ae57af261d357339cc673eb4afb6`，为 PR #137 `docs: roll baseline forward after hunger authority` 的合并结果；它只滚动 merged documentation，不新增生产功能。
 
 `docs/PROJECT_BASELINE.md` 只描述 merged main；未合并功能必须放在 active delivery 中。
 
@@ -85,19 +85,45 @@ Squash merge commit：`6a56c33d79c074f95f2be750f9d25ec246766b1b`。
 - browser presentation 不成为 gameplay authority；
 - multiplayer Hunger/food use 不允许 client-side competing truth。
 
-## 下一阶段：Registry breadth
+## Active delivery：PR #138 Registry breadth phase 1
 
-下一连续开发切片聚焦常用 block/item registry 扩展，而不是继续堆特殊-case：
+当前 Draft PR #138 基于 `main 7dafe9f23700ae57af261d357339cc673eb4afb6`，本阶段只收口普通 full-cube stone/wood breadth 与已经进入同一 PR 的 Creative/first-person presentation 修复，不向 stateful block families 扩 scope。
 
-1. 扩展常见 stone variants 与 wood species，保持现有 ID append-only；
-2. 优先建立 slab / stair / fence / door 等可复用 block-family rule，而不是为每个方块手写独立 rendering/gameplay 分支；
+### Registry breadth phase 1
+
+- append-only 新增 block ID 44..53：granite、diorite、andesite、spruce/birch/jungle/acacia/dark oak/mangrove/cherry planks；既有 oak planks 继续保持 ID 5。
+- granite/diorite/andesite 使用 stone/pickaxe contract；新增木板使用 axe-effective plank contract；drop/item path 直接复用 live registry。
+- oak planks 与 ID 44..53 接入 canonical Java 1.20.1 blockstate/model/texture source，普通 full cube 通过 declarative `MINECRAFT_SIMPLE_FULL_CUBE_MODELS` 注册，不为每个方块增加 renderer special-case。
+- model runtime closure 扩为 **24 blockstates / 70 models / 39 textures / 0 metadata**；deterministic model atlas 保持 128×128。
+- runtime/source manifests 与生成闭包同步，并在 Minecraft asset source audit 中逐字节 `cmp`，防止闭包改变后 tracked manifest 陈旧却继续绿灯。
+- Creative catalog 继续从 live `ITEMS` registry 派生；历史 `CREATIVE_START` 不变；新 stone/wood blocks 直接进入实际 Creative 分类与 3D block preview path。
+
+### Presentation 同步收口
+
+- Creative inventory 改为更接近 Java 原版的 category/search/survival inventory tabs，并复用 canonical Java 1.20.1 GUI sprites。
+- source-backed block items 统一按 block semantic 走 3D preview，不再因为纹理来源而错误退化为 flat sprite。
+- 第一人称右手 idle anchor 下移/右移；pickaxe/sword/axe/shovel/hoe 使用区分后的 held transform。
+
+### 本阶段明确不做
+
+- 不在同一 PR 扩展 logs、slabs、stairs、fences、doors；下一阶段先建立 `axis` / `facing` / `half` / `shape` / `open` 等可复用 family-state rule，再扩具体种类。
+- 不在本阶段把新增 registry blocks 塞入 terrain/worldgen distribution；worldgen 仍作为独立连续开发阶段推进。
+- 不改变 save schema v10、terrain v4、multiplayer v5 / action frame v3。
+- 不扩展或重排历史 `CREATIVE_START`。
+
+## 下一阶段：Stateful registry families
+
+PR #138 收口后，下一连续 Registry breadth 切片优先建立 family rule，而不是继续堆特殊-case：
+
+1. 建立 wood/log `axis` 与 slab/stair/fence/door 等 state/property 的通用映射与碰撞/放置规则；
+2. 在通用规则稳定后再批量增加对应 wood species/family entries；
 3. 继续复用 Java 1.20.1 source-backed blockstate/model/texture pipeline；
 4. Creative catalog 继续从 live `ITEMS` registry 派生，不扩展历史 `CREATIVE_START` starter contract；
-5. 如果新增 family 真正要求 save/network contract 变化，必须显式 bump；否则保持 save v10、terrain v4、multiplayer v5。
+5. 只有新增 family 真正要求 save/network contract 变化时才显式 bump，否则保持 save v10、terrain v4、multiplayer v5。
 
 ## 后续连续开发顺序
 
-1. Registry breadth：stone variants、wood species、slab/stair/fence/door 等 common families；
+1. Registry breadth：stateful wood/log/slab/stair/fence/door common families；
 2. Worldgen：biomes → caves/aquifers → ores/features → structures；
 3. Server gameplay breadth：server-authoritative PvE/XP、durable world/block-entity persistence；
 4. Farming 后续：farmland trampling、exact crop random tick/light/neighbor formula、Fortune/loot tables、其它 crops/breeding；
