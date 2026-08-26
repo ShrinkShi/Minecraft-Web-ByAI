@@ -47,7 +47,7 @@ export const ITEMS={
   raw_beef:textured('生牛肉',64,'item.raw_beef',{color:0xb7473f,food:{nutrition:3,saturationModifier:.3}}),
   cooked_beef:textured('牛排',64,'item.cooked_beef',{food:{nutrition:8,saturationModifier:.8}}),
   leather:textured('皮革',64,'item.leather',{color:0x8b5a2b}),
-  white_wool:textured('白色羊毛',64,'block.white_wool',{color:0xf0eee7}),
+  white_wool:textured('白色羊毛',64,'block.white_wool',{color:0xf0eee7,blockPreview:'source-texture'}),
   raw_mutton:textured('生羊肉',64,'item.raw_mutton',{color:0xc96868,food:{nutrition:2,saturationModifier:.3}}),
   cooked_mutton:textured('熟羊肉',64,'item.cooked_mutton',{food:{nutrition:6,saturationModifier:.8}}),
   raw_porkchop:textured('生猪排',64,'item.raw_porkchop',{color:0xe68f93,food:{nutrition:3,saturationModifier:.3}}),
