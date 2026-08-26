@@ -109,6 +109,18 @@ export class BlockStateSidecar{
     return changed;
   }
 
+  reconcileChunk(rawChunkKey,blockIds){
+    const key=chunkKey(rawChunkKey),entries=this.entries.get(key);
+    if(!entries)return 0;
+    if(!blockIds||typeof blockIds.length!=='number')throw new TypeError('block-state sidecar reconciliation requires an indexed block-id collection');
+    let removed=0;
+    for(const [index,value] of [...entries]){
+      if(index>=blockIds.length||Number(blockIds[index])!==value.id){entries.delete(index);removed++;}
+    }
+    if(entries.size===0)this.entries.delete(key);
+    return removed;
+  }
+
   clear(){this.entries.clear();}
   get size(){let total=0;for(const entries of this.entries.values())total+=entries.size;return total;}
 
