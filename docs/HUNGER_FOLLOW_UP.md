@@ -2,7 +2,7 @@
 
 ## Status
 
-PR #136 active Draft, based on `main 3bdf713d44de15e47dd2d8a731b2832dea7fca33`.
+PR #136, based on `main 3bdf713d44de15e47dd2d8a731b2832dea7fca33`.
 
 This slice closes the explicit deferrals left by the merged hunger core and timed-food-use work. It does not redefine terrain generation, block/item IDs, or the historical Creative starter ordering.
 
