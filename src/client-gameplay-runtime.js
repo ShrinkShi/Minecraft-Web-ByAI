@@ -62,6 +62,7 @@ export async function createClientGameplayRuntime({
       onFuseStart:event=>{playGameSound('creeper-prime',{minIntervalMs:250});onCreeperPrime(event);},
       getEnvironment:()=>({weather:weatherSystem?.type||weather})
     });
+    projectiles.setMobSystems({passiveMobs,hostileMobs});
     jadeInspector=new JadeRuntimeInspector({world,player,inventory,passiveMobs,hostileMobs});return new ClientGameplayRuntime({world,player,inventory,equipment,drops,experienceOrbs,projectiles,explosions,passiveMobs,hostileMobs,weatherSystem,miningCracks,jadeInspector,vanillaBlockAudio});
   }catch(error){safeDispose(vanillaBlockAudio);safeDispose(miningCracks);safeDispose(jadeInspector);safeDispose(weatherSystem);safeDispose(explosions);safeDispose(projectiles);safeDispose(hostileMobs);safeDispose(passiveMobs);safeDispose(experienceOrbs);safeDispose(drops);safeDispose(player);safeDispose(world);throw error;}
 }

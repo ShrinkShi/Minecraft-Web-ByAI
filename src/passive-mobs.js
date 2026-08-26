@@ -5,6 +5,7 @@ import {PASSIVE_MOBS,choosePassiveMob} from './mobs.js';
 import {applyDamage,knockbackDirection} from './combat.js';
 import {animateMobVisual,applyMobVisualState,bindMobVisual,createMobModelTemplate,disposeMobModelResources,disposeMobVisualInstance} from './mob-model-renderer.js';
 import {MOB_HURT_FLASH_SECONDS,mobHitVisual} from './combat-mob-presentation-rules.js';
+import {nearestMobSegmentHit} from './mob-segment-hit-rules.js';
 
 const tempA=new THREE.Vector3(),tempB=new THREE.Vector3();
 const nextAmbientDelay=()=>7+Math.random()*9;
@@ -24,6 +25,8 @@ export class PassiveMobSystem{
   raycast(origin,direction,maxDistance=4.5){
     const candidates=this.store.nearby(origin.x,origin.z,maxDistance+2);let best=null,bestDistance=maxDistance;for(const record of candidates){const def=PASSIVE_MOBS[record.type],position=this.store.getPosition(record.id);if(!def||!position)continue;const center=tempA.set(position.x,position.y+def.height*.5,position.z),to=tempB.copy(center).sub(origin),distance=to.dot(direction);if(distance<0||distance>bestDistance)continue;const closestX=origin.x+direction.x*distance,closestY=origin.y+direction.y*distance,closestZ=origin.z+direction.z*distance,radius=Math.max(def.width*.56,def.height*.34),dx=closestX-center.x,dy=closestY-center.y,dz=closestZ-center.z;if(dx*dx+dy*dy+dz*dz<=radius*radius){best=record;bestDistance=distance;}}return best?{entity:best,distance:bestDistance}:null;
   }
+
+  projectileHit(start,end){return nearestMobSegmentHit({records:this.store.values(),positionOf:record=>this.store.getPosition(record.id),definitionFor:record=>PASSIVE_MOBS[record.type],start,end});}
 
   hurt(record,amount,sourcePosition,now){
     if(!record||!this.store.has(record.id))return{applied:false,dead:false};const def=PASSIVE_MOBS[record.type],position=this.store.getPosition(record.id);if(!def||!position)return{applied:false,dead:false};const result=applyDamage(record.components,amount,now,{maxHp:def.hp});if(!result.applied)return result;const state=record.components;state.fleeTimer=3;state.hurtPulse=MOB_HURT_FLASH_SECONDS;if(sourcePosition){state.fleeX=sourcePosition.x;state.fleeZ=sourcePosition.z;const direction=knockbackDirection(sourcePosition.x,sourcePosition.z,position.x,position.z);state.pushX+=direction.x*3.8;state.pushZ+=direction.z*3.8;}this.onSound({type:record.type,kind:result.dead?'death':'hurt',position:{...position},entity:record});if(result.dead){this.onDeath({type:record.type,position:{...position},entity:record});this.despawn(record.id);}return result;
