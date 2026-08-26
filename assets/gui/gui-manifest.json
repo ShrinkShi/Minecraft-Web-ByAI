@@ -26,6 +26,21 @@
   "sourceKind": "directory",
   "sourceRoot": "MC原版素材assets",
   "sources": {
+    "assets/minecraft/textures/gui/container/creative_inventory/tab_inventory.png": {
+      "bytes": 1125,
+      "sha256": "8b49c72ace803bc876b879dc7b758c05ebf123763db7ce982e672766cf5cad8d",
+      "source": "MC原版素材assets/minecraft/textures/gui/container/creative_inventory/tab_inventory.png"
+    },
+    "assets/minecraft/textures/gui/container/creative_inventory/tab_item_search.png": {
+      "bytes": 1005,
+      "sha256": "92789c4d09c832b266f002a6bd2b351468d64b2dcd56cfef13846adb1921692e",
+      "source": "MC原版素材assets/minecraft/textures/gui/container/creative_inventory/tab_item_search.png"
+    },
+    "assets/minecraft/textures/gui/container/creative_inventory/tab_items.png": {
+      "bytes": 965,
+      "sha256": "3c643b9a864995d4eba39657dac1c56ea60ce18d4c4848242dd7b1f96c9041c1",
+      "source": "MC原版素材assets/minecraft/textures/gui/container/creative_inventory/tab_items.png"
+    },
     "assets/minecraft/textures/gui/container/inventory.png": {
       "bytes": 2195,
       "sha256": "1952f9978a96e15197ad58d998a40840a86f41b1c8cd4323e04fd8eeff9f7337",
@@ -43,6 +58,30 @@
     }
   },
   "sprites": {
+    "creative-tab-inventory.png": {
+      "passthrough": true,
+      "size": [
+        256,
+        256
+      ],
+      "source": "assets/minecraft/textures/gui/container/creative_inventory/tab_inventory.png"
+    },
+    "creative-tab-items.png": {
+      "passthrough": true,
+      "size": [
+        256,
+        256
+      ],
+      "source": "assets/minecraft/textures/gui/container/creative_inventory/tab_items.png"
+    },
+    "creative-tab-search.png": {
+      "passthrough": true,
+      "size": [
+        256,
+        256
+      ],
+      "source": "assets/minecraft/textures/gui/container/creative_inventory/tab_item_search.png"
+    },
     "crosshair.png": {
       "crop": [
         0,

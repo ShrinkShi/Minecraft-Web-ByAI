@@ -10,12 +10,11 @@ assert.equal(creativeCatalogCategoryFor('iron_pickaxe'),'tools');
 assert.equal(creativeCatalogCategoryFor('iron_sword'),'combat');
 
 for(const [key,file] of [
-  ['gui.creative_tab_items','tab_items.png'],
-  ['gui.creative_tab_search','tab_item_search.png'],
-  ['gui.creative_tab_inventory','tab_inventory.png'],
-  ['gui.creative_tabs','tabs.png']
+  ['gui.creative_tab_items','creative-tab-items.png'],
+  ['gui.creative_tab_search','creative-tab-search.png'],
+  ['gui.creative_tab_inventory','creative-tab-inventory.png']
 ]){
-  const record=assetRecord(key);assert.ok(record,`${key} must be registered`);assert.equal(record.directCanonical,true);assert.equal(record.minecraftVersion,'1.20.1');assert.ok(requireAssetUrl(key).endsWith(`/creative_inventory/${file}`),`${key} must use the canonical creative inventory texture`);
+  const record=assetRecord(key);assert.ok(record,`${key} must be registered`);assert.equal(record.directCanonical,undefined);assert.equal(record.minecraftVersion,'1.20.1');assert.equal(requireAssetUrl(key),`./assets/gui/${file}`,`${key} must resolve through the deterministic GUI runtime boundary`);
 }
 
-console.log('creative catalog block classification + canonical GUI assets: PASS');
+console.log('creative catalog block classification + deterministic GUI assets: PASS');
