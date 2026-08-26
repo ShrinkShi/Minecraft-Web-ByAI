@@ -11,6 +11,11 @@ function sourceFace(value,label){
   return texture;
 }
 
+export function isBlockItemDefinition(itemDefinition){
+  if(!itemDefinition||typeof itemDefinition!=='object'||Array.isArray(itemDefinition))return false;
+  return Number.isInteger(itemDefinition.blockId)||Number.isInteger(itemDefinition.tile)||itemDefinition.blockPreview==='source-texture'||itemDefinition.blockPreview==='source-faces';
+}
+
 export function blockItemFaceTextures(itemDefinition){
   if(!itemDefinition||typeof itemDefinition!=='object')return null;
   if(itemDefinition.blockPreview==='source-texture'){

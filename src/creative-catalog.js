@@ -1,4 +1,5 @@
 import {ITEMS} from './items.js';
+import {isBlockItemDefinition} from './block-item-preview.js';
 
 export const CREATIVE_CATALOG_CATEGORIES=Object.freeze([
   Object.freeze({id:'building',label:'建筑方块'}),
@@ -17,7 +18,10 @@ function categoryFor(def){
   if(def?.armorSlot||def?.combat)return'combat';
   if(def?.food)return'food';
   if(def?.plantKind||def?.useKind==='bone_meal')return'nature';
-  if(Number.isInteger(def?.blockId)||def?.placeKind)return'building';
+  // blockPreview is an explicit block-item presentation contract. Treat those
+  // entries as building blocks even when the gameplay block id has not joined
+  // the registry yet (white wool is the current compatibility example).
+  if(isBlockItemDefinition(def)||def?.placeKind)return'building';
   if(Number.isInteger(def?.stack)&&def.stack>1)return'materials';
   return'misc';
 }
