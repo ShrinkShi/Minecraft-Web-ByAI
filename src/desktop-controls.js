@@ -48,10 +48,11 @@ export class DesktopControls{
       else if(e.button===2){publishFirstPersonAction('use');this.bus.setSecondary(this.source,true);}
     };
     this.onMouseUp=e=>{if(e.button===0)this.bus.setButton(this.source,'primary',false);else if(e.button===2)this.bus.setSecondary(this.source,false);};
-    this.onWheel=e=>{if(!this.gameplayEnabled)return;this.bus.action(this.source,'hotbar-step',{step:e.deltaY>0?1:-1});};
+    this.onWheel=e=>{if(e.ctrlKey){e.preventDefault();return;}if(!this.gameplayEnabled)return;e.preventDefault();this.bus.action(this.source,'hotbar-step',{step:e.deltaY>0?1:-1});};
+    this.onBrowserZoomWheel=e=>{if(e.ctrlKey)e.preventDefault();};
     this.onCanvasClick=()=>this.bus.action(this.source,'focus');
     this.onWindowBlur=()=>{this.pointerMoveReady=false;this.reset();};
-    window.addEventListener('keydown',this.onKeyDown);window.addEventListener('keyup',this.onKeyUp);window.addEventListener('blur',this.onWindowBlur);document.addEventListener('mousemove',this.onMouseMove);this.canvas.addEventListener('mousedown',this.onMouseDown);window.addEventListener('mouseup',this.onMouseUp);this.canvas.addEventListener('wheel',this.onWheel,{passive:true});this.canvas.addEventListener('click',this.onCanvasClick);
+    window.addEventListener('keydown',this.onKeyDown);window.addEventListener('keyup',this.onKeyUp);window.addEventListener('blur',this.onWindowBlur);window.addEventListener('wheel',this.onBrowserZoomWheel,{passive:false,capture:true});document.addEventListener('mousemove',this.onMouseMove);this.canvas.addEventListener('mousedown',this.onMouseDown);window.addEventListener('mouseup',this.onMouseUp);this.canvas.addEventListener('wheel',this.onWheel,{passive:false});this.canvas.addEventListener('click',this.onCanvasClick);
   }
 
   syncContinuous(){
@@ -65,5 +66,5 @@ export class DesktopControls{
 
   reset(){this.keys.clear();this.forwardSprint.reset();this.bus.resetSource(this.source);}
   setGameplayEnabled(enabled){const next=!!enabled;if(next===this.gameplayEnabled)return;this.gameplayEnabled=next;this.pointerMoveReady=false;if(!next)this.reset();}
-  dispose(){this.reset();window.removeEventListener('keydown',this.onKeyDown);window.removeEventListener('keyup',this.onKeyUp);window.removeEventListener('blur',this.onWindowBlur);document.removeEventListener('mousemove',this.onMouseMove);this.canvas.removeEventListener('mousedown',this.onMouseDown);window.removeEventListener('mouseup',this.onMouseUp);this.canvas.removeEventListener('wheel',this.onWheel);this.canvas.removeEventListener('click',this.onCanvasClick);}
+  dispose(){this.reset();window.removeEventListener('keydown',this.onKeyDown);window.removeEventListener('keyup',this.onKeyUp);window.removeEventListener('blur',this.onWindowBlur);window.removeEventListener('wheel',this.onBrowserZoomWheel,{capture:true});document.removeEventListener('mousemove',this.onMouseMove);this.canvas.removeEventListener('mousedown',this.onMouseDown);window.removeEventListener('mouseup',this.onMouseUp);this.canvas.removeEventListener('wheel',this.onWheel);this.canvas.removeEventListener('click',this.onCanvasClick);}
 }
