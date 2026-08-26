@@ -77,6 +77,24 @@ restored.clear();
 assert.equal(restored.size,0);
 assert.deepEqual(restored.export(),{});
 
+const reconciled=new BlockStateSidecar({
+  '0,0':[
+    [2,BLOCK.LOG,'axis=x'],
+    [5,BLOCK.FURNACE,'facing=east,lit=false'],
+    [99,BLOCK.LOG,'axis=z']
+  ]
+});
+const blockIds=new Uint8Array(8);
+blockIds[2]=BLOCK.LOG;
+blockIds[5]=BLOCK.STONE;
+assert.equal(reconciled.reconcileChunk('0,0',blockIds),2,'mismatched and out-of-range sparse states must be pruned');
+assert.deepEqual(reconciled.export(),{'0,0':[[2,BLOCK.LOG,'axis=x']]});
+blockIds[2]=BLOCK.STONE;
+assert.equal(reconciled.reconcileChunk('0,0',blockIds),1);
+assert.equal(reconciled.size,0);
+assert.equal(reconciled.reconcileChunk('missing',blockIds),0);
+assert.throws(()=>states.reconcileChunk('0,0',null),/indexed block-id collection/);
+
 assert.throws(()=>new BlockStateSidecar({'0,0':[[0,BLOCK.LOG,'axis=north']]}),/log\.axis must be one of/);
 assert.throws(()=>new BlockStateSidecar({'0,0':[[0,BLOCK.STONE,'axis=x']]}),/does not define mutable/);
 assert.throws(()=>states.set('',0,BLOCK.LOG,{axis:'x'}),/chunk key/);
