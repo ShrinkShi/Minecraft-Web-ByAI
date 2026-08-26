@@ -5,10 +5,10 @@ This document records **merged `main` only**. Open PR work is excluded from merg
 ## Authority
 
 - Branch: `main`
-- Commit: `6a56c33d79c074f95f2be750f9d25ec246766b1b`
-- Includes merged work through PR #136.
+- Commit: `9edb249f1f5c44dc9f4f0098fc4d7395b41974e7`
+- Includes merged work through PR #138.
 - Development line: `v0.4.0-dev`.
-- Strict Minecraft Java 1.20.1 gameplay/content parity remains a planning estimate of about **35%**. Engine, resource and multiplayer-authority foundations are materially further along than registry/content breadth.
+- Strict Minecraft Java 1.20.1 gameplay/content parity remains a planning estimate of about **35%**. Engine, source-resource and multiplayer-authority foundations are materially further along than total content breadth.
 
 ## Browser / rendering / UI
 
@@ -17,178 +17,137 @@ Merged main provides:
 - shared desktop/mobile runtime with unified control intents;
 - Pointer Lock desktop controls, landscape mobile controls and F5 first/third-person views;
 - source-backed Steve first-person arm/sleeve and articulated wide-Steve third-person model;
-- distinct walk/sprint locomotion presentation with sprint body lean/bob/sway;
-- desktop sprint via Ctrl+W or double-W, with the legacy temporary R binding removed;
-- immersive browser shortcut containment for Ctrl/Meta+W and Keyboard Lock where supported;
+- distinct walk/sprint locomotion presentation, Ctrl+W or double-W sprint and immersive browser shortcut containment;
 - 70° first-person viewmodel camera with shoulder → arm → wrist → held-item hierarchy;
+- distinct first-person transforms for pickaxe/sword/axe/shovel/hoe and lower/right neutral hand placement;
 - transparent planar presentation for ordinary textured items and 3D previews for block items;
 - Inventory/Workbench modal presentation that hides world HUD/viewmodel while a container is open;
-- canonical Java 1.20.1 Workbench texture/layout;
+- canonical Java 1.20.1 Workbench and Creative GUI resources;
+- Creative category/search/survival-inventory tabs styled from canonical Java 1.20.1 assets;
 - compact voxel chunks, terrain/mesh Workers, bounded chunk streaming/unload/disposal and merged geometry;
 - selected-root Minecraft blockstate/model interpretation with parent/texture inheritance, variants/multipart, rotations, uvlock/cull/tint metadata and opaque/cutout/translucent batching.
 
-PR #134 adds merged mode-aware Creative presentation:
-
-- Creative/Spectator hide survival-only hearts/hunger, armor, XP and oxygen while retaining the hotbar;
-- underlying HP/hunger/armor/XP/oxygen gameplay values are not falsified to achieve that presentation;
-- Creative inventory is a categorized/searchable registry-backed catalog rather than an expansion of `CREATIVE_START`;
-- Survival equipment/2×2 crafting/27-slot main presentation is removed from Creative layout/hit-testing while the real nine-slot hotbar remains available.
-
-PR #136 adds authoritative Hunger presentation in multiplayer:
-
-- browser Hunger HUD follows revisioned server Hunger snapshots;
-- active authoritative food use drives first-person eating progress without creating a second client simulation;
-- multiplayer bootstrap does not become gameplay-ready until the initial Hunger snapshot is available.
+The generic interpreted-model acceptance closure after PR #138 is **24 blockstates / 70 block models / 39 textures / 0 metadata**. The deterministic model texture atlas remains **128×128**, SHA-256 `28dea729513157f790032964dc4607a88ba6657e72d3e9eca5a9cc85fa5ce1b5`. Tracked runtime/source manifests are byte-compared against regenerated CI output.
 
 ## Creative mode
 
 Merged Creative behavior includes:
 
-- Creative enters grounded instead of permanently flying;
-- double-Jump toggles Creative flight through the shared desktop/mobile Jump edge detector;
-- Spectator remains forced-flying; Survival/Adventure remain non-flying;
-- hostile player target eligibility is limited to Survival/Adventure, so Creative/Spectator are not acquired/maintained as hostile targets;
-- Creeper fuse clears when its player target becomes ineligible while physical knockback decay continues;
-- the live Creative catalog derives from `ITEMS`, supports category and name/ID search, and writes selections to the real inventory cursor;
-- historical `CREATIVE_START` ordering and starter-slot mapping remain unchanged.
+- grounded entry with double-Jump Creative flight toggle; Spectator remains forced-flying;
+- Creative/Spectator hide survival-only hearts/hunger, armor, XP and oxygen without falsifying underlying gameplay values;
+- hostile target eligibility limited to Survival/Adventure;
+- registry-backed categorized/searchable Creative catalog derived from live `ITEMS`;
+- real cursor/hotbar transactions in singleplayer and server-authoritative `creative-pick` in multiplayer;
+- source-backed block items using the 3D block-preview path;
+- historical `CREATIVE_START` ordering and starter-slot mapping unchanged.
 
-The implementation does not claim complete Java 1.20.1 Creative tabs/search tags, operator tabs, saved hotbars, full registry breadth or complete Creative command parity.
+Java 1.20.1 operator tabs, saved hotbars, complete registry breadth, full search tags and complete Creative command parity remain incomplete.
 
-## Mining / block destruction presentation
+## Registry / blocks / world
 
-PR #133 remains the merged mining-presentation foundation:
+Block IDs are append-only. Current merged gameplay families include:
 
-- singleplayer mining progress published through a presentation-only channel;
-- singleplayer and multiplayer sharing one runtime-owned mining crack overlay;
-- Java 1.20.1 canonical `destroy_stage_0.png` … `destroy_stage_9.png` rather than generated crack textures;
-- explicit crack cleanup on cancellation, target loss, restricted mode and completed break;
-- local explosion destruction resolving current drops through registered block drop metadata, including grass→dirt and stone→cobblestone under the current simplified rules.
+- grass/dirt/stone/sand/cobblestone;
+- oak planks/log/leaves plus stripped oak log;
+- granite, diorite and andesite;
+- spruce, birch, jungle, acacia, dark oak, mangrove and cherry planks;
+- water, crafting table, glass, furnace, iron ore and coal ore;
+- farmland moisture 0..7, wheat age 0..7, dirt path and short grass;
+- directional red-bed states.
 
-Full Java loot tables, explosion decay, Silk Touch/Fortune and complete mining particles/animation remain outside the merged implementation.
+PR #138 appends IDs **44..53** for granite/diorite/andesite and seven additional wood plank species without reordering existing IDs. Oak planks and IDs 44..53 use canonical Java 1.20.1 source-backed blockstate/model/texture resources through the declarative `MINECRAFT_SIMPLE_FULL_CUBE_MODELS` path.
 
-## World / persistence
+The voxel world cell payload still stores **block ID only**. Existing stateful behavior therefore uses either separate append-only IDs (bed direction, farmland moisture, wheat age) or a fixed visual state (current furnace north/unlit). A general persisted block-property/state layer for `axis`, `facing`, `half`, `shape`, `open`, `waterlogged`, etc. is not yet merged.
 
-Merged gameplay families include grass/dirt/stone/sand, oak plank/log/leaves, water, crafting table, cobblestone, red bed, iron ore, coal ore, glass, furnace, farmland moisture 0..7, wheat age 0..7, dirt path, stripped oak log and short grass.
+Current terrain generator is **v4**:
 
-Current merged terrain generator is **v4**:
+- v2 remains the explicit pre-coal compatibility path;
+- v3 adds deterministic coal while preserving v2 compatibility;
+- v4 adds deterministic short-grass surface decoration;
+- persisted worlds remain pinned to their recorded terrain version;
+- multiplayer requires the exact current terrain version.
 
-- v2 remains the explicit pre-coal singleplayer compatibility path;
-- v3 adds deterministic coal while preserving the v2 compatibility contract;
-- v4 adds deterministic short-grass surface decoration for new/current worlds;
-- old persisted worlds stay pinned to their recorded terrain version rather than being silently reinterpreted;
-- multiplayer requires the exact current terrain version and does not allow mixed generator versions.
+Java biome/climate generation, caves/aquifers, broad features/structures, full vertical range, Nether and End remain unimplemented. The new PR #138 registry blocks are Creative-obtainable but are not added to worldgen distribution.
 
-Singleplayer save schema is now **v10**. `terrainVersion` remains required from schema v8 onward. PR #136 persists normalized active status effects, while active food-use input remains transient and is not saved. Pre-v10 worlds continue through the explicit compatibility path rather than being silently reinterpreted.
+## Persistence / compatibility
 
-Java biome/climate generation, caves/aquifers, broad features/structures, full vertical range, Nether and End remain unimplemented.
+- Singleplayer save schema: **v10**.
+- Terrain generator: **v4**.
+- Multiplayer handshake/subprotocol: **v5 / `minecraft-web-v5`**.
+- Player action frame: **v3**.
+- Historical `CREATIVE_START` order/slot mapping remains stable.
+- Block/item IDs remain append-only.
+
+Singleplayer save v10 persists normalized active status effects. `terrainVersion` remains required from schema v8 onward. Active input/use gestures remain transient rather than persisted.
 
 ## Farming / food / processing
 
-Merged main contains the first natural wheat progression loop:
+Merged main includes:
 
 - farmland moisture 0..7 and wheat age 0..7;
-- source-backed farmland/wheat blockstate and model interpretation;
 - hoe-created farmland, nearby-water/weather hydration, drying and empty dry farmland returning to dirt;
-- survival seed planting after successful mutation only; creative planting does not consume seed;
-- simplified farming tick/growth probabilities rather than exact Java random-tick/light/neighbor formulas;
-- immature/mature wheat harvest and seed recycling;
-- wheat → bread Workbench recipe;
-- deterministic short grass in terrain v4;
-- base short-grass wheat-seed acquisition;
-- bone → 3 bone meal;
-- singleplayer bone meal advances wheat and spreads short grass under the current simplified rules.
-
-Merged food/hunger support now includes:
-
+- seed planting, wheat growth/harvest, seed recycling and wheat → bread;
+- short-grass wheat-seed acquisition and bone-meal wheat/grass behavior in singleplayer;
 - food, saturation, exhaustion and food timer;
-- apple, bread, raw meats, cooked meats and rotten flesh;
-- held, interruptible 1.6-second eating with cancellation before commit;
-- raw chicken 30% and rotten flesh 80% Hunger I for 30 seconds through a reusable finite-duration status-effect foundation;
-- Peaceful/Easy/Normal/Hard starvation boundaries and a `naturalRegeneration` switch;
+- apple, bread, raw/cooked meats and rotten flesh;
+- held, interruptible 1.6-second eating;
+- raw chicken 30% and rotten flesh 80% Hunger I / 30 s through the status-effect foundation;
+- Peaceful/Easy/Normal/Hard starvation boundaries and `naturalRegeneration` switch;
 - saturated fast regeneration and normal regeneration;
 - raw iron and meat Furnace recipes; coal as 1600-tick fuel.
 
-Singleplayer and multiplayer both preserve the held/cancelable food-use boundary. In multiplayer, the server owns the pending food use, selected-stack revalidation, Hunger/status-effect mutation and inventory decrement; release or invalidation cancels without consumption.
+Singleplayer and multiplayer preserve held/cancelable food use. Multiplayer server authority owns Hunger state, status effects, selected-stack revalidation and item commit.
 
-The current status-effect implementation is a reusable foundation but only the Hunger effect is modeled. Broad potion/effect semantics remain unimplemented.
+Exact Java random-tick/light/neighbor crop formulas, farmland trampling, Fortune/loot tables, broad crops/breeding and broad potion/effect semantics remain incomplete.
 
 ## Items, crafting and progression
 
-Merged main has:
+Merged main includes:
 
 - 36-slot Inventory + 9-slot hotbar;
 - Equipment head/chest/legs/feet foundation;
-- wooden/stone/iron pickaxes;
-- wooden/stone/iron swords;
+- wooden/stone/iron pickaxes and swords;
 - iron axe/shovel/hoe;
-- raw iron → Furnace → iron ingot;
-- coal ore → coal;
-- leather and iron armor with durability and Java-style damage-dependent armor mitigation;
-- till / strip / flatten in singleplayer and authoritative multiplayer;
+- leather and iron armor with durability;
 - item-instance durability for implemented tools/weapons;
-- the current food/farming items described above.
+- till / strip / flatten;
+- current food/farming items and recipes;
+- source-backed block item entries for the expanded stone/wood registry.
 
-The current stone→iron chain is:
+The current stone→iron chain remains:
 
 `stone pickaxe → iron ore → raw iron → Furnace → iron ingot → iron pickaxe / axe / shovel / sword / hoe / iron armor`
 
-`CREATIVE_START` remains intentionally stable. Later progression content is registered/obtainable without silently shifting historical bootstrap slots. Creative catalog breadth follows the live `ITEMS` registry and is therefore separate from the historical starter list.
-
 ## Survival / combat / PvE
 
-Merged singleplayer survival includes:
+Merged singleplayer survival includes HP, hurt cooldown, knockback, death/respawn, recoverable item/XP drops, armor mitigation/wear, hunger/sprint gates, regeneration/starvation, finite Hunger status effects, oxygen/drowning, simplified swimming, time/weather, bed sleep/respawn, XP and persistent Furnace processing.
 
-- HP, hurt cooldown, knockback, death/respawn and recoverable item/XP drops;
-- armor mitigation and durability wear;
-- food/saturation/exhaustion and hunger-driven sprint gate at food <= 6;
-- saturated fast regeneration, food>=18 normal regeneration and difficulty-aware starvation floors;
-- finite-duration Hunger status effects from implemented risky foods;
-- timed/interruptible food use;
-- oxygen/drowning and simplified swimming;
-- time/weather, bed sleep/respawn and singleplayer XP;
-- persistent singleplayer Furnace processing.
-
-Current mobs are cow, sheep, pig, chicken, zombie, skeleton, creeper and spider. Their PvE remains simplified and client/singleplayer-owned; server-authoritative PvE is still absent. PR #134 makes local hostile targeting mode-aware so Creative/Spectator players are not valid proactive hostile targets.
+Current mobs are cow, sheep, pig, chicken, zombie, skeleton, creeper and spider. PvE remains simplified and client/singleplayer-owned; server-authoritative PvE is not merged.
 
 ## Multiplayer authority
 
 The merged Node WebSocket runtime owns:
 
 - handshake/session/input validation and replay guards;
-- 20 Hz movement/collision;
-- self/remote player snapshots;
+- 20 Hz movement/collision and player snapshots;
 - deterministic terrain + revisioned sparse world edits;
-- creative/survival mining and placement;
-- till / strip / flatten;
+- mining, placement and till/strip/flatten;
 - ground items/drop/pickup;
-- Inventory/cursor/item damage;
-- Equipment transactions;
-- 2×2 crafting and transient 3×3 Workbench;
+- Inventory/cursor/item damage, Equipment, 2×2 crafting and transient 3×3 Workbench;
 - Furnace container/process runtime;
 - chat and controlled commands;
-- PvP HP/melee/armor mitigation/knockback/death drops/respawn;
-- Creative flight intent/state ownership;
-- Creative item creation through inventory transaction protocol **v2** `creative-pick`;
-- revisioned Hunger authority for food/saturation/exhaustion/timer, status effects and active food use;
-- server-side sprint gating from Hunger state;
-- movement/swim/jump/attack/damage exhaustion;
-- hunger-driven natural regeneration/starvation through Combat authority;
-- authoritative food-use cancellation, selected-stack revalidation and atomic inventory commit;
-- Hunger reset through respawn/mode/session lifecycle.
+- PvP HP/melee/armor/knockback/death drops/respawn;
+- Creative flight and authoritative `creative-pick`;
+- revisioned Hunger/status effects/active food use;
+- server sprint gating, exhaustion, regeneration and starvation.
 
-For `creative-pick`, the client submits only `itemId`; server mode/dead/registry/revision/replay checks determine validity, server-side registry metadata determines `maxStack`, and the server owns cursor/revision mutation and replication.
-
-PR #136 adds `use-release` to multiplayer gameplay actions. The player action frame is **v3**, and the incompatible session handshake/subprotocol is now **v5 / `minecraft-web-v5`**. Legacy v4 peers are rejected rather than silently treated as compatible.
-
-The merged server does **not** yet own farming/random ticks/bone meal, mobs/PvE/projectiles/explosions, XP/levels or durable world/block-entity persistence. Client-side competing truth remains deliberately disabled for those missing multiplayer domains.
+The server does not yet own farming/random ticks/bone meal, mobs/PvE/projectiles/explosions, XP/levels, durable world/block-entity persistence or a generic block-property state layer. Missing multiplayer domains remain disabled rather than replaced by client-side competing truth.
 
 ## Original Minecraft resources / audio
 
-The repository tracks the extracted Java 1.20.1 client resource tree under `MC原版素材assets/` and the separately imported sound-object corpus under `原版Minecraft音频文件/`. Resource availability alone is not counted as runtime parity.
+The repository tracks the extracted Java 1.20.1 client resource tree under `MC原版素材assets/` and imported sound-object corpus under `原版Minecraft音频文件/`. Resource availability alone is not counted as runtime parity.
 
-Merged source-backed audio includes current till/strip/flatten actions, common block/material break/place/step families, local footsteps, mining hits and ambient/hurt/death baseline events for the current mob set.
-
-Full `sounds.json` event coverage, true positional/HRTF audio, remote replicated SFX and music scheduling remain incomplete.
+Source-backed audio covers current tool secondary actions, common block/material break/place/step families, local footsteps, mining hits and baseline mob ambient/hurt/death events. Full `sounds.json` event coverage, positional/HRTF audio, remote replicated SFX and music scheduling remain incomplete.
 
 ## Quality baseline
 
@@ -201,17 +160,25 @@ Repository quality is exact-head based:
 5. browser integration where Three.js/CSS/WebAudio/HTTP boundaries matter;
 6. final base-drift and review-surface checks.
 
-PR #136 final head `80cc188fd9deaec104c4a86ab8e952965f4759f1` passed Repository quality run #1271 (`32924502937`): static checks, Chromium 1/2 and Chromium 2/2 all succeeded. The final branch was based directly on `main 3bdf713d44de15e47dd2d8a731b2832dea7fca33` with no drift and no review/comment blockers before squash merge as `6a56c33d79c074f95f2be750f9d25ec246766b1b`.
+PR #138 final head `a40ac69137a0636f6831ba3e91d1590e676ad730` passed:
+
+- Minecraft asset source audit #317 (`32971126562`);
+- Repository quality #1296 (`32971126568`): static checks, Chromium 1/2 and Chromium 2/2 all succeeded;
+- final compare against `main 7dafe9f23700ae57af261d357339cc673eb4afb6`: ahead 21 / behind 0;
+- reviews 0, review threads 0, PR comments 0.
+
+It was squash-merged as `9edb249f1f5c44dc9f4f0098fc4d7395b41974e7`.
 
 A green older head never validates a newer head.
 
 ## Next planned delivery
 
-The next continuous development slice is **Registry breadth**:
+The next continuous development slice is **Stateful registry families foundation**:
 
-- expand common stone and wood families using append-only IDs and the existing source-backed model pipeline;
-- prioritize reusable block-family rules for slabs/stairs/fences/doors and related common building variants rather than one-off rendering hacks;
-- preserve terrain v4, save v10, multiplayer v5 and historical `CREATIVE_START` compatibility unless a real contract change requires an explicit version bump;
-- keep authoritative/server and browser-presentation boundaries intact while registry breadth grows.
+1. define reusable, canonical block-property schemas and deterministic state keys for properties such as `axis`, horizontal `facing`, `half`, stair `shape`, door `hinge/open/powered`, fence connectivity and `waterlogged`;
+2. decide and implement the world/save/network storage boundary for block properties instead of multiplying block IDs per state;
+3. feed normalized state properties into the existing Java 1.20.1 blockstate/model interpreter;
+4. add placement/collision/interaction rules only after the state representation is deterministic and persistence-safe;
+5. then expand common logs/slabs/stairs/fences/doors by wood species using data-driven family registration.
 
 Broader worldgen, server-authoritative PvE/XP/persistence and deeper farming parity remain subsequent planned slices.
