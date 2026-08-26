@@ -2,6 +2,7 @@ const SAFE_NAME_RE=/^[a-z0-9_.-]+$/;
 const RESERVED_NAMES=new Set(['__proto__','prototype','constructor']);
 const PROPERTY_SPEC_BRAND=new WeakSet();
 const SCHEMA_BRAND=new WeakSet();
+const lexicalCompare=(a,b)=>a<b?-1:a>b?1:0;
 
 function plainObject(value,label){
   if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError(`${label} must be an object`);
@@ -40,7 +41,7 @@ export function integerStateProperty({min=Number.MIN_SAFE_INTEGER,max=Number.MAX
 
 export function defineBlockStateSchema(name,properties){
   safeName(name,'block state schema name');plainObject(properties,'block state schema properties');
-  const entries=Object.entries(properties).sort(([a],[b])=>a.localeCompare(b));
+  const entries=Object.entries(properties).sort(([a],[b])=>lexicalCompare(a,b));
   if(entries.length===0)throw new TypeError('block state schema must define at least one property');
   for(const [property,spec] of entries){safeName(property,'block state property name');if(!PROPERTY_SPEC_BRAND.has(spec))throw new TypeError(`block state property ${property} must use a state property definition`);}
   const schema=Object.freeze({name,properties:Object.freeze(Object.fromEntries(entries))});SCHEMA_BRAND.add(schema);return schema;
