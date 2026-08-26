@@ -64,6 +64,7 @@ assert.deepEqual(states.export(),{
     [9,BLOCK.FURNACE,'facing=west,lit=true']
   ]
 },'snapshot order must be deterministic by chunk key then cell index');
+assert.throws(()=>states.reconcileChunk('1,0',null),/indexed block-id collection/);
 
 const restored=new BlockStateSidecar(states.export());
 assert.deepEqual(restored.export(),states.export());
@@ -93,7 +94,6 @@ blockIds[2]=BLOCK.STONE;
 assert.equal(reconciled.reconcileChunk('0,0',blockIds),1);
 assert.equal(reconciled.size,0);
 assert.equal(reconciled.reconcileChunk('missing',blockIds),0);
-assert.throws(()=>states.reconcileChunk('0,0',null),/indexed block-id collection/);
 
 assert.throws(()=>new BlockStateSidecar({'0,0':[[0,BLOCK.LOG,'axis=north']]}),/log\.axis must be one of/);
 assert.throws(()=>new BlockStateSidecar({'0,0':[[0,BLOCK.STONE,'axis=x']]}),/does not define mutable/);
