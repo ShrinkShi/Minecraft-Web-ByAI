@@ -18,6 +18,8 @@ import {
   parseCanonicalBlockStateKey
 } from '../src/block-state-schema.js';
 import {resolveMinecraftBlockstate} from '../src/minecraft-blockstate-resolver.js';
+import {minecraftModelBlockDescriptor} from '../src/minecraft-model-registry.js';
+import {BLOCK} from '../src/blocks.js';
 
 assert.deepEqual(Object.keys(BLOCK_STATE_SCHEMAS),['log','furnace','farmland','wheat','slab','stair','fence','door']);
 
@@ -66,6 +68,16 @@ const resolved=resolveMinecraftBlockstate({variants:{
 }},stairState);
 assert.equal(resolved.variant.key,'facing=east,half=bottom,shape=straight,waterlogged=false');
 assert.deepEqual(resolved.state,stairState,'schema output must feed the existing Minecraft blockstate resolver without translation');
+
+assert.deepEqual(minecraftModelBlockDescriptor(BLOCK.FURNACE).state,normalizeBlockStateProperties(FURNACE_BLOCK_STATE_SCHEMA));
+for(let moisture=0;moisture<=7;moisture++){
+  const blockId=BLOCK.FARMLAND+moisture;
+  assert.deepEqual(minecraftModelBlockDescriptor(blockId).state,normalizeBlockStateProperties(FARMLAND_BLOCK_STATE_SCHEMA,{moisture}));
+}
+for(let age=0;age<=7;age++){
+  const blockId=BLOCK.WHEAT_AGE_0+age;
+  assert.deepEqual(minecraftModelBlockDescriptor(blockId).state,normalizeBlockStateProperties(WHEAT_BLOCK_STATE_SCHEMA,{age}));
+}
 
 for(const schema of Object.values(BLOCK_STATE_SCHEMAS)){
   const normalized=normalizeBlockStateProperties(schema);
