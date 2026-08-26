@@ -2,6 +2,7 @@ import {BLOCKS} from './blocks.js';
 import {requireAssetUrl} from './asset-manifest.js';
 
 const textured=(name,stack,assetKey,extra={})=>({name,stack,assetKey,texture:requireAssetUrl(assetKey),...extra});
+const sourceBlock=(name,blockId,assetKey)=>textured(name,64,assetKey,{blockId,blockPreview:'source-texture'});
 const sourceFaces=(top,left,right)=>Object.freeze({top:requireAssetUrl(top),left:requireAssetUrl(left),right:requireAssetUrl(right)});
 
 export const ITEMS={
@@ -9,7 +10,7 @@ export const ITEMS={
   'block:2':{name:'泥土',stack:64,blockId:2,tile:2},
   'block:3':{name:'石头',stack:64,blockId:3,tile:3},
   'block:4':{name:'沙子',stack:64,blockId:4,tile:4},
-  'block:5':{name:'橡木木板',stack:64,blockId:5,tile:5},
+  'block:5':sourceBlock('橡木木板',5,'block.oak_planks'),
   'block:6':{name:'橡木原木',stack:64,blockId:6,tile:7},
   'block:7':{name:'橡树树叶',stack:64,blockId:7,tile:8},
   'block:9':{name:'工作台',stack:64,blockId:9,tile:10},
@@ -18,6 +19,16 @@ export const ITEMS={
   'block:21':{name:'熔炉',stack:64,blockId:21,blockPreview:'source-faces',blockPreviewFaces:sourceFaces('block.furnace_top','block.furnace_side','block.furnace_front')},
   'block:26':{name:'去皮橡木原木',stack:64,blockId:26,blockPreview:'source-faces',blockPreviewFaces:sourceFaces('block.stripped_oak_log_top','block.stripped_oak_log','block.stripped_oak_log')},
   'block:27':{name:'煤矿石',stack:64,blockId:27,tile:15,assetKey:'block.coal_ore'},
+  'block:44':sourceBlock('花岗岩',44,'block.granite'),
+  'block:45':sourceBlock('闪长岩',45,'block.diorite'),
+  'block:46':sourceBlock('安山岩',46,'block.andesite'),
+  'block:47':sourceBlock('云杉木板',47,'block.spruce_planks'),
+  'block:48':sourceBlock('白桦木板',48,'block.birch_planks'),
+  'block:49':sourceBlock('丛林木板',49,'block.jungle_planks'),
+  'block:50':sourceBlock('金合欢木板',50,'block.acacia_planks'),
+  'block:51':sourceBlock('深色橡木木板',51,'block.dark_oak_planks'),
+  'block:52':sourceBlock('红树木板',52,'block.mangrove_planks'),
+  'block:53':sourceBlock('樱花木板',53,'block.cherry_planks'),
   stick:textured('木棍',64,'item.stick'),
   wooden_pickaxe:textured('木镐',1,'item.wooden_pickaxe',{attackDamage:2,combat:{attackSpeed:1.2,durabilityCost:2},tool:{kind:'pickaxe',tier:'wood',speed:2,durability:59}}),
   stone_pickaxe:textured('石镐',1,'item.stone_pickaxe',{attackDamage:3,combat:{attackSpeed:1.2,durabilityCost:2},tool:{kind:'pickaxe',tier:'stone',speed:4,durability:131}}),
