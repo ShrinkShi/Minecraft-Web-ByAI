@@ -8,6 +8,10 @@ test('two browser players use server-authoritative PvP death drops and respawn',
   const errors=[],runtime=createAuthoritativeServerRuntime({config:{host:'127.0.0.1',port:0,allowedOrigins:[ORIGIN],worldId:'e2e-pvp-combat',seed:'pvp-combat-seed',prompt:'plains',mode:'survival',spawnX:0,spawnZ:0,prefetchRadius:0,terrainCacheChunks:32},combatOptions:{attackCooldownMs:0,hurtCooldownMs:0},onError:event=>errors.push(event)});let contextA=null,contextB=null;
   try{
     const address=await runtime.start(),url=`ws://127.0.0.1:${address.port}/ws`;contextA=await browser.newContext();contextB=await browser.newContext();const pageA=await contextA.newPage(),pageB=await contextB.newPage();await connectPage(pageA,url,'e2e-pvp-combat');await connectPage(pageB,url,'e2e-pvp-combat');const sessions=[...runtime.authoritative.sessions];expect(sessions).toHaveLength(2);const [sessionA,sessionB]=sessions,base=runtime.authoritative.snapshot(sessionA).position,y=base.y;
+    // This test owns the Combat death/drop/respawn contract. Disable hunger-driven
+    // natural regeneration so saturated healing cannot advance Combat revisions
+    // between the deliberate PvP hits below.
+    runtime.hunger.configure(sessionB,{naturalRegeneration:false});
     const align=()=>{runtime.authoritative.simulation.relocate(sessionA,{x:base.x,y,z:base.z},{velocity:{x:0,y:0,z:0}});runtime.authoritative.simulation.relocate(sessionB,{x:base.x,y,z:base.z-2.4},{velocity:{x:0,y:0,z:0}});};align();await expect.poll(()=>runtime.authoritative.snapshot(sessionB).position.z,{timeout:5_000}).toBeCloseTo(base.z-2.4,4);
 
     await pageA.evaluate(()=>globalThis.__minecraftE2E?.sendAttack?.({yaw:0,pitch:0}));await expect.poll(()=>pageB.evaluate(()=>globalThis.__minecraftE2E?.combat?.()),{timeout:5_000}).toMatchObject({revision:1,hp:19,dead:false});await expect.poll(()=>runtime.authoritative.snapshot(sessionB).velocity.z,{timeout:5_000}).toBeLessThan(0);

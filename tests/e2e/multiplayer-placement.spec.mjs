@@ -35,7 +35,7 @@ test('creative browser secondary waits for authoritative tick before placing a b
     await expect.poll(()=>page.evaluate(({x,y,z})=>globalThis.__minecraftE2E?.worldBlock(x,y,z),{x,y,z:anchorZ}),{timeout:5_000}).toBe(BLOCK.STONE);await expect.poll(()=>page.evaluate(({x,y,z})=>globalThis.__minecraftE2E?.worldBlock(x,y,z),{x,y,z:placeZ}),{timeout:5_000}).toBe(BLOCK.AIR);
 
     await page.mouse.down({button:'right'});await page.mouse.up({button:'right'});
-    await expect.poll(()=>runtime.server.getSessionInputState(session)?.pendingActionCount,{timeout:5_000}).toBe(1);
+    await expect.poll(()=>runtime.server.getSessionInputState(session)?.pendingActionCount,{timeout:5_000}).toBe(2);
     expect(runtime.world.getBlock(x,y,anchorZ)).toBe(BLOCK.STONE);expect(runtime.world.getBlock(x,y,placeZ)).toBe(BLOCK.AIR);expect(await page.evaluate(({x,y,z})=>globalThis.__minecraftE2E?.worldBlock(x,y,z),{x,y,z:placeZ})).toBe(BLOCK.AIR);
 
     tick();await expect.poll(()=>runtime.authoritative.snapshot(session)?.tick,{timeout:5_000}).toBe(2);await expect.poll(()=>runtime.world.getBlock(x,y,placeZ),{timeout:5_000}).toBe(BLOCK.GRASS);await expect.poll(()=>page.evaluate(({x,y,z})=>globalThis.__minecraftE2E?.worldBlock(x,y,z),{x,y,z:placeZ}),{timeout:5_000}).toBe(BLOCK.GRASS);expect(runtime.server.getSessionInputState(session).pendingActionCount).toBe(0);

@@ -1,3 +1,5 @@
+import {normalizeFoodStatusEffects} from './status-effect-rules.js';
+
 export const MAX_FOOD_LEVEL=20;
 export const MAX_SATURATION=20;
 export const MAX_EXHAUSTION=40;
@@ -5,12 +7,18 @@ export const EXHAUSTION_THRESHOLD=4;
 export const SATURATED_REGEN_INTERVAL_SECONDS=.5;
 export const NATURAL_REGEN_INTERVAL_SECONDS=4;
 export const STARVATION_INTERVAL_SECONDS=4;
+export const PEACEFUL_FOOD_REGEN_INTERVAL_SECONDS=.5;
+export const PEACEFUL_HEALTH_REGEN_INTERVAL_SECONDS=1;
+export const EASY_STARVATION_FLOOR_HP=10;
 export const NORMAL_STARVATION_FLOOR_HP=1;
+export const HARD_STARVATION_FLOOR_HP=0;
 export const SPRINT_FOOD_THRESHOLD=6;
+export const HUNGER_DIFFICULTIES=Object.freeze(['peaceful','easy','normal','hard']);
 
 const finite=(value,label)=>{if(typeof value!=='number'||!Number.isFinite(value))throw new TypeError(`${label} must be a finite number`);return value;};
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 const modeValue=value=>{if(!['survival','creative','adventure','spectator'].includes(value))throw new RangeError(`unsupported hunger mode: ${value}`);return value;};
+const difficultyValue=value=>{if(!HUNGER_DIFFICULTIES.includes(value))throw new RangeError(`unsupported hunger difficulty: ${value}`);return value;};
 
 export function createHungerState(value={}){
   if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError('hunger state must be an object');
@@ -36,11 +44,20 @@ export function jumpExhaustion({sprinting=false}={}){return sprinting===true ? .
 export function attackExhaustion(){return .1;}
 export function damageExhaustion(){return .1;}
 
+export function starvationFloorHpForDifficulty(difficulty='normal',maxHp=20){
+  difficulty=difficultyValue(difficulty);maxHp=finite(maxHp,'maxHp');if(maxHp<=0)throw new RangeError('maxHp must be > 0');
+  if(difficulty==='peaceful')return maxHp;
+  if(difficulty==='easy')return Math.min(EASY_STARVATION_FLOOR_HP,maxHp);
+  if(difficulty==='normal')return Math.min(NORMAL_STARVATION_FLOOR_HP,maxHp);
+  return HARD_STARVATION_FLOOR_HP;
+}
+
 export function normalizeFoodProfile(value){
   if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError('food profile must be an object');
   const nutrition=finite(value.nutrition,'food nutrition');if(!Number.isInteger(nutrition)||nutrition<0||nutrition>MAX_FOOD_LEVEL)throw new RangeError('food nutrition must be an integer from 0 to 20');
   const saturationModifier=finite(value.saturationModifier,'food saturation modifier');if(saturationModifier<0||saturationModifier>2)throw new RangeError('food saturation modifier must be from 0 to 2');
-  return Object.freeze({nutrition,saturationModifier,alwaysEdible:!!value.alwaysEdible});
+  const effects=normalizeFoodStatusEffects(value.effects);
+  return Object.freeze({nutrition,saturationModifier,alwaysEdible:!!value.alwaysEdible,effects});
 }
 
 export function consumeFood(value,profile){
@@ -52,19 +69,36 @@ export function consumeFood(value,profile){
   return Object.freeze({consumed:true,state:next,nutrition:next.food-state.food,saturationAdded:next.saturation-state.saturation});
 }
 
-function drainExhaustion(state){
+function drainExhaustion(state,{allowFoodDrain=true}={}){
   let {food,saturation,exhaustion,timer}=state,changed=false;
   if(exhaustion>EXHAUSTION_THRESHOLD){
     exhaustion-=EXHAUSTION_THRESHOLD;changed=true;
     if(saturation>0)saturation=Math.max(0,saturation-1);
-    else if(food>0)food=Math.max(0,food-1);
+    else if(allowFoodDrain&&food>0)food=Math.max(0,food-1);
   }
   return{state:createHungerState({food,saturation,exhaustion,timer}),changed};
 }
 
-export function stepHunger(value,{dt,hp,maxHp=20,mode='survival',naturalRegeneration=true,starvationFloorHp=NORMAL_STARVATION_FLOOR_HP}={}){
-  let state=createHungerState(value);dt=finite(dt,'hunger dt');if(dt<0||dt>60)throw new RangeError('hunger dt must be from 0 to 60 seconds');hp=finite(hp,'hp');maxHp=finite(maxHp,'maxHp');if(maxHp<=0)throw new RangeError('maxHp must be > 0');mode=modeValue(mode);starvationFloorHp=clamp(finite(starvationFloorHp,'starvation floor hp'),0,maxHp);
+function stepPeaceful(state,{dt,hp,maxHp,naturalRegeneration}){
+  const drained=drainExhaustion(state,{allowFoodDrain:false});state=drained.state;let changed=drained.changed,heal=0;
+  if(!naturalRegeneration){
+    if(state.timer!==0){state=createHungerState({...state,timer:0});changed=true;}
+    return Object.freeze({state,heal,damage:0,changed});
+  }
+  const phase=state.timer%PEACEFUL_HEALTH_REGEN_INTERVAL_SECONDS,total=phase+dt;
+  const foodEvents=Math.floor((total+1e-9)/PEACEFUL_FOOD_REGEN_INTERVAL_SECONDS)-Math.floor((phase+1e-9)/PEACEFUL_FOOD_REGEN_INTERVAL_SECONDS);
+  const healEvents=Math.floor((total+1e-9)/PEACEFUL_HEALTH_REGEN_INTERVAL_SECONDS)-Math.floor((phase+1e-9)/PEACEFUL_HEALTH_REGEN_INTERVAL_SECONDS);
+  const food=Math.min(MAX_FOOD_LEVEL,state.food+foodEvents);heal=Math.min(Math.max(0,maxHp-hp),healEvents);
+  const timer=total%PEACEFUL_HEALTH_REGEN_INTERVAL_SECONDS;
+  if(food!==state.food||heal>0||timer!==state.timer){state=createHungerState({...state,food,timer});changed=true;}
+  return Object.freeze({state,heal,damage:0,changed});
+}
+
+export function stepHunger(value,{dt,hp,maxHp=20,mode='survival',difficulty='normal',naturalRegeneration=true,starvationFloorHp=undefined}={}){
+  let state=createHungerState(value);dt=finite(dt,'hunger dt');if(dt<0||dt>60)throw new RangeError('hunger dt must be from 0 to 60 seconds');hp=finite(hp,'hp');maxHp=finite(maxHp,'maxHp');if(maxHp<=0)throw new RangeError('maxHp must be > 0');mode=modeValue(mode);difficulty=difficultyValue(difficulty);if(typeof naturalRegeneration!=='boolean')throw new TypeError('naturalRegeneration must be a boolean');
+  const starvationFloor=starvationFloorHp===undefined?starvationFloorHpForDifficulty(difficulty,maxHp):clamp(finite(starvationFloorHp,'starvation floor hp'),0,maxHp);
   if(mode!=='survival'||dt===0)return Object.freeze({state,heal:0,damage:0,changed:false});
+  if(difficulty==='peaceful')return stepPeaceful(state,{dt,hp,maxHp,naturalRegeneration});
   const drained=drainExhaustion(state);state=drained.state;let changed=drained.changed,heal=0,damage=0,timer=state.timer;
   if(naturalRegeneration&&hp<maxHp&&state.food===MAX_FOOD_LEVEL&&state.saturation>0){
     timer+=dt;
@@ -76,7 +110,7 @@ export function stepHunger(value,{dt,hp,maxHp=20,mode='survival',naturalRegenera
     while(timer>=NATURAL_REGEN_INTERVAL_SECONDS&&hp+heal<maxHp){heal+=Math.min(1,maxHp-(hp+heal));state=addHungerExhaustion(state,6);timer-=NATURAL_REGEN_INTERVAL_SECONDS;changed=true;}
   }else if(state.food<=0){
     timer+=dt;
-    while(timer>=STARVATION_INTERVAL_SECONDS&&hp-damage>starvationFloorHp){damage+=Math.min(1,hp-damage-starvationFloorHp);timer-=STARVATION_INTERVAL_SECONDS;changed=true;}
+    while(timer>=STARVATION_INTERVAL_SECONDS&&hp-damage>starvationFloor){damage+=Math.min(1,hp-damage-starvationFloor);timer-=STARVATION_INTERVAL_SECONDS;changed=true;}
   }else timer=0;
   if(timer!==state.timer){state=createHungerState({...state,timer});changed=true;}
   return Object.freeze({state,heal,damage,changed});

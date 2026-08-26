@@ -41,7 +41,7 @@ export class SingleplayerFoodUseRuntime{
     if(!stepped.completed)return Object.freeze({changed:stepped.changed,completed:false,reason:'using',state:this.snapshot()});
     const itemId=selected.id,profile=this.profile;this.profile=null;this.lastUpdateAt=null;
     const result=this.complete(itemId,profile);
-    const completed=!!result?.consumed;this.lastReason=completed?'completed':(result?.reason||'completion-rejected');this.emit();
+    const completed=!!result?.consumed;if(completed&&typeof result?.commitStatusEffects==='function')result.commitStatusEffects();this.lastReason=completed?'completed':(result?.reason||'completion-rejected');this.emit();
     return Object.freeze({changed:true,completed,reason:this.lastReason,result:result||null,state:this.snapshot()});
   }
 

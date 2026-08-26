@@ -1,9 +1,10 @@
-export const PLAYER_ACTION_FRAME_VERSION=2;
-export const PLAYER_GAMEPLAY_ACTIONS=Object.freeze(['use','drop','attack','respawn','hotbar-select','flight-toggle']);
+export const PLAYER_ACTION_FRAME_VERSION=3;
+export const PLAYER_GAMEPLAY_ACTIONS=Object.freeze(['use','use-release','drop','attack','respawn','hotbar-select','flight-toggle']);
 const ACTION_SET=new Set(PLAYER_GAMEPLAY_ACTIONS);
 const MAX_UINT32=0xffffffff;
 const ACTION_KEYS=Object.freeze({
   use:Object.freeze(['kind','viewSeq']),
+  'use-release':Object.freeze(['kind']),
   drop:Object.freeze(['kind','viewSeq']),
   attack:Object.freeze(['kind','viewSeq']),
   respawn:Object.freeze(['kind']),
@@ -12,6 +13,7 @@ const ACTION_KEYS=Object.freeze({
 });
 const FRAME_KEYS=Object.freeze({
   use:Object.freeze(['kind','seq','v','viewSeq']),
+  'use-release':Object.freeze(['kind','seq','v']),
   drop:Object.freeze(['kind','seq','v','viewSeq']),
   attack:Object.freeze(['kind','seq','v','viewSeq']),
   respawn:Object.freeze(['kind','seq','v']),
@@ -26,7 +28,7 @@ function assertExactKeys(value,expected,label){const keys=Object.keys(value).sor
 function assertSlot(value){if(!Number.isInteger(value)||value<0||value>8)throw new RangeError('player action hotbar slot must be an integer from 0 to 8');return value;}
 
 export function actionRequiresView(kind){return kind==='use'||kind==='drop'||kind==='attack';}
-export function actionHasNoPayload(kind){return kind==='respawn'||kind==='flight-toggle';}
+export function actionHasNoPayload(kind){return kind==='use-release'||kind==='respawn'||kind==='flight-toggle';}
 
 export function encodePlayerActionFrame(action,sequence=0){assertObject(action,'player gameplay action');const kind=assertKind(action.kind),seq=assertSequence(sequence);assertExactKeys(action,ACTION_KEYS[kind],'player gameplay action');if(actionRequiresView(kind))return{v:PLAYER_ACTION_FRAME_VERSION,seq,kind,viewSeq:assertSequence(action.viewSeq,'player action view sequence')};if(actionHasNoPayload(kind))return{v:PLAYER_ACTION_FRAME_VERSION,seq,kind};return{v:PLAYER_ACTION_FRAME_VERSION,seq,kind,slot:assertSlot(action.slot)};}
 
