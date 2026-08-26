@@ -1,82 +1,107 @@
 # Minecraft Web - 当前开发进度
 
-更新时间：2026-08-25
+更新时间：2026-08-26
 
 ## 当前主线
 
-项目处于 `v0.4.0-dev`。严格按 Minecraft Java 1.20.1 完整玩法/内容口径，整体完成度仍保守维持约 **35%**。浏览器渲染/资源管线、单机生存基础与 authoritative multiplayer 骨架已形成，但完整 registry、原版 worldgen、redstone、dimensions、enchanting/brewing、status effects 与 server-authoritative PvE 仍是主要缺口。
+项目处于 `v0.4.0-dev`。严格按 Minecraft Java 1.20.1 完整玩法/内容口径，整体完成度仍保守维持约 **35%**。浏览器渲染/资源管线、单机生存基础和 authoritative multiplayer 骨架已形成，当前主要缺口转向 registry breadth、原版 worldgen、redstone、dimensions、enchanting/brewing、广泛 status effects、server-authoritative PvE/XP/persistence 与更深 farming parity。
 
-当前 merged `main`：`ad12dd143263628aac856a1538d6093a7614dae3`，已包含 PR #134 `feat: overhaul creative mode foundations`。
+当前 merged `main`：`6a56c33d79c074f95f2be750f9d25ec246766b1b`，已包含 PR #136 `feat: complete hunger status effects and multiplayer authority`。
 
 `docs/PROJECT_BASELINE.md` 只描述 merged main；未合并功能必须放在 active delivery 中。
 
-## 最近完成：PR #134 Creative mode overhaul
+## 最近完成：PR #136 Hunger follow-up
 
-PR #134 已于 2026-08-25 squash merge。
+PR #136 已于 2026-08-26 squash merge。
 
-### Creative flight
+### Food status effects
 
-- Creative 默认 grounded，不再进入模式就永久飞行。
-- double-Jump 在 Creative 中切换飞行；desktop Space 与 mobile Jump 共用 rising-edge detector。
-- Spectator forced-flying；Survival/Adventure 禁止该 flight toggle。
-- multiplayer 客户端只提交 `flight-toggle` intent；服务器持有 `flying` 真值并通过 authoritative self snapshot 下发。
-- self player snapshot v2 严格要求 boolean `flying`；共享 interpolator 仅在字段存在时严格校验，以兼容 remote player state 无该字段的情况。
+- 新增可复用 finite-duration status-effect state，不再把食物中毒逻辑硬编码进 Player loop。
+- raw chicken：30% 概率 Hunger I / 30 秒。
+- rotten flesh：80% 概率 Hunger I / 30 秒。
+- effect roll 只在完整 1.6 s food transaction 成功提交后发生；cancel/reject 不产生效果。
+- Hunger effect 通过同一 exhaustion state 生效，不建立第二套饥饿状态。
 
-### Creative HUD
+### Difficulty / gamerule boundary
 
-- Creative/Spectator 隐藏 hearts+hunger、armor、XP、oxygen；hotbar 保留。
-- gameplay HP/hunger/armor/XP/oxygen 不因 presentation 改造而被改写。
-- 后续 status render 不能把 Creative 中已隐藏的 Survival HUD 重新显示。
+- Peaceful：无 starvation damage，并进入当前实现的和平恢复规则。
+- Easy：starvation 最低 10 HP。
+- Normal：starvation 最低 1 HP。
+- Hard：starvation 可降到 0 HP。
+- `naturalRegeneration=false` 禁止 hunger-driven natural healing。
+- 规则保持 pure/testable，不依赖浏览器 DOM。
 
-### Hostile target eligibility
+### Singleplayer persistence
 
-- Survival/Adventure 可被 hostile mob 锁定；Creative/Spectator 不可成为主动目标。
-- zombie/spider 不再追击近战，skeleton 不再向 Creative/Spectator 主动射击。
-- Creeper 目标失效时立即清除 fuse；knockback 衰减、daylight、ambient、spawn/despawn 继续运行。
+- save schema 从 **v9 → v10**，用于持久化 normalized active status effects。
+- `terrainVersion` 自 schema v8 起必填的独立兼容合同保持不变。
+- terrain generator 仍为 **v4**。
+- active food-use input 继续是 transient state，不写入存档。
+- pre-v10 world 继续通过显式 compatibility path 打开，而不是静默 reinterpret。
 
-### Registry-backed Creative catalog
+### Multiplayer Hunger authority
 
-- 历史 `CREATIVE_START` 13 项顺序保持不变；starter bootstrap 不再冒充完整创造物品栏。
-- catalog 从当前 `ITEMS` registry 自动派生，当前覆盖 56 个注册 item entry。
-- 提供全部、建筑、工具、战斗、食物、自然、材料、其他分类，并支持名称/ID 搜索。
-- Creative 背包隐藏 Survival equipment / 2×2 crafting / 27-slot main 区，保留真实 9-slot hotbar。
-- 单机 catalog 点击写入真实 inventory cursor，再复用既有 slot-click 放置/交换；模式切换不重建物理库存。
-- Creative 与 Survival presentation 明确隔离；被替换的 Survival UI 在 Creative 中退出布局和 pointer hit-testing。
+- 新增 `ServerPlayerHungerHub` + `HungerRuntimeController`，服务器持有 food / saturation / exhaustion / timer / status effects / active food use 真值。
+- multiplayer food use 保持 1.6 s held/cancelable 行为。
+- `use-release`、attack、drop、respawn、mode/death、selected-stack change 都能在完成前取消且不消费。
+- completion 时重新校验 selected stack，并通过 authoritative inventory `commitSelected()` 原子提交 Hunger/effect mutation 与物品扣除。
+- Workbench/Furnace interaction 优先于 eating，手持食物不会阻止打开容器。
+- movement/swim/jump/successful attack/successful damage exhaustion 接入服务器 Hunger。
+- food<=6 的 sprint gate 在服务器 input state 上执行。
+- regeneration/starvation 不直接篡改 Combat HP，而是调用 Combat authority 的 heal/environment-damage API。
+- respawn/mode/session lifecycle 同步 Hunger state。
 
-### Multiplayer Creative item creation
+### Multiplayer wire / browser presentation
 
-- Inventory transaction protocol 为 **v2**，包含 `creative-pick`。
-- 客户端只提交 `itemId`，不能声明可信 `count`。
-- server 检查 mode/dead/registry item/expected revision/replay；堆叠数量由 server-side `maxStack()` 决定。
-- 成功时服务器替换 authoritative cursor、推进 inventory revision，并复制权威 snapshot；non-Creative、unknown item、stale/replay 请求不产生非法库存 mutation。
-- 因 action semantics 不兼容，handshake/subprotocol 已升级到 **v4 / `minecraft-web-v4`**，不伪装兼容 legacy v3。
+- 新增 revisioned `player-hunger-snapshot`。
+- live multiplayer bootstrap 必须收到首个 Hunger snapshot 才进入 ready。
+- browser 只把 authoritative Hunger snapshot 应用到 Player cache、HUD 和 first-person eating progress，不运行 competing Hunger simulation。
+- `use-release` 改变 action wire semantics：player action frame 为 **v3**，handshake/subprotocol 升级为 **v5 / `minecraft-web-v5`**；legacy v4 不伪装兼容。
+
+### Validation
+
+最终 exact head：`80cc188fd9deaec104c4a86ab8e952965f4759f1`
+
+Repository quality run #1271 (`32924502937`)：
+
+- JavaScript syntax：PASS；
+- full logic/worker regression：PASS；
+- Chromium shard 1/2：PASS；
+- Chromium shard 2/2：PASS；
+- real browser → real authoritative Node server Hunger E2E：PASS；
+- final base drift：0；
+- reviews / review threads / PR comments：0。
+
+Squash merge commit：`6a56c33d79c074f95f2be750f9d25ec246766b1b`。
 
 ## 当前兼容性边界
 
-- block/item IDs 不变；
-- singleplayer save schema **v9** 不变；
-- terrain generator **v4** 不变，local v2/v3 compatibility path 不变；
+- block/item IDs 保持 append-only，不重排现有 ID；
+- singleplayer save schema：**v10**；
+- terrain generator：**v4**，local v2/v3 compatibility path 保持不变；
 - historical `CREATIVE_START` 顺序/slot mapping 不变；
+- multiplayer handshake/subprotocol：**v5 / `minecraft-web-v5`**；
+- player action frame：**v3**；
 - browser presentation 不成为 gameplay authority；
-- multiplayer Creative flight/item creation 不允许 client-side competing truth。
+- multiplayer Hunger/food use 不允许 client-side competing truth。
 
-## 下一阶段：Hunger follow-up
+## 下一阶段：Registry breadth
 
-下一连续开发切片聚焦：
+下一连续开发切片聚焦常用 block/item registry 扩展，而不是继续堆特殊-case：
 
-1. food status effects，优先补 raw chicken / rotten flesh 的 Hunger 效果，并建立可扩展的通用 status-effect 基础；
-2. difficulty / gamerule boundary，把 starvation、natural regeneration 等规则从当前固定 Normal-style 行为中拆出；
-3. server-authoritative hunger/use，让 multiplayer 食物使用、food/saturation/exhaustion/timer 不再缺失 server truth；
-4. 继续保持 held 1.6 s use、cancel/complete transaction 与 singleplayer save v9 的兼容边界；
-5. 为新增多人状态扩展独立 wire/version contract，禁止 client-side fake authority。
+1. 扩展常见 stone variants 与 wood species，保持现有 ID append-only；
+2. 优先建立 slab / stair / fence / door 等可复用 block-family rule，而不是为每个方块手写独立 rendering/gameplay 分支；
+3. 继续复用 Java 1.20.1 source-backed blockstate/model/texture pipeline；
+4. Creative catalog 继续从 live `ITEMS` registry 派生，不扩展历史 `CREATIVE_START` starter contract；
+5. 如果新增 family 真正要求 save/network contract 变化，必须显式 bump；否则保持 save v10、terrain v4、multiplayer v5。
 
 ## 后续连续开发顺序
 
-1. Hunger follow-up：food status effects、difficulty/gamerule boundary、server-authoritative hunger/use；
-2. Registry breadth：stone variants、wood species、slab/stair/fence/door 等通用 families；
-3. Worldgen：biomes → caves/aquifers → ores/features → structures；
-4. Server gameplay breadth：server-authoritative PvE/XP、durable world/block-entity persistence；
-5. Farming 后续：farmland trampling、exact crop random tick/light/neighbor formula、Fortune/loot tables、其它 crops/breeding。
+1. Registry breadth：stone variants、wood species、slab/stair/fence/door 等 common families；
+2. Worldgen：biomes → caves/aquifers → ores/features → structures；
+3. Server gameplay breadth：server-authoritative PvE/XP、durable world/block-entity persistence；
+4. Farming 后续：farmland trampling、exact crop random tick/light/neighbor formula、Fortune/loot tables、其它 crops/breeding；
+5. 更广 status effects / enchanting / brewing / redstone / dimensions 等系统继续按依赖关系展开。
 
 ## 工程规则
 

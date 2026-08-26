@@ -1,12 +1,12 @@
-# Project Baseline — 2026-08-25
+# Project Baseline — 2026-08-26
 
 This document records **merged `main` only**. Open PR work is excluded from merged facts.
 
 ## Authority
 
 - Branch: `main`
-- Commit: `ad12dd143263628aac856a1538d6093a7614dae3`
-- Includes merged work through PR #134.
+- Commit: `6a56c33d79c074f95f2be750f9d25ec246766b1b`
+- Includes merged work through PR #136.
 - Development line: `v0.4.0-dev`.
 - Strict Minecraft Java 1.20.1 gameplay/content parity remains a planning estimate of about **35%**. Engine, resource and multiplayer-authority foundations are materially further along than registry/content breadth.
 
@@ -34,9 +34,15 @@ PR #134 adds merged mode-aware Creative presentation:
 - Creative inventory is a categorized/searchable registry-backed catalog rather than an expansion of `CREATIVE_START`;
 - Survival equipment/2×2 crafting/27-slot main presentation is removed from Creative layout/hit-testing while the real nine-slot hotbar remains available.
 
+PR #136 adds authoritative Hunger presentation in multiplayer:
+
+- browser Hunger HUD follows revisioned server Hunger snapshots;
+- active authoritative food use drives first-person eating progress without creating a second client simulation;
+- multiplayer bootstrap does not become gameplay-ready until the initial Hunger snapshot is available.
+
 ## Creative mode
 
-Merged Creative behavior now includes:
+Merged Creative behavior includes:
 
 - Creative enters grounded instead of permanently flying;
 - double-Jump toggles Creative flight through the shared desktop/mobile Jump edge detector;
@@ -72,7 +78,7 @@ Current merged terrain generator is **v4**:
 - old persisted worlds stay pinned to their recorded terrain version rather than being silently reinterpreted;
 - multiplayer requires the exact current terrain version and does not allow mixed generator versions.
 
-Singleplayer save schema remains **v9**. `terrainVersion` is required from schema v8 onward. PR #134 did not add Creative `flying` as a new persistent save field; player mode remains the persistence boundary and runtime flight is normalized by mode rules.
+Singleplayer save schema is now **v10**. `terrainVersion` remains required from schema v8 onward. PR #136 persists normalized active status effects, while active food-use input remains transient and is not saved. Pre-v10 worlds continue through the explicit compatibility path rather than being silently reinterpreted.
 
 Java biome/climate generation, caves/aquifers, broad features/structures, full vertical range, Nether and End remain unimplemented.
 
@@ -92,11 +98,19 @@ Merged main contains the first natural wheat progression loop:
 - bone → 3 bone meal;
 - singleplayer bone meal advances wheat and spreads short grass under the current simplified rules.
 
-Merged food/hunger support includes food, saturation, exhaustion and food timer; apple, bread, raw meats, cooked meats and rotten flesh; natural regeneration/starvation; raw iron and meat Furnace recipes; coal as 1600-tick fuel.
+Merged food/hunger support now includes:
 
-Singleplayer eating is a held, interruptible 1.6-second action. Release, control/modal loss, hotbar/item/mode change, drop or primary attack cancels without consuming. Multiplayer hunger/eating state remains disabled until the server owns the complete transaction.
+- food, saturation, exhaustion and food timer;
+- apple, bread, raw meats, cooked meats and rotten flesh;
+- held, interruptible 1.6-second eating with cancellation before commit;
+- raw chicken 30% and rotten flesh 80% Hunger I for 30 seconds through a reusable finite-duration status-effect foundation;
+- Peaceful/Easy/Normal/Hard starvation boundaries and a `naturalRegeneration` switch;
+- saturated fast regeneration and normal regeneration;
+- raw iron and meat Furnace recipes; coal as 1600-tick fuel.
 
-Food status effects such as raw-chicken/rotten-flesh Hunger remain unimplemented because a generic status-effect system is absent. Difficulty/gamerule-specific hunger behavior is also not yet modeled beyond the current fixed Normal-style starvation floor/natural-regeneration rules.
+Singleplayer and multiplayer both preserve the held/cancelable food-use boundary. In multiplayer, the server owns the pending food use, selected-stack revalidation, Hunger/status-effect mutation and inventory decrement; release or invalidation cancels without consumption.
+
+The current status-effect implementation is a reusable foundation but only the Hunger effect is modeled. Broad potion/effect semantics remain unimplemented.
 
 ## Items, crafting and progression
 
@@ -127,13 +141,14 @@ Merged singleplayer survival includes:
 - HP, hurt cooldown, knockback, death/respawn and recoverable item/XP drops;
 - armor mitigation and durability wear;
 - food/saturation/exhaustion and hunger-driven sprint gate at food <= 6;
-- saturated fast regeneration, food>=18 normal regeneration and the current fixed Normal-style 1 HP starvation floor;
+- saturated fast regeneration, food>=18 normal regeneration and difficulty-aware starvation floors;
+- finite-duration Hunger status effects from implemented risky foods;
 - timed/interruptible food use;
 - oxygen/drowning and simplified swimming;
 - time/weather, bed sleep/respawn and singleplayer XP;
 - persistent singleplayer Furnace processing.
 
-Current mobs are cow, sheep, pig, chicken, zombie, skeleton, creeper and spider. Their PvE remains simplified and client/singleplayer-owned; server-authoritative PvE is still absent. PR #134 does, however, make local hostile targeting mode-aware so Creative/Spectator players are not valid proactive hostile targets.
+Current mobs are cow, sheep, pig, chicken, zombie, skeleton, creeper and spider. Their PvE remains simplified and client/singleplayer-owned; server-authoritative PvE is still absent. PR #134 makes local hostile targeting mode-aware so Creative/Spectator players are not valid proactive hostile targets.
 
 ## Multiplayer authority
 
@@ -153,13 +168,19 @@ The merged Node WebSocket runtime owns:
 - chat and controlled commands;
 - PvP HP/melee/armor mitigation/knockback/death drops/respawn;
 - Creative flight intent/state ownership;
-- Creative item creation through inventory transaction protocol **v2** `creative-pick`.
+- Creative item creation through inventory transaction protocol **v2** `creative-pick`;
+- revisioned Hunger authority for food/saturation/exhaustion/timer, status effects and active food use;
+- server-side sprint gating from Hunger state;
+- movement/swim/jump/attack/damage exhaustion;
+- hunger-driven natural regeneration/starvation through Combat authority;
+- authoritative food-use cancellation, selected-stack revalidation and atomic inventory commit;
+- Hunger reset through respawn/mode/session lifecycle.
 
 For `creative-pick`, the client submits only `itemId`; server mode/dead/registry/revision/replay checks determine validity, server-side registry metadata determines `maxStack`, and the server owns cursor/revision mutation and replication.
 
-Because PR #134 expanded inventory transaction semantics incompatibly, the merged handshake/subprotocol is **v4 / `minecraft-web-v4`**. Legacy v3 peers are rejected rather than silently treated as compatible.
+PR #136 adds `use-release` to multiplayer gameplay actions. The player action frame is **v3**, and the incompatible session handshake/subprotocol is now **v5 / `minecraft-web-v5`**. Legacy v4 peers are rejected rather than silently treated as compatible.
 
-The merged server does **not** yet own hunger/eating state, farming/random ticks/bone meal, mobs/PvE/projectiles/explosions, XP/levels or durable world persistence. Client-side competing truth remains deliberately disabled for those missing multiplayer domains.
+The merged server does **not** yet own farming/random ticks/bone meal, mobs/PvE/projectiles/explosions, XP/levels or durable world/block-entity persistence. Client-side competing truth remains deliberately disabled for those missing multiplayer domains.
 
 ## Original Minecraft resources / audio
 
@@ -180,17 +201,17 @@ Repository quality is exact-head based:
 5. browser integration where Three.js/CSS/WebAudio/HTTP boundaries matter;
 6. final base-drift and review-surface checks.
 
-PR #134 final head `e2dd61ae5603839ed4590f2a58121a4aad296a13` passed Repository quality run #1212: static checks, Chromium 1/2 and Chromium 2/2 all succeeded. It was `behind_by=0` with no reviews, review threads or PR comments before squash merge.
+PR #136 final head `80cc188fd9deaec104c4a86ab8e952965f4759f1` passed Repository quality run #1271 (`32924502937`): static checks, Chromium 1/2 and Chromium 2/2 all succeeded. The final branch was based directly on `main 3bdf713d44de15e47dd2d8a731b2832dea7fca33` with no drift and no review/comment blockers before squash merge as `6a56c33d79c074f95f2be750f9d25ec246766b1b`.
 
 A green older head never validates a newer head.
 
 ## Next planned delivery
 
-The next continuous development slice is Hunger follow-up:
+The next continuous development slice is **Registry breadth**:
 
-- food status effects, starting with raw chicken / rotten flesh Hunger semantics and a reusable status-effect foundation;
-- difficulty / gamerule boundary for starvation and natural regeneration behavior;
-- server-authoritative multiplayer hunger/use state and transactions;
-- preservation of current singleplayer save v9 and 1.6-second held/cancelable food-use behavior unless an actual persistence change requires a schema bump.
+- expand common stone and wood families using append-only IDs and the existing source-backed model pipeline;
+- prioritize reusable block-family rules for slabs/stairs/fences/doors and related common building variants rather than one-off rendering hacks;
+- preserve terrain v4, save v10, multiplayer v5 and historical `CREATIVE_START` compatibility unless a real contract change requires an explicit version bump;
+- keep authoritative/server and browser-presentation boundaries intact while registry breadth grows.
 
-Registry breadth, broader worldgen, server-authoritative PvE/XP/persistence and farming depth remain subsequent planned slices.
+Broader worldgen, server-authoritative PvE/XP/persistence and deeper farming parity remain subsequent planned slices.

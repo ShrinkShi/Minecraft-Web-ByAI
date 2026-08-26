@@ -2,7 +2,12 @@
 
 ## Status
 
-PR #136, based on `main 3bdf713d44de15e47dd2d8a731b2832dea7fca33`.
+PR #136 was squash-merged on 2026-08-26.
+
+- Base used for final review: `main 3bdf713d44de15e47dd2d8a731b2832dea7fca33`
+- Final reviewed head: `80cc188fd9deaec104c4a86ab8e952965f4759f1`
+- Merge commit: `6a56c33d79c074f95f2be750f9d25ec246766b1b`
+- Repository quality: run #1271 (`32924502937`) — static checks and both Chromium shards succeeded.
 
 This slice closes the explicit deferrals left by the merged hunger core and timed-food-use work. It does not redefine terrain generation, block/item IDs, or the historical Creative starter ordering.
 
@@ -18,7 +23,7 @@ This slice closes the explicit deferrals left by the merged hunger core and time
 
 ### Difficulty and regeneration boundary
 
-The hunger rules now model the Java 1.20.1 difficulty boundary used by this project:
+The hunger rules model the Java 1.20.1 difficulty boundary used by this project:
 
 - Peaceful: no starvation damage; food/health recovery follows the implemented natural-regeneration boundary.
 - Easy: starvation stops at 10 HP.
@@ -39,7 +44,7 @@ Singleplayer save schema advances from v9 to v10 because active status effects a
 
 ### Multiplayer server authority
 
-Multiplayer Hunger is now a separate revisioned authoritative state owned by the server.
+Multiplayer Hunger is a separate revisioned authoritative state owned by the server.
 
 `ServerPlayerHungerHub` and `HungerRuntimeController` own:
 
@@ -72,7 +77,7 @@ Workbench and Furnace interaction retain priority over eating so holding food do
 - Live multiplayer bootstrap explicitly requires an initial Hunger snapshot before `MultiplayerMovementSession` becomes ready.
 - The generic bootstrap remains opt-in for the Hunger barrier so lower-level/custom transport tests are not falsely forced to emulate the full live-world client.
 - The authoritative Hunger snapshot is applied to `PlayerController`, first-person food-use presentation and Hunger HUD only as presentation/cache state; the server remains the source of truth.
-- The action frame includes `use-release` so the server can cancel held food use without serializing a continuous secondary-button state into movement control snapshots.
+- The action frame includes `use-release`; player action frame is v3 and the incompatible handshake/subprotocol is v5 / `minecraft-web-v5`.
 
 ## Combat boundary
 
@@ -107,15 +112,18 @@ Chromium acceptance covers both authority modes:
 - historical `CREATIVE_START` ordering/slot mapping is unchanged;
 - active food use remains transient and is not stored in singleplayer saves;
 - multiplayer Hunger has one server source of truth;
-- no Project Baseline claim is made until the PR is merged.
+- singleplayer save schema is v10;
+- multiplayer handshake/subprotocol is v5 / `minecraft-web-v5`.
 
-## Merge gate
+## Merge record
 
-Do not merge #136 until its exact final head satisfies all of the following:
+Final exact-head gate before merge:
 
-- JavaScript syntax gate green;
-- full logic/worker regression green;
-- Chromium shard 1/2 green;
-- Chromium shard 2/2 green;
-- `main` still matches the reviewed base or any drift has been explicitly reconciled;
-- no unresolved review thread/comment blocker remains.
+- JavaScript syntax: success;
+- full logic/worker regression: success;
+- Chromium shard 1/2: success;
+- Chromium shard 2/2: success;
+- base drift: zero;
+- unresolved review threads/comments: none.
+
+PR #136 was then squash-merged as `6a56c33d79c074f95f2be750f9d25ec246766b1b`.
