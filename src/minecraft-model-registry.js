@@ -9,10 +9,28 @@ const descriptor=(blockstate,{state={},renderLayer='opaque',textureLayers={}}={}
   textureLayers:Object.freeze({...textureLayers})
 });
 
+// Full-cube blocks are deliberately data-driven here. This is the reusable path
+// for ordinary source-backed cubes; stateful/non-cube families stay explicit.
+export const MINECRAFT_SIMPLE_FULL_CUBE_MODELS=Object.freeze([
+  Object.freeze({blockId:BLOCK.PLANKS,blockstate:'minecraft:oak_planks'}),
+  Object.freeze({blockId:BLOCK.GRANITE,blockstate:'minecraft:granite'}),
+  Object.freeze({blockId:BLOCK.DIORITE,blockstate:'minecraft:diorite'}),
+  Object.freeze({blockId:BLOCK.ANDESITE,blockstate:'minecraft:andesite'}),
+  Object.freeze({blockId:BLOCK.SPRUCE_PLANKS,blockstate:'minecraft:spruce_planks'}),
+  Object.freeze({blockId:BLOCK.BIRCH_PLANKS,blockstate:'minecraft:birch_planks'}),
+  Object.freeze({blockId:BLOCK.JUNGLE_PLANKS,blockstate:'minecraft:jungle_planks'}),
+  Object.freeze({blockId:BLOCK.ACACIA_PLANKS,blockstate:'minecraft:acacia_planks'}),
+  Object.freeze({blockId:BLOCK.DARK_OAK_PLANKS,blockstate:'minecraft:dark_oak_planks'}),
+  Object.freeze({blockId:BLOCK.MANGROVE_PLANKS,blockstate:'minecraft:mangrove_planks'}),
+  Object.freeze({blockId:BLOCK.CHERRY_PLANKS,blockstate:'minecraft:cherry_planks'})
+]);
+const SIMPLE_FULL_CUBE_REGISTRY=Object.fromEntries(MINECRAFT_SIMPLE_FULL_CUBE_MODELS.map(({blockId,blockstate})=>[blockId,descriptor(blockstate)]));
+
 // Explicit opt-in only. Blocks not listed here remain on the existing terrain
 // atlas fast path. Keep visual-model registration separate from gameplay
 // collision/state rules in blocks.js.
 export const MINECRAFT_MODEL_BLOCK_REGISTRY=Object.freeze({
+  ...SIMPLE_FULL_CUBE_REGISTRY,
   [BLOCK.CRAFTING_TABLE]:descriptor('minecraft:crafting_table'),
   [BLOCK.IRON_ORE]:descriptor('minecraft:iron_ore'),
   [BLOCK.GLASS]:descriptor('minecraft:glass',{renderLayer:'translucent'}),
