@@ -1,9 +1,39 @@
 {
   "files": {
+    "blockstates/acacia_planks.json": {
+      "bytes": 86,
+      "sha256": "b8922239152d8b9e03ce83a9f6a95989f094e3a733b6def6060ba711a1ee9ddd",
+      "source": "MC原版素材assets/minecraft/blockstates/acacia_planks.json"
+    },
+    "blockstates/andesite.json": {
+      "bytes": 81,
+      "sha256": "831f843b371f1f59766ddf2ace20e5b144dce629eb60323640a149b4edfdf5e6",
+      "source": "MC原版素材assets/minecraft/blockstates/andesite.json"
+    },
+    "blockstates/birch_planks.json": {
+      "bytes": 85,
+      "sha256": "5971c7d60581343e97a3ff9ad576a138ffd0b73da1f20e99ebd32aa243e91be2",
+      "source": "MC原版素材assets/minecraft/blockstates/birch_planks.json"
+    },
+    "blockstates/cherry_planks.json": {
+      "bytes": 86,
+      "sha256": "960163a72d3d4254bc39e80edc35710a3dd70af3158c10be84c539d4bc7d159c",
+      "source": "MC原版素材assets/minecraft/blockstates/cherry_planks.json"
+    },
     "blockstates/crafting_table.json": {
       "bytes": 87,
       "sha256": "bd75337fe8f663e3c88e5f2490a7217d60925ff7f0001f98656b037441ecdb98",
       "source": "MC原版素材assets/minecraft/blockstates/crafting_table.json"
+    },
+    "blockstates/dark_oak_planks.json": {
+      "bytes": 88,
+      "sha256": "c44355a7cc0c8ebac30fac4c22085ffecd6da2427fd30e4b7ac527f5a703ff70",
+      "source": "MC原版素材assets/minecraft/blockstates/dark_oak_planks.json"
+    },
+    "blockstates/diorite.json": {
+      "bytes": 80,
+      "sha256": "3dac0a7007dcf4f8d6443fc542639c31fb04d959416ee5f180853b719a78f224",
+      "source": "MC原版素材assets/minecraft/blockstates/diorite.json"
     },
     "blockstates/farmland.json": {
       "bytes": 580,
@@ -20,6 +50,11 @@
       "sha256": "1dbff97d8ac074c330024db2f2acc93eea26ffad0cd33e2f0442ca6e5145e9d5",
       "source": "MC原版素材assets/minecraft/blockstates/glass.json"
     },
+    "blockstates/granite.json": {
+      "bytes": 80,
+      "sha256": "f0565cc44c3b15b560051ba668fa2738636ee3d936be4a95416ac1c3adfc24c4",
+      "source": "MC原版素材assets/minecraft/blockstates/granite.json"
+    },
     "blockstates/grass.json": {
       "bytes": 78,
       "sha256": "eb860ec8e498bc4c6b9756c3e7a0c5592fbcba7d86c80c4aa8ecac41eaa4ae4e",
@@ -35,6 +70,16 @@
       "sha256": "252ffc2fbd790eb52ea3c54bcb5a35e4bf3c08ed022bd65f4de5c0fa00d0514a",
       "source": "MC原版素材assets/minecraft/blockstates/iron_ore.json"
     },
+    "blockstates/jungle_planks.json": {
+      "bytes": 86,
+      "sha256": "733b243aa042e015729edb20bba4a3154cb207b7df008a46380f41e91f3317ca",
+      "source": "MC原版素材assets/minecraft/blockstates/jungle_planks.json"
+    },
+    "blockstates/mangrove_planks.json": {
+      "bytes": 88,
+      "sha256": "35244921ded1c6daf34dd12a949dd919e6d1466ad40236407e141d5f8863322d",
+      "source": "MC原版素材assets/minecraft/blockstates/mangrove_planks.json"
+    },
     "blockstates/oak_door.json": {
       "bytes": 4142,
       "sha256": "a909607ae843a76b9f4882aae7f5320a4b30b8694d855b2904b9a627aea10550",
@@ -44,6 +89,11 @@
       "bytes": 806,
       "sha256": "8baa0ab562c6deacef56a1d26530117d9bda8104d76a4fb71e4318443968142a",
       "source": "MC原版素材assets/minecraft/blockstates/oak_fence.json"
+    },
+    "blockstates/oak_planks.json": {
+      "bytes": 83,
+      "sha256": "6f2d386f25be963313312900c1d4ec49fde45987f01e5f320c2c45cce6cec8ad",
+      "source": "MC原版素材assets/minecraft/blockstates/oak_planks.json"
     },
     "blockstates/oak_slab.json": {
       "bytes": 235,
@@ -55,6 +105,11 @@
       "sha256": "b569dcddb0c8b1841bdb939ff4e3f6dce622bc2d08f5110797e853c2dbdd6eb8",
       "source": "MC原版素材assets/minecraft/blockstates/oak_stairs.json"
     },
+    "blockstates/spruce_planks.json": {
+      "bytes": 86,
+      "sha256": "cc77a0e944cfe32ac802bbc7a5463834ff2a029b3a8a5134a08341624a2ce4a8",
+      "source": "MC原版素材assets/minecraft/blockstates/spruce_planks.json"
+    },
     "blockstates/torch.json": {
       "bytes": 78,
       "sha256": "6eb66f347e7de8f032f8ccc7d4f79c26bfee9f8ab27dff74bccca43b3a76c418",
@@ -65,10 +120,30 @@
       "sha256": "787dc13c2149a133ebe4d4626b33396ec804ebf293a150dd8dab3eea65e02d57",
       "source": "MC原版素材assets/minecraft/blockstates/wheat.json"
     },
+    "models/block/acacia_planks.json": {
+      "bytes": 106,
+      "sha256": "d373b2600164fa2c557ab568b799dc6fb35dfec9bd6343f801ca52fc18f2d12d",
+      "source": "MC原版素材assets/minecraft/models/block/acacia_planks.json"
+    },
+    "models/block/andesite.json": {
+      "bytes": 101,
+      "sha256": "d552abc7c49f4e0977093288e1bd26c1259f86891d773436bd5e498cc51fee4f",
+      "source": "MC原版素材assets/minecraft/models/block/andesite.json"
+    },
+    "models/block/birch_planks.json": {
+      "bytes": 105,
+      "sha256": "f758b05d70508f26a3e760e46f8cfb399ea100259f475960f196555167921488",
+      "source": "MC原版素材assets/minecraft/models/block/birch_planks.json"
+    },
     "models/block/block.json": {
       "bytes": 997,
       "sha256": "3ef6c442f1ab55d2a57fa58e28bb831268159052659f12b453b637b31ded1da8",
       "source": "MC原版素材assets/minecraft/models/block/block.json"
+    },
+    "models/block/cherry_planks.json": {
+      "bytes": 106,
+      "sha256": "da966c62d5613696c71124144076bb1d6d9c226e2cb41e83a73675c8dbd92ed3",
+      "source": "MC原版素材assets/minecraft/models/block/cherry_planks.json"
     },
     "models/block/crafting_table.json": {
       "bytes": 412,
@@ -94,6 +169,16 @@
       "bytes": 235,
       "sha256": "14f8400761cfc0c5664d165a3602bd2bb25953ade361c77c43511147bfdd2a15",
       "source": "MC原版素材assets/minecraft/models/block/cube_bottom_top.json"
+    },
+    "models/block/dark_oak_planks.json": {
+      "bytes": 108,
+      "sha256": "060c792b0ba66cabde22659f98e21e7dfb970d513f1ab959210e171c6c28012c",
+      "source": "MC原版素材assets/minecraft/models/block/dark_oak_planks.json"
+    },
+    "models/block/diorite.json": {
+      "bytes": 100,
+      "sha256": "4eb8731e843d388471aa1aab79b62b9857596b69949caf5688ed96c5133621bc",
+      "source": "MC原版素材assets/minecraft/models/block/diorite.json"
     },
     "models/block/door_bottom_left.json": {
       "bytes": 709,
@@ -170,6 +255,11 @@
       "sha256": "7ed800415aa94222ad48aabe11c0effe5874414b724f7ceea06a3fb7fbad6f7e",
       "source": "MC原版素材assets/minecraft/models/block/glass.json"
     },
+    "models/block/granite.json": {
+      "bytes": 100,
+      "sha256": "f72ea815449f4bd7b0e87b7bc1cfdcf6f84e99534971df6cb612670adbd2735a",
+      "source": "MC原版素材assets/minecraft/models/block/granite.json"
+    },
     "models/block/grass.json": {
       "bytes": 104,
       "sha256": "079badaebfeeccd9919a9d02cfacac4cb49fd2dad9de1f5bc37479d396e875d1",
@@ -194,6 +284,16 @@
       "bytes": 101,
       "sha256": "46979c8a4e8da0eef0c6f44f2dc2c5d0b473d02d7aeb7f94eb9819387c56edb1",
       "source": "MC原版素材assets/minecraft/models/block/iron_ore.json"
+    },
+    "models/block/jungle_planks.json": {
+      "bytes": 106,
+      "sha256": "a95e57bfae4144373f0b3fbbad7756bbea7f4c392f723c13111d32c988515223",
+      "source": "MC原版素材assets/minecraft/models/block/jungle_planks.json"
+    },
+    "models/block/mangrove_planks.json": {
+      "bytes": 108,
+      "sha256": "9bbc29d83e60882be82a025a0a0585eedea17ad6feec461991f0b3b228b8f766",
+      "source": "MC原版素材assets/minecraft/models/block/mangrove_planks.json"
     },
     "models/block/oak_door_bottom_left.json": {
       "bytes": 162,
@@ -299,6 +399,11 @@
       "bytes": 733,
       "sha256": "c02e81cd0b59698040db7a682d32d08ddeb0de64756e309d62ecfbda4af804f9",
       "source": "MC原版素材assets/minecraft/models/block/slab_top.json"
+    },
+    "models/block/spruce_planks.json": {
+      "bytes": 106,
+      "sha256": "6114266bac6b7da4e888a9227f4c1ef8f9c1a99706bb36140528eba0aaa7a459",
+      "source": "MC原版素材assets/minecraft/models/block/spruce_planks.json"
     },
     "models/block/stairs.json": {
       "bytes": 1806,
@@ -635,31 +740,48 @@
   "minecraftVersion": "1.20.1",
   "modelRuntimeClosure": {
     "blockstates": [
+      "blockstates/acacia_planks.json",
+      "blockstates/andesite.json",
+      "blockstates/birch_planks.json",
+      "blockstates/cherry_planks.json",
       "blockstates/crafting_table.json",
+      "blockstates/dark_oak_planks.json",
+      "blockstates/diorite.json",
       "blockstates/farmland.json",
       "blockstates/furnace.json",
       "blockstates/glass.json",
+      "blockstates/granite.json",
       "blockstates/grass.json",
       "blockstates/grass_block.json",
       "blockstates/iron_ore.json",
+      "blockstates/jungle_planks.json",
+      "blockstates/mangrove_planks.json",
       "blockstates/oak_door.json",
       "blockstates/oak_fence.json",
+      "blockstates/oak_planks.json",
       "blockstates/oak_slab.json",
       "blockstates/oak_stairs.json",
+      "blockstates/spruce_planks.json",
       "blockstates/torch.json",
       "blockstates/wheat.json"
     ],
     "counts": {
-      "blockstates": 13,
-      "models": 60
+      "blockstates": 24,
+      "models": 70
     },
     "models": [
+      "models/block/acacia_planks.json",
+      "models/block/andesite.json",
+      "models/block/birch_planks.json",
       "models/block/block.json",
+      "models/block/cherry_planks.json",
       "models/block/crafting_table.json",
       "models/block/crop.json",
       "models/block/cube.json",
       "models/block/cube_all.json",
       "models/block/cube_bottom_top.json",
+      "models/block/dark_oak_planks.json",
+      "models/block/diorite.json",
       "models/block/door_bottom_left.json",
       "models/block/door_bottom_left_open.json",
       "models/block/door_bottom_right.json",
@@ -675,11 +797,14 @@
       "models/block/furnace.json",
       "models/block/furnace_on.json",
       "models/block/glass.json",
+      "models/block/granite.json",
       "models/block/grass.json",
       "models/block/grass_block.json",
       "models/block/grass_block_snow.json",
       "models/block/inner_stairs.json",
       "models/block/iron_ore.json",
+      "models/block/jungle_planks.json",
+      "models/block/mangrove_planks.json",
       "models/block/oak_door_bottom_left.json",
       "models/block/oak_door_bottom_left_open.json",
       "models/block/oak_door_bottom_right.json",
@@ -701,6 +826,7 @@
       "models/block/outer_stairs.json",
       "models/block/slab.json",
       "models/block/slab_top.json",
+      "models/block/spruce_planks.json",
       "models/block/stairs.json",
       "models/block/template_farmland.json",
       "models/block/template_torch.json",
@@ -716,17 +842,28 @@
       "models/block/wheat_stage7.json"
     ],
     "roots": [
+      "minecraft:acacia_planks",
+      "minecraft:andesite",
+      "minecraft:birch_planks",
+      "minecraft:cherry_planks",
       "minecraft:crafting_table",
+      "minecraft:dark_oak_planks",
+      "minecraft:diorite",
       "minecraft:farmland",
       "minecraft:furnace",
       "minecraft:glass",
+      "minecraft:granite",
       "minecraft:grass",
       "minecraft:grass_block",
       "minecraft:iron_ore",
+      "minecraft:jungle_planks",
+      "minecraft:mangrove_planks",
       "minecraft:oak_door",
       "minecraft:oak_fence",
+      "minecraft:oak_planks",
       "minecraft:oak_slab",
       "minecraft:oak_stairs",
+      "minecraft:spruce_planks",
       "minecraft:torch",
       "minecraft:wheat"
     ]

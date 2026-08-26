@@ -19,11 +19,11 @@ assert.equal(resolver.manifest.minecraftVersion,'1.20.1');
 assert.equal(resolver.manifest.sourceKind,'directory');
 assert.equal(resolver.manifest.sourceRoot,'MC原版素材assets');
 assert.equal('sourceArchiveSha256' in resolver.manifest,false);
-assert.deepEqual(resolver.manifest.closure,{blockstates:13,models:60,textures:29,metadata:0});
-assert.equal(resolver.textureCount,29);
+assert.deepEqual(resolver.manifest.closure,{blockstates:24,models:70,textures:39,metadata:0});
+assert.equal(resolver.textureCount,39);
 assert.deepEqual(resolver.atlas,{
   path:'model-texture-atlas.png',
-  sha256:'d3770949b24633637dd68c7a96a92217b4d46265b5bbef3ea965831eeb04fd31',
+  sha256:'28dea729513157f790032964dc4607a88ba6657e72d3e9eca5a9cc85fa5ce1b5',
   width:128,
   height:128,
   gutterPx:1,
@@ -34,40 +34,59 @@ assert.equal(Object.isFrozen(resolver.manifest.closure),true);
 assert.equal(Object.isFrozen(resolver.manifest.textures),true);
 assert.equal(Object.isFrozen(resolver.requireRegion('block/glass')),true);
 
-assert.equal(resolver.hasTexture('block/glass'),true);
-assert.equal(resolver.hasTexture('minecraft:block/iron_ore'),true);
-assert.equal(resolver.hasTexture('minecraft:block/furnace_front'),true);
-assert.equal(resolver.hasTexture('minecraft:block/furnace_front_on'),true);
-assert.equal(resolver.hasTexture('minecraft:block/furnace_side'),true);
-assert.equal(resolver.hasTexture('minecraft:block/furnace_top'),true);
-assert.equal(resolver.hasTexture('minecraft:block/farmland'),true);
-assert.equal(resolver.hasTexture('minecraft:block/farmland_moist'),true);
-assert.equal(resolver.hasTexture('minecraft:block/grass'),true);
-assert.equal(resolver.hasTexture('minecraft:block/wheat_stage7'),true);
+for(const texture of [
+  'block/glass','minecraft:block/iron_ore','minecraft:block/furnace_front','minecraft:block/furnace_front_on','minecraft:block/furnace_side','minecraft:block/furnace_top',
+  'minecraft:block/farmland','minecraft:block/farmland_moist','minecraft:block/grass','minecraft:block/wheat_stage7',
+  'minecraft:block/oak_planks','minecraft:block/granite','minecraft:block/diorite','minecraft:block/andesite','minecraft:block/spruce_planks','minecraft:block/birch_planks','minecraft:block/jungle_planks','minecraft:block/acacia_planks','minecraft:block/dark_oak_planks','minecraft:block/mangrove_planks','minecraft:block/cherry_planks'
+])assert.equal(resolver.hasTexture(texture),true,`${texture} must be present in the tracked atlas`);
 assert.equal(resolver.hasTexture('minecraft:block/not_imported'),false);
+
 assert.deepEqual(resolver.requireRegion('block/glass'),{
-  u0:0.4296875,
-  v0:0.1484375,
-  u1:0.5546875,
-  v1:0.2734375
+  u0:0.2890625,
+  v0:0.2890625,
+  u1:0.4140625,
+  v1:0.4140625
 });
 assert.deepEqual(resolver.requireRegion('block/furnace_front'),{
-  u0:0.8515625,
-  v0:0.0078125,
-  u1:0.9765625,
-  v1:0.1328125
+  u0:0.7109375,
+  v0:0.1484375,
+  u1:0.8359375,
+  v1:0.2734375
 });
 assert.deepEqual(resolver.requireRegion('block/grass'),{
   u0:0.5703125,
-  v0:0.1484375,
+  v0:0.2890625,
   u1:0.6953125,
-  v1:0.2734375
+  v1:0.4140625
+});
+assert.deepEqual(resolver.requireRegion('block/oak_planks'),{
+  u0:0.0078125,
+  v0:0.5703125,
+  u1:0.1328125,
+  v1:0.6953125
+});
+assert.deepEqual(resolver.requireRegion('block/granite'),{
+  u0:0.4296875,
+  v0:0.2890625,
+  u1:0.5546875,
+  v1:0.4140625
+});
+assert.deepEqual(resolver.requireRegion('block/cherry_planks'),{
+  u0:0.4296875,
+  v0:0.0078125,
+  u1:0.5546875,
+  v1:0.1328125
 });
 assert.equal(resolver.requireTextureRecord('block/furnace_front').canonical,'assets/minecraft/textures/block/furnace_front.png');
 assert.equal(resolver.requireTextureRecord('block/furnace_front').source,'MC原版素材assets/minecraft/textures/block/furnace_front.png');
 assert.equal(resolver.requireTextureRecord('block/grass').canonical,'assets/minecraft/textures/block/grass.png');
 assert.equal(resolver.requireTextureRecord('block/grass').source,'MC原版素材assets/minecraft/textures/block/grass.png');
 assert.equal(resolver.requireTextureRecord('block/torch').canonical,'assets/minecraft/textures/block/torch.png');
+for(const name of ['oak_planks','granite','diorite','andesite','spruce_planks','birch_planks','jungle_planks','acacia_planks','dark_oak_planks','mangrove_planks','cherry_planks']){
+  const record=resolver.requireTextureRecord(`block/${name}`);
+  assert.equal(record.canonical,`assets/minecraft/textures/block/${name}.png`);
+  assert.equal(record.source,`MC原版素材assets/minecraft/textures/block/${name}.png`);
+}
 assert.throws(()=>resolver.requireRegion('block/not_imported'),/not present in the tracked atlas/);
 assert.throws(()=>resolver.hasTexture('../glass'),/resource path/);
 
@@ -89,6 +108,8 @@ assert.equal(runtimeBinding('block/glass',{tag:'face'},{blockId:20,renderLayer:'
 assert.equal(runtimeBinding('block/iron_ore',{tag:'face'},{blockId:19,renderLayer:'opaque',textureLayers:{}}).layer,'opaque');
 assert.equal(runtimeBinding('block/furnace_front',{tag:'face'},{blockId:21,renderLayer:'opaque',textureLayers:{}}).layer,'opaque');
 assert.equal(runtimeBinding('block/grass',{tag:'face'},{blockId:43,renderLayer:'cutout',textureLayers:{}}).layer,'cutout');
+assert.equal(runtimeBinding('block/granite',{tag:'face'},{blockId:44,renderLayer:'opaque',textureLayers:{}}).layer,'opaque');
+assert.equal(runtimeBinding('block/cherry_planks',{tag:'face'},{blockId:53,renderLayer:'opaque',textureLayers:{}}).layer,'opaque');
 assert.equal(runtimeBinding('block/glass',{tag:'face'},{blockId:20,renderLayer:'opaque',textureLayers:{'minecraft:block/glass':'cutout'}}).layer,'cutout');
 
 const model={faces:[{
@@ -119,7 +140,7 @@ const loaded=await loadMinecraftModelAtlasResolver({
   }
 });
 assert.equal(requestedUrl,'./assets/model-textures/model-texture-atlas.json');
-assert.equal(loaded.textureCount,29);
+assert.equal(loaded.textureCount,39);
 assert.deepEqual(loaded.requireRegion('block/iron_ore'),resolver.requireRegion('block/iron_ore'));
 await assert.rejects(
   ()=>loadMinecraftModelAtlasResolver({fetchImpl:async()=>({ok:false,status:404,json:async()=>({})})}),
@@ -193,4 +214,4 @@ const badArchiveSha=structuredClone(legacyArchive);
 badArchiveSha.sourceArchiveSha256='not-a-sha';
 assert.throws(()=>normalizeMinecraftModelAtlasManifest(badArchiveSha),/sourceArchiveSha256 must be a lowercase SHA-256/);
 
-console.log('tracked Minecraft model atlas manifest + grass/furnace directory provenance + strict texture binding resolver: PASS');
+console.log('tracked Minecraft model atlas manifest + registry breadth directory provenance + strict texture binding resolver: PASS');

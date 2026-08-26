@@ -19,7 +19,10 @@ export const BLOCK = Object.freeze({
   WHEAT_AGE_0:35,WHEAT_AGE_1:36,WHEAT_AGE_2:37,WHEAT_AGE_3:38,WHEAT_AGE_4:39,WHEAT_AGE_5:40,WHEAT_AGE_6:41,WHEAT_AGE_7:42,
   // Java 1.20.1 names this block resource `minecraft:grass`; the later
   // `short_grass` registry name is intentionally not used for source lookup.
-  SHORT_GRASS:43
+  SHORT_GRASS:43,
+  // Registry breadth phase 1 is append-only. Keep these IDs stable once shipped.
+  GRANITE:44,DIORITE:45,ANDESITE:46,
+  SPRUCE_PLANKS:47,BIRCH_PLANKS:48,JUNGLE_PLANKS:49,ACACIA_PLANKS:50,DARK_OAK_PLANKS:51,MANGROVE_PLANKS:52,CHERRY_PLANKS:53
 });
 
 export const BLOCKS = {
@@ -53,7 +56,20 @@ export const BLOCKS = {
   // Coal keeps the legacy terrain-atlas fast path. Tile 15 is now the canonical
   // Java 1.20.1 coal_ore texture; white wool item presentation moved to a
   // direct canonical texture so the 4x4 terrain atlas does not need resizing.
-  27:{name:'煤矿石',solid:true,hardness:3,tiles:[15,15,15],drops:'coal',requires:'pickaxe',effectiveTool:'pickaxe',minToolTier:'wood'}
+  27:{name:'煤矿石',solid:true,hardness:3,tiles:[15,15,15],drops:'coal',requires:'pickaxe',effectiveTool:'pickaxe',minToolTier:'wood'},
+  // Registry breadth full cubes render through the source-backed model path.
+  // Their tiles are fail-open fallbacks only, so broadening the gameplay registry
+  // does not require resizing or reinterpreting the legacy 4x4 terrain atlas.
+  44:{name:'花岗岩',solid:true,hardness:1.5,tiles:[3,3,3],drops:'block:44',requires:'pickaxe',effectiveTool:'pickaxe',minToolTier:'wood'},
+  45:{name:'闪长岩',solid:true,hardness:1.5,tiles:[3,3,3],drops:'block:45',requires:'pickaxe',effectiveTool:'pickaxe',minToolTier:'wood'},
+  46:{name:'安山岩',solid:true,hardness:1.5,tiles:[3,3,3],drops:'block:46',requires:'pickaxe',effectiveTool:'pickaxe',minToolTier:'wood'},
+  47:{name:'云杉木板',solid:true,hardness:2,tiles:[5,5,5],drops:'block:47',effectiveTool:'axe'},
+  48:{name:'白桦木板',solid:true,hardness:2,tiles:[5,5,5],drops:'block:48',effectiveTool:'axe'},
+  49:{name:'丛林木板',solid:true,hardness:2,tiles:[5,5,5],drops:'block:49',effectiveTool:'axe'},
+  50:{name:'金合欢木板',solid:true,hardness:2,tiles:[5,5,5],drops:'block:50',effectiveTool:'axe'},
+  51:{name:'深色橡木木板',solid:true,hardness:2,tiles:[5,5,5],drops:'block:51',effectiveTool:'axe'},
+  52:{name:'红树木板',solid:true,hardness:2,tiles:[5,5,5],drops:'block:52',effectiveTool:'axe'},
+  53:{name:'樱花木板',solid:true,hardness:2,tiles:[5,5,5],drops:'block:53',effectiveTool:'axe'}
 };
 
 BLOCKS[BLOCK.FARMLAND].farmlandMoisture=0;

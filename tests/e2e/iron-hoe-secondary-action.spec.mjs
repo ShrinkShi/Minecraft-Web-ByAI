@@ -2,6 +2,7 @@ import {test,expect} from '@playwright/test';
 import {createSingleplayerWorld} from './helpers/world-flow.mjs';
 
 const TILL_SOUND_HASHES=['0e6696ec35c5f4982cad6a6731edcffb11728aa9','46dd1e5e0f90bb72261e2986d530e80e8fc50560','cb95637a9d5e9b0cb36a2516f0dfac30fed9d720'];
+const FARMLAND_IDS=[24,28,29,30,31,32,33,34];
 
 async function runCommand(page,text){
   await page.evaluate(()=>window.dispatchEvent(new KeyboardEvent('keydown',{code:'Slash',bubbles:true})));
@@ -33,6 +34,7 @@ async function placeFromInventory(workbench,title,indices){
   for(const index of indices)await workbench.locator(`[data-craft-size="3"][data-craft-index="${index}"]`).click({button:'right'});
 }
 async function soundCount(page,eventName){return page.evaluate(name=>(globalThis.__minecraftE2ESounds||[]).filter(event=>event.eventName===name).length,eventName);}
+async function blockAt(page,target){return page.evaluate(({x,y,z})=>globalThis.__minecraftE2E?.worldBlock?.(x,y,z)??null,target);}
 
 test('iron ingots craft an iron hoe whose real till action costs durability and plays the original sound only on success',async({page})=>{
   const pageErrors=[],consoleErrors=[],audioWarnings=[];
@@ -68,6 +70,10 @@ test('iron ingots craft an iron hoe whose real till action costs durability and 
   await expect(hoe.locator('img[alt="铁锄"]')).toBeVisible();
   await expect(hoe).not.toHaveAttribute('data-durability-damage');
 
+  // Keep the newly tilled target hydrated. The farming runtime intentionally
+  // advances all tracked cells on a shared 10-second tick, so a dry moisture-0
+  // cell can otherwise revert to dirt while this browser test waits on audio/UI.
+  await runCommand(page,'/weather rain');
   await lockPointer(page);
   const grass=await page.evaluate(()=>globalThis.__minecraftE2E?.prepareSingleplayerMiningTarget?.(1)||null);
   expect(grass).not.toBeNull();
@@ -86,11 +92,13 @@ test('iron ingots craft an iron hoe whose real till action costs durability and 
   expect(tillSound?.logicalPath).toMatch(/^minecraft\/sounds\/item\/hoe\/till[124]\.ogg$/);
   expect(tillSound?.sha1).toMatch(/^[0-9a-f]{40}$/);
 
-  // The target is now farmland, which is not a valid second till target. A second
-  // real right click must therefore leave the same tool instance at exactly 249
-  // and must not emit another successful-use sound event.
+  // The target must still be a farmland state before the second real click.
+  // This makes the non-repeatability assertion about tool semantics rather than
+  // about whether the shared farming tick happened to dry the cell first.
+  expect(FARMLAND_IDS).toContain(await blockAt(page,grass));
   await useTarget(page);
   await page.waitForTimeout(500);
+  expect(FARMLAND_IDS).toContain(await blockAt(page,grass));
   await expect(hoe).toHaveAttribute('data-durability-damage','1');
   await expect(hoe).toHaveAttribute('data-durability-remaining','249');
   expect(await soundCount(page,'item.hoe.till')).toBe(1);

@@ -13,6 +13,7 @@ test('multiplayer Creative catalog and inventory slot clicks round-trip through 
     const [session]=[...runtime.authoritative.sessions];expect(session).toBeTruthy();await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E?.inventoryRevision?.()),{timeout:5_000}).toBe(0);await expect.poll(()=>page.evaluate(i=>globalThis.__minecraftE2E?.inventorySlot?.(i),HOTBAR_START),{timeout:5_000}).toMatchObject({id:'block:1',count:64});
 
     const inventoryPanel=page.locator('#inventory');await page.keyboard.press('e');await expect(inventoryPanel).not.toHaveClass(/hidden/);await expect(page.locator('[data-creative-catalog]')).toBeVisible();
+    const combatTab=page.locator('[data-creative-category="combat"]');await combatTab.click();await expect(combatTab).toHaveClass(/active/);
     const creativeSword=page.locator('[data-creative-item="iron_sword"]');await expect(creativeSword).toBeVisible();await creativeSword.click();
     await expect.poll(()=>runtime.inventories.snapshot(session).revision,{timeout:5_000}).toBe(1);expect(runtime.inventories.snapshot(session).cursor).toEqual({id:'iron_sword',count:1});expect(runtime.inventories.snapshot(session).slots[HOTBAR_START]).toEqual({id:'block:1',count:64});await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E?.inventoryRevision?.()),{timeout:5_000}).toBe(1);await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E?.inventoryCursor?.()),{timeout:5_000}).toEqual({id:'iron_sword',count:1});
 

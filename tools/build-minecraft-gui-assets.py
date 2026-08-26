@@ -23,6 +23,9 @@ MINECRAFT_VERSION = "1.20.1"
 ICONS = "assets/minecraft/textures/gui/icons.png"
 WIDGETS = "assets/minecraft/textures/gui/widgets.png"
 INVENTORY = "assets/minecraft/textures/gui/container/inventory.png"
+CREATIVE_ITEMS = "assets/minecraft/textures/gui/container/creative_inventory/tab_items.png"
+CREATIVE_SEARCH = "assets/minecraft/textures/gui/container/creative_inventory/tab_item_search.png"
+CREATIVE_INVENTORY = "assets/minecraft/textures/gui/container/creative_inventory/tab_inventory.png"
 
 GUI_SPRITES = {
     "crosshair.png": (ICONS, (0, 0, 15, 15)),
@@ -39,7 +42,19 @@ GUI_SPRITES = {
     "inventory-panel.png": (INVENTORY, (0, 0, 176, 166)),
     "inventory-slot.png": (INVENTORY, (7, 83, 25, 101)),
 }
-EXPECTED_SOURCE_SIZE = {ICONS: (256, 256), WIDGETS: (256, 256), INVENTORY: (256, 256)}
+GUI_PASSTHROUGH = {
+    "creative-tab-inventory.png": CREATIVE_INVENTORY,
+    "creative-tab-items.png": CREATIVE_ITEMS,
+    "creative-tab-search.png": CREATIVE_SEARCH,
+}
+EXPECTED_SOURCE_SIZE = {
+    ICONS: (256, 256),
+    WIDGETS: (256, 256),
+    INVENTORY: (256, 256),
+    CREATIVE_ITEMS: (256, 256),
+    CREATIVE_SEARCH: (256, 256),
+    CREATIVE_INVENTORY: (256, 256),
+}
 
 
 class GuiAssetError(RuntimeError):
@@ -94,6 +109,15 @@ def build_gui_assets(source_path: Path, output: Path) -> dict[str, object]:
                     "source": canonical,
                     "crop": list(crop_box),
                     "size": [sprite.width, sprite.height],
+                }
+
+            for destination, canonical in sorted(GUI_PASSTHROUGH.items()):
+                image = images[canonical]
+                (output / destination).write_bytes(index.read(canonical))
+                sprites[destination] = {
+                    "source": canonical,
+                    "passthrough": True,
+                    "size": [image.width, image.height],
                 }
 
             sources: dict[str, dict[str, object]] = {}
