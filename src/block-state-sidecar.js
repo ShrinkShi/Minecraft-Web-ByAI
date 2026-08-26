@@ -54,9 +54,12 @@ export class BlockStateSidecar{
     for(const [rawChunkKey,rows] of Object.entries(serialized)){
       const key=chunkKey(rawChunkKey);
       if(!Array.isArray(rows))throw new TypeError(`block-state sidecar ${key} entries must be an array`);
+      const seen=new Set();
       for(const row of rows){
         if(!Array.isArray(row)||row.length!==3)throw new TypeError(`block-state sidecar ${key} entry must be [index,id,stateKey]`);
         const [rawIndex,rawId,rawStateKey]=row,index=cellIndex(rawIndex),id=blockId(rawId);
+        if(seen.has(index))throw new TypeError(`block-state sidecar ${key} contains duplicate cell index: ${index}`);
+        seen.add(index);
         const value=blockIdentityFromKey(id,rawStateKey);
         const defaultKey=blockDefaultStateKey(id);
         if(value.stateKey===defaultKey)continue;
