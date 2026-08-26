@@ -1,4 +1,5 @@
 import {BLOCK} from './blocks.js';
+import {FARMLAND_BLOCK_STATE_SCHEMA,FURNACE_BLOCK_STATE_SCHEMA,WHEAT_BLOCK_STATE_SCHEMA,normalizeBlockStateProperties} from './block-state-schema.js';
 
 export const MINECRAFT_MODEL_RUNTIME_VERSION=1;
 
@@ -8,6 +9,7 @@ const descriptor=(blockstate,{state={},renderLayer='opaque',textureLayers={}}={}
   renderLayer,
   textureLayers:Object.freeze({...textureLayers})
 });
+const schemaState=(schema,state={})=>normalizeBlockStateProperties(schema,state);
 
 // Full-cube blocks are deliberately data-driven here. This is the reusable path
 // for ordinary source-backed cubes; stateful/non-cube families stay explicit.
@@ -35,25 +37,25 @@ export const MINECRAFT_MODEL_BLOCK_REGISTRY=Object.freeze({
   [BLOCK.IRON_ORE]:descriptor('minecraft:iron_ore'),
   [BLOCK.GLASS]:descriptor('minecraft:glass',{renderLayer:'translucent'}),
   // The current voxel payload stores block IDs only, so the first furnace slice
-  // uses the canonical north-facing unlit state. Facing/lit are state upgrades,
-  // not reasons to fall back to handmade geometry or textures.
-  [BLOCK.FURNACE]:descriptor('minecraft:furnace',{state:{facing:'north',lit:'false'}}),
-  [BLOCK.FARMLAND]:descriptor('minecraft:farmland',{state:{moisture:'0'}}),
-  [BLOCK.FARMLAND_MOISTURE_1]:descriptor('minecraft:farmland',{state:{moisture:'1'}}),
-  [BLOCK.FARMLAND_MOISTURE_2]:descriptor('minecraft:farmland',{state:{moisture:'2'}}),
-  [BLOCK.FARMLAND_MOISTURE_3]:descriptor('minecraft:farmland',{state:{moisture:'3'}}),
-  [BLOCK.FARMLAND_MOISTURE_4]:descriptor('minecraft:farmland',{state:{moisture:'4'}}),
-  [BLOCK.FARMLAND_MOISTURE_5]:descriptor('minecraft:farmland',{state:{moisture:'5'}}),
-  [BLOCK.FARMLAND_MOISTURE_6]:descriptor('minecraft:farmland',{state:{moisture:'6'}}),
-  [BLOCK.FARMLAND_MOISTURE_7]:descriptor('minecraft:farmland',{state:{moisture:'7'}}),
-  [BLOCK.WHEAT_AGE_0]:descriptor('minecraft:wheat',{state:{age:'0'},renderLayer:'cutout'}),
-  [BLOCK.WHEAT_AGE_1]:descriptor('minecraft:wheat',{state:{age:'1'},renderLayer:'cutout'}),
-  [BLOCK.WHEAT_AGE_2]:descriptor('minecraft:wheat',{state:{age:'2'},renderLayer:'cutout'}),
-  [BLOCK.WHEAT_AGE_3]:descriptor('minecraft:wheat',{state:{age:'3'},renderLayer:'cutout'}),
-  [BLOCK.WHEAT_AGE_4]:descriptor('minecraft:wheat',{state:{age:'4'},renderLayer:'cutout'}),
-  [BLOCK.WHEAT_AGE_5]:descriptor('minecraft:wheat',{state:{age:'5'},renderLayer:'cutout'}),
-  [BLOCK.WHEAT_AGE_6]:descriptor('minecraft:wheat',{state:{age:'6'},renderLayer:'cutout'}),
-  [BLOCK.WHEAT_AGE_7]:descriptor('minecraft:wheat',{state:{age:'7'},renderLayer:'cutout'}),
+  // still uses the canonical north-facing unlit state. The value now passes
+  // through the same schema layer that later persisted properties will use.
+  [BLOCK.FURNACE]:descriptor('minecraft:furnace',{state:schemaState(FURNACE_BLOCK_STATE_SCHEMA)}),
+  [BLOCK.FARMLAND]:descriptor('minecraft:farmland',{state:schemaState(FARMLAND_BLOCK_STATE_SCHEMA,{moisture:0})}),
+  [BLOCK.FARMLAND_MOISTURE_1]:descriptor('minecraft:farmland',{state:schemaState(FARMLAND_BLOCK_STATE_SCHEMA,{moisture:1})}),
+  [BLOCK.FARMLAND_MOISTURE_2]:descriptor('minecraft:farmland',{state:schemaState(FARMLAND_BLOCK_STATE_SCHEMA,{moisture:2})}),
+  [BLOCK.FARMLAND_MOISTURE_3]:descriptor('minecraft:farmland',{state:schemaState(FARMLAND_BLOCK_STATE_SCHEMA,{moisture:3})}),
+  [BLOCK.FARMLAND_MOISTURE_4]:descriptor('minecraft:farmland',{state:schemaState(FARMLAND_BLOCK_STATE_SCHEMA,{moisture:4})}),
+  [BLOCK.FARMLAND_MOISTURE_5]:descriptor('minecraft:farmland',{state:schemaState(FARMLAND_BLOCK_STATE_SCHEMA,{moisture:5})}),
+  [BLOCK.FARMLAND_MOISTURE_6]:descriptor('minecraft:farmland',{state:schemaState(FARMLAND_BLOCK_STATE_SCHEMA,{moisture:6})}),
+  [BLOCK.FARMLAND_MOISTURE_7]:descriptor('minecraft:farmland',{state:schemaState(FARMLAND_BLOCK_STATE_SCHEMA,{moisture:7})}),
+  [BLOCK.WHEAT_AGE_0]:descriptor('minecraft:wheat',{state:schemaState(WHEAT_BLOCK_STATE_SCHEMA,{age:0}),renderLayer:'cutout'}),
+  [BLOCK.WHEAT_AGE_1]:descriptor('minecraft:wheat',{state:schemaState(WHEAT_BLOCK_STATE_SCHEMA,{age:1}),renderLayer:'cutout'}),
+  [BLOCK.WHEAT_AGE_2]:descriptor('minecraft:wheat',{state:schemaState(WHEAT_BLOCK_STATE_SCHEMA,{age:2}),renderLayer:'cutout'}),
+  [BLOCK.WHEAT_AGE_3]:descriptor('minecraft:wheat',{state:schemaState(WHEAT_BLOCK_STATE_SCHEMA,{age:3}),renderLayer:'cutout'}),
+  [BLOCK.WHEAT_AGE_4]:descriptor('minecraft:wheat',{state:schemaState(WHEAT_BLOCK_STATE_SCHEMA,{age:4}),renderLayer:'cutout'}),
+  [BLOCK.WHEAT_AGE_5]:descriptor('minecraft:wheat',{state:schemaState(WHEAT_BLOCK_STATE_SCHEMA,{age:5}),renderLayer:'cutout'}),
+  [BLOCK.WHEAT_AGE_6]:descriptor('minecraft:wheat',{state:schemaState(WHEAT_BLOCK_STATE_SCHEMA,{age:6}),renderLayer:'cutout'}),
+  [BLOCK.WHEAT_AGE_7]:descriptor('minecraft:wheat',{state:schemaState(WHEAT_BLOCK_STATE_SCHEMA,{age:7}),renderLayer:'cutout'}),
   // Java 1.20.1 canonical resource name is minecraft:grass. The model inherits
   // tinted_cross, so BLOCKS[SHORT_GRASS].tint supplies the current non-biome fallback.
   [BLOCK.SHORT_GRASS]:descriptor('minecraft:grass',{renderLayer:'cutout'})
