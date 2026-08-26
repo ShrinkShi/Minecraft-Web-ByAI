@@ -2,20 +2,32 @@
 
 ## [Unreleased]
 
-> 2026-08-25 merged baseline: `main d3de76d31a8d35b3dd50516845abe51d9fabc318` includes PR #133. PR #134 is the active Draft Creative-mode overhaul. Merged facts live in `docs/PROJECT_BASELINE.md`; active-slice details live in `docs/CREATIVE_MODE_OVERHAUL.md`.
+> 2026-08-26 merged baseline: `main 6a56c33d79c074f95f2be750f9d25ec246766b1b` includes PR #136. Merged facts live in `docs/PROJECT_BASELINE.md`; the next active delivery is Registry breadth as recorded in `docs/PROGRESS.md`.
 
-### 2026-08-25 — PR #134 Creative mode overhaul (active Draft)
+### 2026-08-26 — PR #136 Hunger status effects and multiplayer authority (merged)
+
+- 新增 reusable finite-duration status-effect foundation；raw chicken 为 30% Hunger I / 30 秒，rotten flesh 为 80% Hunger I / 30 秒，且只在完整 food transaction 成功提交后 roll/apply。
+- difficulty boundary 扩展为 Peaceful/Easy/Normal/Hard starvation 规则，并加入 `naturalRegeneration` 开关；Hunger effect 与移动/战斗共享同一 exhaustion state。
+- singleplayer save schema 从 **v9 升到 v10** 持久化 normalized active status effects；active food-use input 仍为 transient，terrain generator 保持 v4，旧 world 继续走显式 compatibility path。
+- multiplayer 新增独立 revisioned Hunger authority：服务器持有 food/saturation/exhaustion/timer、status effects、1.6 秒 active food use、sprint gate、regen/starvation 与 respawn/mode/session lifecycle。
+- `use-release`、attack、drop、respawn、mode/death、selected-stack change 可在完成前取消 food use 且不扣物；完成时重新校验 selected stack，并通过 authoritative inventory boundary 原子提交 Hunger/effect mutation 与物品扣除。
+- Workbench/Furnace interaction 优先于 eating；移动/游泳/跳跃/成功攻击/成功受伤 exhaustion 接入服务器 Hunger。
+- Hunger-driven heal/starvation 通过 Combat authority API 修改 HP，不直接篡改 Combat internals；浏览器只应用 authoritative Hunger snapshot 到 cache/HUD/viewmodel，不运行 competing multiplayer Hunger simulation。
+- player action frame 升到 **v3**；因 `use-release` 改变 wire semantics，multiplayer handshake/subprotocol 升到 **v5 / `minecraft-web-v5`**，legacy v4 不伪装兼容。
+- final exact head `80cc188fd9deaec104c4a86ab8e952965f4759f1` 通过 Repository quality #1271：static checks、Chromium 1/2、Chromium 2/2 全绿；最终无 base drift、review/thread/comment blocker，随后 squash merge 为 `6a56c33d79c074f95f2be750f9d25ec246766b1b`。
+
+### 2026-08-25 — PR #134 Creative mode overhaul (merged)
 
 - Creative 不再进入模式即永久飞行；desktop Space 与 mobile Jump 共用同一 rising-edge detector，double-Jump 切换 Creative flight，Spectator 继续 forced-flying。
 - multiplayer flight 只发送 `flight-toggle` intent；服务器持有 `flying` 真值并通过 self-authoritative snapshot 复制，客户端不建立 competing truth。
-- Creative/Spectator HUD 隐藏 hearts/hunger、armor、XP、oxygen，只保留 hotbar；底层 HP/hunger/armor/XP/oxygen gameplay state 不因 presentation 被伪造或重置。
+- Creative/Spectator HUD 隐藏 hearts+hunger、armor、XP、oxygen，只保留 hotbar；底层 HP/hunger/armor/XP/oxygen gameplay state 不因 presentation 被伪造或重置。
 - hostile target eligibility 收紧为 Survival/Adventure；Creative/Spectator 不再被追击、近战或作为骷髅射击目标，Creeper 在目标失效时清空 fuse，同时保留 knockback 衰减等物理状态。
 - Creative inventory 从当前 `ITEMS` registry 派生分类/搜索 catalog，不扩展或重排历史 `CREATIVE_START`；Creative UI 隐藏 Survival equipment/2×2 crafting/27-slot main 区并保留真实 9-slot hotbar。
 - singleplayer catalog selection 写入真实 cursor；multiplayer 使用 server-owned inventory transaction v2 `creative-pick`，客户端只提交 `itemId`，server 校验 mode/dead/registry/revision/replay 并按 `maxStack()` 创建 authoritative cursor。
 - inventory transaction action semantics 扩展不兼容，因此 multiplayer handshake/subprotocol 升级为 **v4 / `minecraft-web-v4`**，legacy v3 不伪装兼容。
 - 新增 pure/runtime、real WebSocket 与 Chromium 回归，覆盖 flight、HUD、hostile target、catalog、server Creative pick 以及真实 browser catalog→server inventory round trip。
 - block/item IDs、singleplayer save schema v9、terrain generator v4、历史 `CREATIVE_START` ordering/slot mapping 保持不变。
-- PR 只有在最终 exact-head static 与两片 Chromium 全绿、base 无漂移且 review/comment surface 无 blocker 后才可合并。
+- final exact head `e2dd61ae5603839ed4590f2a58121a4aad296a13` 在合并前通过 exact-head Repository quality 与无漂移/review blocker 门禁。
 
 ### 2026-08-24 — PR #133 presentation / mining foundation (merged)
 
@@ -133,8 +145,8 @@
 - generic Minecraft blockstate/model interpretation for selected roots;
 - Inventory/Equipment/Crafting/Workbench/Furnace/durability/bed/death/oxygen/weather/XP/hunger-food slices;
 - current 8 mobs with source textures and compatible reconstructed geometry;
-- real Node authoritative multiplayer covering movement/world/mining/placement/items/Inventory/Equipment/Crafting/Workbench/Furnace/chat/commands/PvP;
-- strict overall Java 1.20.1 parity planning estimate remains about 35% because registry/worldgen/farming breadth/redstone/dimensions/enchanting/brewing/status effects remain large gaps。
+- real Node authoritative multiplayer covering movement/world/mining/placement/items/Inventory/Equipment/Crafting/Workbench/Furnace/chat/commands/PvP/Hunger;
+- strict overall Java 1.20.1 parity planning estimate remains about 35% because registry/worldgen/farming breadth/redstone/dimensions/enchanting/brewing/broad status effects remain large gaps。
 
 ## [0.3.0] - 2026-08-11
 
