@@ -29,7 +29,38 @@ const runtime=await compileMinecraftModelRuntime({
 });
 
 assert.equal(assertMinecraftModelRuntime(runtime),runtime);
-assert.deepEqual(runtime.blockIds,[BLOCK.CRAFTING_TABLE,BLOCK.IRON_ORE,BLOCK.GLASS,BLOCK.FURNACE,BLOCK.FARMLAND,BLOCK.FARMLAND_MOISTURE_1,BLOCK.FARMLAND_MOISTURE_2,BLOCK.FARMLAND_MOISTURE_3,BLOCK.FARMLAND_MOISTURE_4,BLOCK.FARMLAND_MOISTURE_5,BLOCK.FARMLAND_MOISTURE_6,BLOCK.FARMLAND_MOISTURE_7,BLOCK.WHEAT_AGE_0,BLOCK.WHEAT_AGE_1,BLOCK.WHEAT_AGE_2,BLOCK.WHEAT_AGE_3,BLOCK.WHEAT_AGE_4,BLOCK.WHEAT_AGE_5,BLOCK.WHEAT_AGE_6,BLOCK.WHEAT_AGE_7,BLOCK.SHORT_GRASS]);
+assert.deepEqual(runtime.blockIds,[
+  BLOCK.PLANKS,
+  BLOCK.CRAFTING_TABLE,BLOCK.IRON_ORE,BLOCK.GLASS,BLOCK.FURNACE,
+  BLOCK.FARMLAND,BLOCK.FARMLAND_MOISTURE_1,BLOCK.FARMLAND_MOISTURE_2,BLOCK.FARMLAND_MOISTURE_3,BLOCK.FARMLAND_MOISTURE_4,BLOCK.FARMLAND_MOISTURE_5,BLOCK.FARMLAND_MOISTURE_6,BLOCK.FARMLAND_MOISTURE_7,
+  BLOCK.WHEAT_AGE_0,BLOCK.WHEAT_AGE_1,BLOCK.WHEAT_AGE_2,BLOCK.WHEAT_AGE_3,BLOCK.WHEAT_AGE_4,BLOCK.WHEAT_AGE_5,BLOCK.WHEAT_AGE_6,BLOCK.WHEAT_AGE_7,BLOCK.SHORT_GRASS,
+  BLOCK.GRANITE,BLOCK.DIORITE,BLOCK.ANDESITE,BLOCK.SPRUCE_PLANKS,BLOCK.BIRCH_PLANKS,BLOCK.JUNGLE_PLANKS,BLOCK.ACACIA_PLANKS,BLOCK.DARK_OAK_PLANKS,BLOCK.MANGROVE_PLANKS,BLOCK.CHERRY_PLANKS
+]);
+
+const simpleFullCubes=[
+  [BLOCK.PLANKS,'minecraft:oak_planks'],
+  [BLOCK.GRANITE,'minecraft:granite'],
+  [BLOCK.DIORITE,'minecraft:diorite'],
+  [BLOCK.ANDESITE,'minecraft:andesite'],
+  [BLOCK.SPRUCE_PLANKS,'minecraft:spruce_planks'],
+  [BLOCK.BIRCH_PLANKS,'minecraft:birch_planks'],
+  [BLOCK.JUNGLE_PLANKS,'minecraft:jungle_planks'],
+  [BLOCK.ACACIA_PLANKS,'minecraft:acacia_planks'],
+  [BLOCK.DARK_OAK_PLANKS,'minecraft:dark_oak_planks'],
+  [BLOCK.MANGROVE_PLANKS,'minecraft:mangrove_planks'],
+  [BLOCK.CHERRY_PLANKS,'minecraft:cherry_planks']
+];
+for(const [blockId,blockstate] of simpleFullCubes){
+  const simple=minecraftModelTemplate(runtime,blockId);
+  assert.equal(simple.blockstate,blockstate);
+  assert.equal(simple.renderLayer,'opaque');
+  assert.equal(simple.parts.length,1);
+  assert.equal(simple.parts[0].kind,'variant');
+  assert.equal(simple.parts[0].alternatives.models.length,1);
+  assert.equal(simple.parts[0].alternatives.models[0].model.faces.length,6);
+  assert.equal(blockstateReads.get(blockstate),1,`${blockstate} blockstate must be cached once`);
+}
+
 const crafting=minecraftModelTemplate(runtime,BLOCK.CRAFTING_TABLE);
 assert.equal(crafting.blockstate,'minecraft:crafting_table');
 assert.equal(crafting.renderLayer,'opaque');
@@ -66,7 +97,7 @@ assert.equal(glass.parts[0].alternatives.models[0].modelId,'minecraft:block/glas
 assert.equal(glass.parts[0].alternatives.models[0].model.faces.length,6);
 assert.equal(blockstateReads.get('minecraft:glass'),1);
 assert.equal(modelReads.get('minecraft:block/glass'),1);
-assert.equal(modelReads.get('minecraft:block/cube_all'),1,'cube_all must remain cached across iron ore and glass');
+assert.equal(modelReads.get('minecraft:block/cube_all'),1,'cube_all must remain cached across source-backed full cubes');
 
 const furnace=minecraftModelTemplate(runtime,BLOCK.FURNACE);
 assert.equal(furnace.blockstate,'minecraft:furnace');
@@ -104,6 +135,7 @@ assert.equal(minecraftModelLayerForTexture('minecraft:block/crafting_table_top',
 const ironInstance=instantiateMinecraftModelTemplate(iron,5,12,7)[0];assert.equal(ironInstance.modelId,'minecraft:block/iron_ore');assert.equal(minecraftModelLayerForTexture('minecraft:block/iron_ore',ironInstance),'opaque');
 const glassInstance=instantiateMinecraftModelTemplate(glass,6,13,8)[0];assert.equal(glassInstance.modelId,'minecraft:block/glass');assert.equal(minecraftModelLayerForTexture('minecraft:block/glass',glassInstance),'translucent');
 const furnaceInstance=instantiateMinecraftModelTemplate(furnace,7,14,9)[0];assert.equal(furnaceInstance.modelId,'minecraft:block/furnace');assert.equal(minecraftModelLayerForTexture('minecraft:block/furnace_front',furnaceInstance),'opaque');
+const graniteInstance=instantiateMinecraftModelTemplate(minecraftModelTemplate(runtime,BLOCK.GRANITE),8,15,10)[0];assert.equal(graniteInstance.modelId,'minecraft:block/granite');assert.equal(minecraftModelLayerForTexture('minecraft:block/granite',graniteInstance),'opaque');
 
 for(const position of [[0,0,0],[1,2,3],[-1,63,-9],[2147483647,1,-2147483648]]){
   const hash=minecraftModelSelectionHash(...position,BLOCK.CRAFTING_TABLE,0);
@@ -138,4 +170,4 @@ assert.equal(minecraftModelLayerForTexture('minecraft:block/stone',instantiateMi
 assert.throws(()=>assertMinecraftModelRuntime({...runtime,format:99}),/format must be/);
 assert.rejects(()=>compileMinecraftModelRuntime({loadBlockstate:async()=>null,loadModel:async()=>null}),/missing Minecraft blockstate/);
 
-console.log('Minecraft interpreted-model preload/cache/template selection runtime + iron ore/glass/furnace/grass roots: PASS');
+console.log('Minecraft interpreted-model preload/cache/template selection runtime + registry breadth full cubes + iron ore/glass/furnace/grass roots: PASS');
