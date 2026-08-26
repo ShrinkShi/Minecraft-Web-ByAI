@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import {existsSync} from 'node:fs';
 import {resolve} from 'node:path';
-import {ASSET_KEYS,ASSET_MANIFEST_VERSION,ASSET_SOURCE,assetAvailable,assetIsPrototype,assetManifestSnapshot,assetRecord,assetUrl,requireAssetUrl} from '../src/asset-manifest.js';
+import {ASSET_KEYS,ASSET_MANIFEST_VERSION,ASSET_SOURCE,REGISTRY_BREADTH_BLOCK_TEXTURES,assetAvailable,assetIsPrototype,assetManifestSnapshot,assetRecord,assetUrl,requireAssetUrl} from '../src/asset-manifest.js';
 import {ITEMS} from '../src/items.js';
 
 assert.equal(ASSET_MANIFEST_VERSION,2);
+const REGISTRY_BREADTH_BLOCK_KEYS=REGISTRY_BREADTH_BLOCK_TEXTURES.map(name=>`block.${name}`);
 for(const key of [
   'terrain.block_atlas','block.model_atlas','block.iron_ore','block.coal_ore','block.white_wool','block.glass','block.stripped_oak_log','block.stripped_oak_log_top',
+  ...REGISTRY_BREADTH_BLOCK_KEYS,
   'item.stick','item.wooden_pickaxe','item.stone_pickaxe','item.wooden_sword','item.stone_sword','item.bow','item.iron_hoe','item.iron_pickaxe','item.raw_iron',
   'item.iron_helmet','item.iron_chestplate','item.iron_leggings','item.iron_boots','item.coal','item.apple','item.bread','item.wheat_seeds','item.wheat','item.bone_meal','item.cooked_beef','item.cooked_mutton','item.cooked_porkchop','item.cooked_chicken',
   'item.leather_helmet','item.leather_chestplate','item.leather_leggings','item.leather_boots','item.raw_beef','item.leather','item.raw_mutton',
@@ -15,13 +17,13 @@ for(const key of [
   'gui.crafting_table_panel','metadata.minecraft_runtime','metadata.minecraft_model_atlas','metadata.minecraft_player'
 ])assert.ok(ASSET_KEYS.includes(key),`${key} must be declared`);
 
-const DIRECT_CANONICAL_KEYS=new Set(['item.wooden_sword','item.stone_sword','item.bow','item.iron_hoe','item.iron_helmet','item.iron_chestplate','item.iron_leggings','item.iron_boots','item.coal','item.apple','item.bread','item.wheat_seeds','item.wheat','item.bone_meal','item.cooked_beef','item.cooked_mutton','item.cooked_porkchop','item.cooked_chicken','block.white_wool','block.stripped_oak_log','block.stripped_oak_log_top','gui.crafting_table_panel']);
+const DIRECT_CANONICAL_KEYS=new Set(['item.wooden_sword','item.stone_sword','item.bow','item.iron_hoe','item.iron_helmet','item.iron_chestplate','item.iron_leggings','item.iron_boots','item.coal','item.apple','item.bread','item.wheat_seeds','item.wheat','item.bone_meal','item.cooked_beef','item.cooked_mutton','item.cooked_porkchop','item.cooked_chicken','block.white_wool','block.stripped_oak_log','block.stripped_oak_log_top',...REGISTRY_BREADTH_BLOCK_KEYS,'gui.crafting_table_panel']);
 for(const key of ASSET_KEYS){
   const record=assetRecord(key);assert.ok(record,`${key} must resolve to a manifest record`);assert.equal(record.source,ASSET_SOURCE.USER_SUPPLIED,`${key} must resolve from the user-supplied original Minecraft source assets`);
   if(DIRECT_CANONICAL_KEYS.has(key)){
     assert.equal(record.directCanonical,true,`${key} must explicitly declare direct canonical usage`);
     if(key.startsWith('item.'))assert.match(record.url,/^\.\/MC原版素材assets\/minecraft\/textures\/item\/(?:wooden_sword|stone_sword|bow|iron_hoe|iron_helmet|iron_chestplate|iron_leggings|iron_boots|coal|apple|bread|wheat_seeds|wheat|bone_meal|cooked_beef|cooked_mutton|cooked_porkchop|cooked_chicken)\.png$/,`${key} must stay on the audited canonical item path`);
-    else if(key.startsWith('block.'))assert.match(record.url,/^\.\/MC原版素材assets\/minecraft\/textures\/block\/(?:stripped_oak_log(?:_top)?|white_wool)\.png$/,`${key} must stay on the audited canonical block path`);
+    else if(key.startsWith('block.'))assert.match(record.url,/^\.\/MC原版素材assets\/minecraft\/textures\/block\/[a-z0-9_]+\.png$/,`${key} must stay on an audited canonical block path`);
     else assert.match(record.url,/^\.\/MC原版素材assets\/minecraft\/textures\/gui\/container\/crafting_table\.png$/,`${key} must stay on the audited canonical GUI path`);
   }else{
     assert.equal(record.directCanonical,undefined,`${key} may not silently bypass the runtime asset boundary`);
@@ -39,6 +41,12 @@ assert.equal(assetUrl('metadata.minecraft_player'),'./assets/minecraft/player-as
 assert.equal(assetUrl('block.glass'),'./assets/items/glass.png');
 assert.equal(assetUrl('block.stripped_oak_log'),'./MC原版素材assets/minecraft/textures/block/stripped_oak_log.png');
 assert.equal(assetUrl('block.stripped_oak_log_top'),'./MC原版素材assets/minecraft/textures/block/stripped_oak_log_top.png');
+for(const name of REGISTRY_BREADTH_BLOCK_TEXTURES){
+  const key=`block.${name}`;
+  assert.equal(assetUrl(key),`./MC原版素材assets/minecraft/textures/block/${name}.png`);
+  assert.equal(assetRecord(key).minecraftVersion,'1.20.1');
+  assert.equal(assetRecord(key).directCanonical,true);
+}
 assert.equal(assetUrl('gui.crafting_table_panel'),'./MC原版素材assets/minecraft/textures/gui/container/crafting_table.png');
 assert.equal(assetRecord('gui.crafting_table_panel').minecraftVersion,'1.20.1');
 assert.equal(assetRecord('gui.crafting_table_panel').directCanonical,true);
@@ -118,6 +126,7 @@ for(const key of ['item.iron_helmet','item.iron_chestplate','item.iron_leggings'
 assert.equal(snapshot['block.white_wool'].directCanonical,true);
 assert.equal(snapshot['block.stripped_oak_log'].directCanonical,true);
 assert.equal(snapshot['block.stripped_oak_log_top'].directCanonical,true);
+for(const key of REGISTRY_BREADTH_BLOCK_KEYS)assert.equal(snapshot[key].directCanonical,true);
 assert.equal(snapshot['gui.crafting_table_panel'].directCanonical,true);
 assert.equal(snapshot['item.iron_pickaxe'].source,ASSET_SOURCE.USER_SUPPLIED);
 assert.equal(snapshot['entity.spider'].source,ASSET_SOURCE.USER_SUPPLIED);
