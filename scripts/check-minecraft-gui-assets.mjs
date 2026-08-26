@@ -26,6 +26,9 @@ assert.deepEqual(manifest.hotbar,{
 });
 
 assert.deepEqual(manifest.sources,{
+  'assets/minecraft/textures/gui/container/creative_inventory/tab_inventory.png':{bytes:1125,sha256:'8b49c72ace803bc876b879dc7b758c05ebf123763db7ce982e672766cf5cad8d',source:'MC原版素材assets/minecraft/textures/gui/container/creative_inventory/tab_inventory.png'},
+  'assets/minecraft/textures/gui/container/creative_inventory/tab_item_search.png':{bytes:1005,sha256:'92789c4d09c832b266f002a6bd2b351468d64b2dcd56cfef13846adb1921692e',source:'MC原版素材assets/minecraft/textures/gui/container/creative_inventory/tab_item_search.png'},
+  'assets/minecraft/textures/gui/container/creative_inventory/tab_items.png':{bytes:965,sha256:'3c643b9a864995d4eba39657dac1c56ea60ce18d4c4848242dd7b1f96c9041c1',source:'MC原版素材assets/minecraft/textures/gui/container/creative_inventory/tab_items.png'},
   'assets/minecraft/textures/gui/container/inventory.png':{bytes:2195,sha256:'1952f9978a96e15197ad58d998a40840a86f41b1c8cd4323e04fd8eeff9f7337',source:'MC原版素材assets/minecraft/textures/gui/container/inventory.png'},
   'assets/minecraft/textures/gui/icons.png':{bytes:8081,sha256:'8d720587f99e2c3d495706ea72249e9b2cc1d1cc9bcd75d4367613e71b898d28',source:'MC原版素材assets/minecraft/textures/gui/icons.png'},
   'assets/minecraft/textures/gui/widgets.png':{bytes:15444,sha256:'26a3d4b8a23b75fdb7a0c5e8b7835ce8bdf98873a81695dde9f7010845edfe8b',source:'MC原版素材assets/minecraft/textures/gui/widgets.png'}
@@ -34,7 +37,13 @@ assert.deepEqual(manifest.sources,{
 const icons='assets/minecraft/textures/gui/icons.png';
 const widgets='assets/minecraft/textures/gui/widgets.png';
 const inventory='assets/minecraft/textures/gui/container/inventory.png';
+const creativeInventory='assets/minecraft/textures/gui/container/creative_inventory/tab_inventory.png';
+const creativeItems='assets/minecraft/textures/gui/container/creative_inventory/tab_items.png';
+const creativeSearch='assets/minecraft/textures/gui/container/creative_inventory/tab_item_search.png';
 const expected={
+  'creative-tab-inventory.png':{source:creativeInventory,passthrough:true,size:[256,256],sha256:'8b49c72ace803bc876b879dc7b758c05ebf123763db7ce982e672766cf5cad8d'},
+  'creative-tab-items.png':{source:creativeItems,passthrough:true,size:[256,256],sha256:'3c643b9a864995d4eba39657dac1c56ea60ce18d4c4848242dd7b1f96c9041c1'},
+  'creative-tab-search.png':{source:creativeSearch,passthrough:true,size:[256,256],sha256:'92789c4d09c832b266f002a6bd2b351468d64b2dcd56cfef13846adb1921692e'},
   'crosshair.png':{source:icons,crop:[0,0,15,15],size:[15,15],sha256:'4d1ed9f1ef8d0153ba0be9e91bed64d1879a02102e89215001734f7826ee960a'},
   'hud-icons.png':{source:icons,crop:[16,0,70,36],size:[54,36],sha256:'040a911feb751ec7babb7aca323d0614516b5bf87952fea449b8d7e611978647'},
   'xp-background.png':{source:icons,crop:[0,64,182,69],size:[182,5],sha256:'f84dc61e621a0fc8da32b0bd73177938a35a6a88b5551c4737caa5d12c5524c8'},
@@ -63,11 +72,12 @@ for(const [name,recordExpected] of Object.entries(expected)){
   const record=manifest.sprites[name];
   assert.ok(record,`${name} must be declared in GUI manifest`);
   assert.equal(record.source,recordExpected.source);
-  assert.deepEqual(record.crop,recordExpected.crop);
   assert.deepEqual(record.size,recordExpected.size);
+  if(recordExpected.passthrough){assert.equal(record.passthrough,true,`${name} must remain an exact source passthrough`);assert.equal(record.crop,undefined,`${name} passthrough must not declare a crop`);}
+  else{assert.equal(record.passthrough,undefined,`${name} cropped sprite must not declare passthrough`);assert.deepEqual(record.crop,recordExpected.crop);}
   const path=resolve(root,'assets/gui',name);
-  assert.deepEqual(pngSize(path),recordExpected.size,`${name} dimensions must match source crop`);
+  assert.deepEqual(pngSize(path),recordExpected.size,`${name} dimensions must match the declared GUI artifact`);
   assert.equal(sha256(path),recordExpected.sha256,`${name} must equal the staged deterministic GUI artifact bytes`);
 }
 
-console.log('Minecraft Java 1.20.1 HUD/hotbar/inventory GUI sprites + extracted source provenance: PASS');
+console.log('Minecraft Java 1.20.1 HUD/hotbar/inventory/Creative GUI sprites + extracted source provenance: PASS');
