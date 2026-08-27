@@ -33,15 +33,15 @@ export class ClientGameplayRuntime{
 }
 
 export async function createClientGameplayRuntime({
-  scene,camera,canvas,seed='1',prompt='',terrainVersion=TERRAIN_GENERATOR_VERSION,renderDistance=3,savedEdits={},centerX=0,centerZ=0,mode='survival',inventoryState=null,equipmentState=null,controlState=null,weather='clear',
-  onWorldEdit=()=>{},onWorldProgress=()=>{},onInventoryPickup=()=>{},onExperience=()=>{},onPlayerHit=()=>{},onPlayerBlast=()=>{},onMobDeath=()=>{},onHostileProjectile=()=>{},onHostileExplosion=()=>{},onMobBurn=()=>{},onCreeperPrime=()=>{},onExplosionBlockDestroyed=()=>{}
+  scene,camera,canvas,seed='1',prompt='',terrainVersion=TERRAIN_GENERATOR_VERSION,renderDistance=3,savedEdits={},savedBlockStates={},centerX=0,centerZ=0,mode='survival',inventoryState=null,equipmentState=null,controlState=null,weather='clear',
+  onWorldEdit=()=>{},onWorldBlockStateEdit=()=>{},onWorldProgress=()=>{},onInventoryPickup=()=>{},onExperience=()=>{},onPlayerHit=()=>{},onPlayerBlast=()=>{},onMobDeath=()=>{},onHostileProjectile=()=>{},onHostileExplosion=()=>{},onMobBurn=()=>{},onCreeperPrime=()=>{},onExplosionBlockDestroyed=()=>{}
 }={}){
-  centerX=finite(centerX,'centerX');centerZ=finite(centerZ,'centerZ');terrainVersion=normalizeTerrainGeneratorVersion(terrainVersion);renderDistance=positiveInteger(renderDistance,'renderDistance');savedEdits=objectOrNull(savedEdits,'savedEdits')||{};inventoryState=objectOrNull(inventoryState,'inventoryState');equipmentState=objectOrNull(equipmentState,'equipmentState');
-  for(const [label,value] of Object.entries({onWorldEdit,onWorldProgress,onInventoryPickup,onExperience,onPlayerHit,onPlayerBlast,onMobDeath,onHostileProjectile,onHostileExplosion,onMobBurn,onCreeperPrime,onExplosionBlockDestroyed}))callback(value,label);
+  centerX=finite(centerX,'centerX');centerZ=finite(centerZ,'centerZ');terrainVersion=normalizeTerrainGeneratorVersion(terrainVersion);renderDistance=positiveInteger(renderDistance,'renderDistance');savedEdits=objectOrNull(savedEdits,'savedEdits')||{};savedBlockStates=objectOrNull(savedBlockStates,'savedBlockStates')||{};inventoryState=objectOrNull(inventoryState,'inventoryState');equipmentState=objectOrNull(equipmentState,'equipmentState');
+  for(const [label,value] of Object.entries({onWorldEdit,onWorldBlockStateEdit,onWorldProgress,onInventoryPickup,onExperience,onPlayerHit,onPlayerBlast,onMobDeath,onHostileProjectile,onHostileExplosion,onMobBurn,onCreeperPrime,onExplosionBlockDestroyed}))callback(value,label);
 
   let world=null,player=null,inventory=null,equipment=null,drops=null,experienceOrbs=null,projectiles=null,explosions=null,passiveMobs=null,hostileMobs=null,weatherSystem=null,miningCracks=null,jadeInspector=null,vanillaBlockAudio=null;
   try{
-    world=new VoxelWorld(scene,{seed:String(seed??'1'),prompt:String(prompt??''),terrainVersion,renderDistance,savedEdits,onEdit:onWorldEdit,onProgress:onWorldProgress});await world.generateArea(centerX,centerZ);
+    world=new VoxelWorld(scene,{seed:String(seed??'1'),prompt:String(prompt??''),terrainVersion,renderDistance,savedEdits,savedBlockStates,onEdit:onWorldEdit,onBlockStateEdit:onWorldBlockStateEdit,onProgress:onWorldProgress});await world.generateArea(centerX,centerZ);
     inventory=new Inventory(mode,inventoryState);equipment=new Equipment(equipmentState);player=new PlayerController(camera,canvas,world,scene);if(controlState!==null&&controlState!==undefined)player.setControlState(controlState);player.setMode(mode);vanillaBlockAudio=installVanillaBlockAudio({world,player});
     const armorAware=(event,forward)=>forwardDamageWithArmorWear({player,equipment,damage:Number(event?.amount)||0,event,callback:forward});
     drops=new DropSystem(scene,world,inventory,onInventoryPickup);experienceOrbs=new ExperienceOrbSystem(scene,world,onExperience);weatherSystem=new WeatherSystem(scene);weatherSystem.setWeather(weather);miningCracks=new MiningCrackOverlay(scene);

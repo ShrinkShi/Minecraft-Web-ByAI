@@ -10,21 +10,23 @@ function normalizeShortGrass(bytes){const copy=bytes.slice();for(let i=0;i<copy.
 assert.equal(TERRAIN_GENERATOR_VERSION,4);
 assert.equal(LEGACY_UNVERSIONED_TERRAIN_GENERATOR_VERSION,2);
 assert.equal(TERRAIN_VERSIONED_SAVE_MIN_VERSION,8);
-assert.equal(SINGLEPLAYER_SAVE_VERSION,10);
+assert.equal(SINGLEPLAYER_SAVE_VERSION,11);
 assert.deepEqual(supportedSingleplayerTerrainVersions(),[2,3,4]);
 assert.equal(resolveSingleplayerTerrainVersion(null),4,'new worlds use the current terrain generator');
 assert.equal(resolveSingleplayerTerrainVersion({version:7}),2,'pre-v3 unversioned saves stay on terrain v2');
 assert.equal(resolveSingleplayerTerrainVersion({version:7,terrainVersion:2}),2);
 assert.equal(resolveSingleplayerTerrainVersion({version:8,terrainVersion:2}),2);
 assert.equal(resolveSingleplayerTerrainVersion({version:8,terrainVersion:3}),3);
-assert.equal(resolveSingleplayerTerrainVersion({version:9,terrainVersion:3}),3,'existing terrain-v3 worlds stay pinned after save schema v10 ships');
+assert.equal(resolveSingleplayerTerrainVersion({version:9,terrainVersion:3}),3,'existing terrain-v3 worlds stay pinned after later save schema upgrades');
 assert.equal(resolveSingleplayerTerrainVersion({version:9,terrainVersion:4}),4,'existing save-v9 terrain-v4 worlds stay pinned');
-assert.equal(resolveSingleplayerTerrainVersion({version:10,terrainVersion:4}),4,'new save-v10 worlds use explicit terrain v4');
+assert.equal(resolveSingleplayerTerrainVersion({version:10,terrainVersion:4}),4,'save-v10 terrain-v4 worlds remain pinned after schema v11');
+assert.equal(resolveSingleplayerTerrainVersion({version:11,terrainVersion:4}),4,'save-v11 worlds keep explicit terrain v4');
 assert.throws(()=>resolveSingleplayerTerrainVersion({version:8}),/missing terrainVersion/);
 assert.throws(()=>resolveSingleplayerTerrainVersion({version:9}),/missing terrainVersion/);
 assert.throws(()=>resolveSingleplayerTerrainVersion({version:10}),/missing terrainVersion/);
+assert.throws(()=>resolveSingleplayerTerrainVersion({version:11}),/missing terrainVersion/);
 assert.throws(()=>resolveSingleplayerTerrainVersion({version:7,terrainVersion:1}),/unsupported terrain generator version/);
-assert.throws(()=>resolveSingleplayerTerrainVersion({version:10,terrainVersion:5}),/unsupported terrain generator version/);
+assert.throws(()=>resolveSingleplayerTerrainVersion({version:11,terrainVersion:5}),/unsupported terrain generator version/);
 assert.throws(()=>resolveSingleplayerTerrainVersion('corrupt'),/world record must be an object/);
 
 const seed='golden-seed',prompt='mountain forest',v2=createTerrainGenerator({seed,prompt,version:2}),v3=createTerrainGenerator({seed,prompt,version:3}),v4=createTerrainGenerator({seed,prompt,version:4}),v2Chunk=v2.generateChunk(2,-1),v3Chunk=v3.generateChunk(2,-1),v4Chunk=v4.generateChunk(2,-1);
@@ -36,4 +38,4 @@ assert.equal(v3Chunk.includes(BLOCK.SHORT_GRASS),false,'terrain-v3 worlds may no
 assert.equal(v4Chunk.includes(BLOCK.SHORT_GRASS),true,'new terrain-v4 worlds generate short grass');
 assert.deepEqual(normalizeCoal(v3Chunk),v2Chunk,'v3 differs from v2 only by deterministic coal injection');
 assert.deepEqual(normalizeShortGrass(v4Chunk),v3Chunk,'v4 differs from v3 only by deterministic short-grass decoration');
-console.log('singleplayer terrain pinning: legacy=v2, existing v3 preserved, new worlds=v4, save schema v10: PASS');
+console.log('singleplayer terrain pinning: legacy=v2, existing v3/v4 preserved, new worlds=v4, save schema v11: PASS');
