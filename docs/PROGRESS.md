@@ -1,135 +1,208 @@
 # Minecraft Web - 当前开发进度
 
-更新时间：2026-08-26
+更新时间：2026-08-27
 
 ## 当前主线
 
-项目处于 `v0.4.0-dev`。严格按 Minecraft Java 1.20.1 完整玩法/内容口径，整体完成度仍保守维持约 **35%**。浏览器渲染/资源管线、单机生存基础和 authoritative multiplayer 骨架已形成，当前主要缺口集中在 registry breadth、原版 worldgen、redstone、dimensions、enchanting/brewing、广泛 status effects、server-authoritative PvE/XP/persistence 与更深 farming parity。
+项目处于 `v0.4.0-dev`。严格按 Minecraft Java 1.20.1 完整玩法/内容口径，整体完成度仍保守维持约 **35%**。浏览器渲染/资源管线、单机生存基础和 authoritative multiplayer 骨架已形成；当前连续主线是先把 stateful block 的语义、存储、存档和网络真值打通，再进入模型、放置、碰撞和具体家族扩展。
 
-当前 merged `main`：`9edb249f1f5c44dc9f4f0098fc4d7395b41974e7`，为 PR #138 `feat: expand registry breadth and align vanilla inventory presentation` 的 squash merge 结果。
+当前 merged `main`：`299c64b04df1f4280d0b2b399a1abdcb38b4bf75`，为 PR #143 `feat: persist block state sidecar in singleplayer saves` 的 squash merge 结果。
 
-`docs/PROJECT_BASELINE.md` 只描述 merged main；未合并功能必须放在 active delivery 中。
+`docs/PROJECT_BASELINE.md` 只描述 merged main；未合并功能必须留在本文件的 active delivery 中。
 
-## 最近完成：PR #138 Registry breadth phase 1
+## 最近完成：Stateful block foundation A → B2a
 
-PR #138 已于 2026-08-26 squash merge。
+### PR #140 — Phase A canonical state schema
 
-### Registry breadth
+已合并：`ee8021ac9d5c8de8e7d2d4b3be1a99b8cab6a6e4`。
 
-- append-only 新增 block ID 44..53：granite、diorite、andesite、spruce/birch/jungle/acacia/dark oak/mangrove/cherry planks；既有 oak planks 继续保持 ID 5。
-- granite/diorite/andesite 使用 stone/pickaxe contract；新增木板使用 axe-effective plank contract；drop/item path 直接复用 live registry。
-- oak planks 与 ID 44..53 接入 canonical Java 1.20.1 blockstate/model/texture source。
-- 普通 full cube 通过 declarative `MINECRAFT_SIMPLE_FULL_CUBE_MODELS` 注册，不为每个方块增加 renderer special-case。
-- model runtime closure 扩为 **24 blockstates / 70 models / 39 textures / 0 metadata**。
-- deterministic model atlas 保持 **128×128**，SHA-256 `28dea729513157f790032964dc4607a88ba6657e72d3e9eca5a9cc85fa5ce1b5`。
-- runtime/source manifests 与生成闭包同步，并在 Minecraft asset source audit 中逐字节 `cmp`，防止 tracked manifest 陈旧却继续绿灯。
+完成：
 
-### Creative / first-person presentation
+- enum / boolean / bounded integer property schema；
+- normalize / validate / deterministic canonical key / strict parse round-trip；
+- log `axis`；
+- furnace `facing + lit`；
+- farmland `moisture`；
+- wheat `age`；
+- slab `type + waterlogged`；
+- stair `facing + half + shape + waterlogged`；
+- fence cardinal connectivity + `waterlogged`；
+- door `facing + half + hinge + open + powered`。
 
-- Creative inventory 使用更接近 Java 原版的 category/search/survival inventory tabs，并复用 canonical Java 1.20.1 GUI sprites。
-- Creative catalog 继续从 live `ITEMS` registry 派生；历史 `CREATIVE_START` 不变。
-- 新 stone/wood blocks 直接进入实际 Creative 分类和 3D block-preview path。
-- source-backed block items 按 block semantic 走 3D preview，不因纹理来源错误退化为 flat sprite。
-- 第一人称右手 idle anchor 下移/右移；pickaxe/sword/axe/shovel/hoe 使用区分后的 held transform。
+此阶段只建立纯语义层，没有修改 world/save/network 格式。
 
-### Exact-head validation
+### PR #142 — Phase B1 sparse in-memory sidecar
 
-最终 exact head：`a40ac69137a0636f6831ba3e91d1590e676ad730`
+已合并：`b6ed60350b76138f51f7028c8ba2675918d7edaa`。
 
-- Minecraft asset source audit #317 (`32971126562`)：PASS；
-- Repository quality #1296 (`32971126568`)：PASS；
-- JavaScript syntax：PASS；
-- full logic/worker regression：PASS；
-- Chromium shard 1/2：PASS；
-- Chromium shard 2/2：PASS；
-- final base drift：0；
-- reviews / review threads / PR comments：0。
+完成：
 
-Squash merge commit：`9edb249f1f5c44dc9f4f0098fc4d7395b41974e7`。
+- `BlockStateSidecar`；
+- block identity `{id,stateKey}`；
+- stateful default canonical key + sparse default elision；
+- stateless `stateKey:null`；
+- block ID ownership guard，防止旧 state 泄漏到新 ID；
+- deterministic export/import；
+- `VoxelWorld.getBlockState()` / `setBlockState()` / `exportBlockStates()`；
+- `savedBlockStates` 与独立 `onBlockStateEdit` runtime boundary；
+- ordinary `setBlock()` 继续表示“写入 ID 的 canonical default state”。
 
-## 当前兼容性边界
+当前 sidecar registry 只 opt-in oak log、stripped oak log、furnace；farmland/wheat 暂时保留历史 ID-encoded compatibility path。
 
-- block/item IDs 保持 append-only，不重排现有 ID；
-- singleplayer save schema：**v10**；
-- terrain generator：**v4**，local v2/v3 compatibility path 保持不变；
-- historical `CREATIVE_START` 顺序/slot mapping 不变；
+### PR #143 — Phase B2a singleplayer persistence
+
+已合并到当前 `main 299c64b04df1f4280d0b2b399a1abdcb38b4bf75`。
+
+完成：
+
+- singleplayer save schema **v10 → v11**；
+- world record 新增 `blockStates: world.exportBlockStates()`；
+- pre-v11 缺少 `blockStates` 时按 canonical default state 迁移；
+- v11+ 缺失 `blockStates` 明确拒绝，禁止静默丢 property；
+- restore 前通过 `BlockStateSidecar` 验证 canonical key / owning ID；
+- state-only local edit 会标记 save dirty；
+- terrain generator 仍为 v4；
+- multiplayer 仍保持 v5，未在 B2a 假装支持 state transport。
+
+最终 exact head `9f1fe7bc7238b52bda011bb5355a67c0e4dfde4e` 通过 Repository quality `33050099078` / #1314：static + Chromium 1/2 + Chromium 2/2 全绿，reviews/threads/comments 为 0。
+
+## 当前 merged 兼容性边界
+
+当前 `main` 权威边界：
+
+- block/item IDs：append-only；
+- singleplayer save schema：**v11**；
+- block-state save feature floor：**v11**；
+- terrain generator：**v4**；
 - multiplayer handshake/subprotocol：**v5 / `minecraft-web-v5`**；
 - player action frame：**v3**；
+- historical `CREATIVE_START` 顺序/slot mapping 不变；
 - browser presentation 不成为 gameplay authority；
 - multiplayer 缺失 authority 不允许 client-side competing truth。
 
-## 关键架构发现：stateful block 不能继续用 ID 爆炸替代 property
+## Active delivery：PR #144 Phase B2b multiplayer block-state authority
 
-当前 `VoxelWorld` 的每个 cell 仍只存一个 block ID。
+Draft PR：#144 `feat: replicate authoritative block states in multiplayer`
 
-现有 stateful 内容采取了两种临时/局部策略：
+分支：`feat/b2b-block-state-multiplayer-transport`
 
-- bed direction、farmland moisture、wheat age：不同状态分别占用 append-only block ID；
-- furnace：interpreter 固定使用 `facing=north,lit=false` 的 canonical state。
+基线：`main 299c64b04df1f4280d0b2b399a1abdcb38b4bf75`
 
-这种策略不适合继续扩展 Java 原版的 stateful families。若对 stairs/doors/fences/logs 继续“每状态一个 ID”，会快速造成 registry、存档、多人同步和 collision/placement 逻辑失控。因此下一阶段必须先建立通用 block-property/state 表达层。
+### 目标
 
-## Active delivery：Stateful registry families foundation
+B2b 只完成 stateful block 的多人权威存储与传输闭环：
 
-下一连续切片先做基础设施，不直接把所有木制家族一次性塞入 registry。
+`ServerTerrainWorld authority → world-edit snapshot/incremental wire → LiveWorldWebSocketClient → VoxelWorld.blockStates`
 
-### Phase A：pure state schema / deterministic key
+它不把 Phase C 的模型解释、放置朝向或复杂碰撞偷偷混入本 PR。
 
-1. 定义可复用 property schema：
-   - `axis`: x/y/z；
-   - horizontal `facing`: north/east/south/west；
-   - slab `type`: bottom/top/double；
-   - stair `half` + `shape` + facing；
-   - door `half` + `hinge` + `open` + `powered` + facing；
-   - fence north/east/south/west connectivity；
-   - `waterlogged` boolean。
-2. 所有 state 都必须 normalize、validate、canonical serialize，属性顺序不能影响 state key。
-3. pure rules 不依赖 DOM、Three.js、World 或 WebSocket，先形成可单测的共享事实层。
+### 已实现候选内容
 
-### Phase B：world/save/network state storage
+1. **Server authority**
+   - `ServerTerrainWorld` 同时持有 sparse numeric edits 与 sparse non-default state edits；
+   - `getBlockState()` 返回 canonical `{id,stateKey}`；
+   - `setBlockStateKey()` 以完整 block identity 判定变化；
+   - **同 ID、不同 `stateKey` 也会推进 world revision**；
+   - state-only base-cell edit 不要求伪造新的 block ID；
+   - initial snapshot 使用同一 authority source 导出。
 
-1. 为 block ID 之外的 properties 建立 sparse sidecar，而不是重写现有 dense voxel ID buffer；
-2. 明确 edit/export/import 格式与旧存档迁移边界；
-3. multiplayer sparse world edits 同步同一 normalized state；
-4. 如果 wire/save contract 真正变化，显式 bump 对应版本，禁止静默 reinterpret。
+2. **World-edit replication v2**
+   - initial chunk tuple：`[x,y,z,id,stateKey]`；
+   - incremental block change：`previous + previousStateKey → id + stateKey`；
+   - assembler 输出 `edits[coord] = {id,stateKey}`；
+   - hydration 同时生成 `savedEdits` 与 `savedBlockStates`；
+   - legacy numeric edit object 仅在内部 hydration helper 保留兼容读取，不伪装 wire v1 与 v2 可互通。
 
-### Phase C：runtime model / gameplay integration
+3. **Client application**
+   - multiplayer bootstrap 使用现有 `VoxelWorld(savedEdits,savedBlockStates)`；
+   - incremental overlay 直接写真实 `VoxelWorld.blockStates`；
+   - stale `previousStateKey` 明确拒绝；
+   - state-only mutation 会使已加载 chunk mesh 失效并请求重建；
+   - 不建立第二份 client block-state truth。
 
-1. normalized properties 输入现有 Java 1.20.1 blockstate/model interpreter；
-2. placement 根据点击面、玩家朝向等生成 canonical state；
-3. collision/selection/interaction 使用 family rule，不在 renderer 中硬编码；
-4. 先完成 oak representative family，再数据驱动扩其它 wood species。
+4. **Explicit compatibility break**
+   - 候选 handshake：**v6**；
+   - 候选 WebSocket subprotocol：**`minecraft-web-v6`**；
+   - 原因：v5 对旧 world-edit shape 做严格校验；若继续让 v5 握手成功再发送 v2 world-edit，只会把明确的不兼容拖到 bootstrap 阶段爆炸。
 
-## 下一批具体内容顺序
+5. **Regression coverage**
+   - world-edit v2 snapshot/incremental/canonical-state checks；
+   - same-ID state-only server revision；
+   - initial `savedEdits + savedBlockStates` hydration；
+   - real `VoxelWorld.blockStates` overlay contract；
+   - stale previous-state rejection；
+   - live WebSocket client 保留 stateKey；
+   - production runtime → real WebSocket stateful/state-only broadcast；
+   - v5 → v6 handshake incompatibility boundary。
 
-1. logs / stripped logs：先验证 `axis`；
-2. slabs：验证 top/bottom/double 与非 full-cube collision；
-3. stairs：验证 facing/half/shape 与复杂 collision；
-4. fences：验证邻接 connectivity；
-5. doors：验证双 block、facing/hinge/open/powered 与 interaction；
-6. family infrastructure 稳定后，再批量扩 spruce/birch/jungle/acacia/dark oak/mangrove/cherry 对应 entries。
+### PR #144 审查中发现并已修复的问题
 
-## 暂不在本切片扩大
+- 旧 bootstrap 测试仍把 world edit snapshot 当纯数字 ID；已改为 `{id,stateKey}` identity contract。
+- 第一版 overlay 错把真实 `VoxelWorld.blockStates` 写成不存在的 `blockStateSidecar`；fake test 同样用了错误名字，因此最初没有暴露。PR 级审查后已统一到生产 API，并同步测试。
+- server terrain state fixture 曾在 fallback 分支使用不完整 Furnace key `facing=north`；Furnace canonical key 实际还要求 `lit=false`。测试已改用 LOG / STRIPPED_LOG 同 schema fixture，避免测试数据本身违反 canonical contract。
 
-- 不把 PR #138 新增 stone/wood registry blocks 强行加入 worldgen distribution；
-- 不在 state representation 未稳定前大量追加 stairs/door block IDs；
-- 不通过 per-block renderer special-case 绕过 blockstate interpreter；
-- 不为了避免 save/network bump 而偷偷丢弃 state properties；
-- 不改变历史 `CREATIVE_START` starter contract。
+### 当前明确非目标
 
-## 后续连续开发顺序
+PR #144 **不**声明以下内容完成：
 
-1. Registry breadth：stateful family foundation → wood/log/slab/stair/fence/door breadth；
+- mesh worker 已消费 block-state sidecar；
+- horizontal log 已产生正确旋转模型；
+- placement 已根据点击面生成 log axis；
+- slab/stair/fence/door gameplay 已实现；
+- farmland/wheat 已从历史 state-per-ID 迁移；
+- multiplayer farming/random ticks/PvE/XP/durable world persistence 已完成。
+
+尤其要注意：当前 `VoxelWorld.requestMesh()` 仍向 mesh worker 发送 dense block IDs；sidecar state 进入模型解释属于 Phase C。B2b 只保证状态真值不会在网络边界丢失。
+
+## #144 合并门禁
+
+必须同时满足：
+
+1. 当前 **exact head** 的 Repository quality 完整成功；
+2. JavaScript syntax 成功；
+3. full logic/worker regression 成功；
+4. Chromium shard 1/2 成功；
+5. Chromium shard 2/2 成功；
+6. PR 对 `main` behind=0；
+7. reviews / unresolved review threads / blocking comments 清零；
+8. 不用删除、放宽或绕过失败测试换绿灯。
+
+旧 head 的绿色 CI 不授权新 head 合并。
+
+## B2b 之后：Phase C1 log axis end-to-end
+
+#144 合并后，不应直接批量上 stairs/doors。下一连续切片先用 log family 压测整条 state pipeline：
+
+1. mesh/model worker payload 携带 sparse normalized state；
+2. chunk meshing 按 cell identity 解析 Java blockstate variant；
+3. oak log / stripped oak log 使用 `axis=x/y/z` 选择 canonical model rotation；
+4. placement 根据点击面决定 axis；
+5. break/drop 保持物品 identity，不把放置 state 错当 item identity；
+6. singleplayer save/reload 后方向不丢；
+7. multiplayer late join + incremental placement 后方向一致；
+8. collision/selection 对 full-cube log 继续复用现有 cube contract，不在 renderer 内产生 gameplay truth。
+
+完成 log 后再按依赖推进：
+
+`slab → stair → fence → door → wood species breadth`
+
+其中 slab/stair 需要先建立 property-aware collision/selection；fence 需要邻接重算；door 需要双 block 原子 mutation 与 interaction。不能把这些差异压成同一个“大量方块一次加入”的 PR。
+
+## 后续长期顺序
+
+1. Stateful families：Phase C → logs → slabs → stairs → fences → doors → species breadth；
 2. Worldgen：biomes → caves/aquifers → ores/features → structures；
 3. Server gameplay breadth：server-authoritative PvE/XP、durable world/block-entity persistence；
-4. Farming 后续：farmland trampling、exact crop random tick/light/neighbor formula、Fortune/loot tables、其它 crops/breeding；
-5. 更广 status effects / enchanting / brewing / redstone / dimensions 等系统继续按依赖关系展开。
+4. Farming：farmland trampling、exact crop random tick/light/neighbor formula、Fortune/loot tables、其它 crops/breeding；
+5. 更广 status effects / enchanting / brewing / redstone / dimensions。
 
 ## 工程规则
 
-- 只认 exact-head CI；旧 head 的绿灯不授权新 head 合并；
+- 只认 exact-head CI；
+- `PROJECT_BASELINE.md` 只写 merged main；
 - source asset availability ≠ runtime implementation；
 - gameplay pure rules、browser presentation、server authority 分层；
 - persistence / terrain version / starter slots / network state 是独立兼容性表面；
-- 多人缺失 authority 必须保持禁用，不通过 client-side fake authority 伪造完成度；
+- multiplayer 缺失 authority 必须保持禁用，不通过 client-side fake authority 伪造完成度；
+- stateful family 不通过 per-state block-ID 爆炸绕过 property system；
 - 不通过降低测试、静默升级旧存档或删除失败覆盖来换绿色门禁。
