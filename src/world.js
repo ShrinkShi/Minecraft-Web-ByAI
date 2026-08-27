@@ -222,6 +222,7 @@ export class VoxelWorld{
       const payload={
         type:'mesh',key:chunkKey,cx,cz,version,
         data:data.slice().buffer,
+        blockStates:this.blockStates.exportChunk(chunkKey),
         px:copy(this.chunks.get(key(cx+1,cz))),nx:copy(this.chunks.get(key(cx-1,cz))),
         pz:copy(this.chunks.get(key(cx,cz+1))),nz:copy(this.chunks.get(key(cx,cz-1)))
       };
