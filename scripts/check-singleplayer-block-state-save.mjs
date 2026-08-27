@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {fileURLToPath} from 'node:url';
 import {BLOCK} from '../src/blocks.js';
 import {
   BLOCK_STATE_SAVE_MIN_VERSION,
@@ -25,7 +24,6 @@ assert.notEqual(restored,savedStates,'compatibility resolver must return a valid
 assert.throws(()=>resolveSingleplayerBlockStates({version:11,blockStates:{'0,0':[[3,BLOCK.LOG,'axis=north']]}}),/log\.axis must be one of/);
 assert.throws(()=>resolveSingleplayerBlockStates({version:11,blockStates:{'0,0':[[3,BLOCK.STONE,'axis=x']]}}),/does not define mutable/);
 
-const root=fileURLToPath(new URL('..',import.meta.url));
 const runtimeSource=readFileSync(new URL('../src/client-gameplay-runtime.js',import.meta.url),'utf8');
 const mainSource=readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
 assert.match(runtimeSource,/savedEdits=\{\},savedBlockStates=\{\}/);
@@ -35,6 +33,5 @@ assert.match(mainSource,/resolveSingleplayerBlockStates\(saved\)/);
 assert.match(mainSource,/blockStates:world\.exportBlockStates\(\)/);
 assert.match(mainSource,/savedEdits:saved\?\.edits\|\|\{\},savedBlockStates/);
 assert.match(mainSource,/onWorldBlockStateEdit:\(\)=>markSaveDirty\(\)/);
-assert.ok(root.endsWith('Minecraft-Web-ByAI/')||root.endsWith('Minecraft-Web-ByAI\\'),'check must execute from repository source tree');
 
 console.log('singleplayer block state save checks passed');
