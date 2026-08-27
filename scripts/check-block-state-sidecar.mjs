@@ -57,6 +57,11 @@ states.set('1,0',9,BLOCK.FURNACE,{facing:'west',lit:true});
 states.set('-1,2',4,BLOCK.LOG,{axis:'z'});
 states.set('1,0',3,BLOCK.LOG,{axis:'x'});
 assert.equal(states.size,3);
+assert.deepEqual(states.exportChunk('1,0'),[
+  [3,BLOCK.LOG,'axis=x'],
+  [9,BLOCK.FURNACE,'facing=west,lit=true']
+],'chunk-local export must preserve deterministic cell order without serializing other chunks');
+assert.deepEqual(states.exportChunk('missing'),[]);
 assert.deepEqual(states.export(),{
   '-1,2':[[4,BLOCK.LOG,'axis=z']],
   '1,0':[
@@ -102,4 +107,4 @@ assert.throws(()=>states.set('',0,BLOCK.LOG,{axis:'x'}),/chunk key/);
 assert.throws(()=>states.set('0,0',-1,BLOCK.LOG,{axis:'x'}),/non-negative/);
 assert.throws(()=>blockIdentity(256),/0\.\.255/);
 
-console.log('block state sidecar checks passed');
+console.log('block state sidecar + chunk-local mesh payload checks passed');
