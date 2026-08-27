@@ -43,7 +43,7 @@ try{
   const welcome=await messages.next('runtime welcome');assert.equal(welcome.kind,'welcome');
   const worldInfo=decodeServerWorldInfo(await messages.next('runtime world info'),{expectedSession:welcome.session});assert.deepEqual({worldId:worldInfo.worldId,terrainVersion:worldInfo.terrainVersion,seed:worldInfo.seed,prompt:worldInfo.prompt,tickRate:worldInfo.tickRate},{worldId:'runtime-world',terrainVersion:TERRAIN_GENERATOR_VERSION,seed:'golden-seed',prompt:'mountain forest',tickRate:20});
   const editAssembler=new WorldEditSyncAssembler({session:welcome.session,worldId:worldInfo.worldId});let editSnapshot=null;while(!editSnapshot){const step=editAssembler.accept(await messages.next('runtime world edit sync'));if(step.complete)editSnapshot=step.result;}
-  assert.equal(editSnapshot.revision,1);assert.deepEqual(editSnapshot.edits,{[`${editX},${editY},${editZ}`]:editId});
+  assert.equal(editSnapshot.revision,1);assert.deepEqual(editSnapshot.edits,{[`${editX},${editY},${editZ}`]:{id:editId,stateKey:null}});
   const voxelEdits=authoritativeEditsToVoxelEdits(editSnapshot.edits),localX=editX%CHUNK_SIZE,localZ=editZ%CHUNK_SIZE,localIndex=localX+CHUNK_SIZE*(localZ+CHUNK_SIZE*editY);assert.deepEqual(voxelEdits['6,6'],[[localIndex,editId]]);
   assert.deepEqual(authoritativeEditsToVoxelEdits({'-1,10,-1':BLOCK.WATER})['-1,-1'],[[15+CHUNK_SIZE*(15+CHUNK_SIZE*10),BLOCK.WATER]]);assert.throws(()=>authoritativeEditsToVoxelEdits({'1,2,3':999}),/known block/);
   const initial=decodeServerPlayerSnapshot(await nextKind(messages,SERVER_PLAYER_SNAPSHOT_KIND,'runtime initial snapshot'),{expectedSession:welcome.session});assert.equal(initial.tick,0);assert.deepEqual(initial.position,{x:33.5,y:23.001,z:-16.5});
@@ -58,4 +58,4 @@ try{
 }finally{if(runtime.state!=='stopped')await runtime.stop();if(socket&&socket.readyState===WebSocket.OPEN)socket.terminate();}
 
 assert.throws(()=>createAuthoritativeServerRuntime({config:null}),/runtime config/);assert.throws(()=>createAuthoritativeServerRuntime({onLog:null}),/onLog/);assert.throws(()=>createAuthoritativeServerRuntime({onError:null}),/onError/);
-console.log('production authoritative runtime + terrain v3 world info + edits + inventory + equipment bootstrap + tick lifecycle: PASS');
+console.log('production authoritative runtime + terrain v3 world info + block-state-aware edits + inventory + equipment bootstrap + tick lifecycle: PASS');
