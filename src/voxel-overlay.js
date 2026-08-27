@@ -24,14 +24,14 @@ export function applyVoxelOverlay(world,{x,y,z,previous,previousStateKey=null,id
   if(knownPrevious!==null&&knownPrevious!==previousIdentity.id)throw new RangeError(`voxel overlay previous mismatch at ${x},${y},${z}`);
 
   let stateChanged=false;
-  if(world.blockStateSidecar){
-    if(typeof world.blockStateSidecar.get!=='function'||typeof world.blockStateSidecar.setFromKey!=='function')throw new TypeError('world blockStateSidecar must expose get and setFromKey');
-    const currentIdentity=world.blockStateSidecar.get(chunkKey,index,previousIdentity.id);
+  if(world.blockStates){
+    if(typeof world.blockStates.get!=='function'||typeof world.blockStates.setFromKey!=='function')throw new TypeError('world blockStates must expose get and setFromKey');
+    const currentIdentity=world.blockStates.get(chunkKey,index,previousIdentity.id);
     if(!blockIdentityEqual(currentIdentity,previousIdentity))throw new RangeError(`voxel overlay previous state mismatch at ${x},${y},${z}`);
     stateChanged=!blockIdentityEqual(currentIdentity,nextIdentity);
-    world.blockStateSidecar.setFromKey(chunkKey,index,nextIdentity.id,nextIdentity.stateKey);
+    world.blockStates.setFromKey(chunkKey,index,nextIdentity.id,nextIdentity.stateKey);
   }else if(previousIdentity.stateKey!==null||nextIdentity.stateKey!==null){
-    throw new TypeError('world must expose blockStateSidecar for stateful block replication');
+    throw new TypeError('world must expose blockStates for stateful block replication');
   }
 
   const edits=existing||new Map();if(!existing)world.edits.set(chunkKey,edits);
