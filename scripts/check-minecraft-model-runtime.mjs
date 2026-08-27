@@ -29,10 +29,12 @@ const runtime=await compileMinecraftModelRuntime({
 });
 
 assert.equal(assertMinecraftModelRuntime(runtime),runtime);
+assert.equal(runtime.format,2);
 assert.deepEqual(runtime.blockIds,[
-  BLOCK.PLANKS,
+  BLOCK.PLANKS,BLOCK.LOG,
   BLOCK.CRAFTING_TABLE,BLOCK.IRON_ORE,BLOCK.GLASS,BLOCK.FURNACE,
-  BLOCK.FARMLAND,BLOCK.FARMLAND_MOISTURE_1,BLOCK.FARMLAND_MOISTURE_2,BLOCK.FARMLAND_MOISTURE_3,BLOCK.FARMLAND_MOISTURE_4,BLOCK.FARMLAND_MOISTURE_5,BLOCK.FARMLAND_MOISTURE_6,BLOCK.FARMLAND_MOISTURE_7,
+  BLOCK.FARMLAND,BLOCK.STRIPPED_OAK_LOG,
+  BLOCK.FARMLAND_MOISTURE_1,BLOCK.FARMLAND_MOISTURE_2,BLOCK.FARMLAND_MOISTURE_3,BLOCK.FARMLAND_MOISTURE_4,BLOCK.FARMLAND_MOISTURE_5,BLOCK.FARMLAND_MOISTURE_6,BLOCK.FARMLAND_MOISTURE_7,
   BLOCK.WHEAT_AGE_0,BLOCK.WHEAT_AGE_1,BLOCK.WHEAT_AGE_2,BLOCK.WHEAT_AGE_3,BLOCK.WHEAT_AGE_4,BLOCK.WHEAT_AGE_5,BLOCK.WHEAT_AGE_6,BLOCK.WHEAT_AGE_7,BLOCK.SHORT_GRASS,
   BLOCK.GRANITE,BLOCK.DIORITE,BLOCK.ANDESITE,BLOCK.SPRUCE_PLANKS,BLOCK.BIRCH_PLANKS,BLOCK.JUNGLE_PLANKS,BLOCK.ACACIA_PLANKS,BLOCK.DARK_OAK_PLANKS,BLOCK.MANGROVE_PLANKS,BLOCK.CHERRY_PLANKS
 ]);
@@ -60,6 +62,27 @@ for(const [blockId,blockstate] of simpleFullCubes){
   assert.equal(simple.parts[0].alternatives.models[0].model.faces.length,6);
   assert.equal(blockstateReads.get(blockstate),1,`${blockstate} blockstate must be cached once`);
 }
+
+for(const [blockId,blockstate,verticalModel,horizontalModel] of [
+  [BLOCK.LOG,'minecraft:oak_log','minecraft:block/oak_log','minecraft:block/oak_log_horizontal'],
+  [BLOCK.STRIPPED_OAK_LOG,'minecraft:stripped_oak_log','minecraft:block/stripped_oak_log','minecraft:block/stripped_oak_log_horizontal']
+]){
+  const entry=runtime.blocks[blockId];
+  assert.equal(entry.blockstate,blockstate);
+  assert.equal(entry.defaultStateKey,'axis=y');
+  assert.deepEqual(Object.keys(entry.stateTemplates),['axis=x','axis=y','axis=z']);
+  const x=minecraftModelTemplate(runtime,blockId,'axis=x'),y=minecraftModelTemplate(runtime,blockId),z=minecraftModelTemplate(runtime,blockId,'axis=z');
+  assert.deepEqual(x.state,{axis:'x'});assert.deepEqual(y.state,{axis:'y'});assert.deepEqual(z.state,{axis:'z'});
+  const xModel=x.parts[0].alternatives.models[0],yModel=y.parts[0].alternatives.models[0],zModel=z.parts[0].alternatives.models[0];
+  assert.equal(xModel.modelId,horizontalModel);assert.equal(xModel.x,90);assert.equal(xModel.y,90);
+  assert.equal(yModel.modelId,verticalModel);assert.equal(yModel.x,0);assert.equal(yModel.y,0);
+  assert.equal(zModel.modelId,horizontalModel);assert.equal(zModel.x,90);assert.equal(zModel.y,0);
+  assert.equal(xModel.model.faces.length,6);assert.equal(yModel.model.faces.length,6);assert.equal(zModel.model.faces.length,6);
+  assert.equal(blockstateReads.get(blockstate),1,`${blockstate} must compile all axis variants from one cached blockstate`);
+  assert.throws(()=>minecraftModelTemplate(runtime,blockId,'axis=north'),/log\.axis must be one of/);
+}
+assert.equal(modelReads.get('minecraft:block/cube_column'),1,'vertical log parent geometry must be shared across log families');
+assert.equal(modelReads.get('minecraft:block/cube_column_horizontal'),1,'horizontal log parent geometry must be shared across log families');
 
 const crafting=minecraftModelTemplate(runtime,BLOCK.CRAFTING_TABLE);
 assert.equal(crafting.blockstate,'minecraft:crafting_table');
@@ -170,4 +193,4 @@ assert.equal(minecraftModelLayerForTexture('minecraft:block/stone',instantiateMi
 assert.throws(()=>assertMinecraftModelRuntime({...runtime,format:99}),/format must be/);
 assert.rejects(()=>compileMinecraftModelRuntime({loadBlockstate:async()=>null,loadModel:async()=>null}),/missing Minecraft blockstate/);
 
-console.log('Minecraft interpreted-model preload/cache/template selection runtime + registry breadth full cubes + iron ore/glass/furnace/grass roots: PASS');
+console.log('Minecraft interpreted-model runtime v2 + canonical log axis template selection + existing registry breadth: PASS');
