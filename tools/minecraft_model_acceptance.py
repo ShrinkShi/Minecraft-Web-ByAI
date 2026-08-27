@@ -3,6 +3,8 @@
 MINECRAFT_MODEL_ACCEPTANCE_BLOCKS = (
     "minecraft:iron_ore",
     "minecraft:glass",
+    "minecraft:oak_log",
+    "minecraft:stripped_oak_log",
     "minecraft:oak_slab",
     "minecraft:oak_stairs",
     "minecraft:oak_door",
