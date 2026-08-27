@@ -24,6 +24,7 @@ function finite(value,label){if(typeof value!=='number'||!Number.isFinite(value)
 function positiveInteger(value,label){if(!Number.isInteger(value)||value<1||value>16)throw new RangeError(`${label} must be an integer from 1 to 16`);return value;}
 function objectOrNull(value,label){if(value===null||value===undefined)return null;if(typeof value!=='object'||Array.isArray(value))throw new TypeError(`${label} must be an object or null`);return value;}
 function safeDispose(value){try{value?.dispose?.();}catch{}}
+function nowMs(){return globalThis.performance?.now?.()??Date.now();}
 
 export class ClientGameplayRuntime{
   constructor({world,player,inventory,equipment,drops,experienceOrbs,projectiles,explosions,passiveMobs,hostileMobs,weatherSystem,miningCracks,jadeInspector=null,vanillaBlockAudio=null}){
@@ -45,7 +46,22 @@ export async function createClientGameplayRuntime({
     inventory=new Inventory(mode,inventoryState);equipment=new Equipment(equipmentState);player=new PlayerController(camera,canvas,world,scene);if(controlState!==null&&controlState!==undefined)player.setControlState(controlState);player.setMode(mode);vanillaBlockAudio=installVanillaBlockAudio({world,player});
     const armorAware=(event,forward)=>forwardDamageWithArmorWear({player,equipment,damage:Number(event?.amount)||0,event,callback:forward});
     drops=new DropSystem(scene,world,inventory,onInventoryPickup);experienceOrbs=new ExperienceOrbSystem(scene,world,onExperience);weatherSystem=new WeatherSystem(scene);weatherSystem.setWeather(weather);miningCracks=new MiningCrackOverlay(scene);
-    projectiles=new ProjectileSystem(scene,world,{onPlayerHit:event=>armorAware(event,onPlayerHit)});
+    const queryMobHit=({origin,direction,maxDistance,projectile})=>{
+      const hits=[];
+      if(passiveMobs){const hit=passiveMobs.raycast(origin,direction,maxDistance);if(hit)hits.push({...hit,system:'passive'});}
+      if(hostileMobs){const excludeId=projectile?.source?.entityType?projectile.source.entityId:null,hit=hostileMobs.raycast(origin,direction,maxDistance,{excludeId});if(hit)hits.push({...hit,system:'hostile'});}
+      hits.sort((a,b)=>a.distance-b.distance);return hits[0]||null;
+    };
+    const onMobProjectileHit=({hit,amount,source})=>{
+      if(!hit?.entity||!Number.isFinite(amount)||amount<=0)return;
+      const sourcePosition=source&&Number.isFinite(source.x)&&Number.isFinite(source.z)?source:null;
+      if(hit.system==='passive'){passiveMobs?.hurt(hit.entity,amount,sourcePosition,nowMs());return;}
+      if(hit.system==='hostile'){
+        const attacker=source?.entityType==='skeleton'&&Number.isInteger(source?.entityId)?hostileMobs?.store.get(source.entityId):null;
+        hostileMobs?.hurt(hit.entity,amount,sourcePosition,nowMs(),{attackerEntity:attacker});
+      }
+    };
+    projectiles=new ProjectileSystem(scene,world,{onPlayerHit:event=>armorAware(event,onPlayerHit),queryMobHit,onMobHit:onMobProjectileHit});
     const emitDestroyedBlock=event=>{
       const itemId=explosionDropForBlock(event?.id);if(itemId&&event?.position)drops.spawn(itemId,1,new THREE.Vector3(event.position.x+.5,event.position.y+.55,event.position.z+.5));onExplosionBlockDestroyed(event);
     };
