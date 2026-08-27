@@ -19,6 +19,12 @@ import {
   samplePlayerWaterCoverage
 } from './player-environment-rules.js';
 
+function emitPlayerHurt(result,source=null){
+  if(!result?.applied||typeof globalThis.dispatchEvent!=='function'||typeof globalThis.CustomEvent!=='function')return false;
+  const safeSource=source&&Number.isFinite(source.x)&&Number.isFinite(source.z)?{x:source.x,z:source.z}:null;
+  globalThis.dispatchEvent(new CustomEvent('minecraft-player-hurt',{detail:{damage:result.damage,hp:result.hp,dead:!!result.dead,source:safeSource}}));return true;
+}
+
 export class PlayerController{
   constructor(camera,canvas,world,scene){
     this.camera=camera;this.canvas=canvas;this.world=world;this.scene=scene;
@@ -76,13 +82,14 @@ export class PlayerController{
   addExhaustion(amount){if(this.mode!=='survival')return this.hungerState();return this.applyHungerState(addHungerExhaustion(this.hungerState(),amount));}
   recordAttackExhaustion(){return this.addExhaustion(attackExhaustion());}
   eat(profile){const result=consumeFood(this.hungerState(),profile);if(!result.consumed)return result;this.applyHungerState(result.state);let committed=null;const commitStatusEffects=()=>committed??(committed=this.applyFoodStatusEffects(profile));return Object.freeze({...result,commitStatusEffects});}
-  stepHunger(dt){const effects=this.stepStatusEffects(dt),result=stepHungerRules(this.hungerState(),{dt,hp:this.hp,maxHp:20,mode:this.mode});this.applyHungerState(result.state);if(result.heal>0)this.hp=Math.min(20,this.hp+result.heal);if(result.damage>0){this.hp=Math.max(0,this.hp-result.damage);if(this.hp<=0)this.setDeathVisual(true);}return Object.freeze({...result,changed:result.changed||effects.changed,statusEffects:effects});}
+  stepHunger(dt){const effects=this.stepStatusEffects(dt),result=stepHungerRules(this.hungerState(),{dt,hp:this.hp,maxHp:20,mode:this.mode});this.applyHungerState(result.state);if(result.heal>0)this.hp=Math.min(20,this.hp+result.heal);if(result.damage>0){this.hp=Math.max(0,this.hp-result.damage);const hurt={applied:true,damage:result.damage,hp:this.hp,dead:this.hp<=0};emitPlayerHurt(hurt,null);if(this.hp<=0)this.setDeathVisual(true);}return Object.freeze({...result,changed:result.changed||effects.changed,statusEffects:effects});}
 
   takeDamage(amount,now,source=null){
     if(this.mode==='creative'||this.mode==='spectator')return{applied:false,damage:0,hp:this.hp,dead:false};
     const result=applyDamage(this,amount,now,{maxHp:20});
     if(result.applied)this.addExhaustion(damageExhaustion());
     if(result.applied&&source&&Number.isFinite(source.x)&&Number.isFinite(source.z))this.knockbackFrom(source.x,source.z,.52,.24);
+    if(result.applied)emitPlayerHurt(result,source);
     if(result.dead)this.setDeathVisual(true);
     return result;
   }
@@ -126,13 +133,14 @@ export class PlayerController{
       this.velocity.x*=motion.horizontalDrag;this.velocity.z*=motion.horizontalDrag;
       if(this.position.y<-10){this.hp=0;this.setDeathVisual(true);}
     }
-    if(this.mode==='survival'){const distance=Math.hypot(this.position.x-startX,this.position.z-startZ),amount=movementExhaustion(distance,{sprinting:motion.sprinting,swimming:motion.swimActive});if(amount>0)this.addExhaustion(amount);}
-    this.syncCamera();this.updateVisual(dt);
+    const distance=Math.hypot(this.position.x-startX,this.position.z-startZ),visualSpeed=dt>0?distance/dt:0;
+    if(this.mode==='survival'){const amount=movementExhaustion(distance,{sprinting:motion.sprinting,swimming:motion.swimActive});if(amount>0)this.addExhaustion(amount);}
+    this.syncCamera();this.updateVisual(dt,{speedOverride:visualSpeed});
   }
 
-  updateVisual(dt){
+  updateVisual(dt,{speedOverride=null}={}){
     if(!this.avatarVisual||!this.playerModelFactory)return false;
-    let speed=Math.hypot(this.velocity.x,this.velocity.z);if(this.flying&&speed<.01)speed=Math.hypot(this.controlState.side,this.controlState.forward)*(this.controlState.sprint?this.sprint:this.walk);
+    let speed=Number.isFinite(speedOverride)?Math.max(0,speedOverride):Math.hypot(this.velocity.x,this.velocity.z);if(this.flying&&speed<.01)speed=Math.hypot(this.controlState.side,this.controlState.forward)*(this.controlState.sprint?this.sprint:this.walk);
     const sprinting=canSprintWithHunger(this.hunger,this.mode)&&playerSprintActive(this.controlState,{swimActive:this.swimCoverage>0})&&speed>.1;
     return this.playerModelFactory.animate(this.avatarVisual,dt,{speed,sprint:sprinting,primary:this.controlState.primary,dead:this.visualDead||this.hp<=0,headPitch:-this.pitch,headYaw:0});
   }
