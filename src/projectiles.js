@@ -5,8 +5,8 @@ import {requireAssetUrl} from './asset-manifest.js';
 const Y_AXIS=new THREE.Vector3(0,1,0),tempDirection=new THREE.Vector3(),tempEnd=new THREE.Vector3();
 
 export class ProjectileSystem{
-  constructor(scene,world,{onPlayerHit=()=>{}}={}){
-    this.scene=scene;this.world=world;this.onPlayerHit=onPlayerHit;this.projectiles=[];
+  constructor(scene,world,{onPlayerHit=()=>{},queryMobHit=()=>null,onMobHit=()=>{}}={}){
+    this.scene=scene;this.world=world;this.onPlayerHit=onPlayerHit;this.queryMobHit=typeof queryMobHit==='function'?queryMobHit:()=>null;this.onMobHit=typeof onMobHit==='function'?onMobHit:()=>{};this.projectiles=[];
     this.arrowTexture=new THREE.TextureLoader().load(requireAssetUrl('item.arrow'));this.arrowTexture.magFilter=THREE.NearestFilter;this.arrowTexture.minFilter=THREE.NearestFilter;this.arrowTexture.generateMipmaps=false;this.arrowTexture.colorSpace=THREE.SRGBColorSpace;
     this.arrowGeometry=new THREE.PlaneGeometry(.76,.76);this.arrowMaterial=new THREE.MeshBasicMaterial({map:this.arrowTexture,transparent:true,alphaTest:.04,side:THREE.DoubleSide,toneMapped:false});
   }
@@ -18,7 +18,7 @@ export class ProjectileSystem{
   spawnArrow(origin,target,{damage=2,speed=15,gravity=4,lifetime=8,source=null}={}){
     if(!origin||!target||!Number.isFinite(damage)||damage<=0||!Number.isFinite(lifetime)||lifetime<=0)return null;
     const velocityData=aimVelocity(origin,target,speed,gravity),velocity=new THREE.Vector3(velocityData.x,velocityData.y,velocityData.z),visual=this.createArrowVisual();visual.position.copy(origin);this.orient(visual,velocity);this.scene.add(visual);
-    const projectile={kind:'arrow',visual,velocity,gravity,damage,age:0,lifetime,source:source?{x:source.x,z:source.z}:{x:origin.x,z:origin.z}};this.projectiles.push(projectile);return projectile;
+    const projectile={kind:'arrow',visual,velocity,gravity,damage,age:0,lifetime,source:source?{x:source.x,y:source.y,z:source.z,entityId:source.entityId??null,entityType:source.entityType??null}:{x:origin.x,y:origin.y,z:origin.z,entityId:null,entityType:null}};this.projectiles.push(projectile);return projectile;
   }
 
   orient(visual,velocity){tempDirection.copy(velocity);if(tempDirection.lengthSq()>.000001){tempDirection.normalize();visual.quaternion.setFromUnitVectors(Y_AXIS,tempDirection);}}
@@ -28,15 +28,21 @@ export class ProjectileSystem{
     if(!Number.isFinite(dt)||dt<=0)return;
     for(let i=this.projectiles.length-1;i>=0;i--){
       const projectile=this.projectiles[i];projectile.age+=dt;if(projectile.age>=projectile.lifetime){this.remove(projectile);continue;}
-      const start=projectile.visual.position,velocity=projectile.velocity;velocity.y-=projectile.gravity*dt;tempEnd.copy(start).addScaledVector(velocity,dt);tempDirection.copy(tempEnd).sub(start);const travelDistance=tempDirection.length();let blockDistance=Infinity;
-      if(travelDistance>.000001){const hit=this.world.raycast(start,tempDirection.normalize(),travelDistance+.03);if(hit)blockDistance=Math.max(0,hit.distance);}
+      const start=projectile.visual.position,velocity=projectile.velocity;velocity.y-=projectile.gravity*dt;tempEnd.copy(start).addScaledVector(velocity,dt);tempDirection.copy(tempEnd).sub(start);const travelDistance=tempDirection.length();let blockDistance=Infinity,direction=null;
+      if(travelDistance>.000001){direction=tempDirection.clone().normalize();const hit=this.world.raycast(start,direction,travelDistance+.03);if(hit)blockDistance=Math.max(0,hit.distance);}
       let playerT=null;if(player&&player.mode!=='spectator'&&player.mode!=='creative'){const pad=.08,bounds={minX:player.position.x-player.radius-pad,maxX:player.position.x+player.radius+pad,minY:player.position.y-pad,maxY:player.position.y+player.height+pad,minZ:player.position.z-player.radius-pad,maxZ:player.position.z+player.radius+pad};playerT=segmentAabbIntersectionT(start,tempEnd,bounds);}
-      if(playerT!==null&&playerT*travelDistance<=blockDistance+.0001){this.onPlayerHit({amount:projectile.damage,source:projectile.source,projectile});this.remove(projectile);continue;}
+      const playerDistance=playerT===null?Infinity:playerT*travelDistance;
+      const mobHit=direction?this.queryMobHit({origin:start,direction,maxDistance:travelDistance+.03,projectile}):null,mobDistance=mobHit&&Number.isFinite(mobHit.distance)?Math.max(0,mobHit.distance):Infinity;
+      const nearestEntityDistance=Math.min(playerDistance,mobDistance);
+      if(nearestEntityDistance<=blockDistance+.0001){
+        if(mobDistance<=playerDistance+.0001){this.onMobHit({hit:mobHit,amount:projectile.damage,source:projectile.source,projectile});this.remove(projectile);continue;}
+        this.onPlayerHit({amount:projectile.damage,source:projectile.source,projectile});this.remove(projectile);continue;
+      }
       if(blockDistance<=travelDistance+.03){this.remove(projectile);continue;}start.copy(tempEnd);this.orient(projectile.visual,velocity);
     }
   }
 
-  snapshot(){return Object.freeze(this.projectiles.map(projectile=>Object.freeze({kind:projectile.kind,model:projectile.visual.userData.projectileModel||null,position:Object.freeze(projectile.visual.position.toArray()),age:projectile.age,damage:projectile.damage})));}
+  snapshot(){return Object.freeze(this.projectiles.map(projectile=>Object.freeze({kind:projectile.kind,model:projectile.visual.userData.projectileModel||null,position:Object.freeze(projectile.visual.position.toArray()),age:projectile.age,damage:projectile.damage,source:projectile.source?Object.freeze({...projectile.source}):null}))));}
   dispose(){for(const projectile of[...this.projectiles])this.remove(projectile);this.arrowGeometry.dispose();this.arrowMaterial.dispose();this.arrowTexture.dispose();}
   get size(){return this.projectiles.length;}
 }
