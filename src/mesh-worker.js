@@ -2,7 +2,7 @@ import {BLOCKS,CHUNK_SIZE,WORLD_HEIGHT,ATLAS_COLS,ATLAS_ROWS,tileForFace} from '
 import {bedVisualDescriptor} from './bed-model-specs.js';
 import {buildMinecraftModelMeshBatches} from './minecraft-model-mesh-batch.js';
 import {createMinecraftModelAtlasResolver,createMinecraftModelTextureBinding} from './minecraft-model-texture-binding.js';
-import {assertMinecraftModelRuntime,instantiateMinecraftModelTemplate,minecraftModelTextureLayerResolver} from './minecraft-model-runtime.js';
+import {assertMinecraftModelRuntime,instantiateMinecraftModelTemplate,minecraftModelTemplate,minecraftModelTextureLayerResolver} from './minecraft-model-runtime.js';
 
 const FACES=[
   {n:[1,0,0],name:'east',v:[[1,0,0],[1,1,0],[1,1,1],[1,0,1]]},
@@ -104,11 +104,30 @@ function modelCullFaceVisible(context,blockAt){
   return block.fullCube===false||!block.solid||!!block.transparent;
 }
 
-function collectModelInstances(data,cx,cz){
+function sparseStateKeys(rows,data){
+  if(rows===undefined||rows===null)return new Map();
+  if(!Array.isArray(rows))throw new TypeError('mesh blockStates must be an array');
+  const result=new Map();
+  for(const [rowIndex,row] of rows.entries()){
+    if(!Array.isArray(row)||row.length!==3)throw new TypeError(`mesh blockStates[${rowIndex}] must be [index,id,stateKey]`);
+    const [cell,rawId,stateKey]=row,id=Number(rawId);
+    if(!Number.isSafeInteger(cell)||cell<0||cell>=data.length)throw new RangeError(`mesh blockStates[${rowIndex}] index is outside the chunk`);
+    if(!Number.isInteger(id)||id<=0||id>255)throw new RangeError(`mesh blockStates[${rowIndex}] block id is invalid`);
+    if(data[cell]!==id)throw new RangeError(`mesh blockStates[${rowIndex}] block id does not match dense chunk data`);
+    if(typeof stateKey!=='string'||stateKey.length===0)throw new TypeError(`mesh blockStates[${rowIndex}] stateKey must be a non-empty string`);
+    if(result.has(cell))throw new RangeError(`mesh blockStates contains duplicate cell index: ${cell}`);
+    result.set(cell,stateKey);
+  }
+  return result;
+}
+
+function collectModelInstances(data,cx,cz,blockStates){
   if(!minecraftModelRuntime)return[];
-  const instances=[];
+  const stateKeys=sparseStateKeys(blockStates,data),instances=[];
   for(let y=0;y<WORLD_HEIGHT;y++)for(let z=0;z<CHUNK_SIZE;z++)for(let x=0;x<CHUNK_SIZE;x++){
-    const id=data[index(x,y,z)],template=minecraftModelRuntime.blocks[id];
+    const cell=index(x,y,z),id=data[cell];
+    if(!minecraftModelRuntime.blocks[id])continue;
+    const template=minecraftModelTemplate(minecraftModelRuntime,id,stateKeys.get(cell)??null);
     if(!template)continue;
     instances.push(...instantiateMinecraftModelTemplate(template,x,y,z,{
       selectionX:cx*CHUNK_SIZE+x,
@@ -135,9 +154,9 @@ function serializeModelBatch(batch){
 
 function emptyInterpreted(){return{opaque:{empty:true,faceCount:0,vertexCount:0},cutout:{empty:true,faceCount:0,vertexCount:0},translucent:{empty:true,faceCount:0,vertexCount:0}};}
 
-function buildInterpretedModels(data,blockAt,cx,cz){
+function buildInterpretedModels(data,blockAt,cx,cz,blockStates){
   if(!minecraftModelRuntime||!minecraftModelTextureBinding)return{parts:emptyInterpreted(),transferables:[]};
-  const instances=collectModelInstances(data,cx,cz);
+  const instances=collectModelInstances(data,cx,cz,blockStates);
   if(instances.length===0)return{parts:emptyInterpreted(),transferables:[]};
   const batches=buildMinecraftModelMeshBatches(instances,{
     textureBinding:minecraftModelTextureBinding,
@@ -186,7 +205,7 @@ self.onmessage=e=>{
   const opaque=buildMesh(data,blockAt,id=>!BLOCKS[id]?.liquid&&BLOCKS[id]?.renderKind!=='bed'&&!isInterpretedModelBlock(id));
   const water=buildMesh(data,blockAt,id=>!!BLOCKS[id]?.liquid);
   const specials=collectSpecials(data);
-  const interpreted=buildInterpretedModels(data,blockAt,m.cx,m.cz);
+  const interpreted=buildInterpretedModels(data,blockAt,m.cx,m.cz,m.blockStates);
   const legacyOpaque=opaque.empty?{empty:true}:{empty:false,positions:opaque.positions,normals:opaque.normals,uvs:opaque.uvs,colors:opaque.colors,indices:opaque.indices};
   self.postMessage({type:'mesh',key:m.key,cx:m.cx,cz:m.cz,version:m.version,opaque,water,specials,interpreted:interpreted.parts,...legacyOpaque},[
     ...transferables(opaque),...transferables(water),...interpreted.transferables
