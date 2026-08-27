@@ -3,13 +3,14 @@ import {BLOCKS,CHUNK_SIZE,WORLD_HEIGHT} from './blocks.js';
 import {requireAssetUrl} from './asset-manifest.js';
 import {BedModelRenderer} from './bed-model-renderer.js';
 import {MinecraftModelWorldRenderer} from './minecraft-model-world-renderer.js';
+import {BlockStateSidecar,blockIdentity,blockIdentityEqual} from './block-state-sidecar.js';
 
 const key=(cx,cz)=>`${cx},${cz}`;
 const floorDiv=(n,d)=>Math.floor(n/d);
 const mod=(n,d)=>((n%d)+d)%d;
 
 export class VoxelWorld{
-  constructor(scene,{seed,prompt,terrainVersion,renderDistance=3,onProgress=()=>{},savedEdits={},onEdit=()=>{}}={}){
+  constructor(scene,{seed,prompt,terrainVersion,renderDistance=3,onProgress=()=>{},savedEdits={},savedBlockStates={},onEdit=()=>{},onBlockStateEdit=()=>{}}={}){
     this.scene=scene;
     this.seed=seed;
     this.prompt=prompt;
@@ -18,6 +19,7 @@ export class VoxelWorld{
     this.unloadDistance=renderDistance+1;
     this.onProgress=onProgress;
     this.onEdit=onEdit;
+    this.onBlockStateEdit=onBlockStateEdit;
     this.chunks=new Map();
     this.meshes=new Map();
     this.pending=new Set();
@@ -30,6 +32,7 @@ export class VoxelWorld{
     this.initialTotal=0;
     this.centerChunk={cx:Number.NaN,cz:Number.NaN};
     this.edits=this.importEdits(savedEdits);
+    this.blockStates=new BlockStateSidecar(savedBlockStates);
     this.disposed=false;
     this.atlasTexture=this.makeAtlasTexture();
     this.material=this.makeOpaqueMaterial();
@@ -91,6 +94,8 @@ export class VoxelWorld{
     }
     return output;
   }
+
+  exportBlockStates(){return this.blockStates.export();}
 
   desiredKeys(cx,cz,radius=this.renderDistance){
     const list=[];
@@ -184,6 +189,7 @@ export class VoxelWorld{
     const data=new Uint8Array(m.data);
     const saved=this.edits.get(chunkKey);
     if(saved)for(const [i,id] of saved)if(i>=0&&i<data.length)data[i]=id;
+    this.blockStates.reconcileChunk(chunkKey,data);
     this.chunks.set(chunkKey,data);
     this.requestMesh(m.cx,m.cz);
     this.requestMesh(m.cx-1,m.cz);this.requestMesh(m.cx+1,m.cz);this.requestMesh(m.cx,m.cz-1);this.requestMesh(m.cx,m.cz+1);
@@ -286,19 +292,50 @@ export class VoxelWorld{
     return arr[this.index(mod(wx,CHUNK_SIZE),wy,mod(wz,CHUNK_SIZE))];
   }
 
+  getBlockState(wx,wy,wz){
+    if(wy<0||wy>=WORLD_HEIGHT)return blockIdentity(this.getBlock(wx,wy,wz));
+    const cx=floorDiv(wx,CHUNK_SIZE),cz=floorDiv(wz,CHUNK_SIZE),chunkKey=key(cx,cz),arr=this.chunks.get(chunkKey);
+    if(!arr)return blockIdentity(0);
+    const i=this.index(mod(wx,CHUNK_SIZE),wy,mod(wz,CHUNK_SIZE));
+    return this.blockStates.get(chunkKey,i,arr[i]);
+  }
+
+  requestCellMeshes(cx,cz,lx,lz){
+    this.requestMesh(cx,cz);
+    if(lx===0)this.requestMesh(cx-1,cz);if(lx===CHUNK_SIZE-1)this.requestMesh(cx+1,cz);
+    if(lz===0)this.requestMesh(cx,cz-1);if(lz===CHUNK_SIZE-1)this.requestMesh(cx,cz+1);
+  }
+
   setBlock(wx,wy,wz,id){
     if(wy<0||wy>=WORLD_HEIGHT)return false;
     const cx=floorDiv(wx,CHUNK_SIZE),cz=floorDiv(wz,CHUNK_SIZE),chunkKey=key(cx,cz),arr=this.chunks.get(chunkKey);
     if(!arr)return false;
-    const lx=mod(wx,CHUNK_SIZE),lz=mod(wz,CHUNK_SIZE),i=this.index(lx,wy,lz);
-    if(arr[i]===id)return false;
-    arr[i]=id;
+    const lx=mod(wx,CHUNK_SIZE),lz=mod(wz,CHUNK_SIZE),i=this.index(lx,wy,lz),desired=blockIdentity(id),idChanged=arr[i]!==desired.id;
+    const stateChanged=this.blockStates.delete(chunkKey,i);
+    if(!idChanged&&!stateChanged)return false;
+    arr[i]=desired.id;
     if(!this.edits.has(chunkKey))this.edits.set(chunkKey,new Map());
-    this.edits.get(chunkKey).set(i,id);
-    this.requestMesh(cx,cz);
-    if(lx===0)this.requestMesh(cx-1,cz);if(lx===CHUNK_SIZE-1)this.requestMesh(cx+1,cz);
-    if(lz===0)this.requestMesh(cx,cz-1);if(lz===CHUNK_SIZE-1)this.requestMesh(cx,cz+1);
-    this.onEdit({cx,cz,index:i,id});
+    this.edits.get(chunkKey).set(i,desired.id);
+    this.requestCellMeshes(cx,cz,lx,lz);
+    if(idChanged)this.onEdit({cx,cz,index:i,id:desired.id});
+    if(stateChanged)this.onBlockStateEdit({cx,cz,index:i,id:desired.id,stateKey:desired.stateKey});
+    return true;
+  }
+
+  setBlockState(wx,wy,wz,id,state={}){
+    if(wy<0||wy>=WORLD_HEIGHT)return false;
+    const cx=floorDiv(wx,CHUNK_SIZE),cz=floorDiv(wz,CHUNK_SIZE),chunkKey=key(cx,cz),arr=this.chunks.get(chunkKey);
+    if(!arr)return false;
+    const lx=mod(wx,CHUNK_SIZE),lz=mod(wz,CHUNK_SIZE),i=this.index(lx,wy,lz),desired=blockIdentity(id,state),current=this.blockStates.get(chunkKey,i,arr[i]);
+    if(blockIdentityEqual(current,desired))return false;
+    const idChanged=arr[i]!==desired.id;
+    arr[i]=desired.id;
+    this.blockStates.setFromKey(chunkKey,i,desired.id,desired.stateKey);
+    if(!this.edits.has(chunkKey))this.edits.set(chunkKey,new Map());
+    this.edits.get(chunkKey).set(i,desired.id);
+    this.requestCellMeshes(cx,cz,lx,lz);
+    if(idChanged)this.onEdit({cx,cz,index:i,id:desired.id});
+    this.onBlockStateEdit({cx,cz,index:i,id:desired.id,stateKey:desired.stateKey});
     return true;
   }
 
@@ -323,7 +360,7 @@ export class VoxelWorld{
     this.disposed=true;
     this.terrainWorker.terminate();this.meshWorker.terminate();
     for(const chunkKey of [...this.meshes.keys()])this.disposeChunkMeshes(chunkKey);
-    this.chunks.clear();this.pending.clear();this.meshQueue.clear();
+    this.chunks.clear();this.pending.clear();this.meshQueue.clear();this.blockStates.clear();
     this.bedRenderer.dispose();
     this.minecraftModelRenderer.dispose();
     this.material.dispose();this.waterMaterial.dispose();this.atlasTexture.dispose();
