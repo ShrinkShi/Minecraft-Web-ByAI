@@ -1,15 +1,17 @@
 import {BLOCK} from './blocks.js';
-import {FARMLAND_BLOCK_STATE_SCHEMA,FURNACE_BLOCK_STATE_SCHEMA,WHEAT_BLOCK_STATE_SCHEMA,normalizeBlockStateProperties} from './block-state-schema.js';
+import {FARMLAND_BLOCK_STATE_SCHEMA,FURNACE_BLOCK_STATE_SCHEMA,LOG_BLOCK_STATE_SCHEMA,WHEAT_BLOCK_STATE_SCHEMA,normalizeBlockStateProperties} from './block-state-schema.js';
 
-export const MINECRAFT_MODEL_RUNTIME_VERSION=1;
+export const MINECRAFT_MODEL_RUNTIME_VERSION=2;
 
-const descriptor=(blockstate,{state={},renderLayer='opaque',textureLayers={}}={})=>Object.freeze({
+const descriptor=(blockstate,{state={},stateVariants=null,renderLayer='opaque',textureLayers={}}={})=>Object.freeze({
   blockstate,
   state:Object.freeze({...state}),
+  stateVariants:stateVariants===null?null:Object.freeze(stateVariants.map(value=>Object.freeze({...value}))),
   renderLayer,
   textureLayers:Object.freeze({...textureLayers})
 });
 const schemaState=(schema,state={})=>normalizeBlockStateProperties(schema,state);
+const logStates=()=>['x','y','z'].map(axis=>schemaState(LOG_BLOCK_STATE_SCHEMA,{axis}));
 
 // Full-cube blocks are deliberately data-driven here. This is the reusable path
 // for ordinary source-backed cubes; stateful/non-cube families stay explicit.
@@ -33,12 +35,14 @@ const SIMPLE_FULL_CUBE_REGISTRY=Object.fromEntries(MINECRAFT_SIMPLE_FULL_CUBE_MO
 // collision/state rules in blocks.js.
 export const MINECRAFT_MODEL_BLOCK_REGISTRY=Object.freeze({
   ...SIMPLE_FULL_CUBE_REGISTRY,
+  [BLOCK.LOG]:descriptor('minecraft:oak_log',{state:schemaState(LOG_BLOCK_STATE_SCHEMA),stateVariants:logStates()}),
+  [BLOCK.STRIPPED_OAK_LOG]:descriptor('minecraft:stripped_oak_log',{state:schemaState(LOG_BLOCK_STATE_SCHEMA),stateVariants:logStates()}),
   [BLOCK.CRAFTING_TABLE]:descriptor('minecraft:crafting_table'),
   [BLOCK.IRON_ORE]:descriptor('minecraft:iron_ore'),
   [BLOCK.GLASS]:descriptor('minecraft:glass',{renderLayer:'translucent'}),
-  // The current voxel payload stores block IDs only, so the first furnace slice
-  // still uses the canonical north-facing unlit state. The value now passes
-  // through the same schema layer that later persisted properties will use.
+  // Furnace has canonical state semantics in the sidecar, but Phase C1 only
+  // makes log axis state model-aware. Furnace remains on its current default
+  // visual until its own stateful rendering slice lands.
   [BLOCK.FURNACE]:descriptor('minecraft:furnace',{state:schemaState(FURNACE_BLOCK_STATE_SCHEMA)}),
   [BLOCK.FARMLAND]:descriptor('minecraft:farmland',{state:schemaState(FARMLAND_BLOCK_STATE_SCHEMA,{moisture:0})}),
   [BLOCK.FARMLAND_MOISTURE_1]:descriptor('minecraft:farmland',{state:schemaState(FARMLAND_BLOCK_STATE_SCHEMA,{moisture:1})}),
