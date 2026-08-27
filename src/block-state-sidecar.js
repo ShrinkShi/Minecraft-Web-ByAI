@@ -22,6 +22,12 @@ function chunkKey(value){
   return value;
 }
 function identity(id,stateKey){return Object.freeze({id,stateKey});}
+function serializedRows(entries){
+  if(!entries)return[];
+  return [...entries.entries()]
+    .sort(([a],[b])=>a-b)
+    .map(([index,value])=>[index,value.id,value.stateKey]);
+}
 
 export function blockIdentity(blockIdValue,state={}){
   const id=blockId(blockIdValue);
@@ -124,6 +130,11 @@ export class BlockStateSidecar{
     return removed;
   }
 
+  exportChunk(rawChunkKey){
+    const key=chunkKey(rawChunkKey);
+    return serializedRows(this.entries.get(key));
+  }
+
   clear(){this.entries.clear();}
   get size(){let total=0;for(const entries of this.entries.values())total+=entries.size;return total;}
 
@@ -132,9 +143,7 @@ export class BlockStateSidecar{
   export(){
     const output={};
     for(const key of [...this.entries.keys()].sort(lexicalCompare)){
-      const rows=[...this.entries.get(key).entries()]
-        .sort(([a],[b])=>a-b)
-        .map(([index,value])=>[index,value.id,value.stateKey]);
+      const rows=this.exportChunk(key);
       if(rows.length)output[key]=rows;
     }
     return output;
