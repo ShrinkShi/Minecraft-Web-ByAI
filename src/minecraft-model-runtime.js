@@ -5,6 +5,7 @@ import {applyMinecraftModelInstanceTransform} from './minecraft-model-instance.j
 import {MINECRAFT_MODEL_RENDER_LAYERS} from './minecraft-model-mesh-batch.js';
 import {normalizeMinecraftResourceId} from './minecraft-resource-id.js';
 import {MINECRAFT_MODEL_BLOCK_REGISTRY,MINECRAFT_MODEL_RUNTIME_VERSION} from './minecraft-model-registry.js';
+import {blockDefaultStateKey,canonicalBlockStateKeyForId,parseCanonicalBlockStateKeyForId} from './block-state-registry.js';
 
 const LAYER_SET=new Set(MINECRAFT_MODEL_RENDER_LAYERS);
 const UINT8_MAX=255;
@@ -47,11 +48,17 @@ function normalizeRegistry(rawRegistry){
     object(rawDescriptor,`Minecraft model registry block ${id}`);
     const blockstate=normalizeMinecraftResourceId(rawDescriptor.blockstate);
     const state=object(rawDescriptor.state??{},`Minecraft model registry block ${id}.state`);
+    let stateVariants=null;
+    if(rawDescriptor.stateVariants!==null&&rawDescriptor.stateVariants!==undefined){
+      if(!Array.isArray(rawDescriptor.stateVariants)||rawDescriptor.stateVariants.length===0)throw new TypeError(`Minecraft model registry block ${id}.stateVariants must be a non-empty array`);
+      stateVariants=Object.freeze(rawDescriptor.stateVariants.map((value,index)=>Object.freeze({...object(value,`Minecraft model registry block ${id}.stateVariants[${index}]`)})));
+    }
     const renderLayerValue=renderLayer(rawDescriptor.renderLayer??'opaque',`Minecraft model registry block ${id}.renderLayer`);
     entries.push(Object.freeze({
       blockId:id,
       blockstate,
       state:Object.freeze({...state}),
+      stateVariants,
       renderLayer:renderLayerValue,
       textureLayers:normalizedTextureLayers(rawDescriptor.textureLayers??{})
     }));
@@ -78,6 +85,26 @@ async function compileAlternativeSet(alternatives,geometryFor){
     }));
   }
   return Object.freeze({models:Object.freeze(models),totalWeight:alternatives.totalWeight});
+}
+
+async function compileStateTemplate(descriptor,state,rawBlockstate,geometryFor){
+  const resolvedState=resolveMinecraftBlockstate(rawBlockstate,state);
+  const parts=[];
+  if(resolvedState.variant){
+    parts.push(runtimePart('variant',0,await compileAlternativeSet(resolvedState.variant.alternatives,geometryFor)));
+  }
+  for(const multipart of resolvedState.multipart){
+    parts.push(runtimePart('multipart',multipart.index,await compileAlternativeSet(multipart.alternatives,geometryFor)));
+  }
+  if(parts.length===0)throw new Error(`Minecraft model registry block ${descriptor.blockId} resolved to no renderable model parts`);
+  return Object.freeze({
+    blockId:descriptor.blockId,
+    blockstate:descriptor.blockstate,
+    state:resolvedState.state,
+    renderLayer:descriptor.renderLayer,
+    textureLayers:descriptor.textureLayers,
+    parts:Object.freeze(parts)
+  });
 }
 
 export async function compileMinecraftModelRuntime({
@@ -118,23 +145,26 @@ export async function compileMinecraftModelRuntime({
 
   const blocks=Object.create(null);
   for(const descriptor of descriptors){
-    const resolvedState=resolveMinecraftBlockstate(await cachedBlockstate(descriptor.blockstate),descriptor.state);
-    const parts=[];
-    if(resolvedState.variant){
-      parts.push(runtimePart('variant',0,await compileAlternativeSet(resolvedState.variant.alternatives,geometryFor)));
+    const rawBlockstate=await cachedBlockstate(descriptor.blockstate);
+    if(descriptor.stateVariants){
+      const stateTemplates=Object.create(null);
+      for(const state of descriptor.stateVariants){
+        const stateKey=canonicalBlockStateKeyForId(descriptor.blockId,state);
+        if(stateKey===null)throw new TypeError(`Minecraft model registry block ${descriptor.blockId} state variants require a canonical block-state schema`);
+        if(Object.hasOwn(stateTemplates,stateKey))throw new Error(`Minecraft model registry block ${descriptor.blockId} contains duplicate state variant ${stateKey}`);
+        stateTemplates[stateKey]=await compileStateTemplate(descriptor,state,rawBlockstate,geometryFor);
+      }
+      const defaultStateKey=blockDefaultStateKey(descriptor.blockId);
+      if(defaultStateKey===null||!Object.hasOwn(stateTemplates,defaultStateKey))throw new Error(`Minecraft model registry block ${descriptor.blockId} must compile its canonical default state`);
+      const defaultTemplate=stateTemplates[defaultStateKey];
+      blocks[descriptor.blockId]=Object.freeze({
+        ...defaultTemplate,
+        defaultStateKey,
+        stateTemplates:Object.freeze(stateTemplates)
+      });
+    }else{
+      blocks[descriptor.blockId]=await compileStateTemplate(descriptor,descriptor.state,rawBlockstate,geometryFor);
     }
-    for(const multipart of resolvedState.multipart){
-      parts.push(runtimePart('multipart',multipart.index,await compileAlternativeSet(multipart.alternatives,geometryFor)));
-    }
-    if(parts.length===0)throw new Error(`Minecraft model registry block ${descriptor.blockId} resolved to no renderable model parts`);
-    blocks[descriptor.blockId]=Object.freeze({
-      blockId:descriptor.blockId,
-      blockstate:descriptor.blockstate,
-      state:resolvedState.state,
-      renderLayer:descriptor.renderLayer,
-      textureLayers:descriptor.textureLayers,
-      parts:Object.freeze(parts)
-    });
   }
 
   return Object.freeze({
@@ -183,6 +213,27 @@ export async function loadMinecraftModelRuntime({
   });
 }
 
+function assertTemplate(template,id,label){
+  object(template,label);
+  if(template.blockId!==id)throw new RangeError(`${label} identity mismatch`);
+  renderLayer(template.renderLayer,`${label}.renderLayer`);
+  object(template.textureLayers??{},`${label}.textureLayers`);
+  if(!Array.isArray(template.parts)||template.parts.length===0)throw new TypeError(`${label}.parts must be a non-empty array`);
+  for(const [partIndex,part] of template.parts.entries()){
+    object(part,`${label}.parts[${partIndex}]`);
+    const alternatives=object(part.alternatives,`${label}.parts[${partIndex}].alternatives`);
+    if(!Array.isArray(alternatives.models)||alternatives.models.length===0||!Number.isSafeInteger(alternatives.totalWeight)||alternatives.totalWeight<=0){
+      throw new TypeError(`${label}.parts[${partIndex}] has invalid alternatives`);
+    }
+    for(const alternative of alternatives.models){
+      object(alternative,`${label}.parts[${partIndex}] alternative`);
+      if(!Number.isSafeInteger(alternative.weight)||alternative.weight<=0)throw new TypeError('Minecraft model runtime alternative weight must be positive');
+      if(!alternative.model||!Array.isArray(alternative.model.faces))throw new TypeError('Minecraft model runtime alternative must contain compiled model faces');
+    }
+  }
+  return template;
+}
+
 export function assertMinecraftModelRuntime(value){
   object(value,'Minecraft model runtime');
   if(value.format!==MINECRAFT_MODEL_RUNTIME_VERSION)throw new RangeError(`Minecraft model runtime format must be ${MINECRAFT_MODEL_RUNTIME_VERSION}`);
@@ -194,21 +245,15 @@ export function assertMinecraftModelRuntime(value){
     const id=blockId(rawId,'Minecraft model runtime block id');
     if(seen.has(id))throw new Error(`duplicate Minecraft model runtime block id: ${id}`);
     seen.add(id);
-    const template=object(value.blocks[id],`Minecraft model runtime block ${id}`);
-    if(template.blockId!==id)throw new RangeError(`Minecraft model runtime block ${id} identity mismatch`);
-    renderLayer(template.renderLayer,`Minecraft model runtime block ${id}.renderLayer`);
-    object(template.textureLayers??{},`Minecraft model runtime block ${id}.textureLayers`);
-    if(!Array.isArray(template.parts)||template.parts.length===0)throw new TypeError(`Minecraft model runtime block ${id}.parts must be a non-empty array`);
-    for(const [partIndex,part] of template.parts.entries()){
-      object(part,`Minecraft model runtime block ${id}.parts[${partIndex}]`);
-      const alternatives=object(part.alternatives,`Minecraft model runtime block ${id}.parts[${partIndex}].alternatives`);
-      if(!Array.isArray(alternatives.models)||alternatives.models.length===0||!Number.isSafeInteger(alternatives.totalWeight)||alternatives.totalWeight<=0){
-        throw new TypeError(`Minecraft model runtime block ${id}.parts[${partIndex}] has invalid alternatives`);
-      }
-      for(const alternative of alternatives.models){
-        object(alternative,`Minecraft model runtime block ${id}.parts[${partIndex}] alternative`);
-        if(!Number.isSafeInteger(alternative.weight)||alternative.weight<=0)throw new TypeError('Minecraft model runtime alternative weight must be positive');
-        if(!alternative.model||!Array.isArray(alternative.model.faces))throw new TypeError('Minecraft model runtime alternative must contain compiled model faces');
+    const template=assertTemplate(value.blocks[id],id,`Minecraft model runtime block ${id}`);
+    if(template.stateTemplates!==undefined){
+      if(typeof template.defaultStateKey!=='string'||template.defaultStateKey.length===0)throw new TypeError(`Minecraft model runtime block ${id}.defaultStateKey must be a non-empty string`);
+      const stateTemplates=object(template.stateTemplates,`Minecraft model runtime block ${id}.stateTemplates`);
+      if(!Object.hasOwn(stateTemplates,template.defaultStateKey))throw new RangeError(`Minecraft model runtime block ${id} is missing its default state template`);
+      for(const [stateKey,stateTemplate] of Object.entries(stateTemplates)){
+        parseCanonicalBlockStateKeyForId(id,stateKey);
+        assertTemplate(stateTemplate,id,`Minecraft model runtime block ${id} state ${stateKey}`);
+        if(canonicalBlockStateKeyForId(id,stateTemplate.state)!==stateKey)throw new RangeError(`Minecraft model runtime block ${id} state template key mismatch: ${stateKey}`);
       }
     }
   }
@@ -231,9 +276,15 @@ export function minecraftModelSelectionHash(x,y,z,blockIdValue,partIndex=0){
   return hash>>>0;
 }
 
-export function minecraftModelTemplate(value,blockIdValue){
-  const runtime=assertMinecraftModelRuntime(value),id=blockId(blockIdValue);
-  return runtime.blocks[id]||null;
+export function minecraftModelTemplate(value,blockIdValue,stateKey=null){
+  const runtime=assertMinecraftModelRuntime(value),id=blockId(blockIdValue),template=runtime.blocks[id]||null;
+  if(!template)return null;
+  if(!template.stateTemplates)return template;
+  const key=stateKey===null||stateKey===undefined?template.defaultStateKey:stateKey;
+  parseCanonicalBlockStateKeyForId(id,key);
+  const selected=template.stateTemplates[key];
+  if(!selected)throw new RangeError(`Minecraft model runtime block ${id} has no compiled state template for ${key}`);
+  return selected;
 }
 
 export function instantiateMinecraftModelTemplate(template,x,y,z,{selectionX=x,selectionY=y,selectionZ=z}={}){
