@@ -2,7 +2,7 @@ import {BLOCKS,CHUNK_SIZE,WORLD_HEIGHT,ATLAS_COLS,ATLAS_ROWS,tileForFace} from '
 import {bedVisualDescriptor} from './bed-model-specs.js';
 import {buildMinecraftModelMeshBatches} from './minecraft-model-mesh-batch.js';
 import {createMinecraftModelAtlasResolver,createMinecraftModelTextureBinding} from './minecraft-model-texture-binding.js';
-import {assertMinecraftModelRuntime,instantiateMinecraftModelTemplate,minecraftModelTemplate,minecraftModelTextureLayerResolver} from './minecraft-model-runtime.js';
+import {assertMinecraftModelRuntime,instantiateMinecraftModelTemplate,minecraftModelTextureLayerResolver} from './minecraft-model-runtime.js';
 
 const FACES=[
   {n:[1,0,0],name:'east',v:[[1,0,0],[1,1,0],[1,1,1],[1,0,1]]},
@@ -98,8 +98,6 @@ function modelCullFaceVisible(context,blockAt){
   const neighbor=blockAt(context.x+offset[0],context.y+offset[1],context.z+offset[2]);
   if(!neighbor)return true;
   const current=BLOCKS[context.instance.blockId]||BLOCKS[0],block=BLOCKS[neighbor]||BLOCKS[0];
-  // Identical transparent full cubes such as glass must not render two hidden
-  // coplanar faces between them. Other transparent boundaries stay visible.
   if(neighbor===context.instance.blockId&&current.solid&&current.transparent&&current.fullCube!==false)return false;
   return block.fullCube===false||!block.solid||!!block.transparent;
 }
@@ -121,13 +119,20 @@ function sparseStateKeys(rows,data){
   return result;
 }
 
+function modelTemplateForValidatedRuntime(id,stateKey){
+  const template=minecraftModelRuntime.blocks[id];
+  if(!template)return null;
+  if(!template.stateTemplates)return template;
+  const key=stateKey??template.defaultStateKey,selected=template.stateTemplates[key];
+  if(!selected)throw new RangeError(`Minecraft model runtime block ${id} has no compiled state template for ${key}`);
+  return selected;
+}
+
 function collectModelInstances(data,cx,cz,blockStates){
   if(!minecraftModelRuntime)return[];
   const stateKeys=sparseStateKeys(blockStates,data),instances=[];
   for(let y=0;y<WORLD_HEIGHT;y++)for(let z=0;z<CHUNK_SIZE;z++)for(let x=0;x<CHUNK_SIZE;x++){
-    const cell=index(x,y,z),id=data[cell];
-    if(!minecraftModelRuntime.blocks[id])continue;
-    const template=minecraftModelTemplate(minecraftModelRuntime,id,stateKeys.get(cell)??null);
+    const cell=index(x,y,z),id=data[cell],template=modelTemplateForValidatedRuntime(id,stateKeys.get(cell)??null);
     if(!template)continue;
     instances.push(...instantiateMinecraftModelTemplate(template,x,y,z,{
       selectionX:cx*CHUNK_SIZE+x,
