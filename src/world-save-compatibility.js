@@ -1,4 +1,5 @@
 import {SUPPORTED_TERRAIN_GENERATOR_VERSIONS,TERRAIN_GENERATOR_VERSION,normalizeTerrainGeneratorVersion} from './terrain-generator.js';
+import {BlockStateSidecar} from './block-state-sidecar.js';
 
 export const LEGACY_UNVERSIONED_TERRAIN_GENERATOR_VERSION=2;
 export const TERRAIN_VERSIONED_SAVE_MIN_VERSION=8;
@@ -30,7 +31,7 @@ export function resolveSingleplayerBlockStates(record=null){
   }
   const states=record.blockStates;
   if(states===null||typeof states!=='object'||Array.isArray(states))throw new TypeError('singleplayer blockStates must be an object');
-  return states;
+  return new BlockStateSidecar(states).export();
 }
 
 export function supportedSingleplayerTerrainVersions(){return [...SUPPORTED_TERRAIN_GENERATOR_VERSIONS];}
