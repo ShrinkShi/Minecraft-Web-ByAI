@@ -1,4 +1,5 @@
 import {BLOCK,BLOCKS,CHUNK_SIZE,WORLD_HEIGHT} from '../src/blocks.js';
+import {blockIdentityEqual,blockIdentityFromKey} from '../src/block-state-sidecar.js';
 import {createTerrainGenerator,terrainChunkIndex} from '../src/terrain-generator.js';
 
 export const DEFAULT_SERVER_TERRAIN_CACHE_CHUNKS=256;
@@ -19,15 +20,17 @@ export class ServerTerrainWorld{
   #generator;
   #cache;
   #edits;
+  #stateEdits;
   #revision;
 
   constructor({seed='1',prompt='',maxCacheChunks=DEFAULT_SERVER_TERRAIN_CACHE_CHUNKS}={}){
-    this.seed=String(seed||'1');this.prompt=String(prompt||'');this.maxCacheChunks=cacheLimit(maxCacheChunks);this.#generator=createTerrainGenerator({seed:this.seed,prompt:this.prompt});this.#cache=new Map();this.#edits=new Map();this.#revision=0;
+    this.seed=String(seed||'1');this.prompt=String(prompt||'');this.maxCacheChunks=cacheLimit(maxCacheChunks);this.#generator=createTerrainGenerator({seed:this.seed,prompt:this.prompt});this.#cache=new Map();this.#edits=new Map();this.#stateEdits=new Map();this.#revision=0;
     this.environment=Object.freeze({isSolidBlock:(x,y,z)=>this.isSolidBlock(x,y,z),isLiquidBlock:(x,y,z)=>this.isLiquidBlock(x,y,z)});
   }
 
   get cacheSize(){return this.#cache.size;}
-  get editCount(){return this.#edits.size;}
+  get editCount(){return new Set([...this.#edits.keys(),...this.#stateEdits.keys()]).size;}
+  get stateEditCount(){return this.#stateEdits.size;}
   get revision(){return this.#revision;}
   clearCache(){this.#cache.clear();}
   hasCachedChunk(cx,cz){return this.#cache.has(chunkKey(integer(cx,'cx'),integer(cz,'cz')));}
@@ -60,13 +63,28 @@ export class ServerTerrainWorld{
 
   getBlock(wx,wy,wz){wx=integer(wx,'wx');wy=integer(wy,'wy');wz=integer(wz,'wz');if(wy<0)return BLOCK.STONE;if(wy>=WORLD_HEIGHT)return BLOCK.AIR;const edited=this.#edits.get(editKey(wx,wy,wz));return edited===undefined?this.getBaseBlock(wx,wy,wz):edited;}
 
-  setBlock(wx,wy,wz,id){
-    wx=integer(wx,'wx');wy=editableY(wy);wz=integer(wz,'wz');id=blockId(id);const previous=this.getBlock(wx,wy,wz),base=this.getBaseBlock(wx,wy,wz),key=editKey(wx,wy,wz);if(previous===id)return Object.freeze({changed:false,revision:this.#revision,x:wx,y:wy,z:wz,previous,id,base,storedEdit:this.#edits.has(key)});
-    if(id===base)this.#edits.delete(key);else this.#edits.set(key,id);this.#revision=(this.#revision+1)>>>0;return Object.freeze({changed:true,revision:this.#revision,x:wx,y:wy,z:wz,previous,id,base,storedEdit:this.#edits.has(key)});
+  getBlockState(wx,wy,wz){
+    wx=integer(wx,'wx');wy=integer(wy,'wy');wz=integer(wz,'wz');const id=this.getBlock(wx,wy,wz),stateKey=wy>=0&&wy<WORLD_HEIGHT?this.#stateEdits.get(editKey(wx,wy,wz))??null:null;return blockIdentityFromKey(id,stateKey);
   }
 
-  editEntries(){const entries=[];for(const[key,id]of this.#edits){const{x,y,z}=parseEditKey(key);entries.push({x,y,z,id});}entries.sort((a,b)=>a.x-b.x||a.z-b.z||a.y-b.y||a.id-b.id);return entries.map(Object.freeze);}
+  setBlock(wx,wy,wz,id){return this.setBlockStateKey(wx,wy,wz,id,null);}
+
+  setBlockStateKey(wx,wy,wz,id,stateKey=null){
+    wx=integer(wx,'wx');wy=editableY(wy);wz=integer(wz,'wz');id=blockId(id);const previousIdentity=this.getBlockState(wx,wy,wz),nextIdentity=blockIdentityFromKey(id,stateKey),base=this.getBaseBlock(wx,wy,wz),key=editKey(wx,wy,wz),defaultIdentity=blockIdentityFromKey(nextIdentity.id,null);
+    if(blockIdentityEqual(previousIdentity,nextIdentity))return Object.freeze({changed:false,revision:this.#revision,x:wx,y:wy,z:wz,previous:previousIdentity.id,previousStateKey:previousIdentity.stateKey,id:nextIdentity.id,stateKey:nextIdentity.stateKey,base,storedEdit:this.#edits.has(key),storedStateEdit:this.#stateEdits.has(key)});
+    if(nextIdentity.id===base)this.#edits.delete(key);else this.#edits.set(key,nextIdentity.id);
+    if(nextIdentity.stateKey===defaultIdentity.stateKey)this.#stateEdits.delete(key);else this.#stateEdits.set(key,nextIdentity.stateKey);
+    this.#revision=(this.#revision+1)>>>0;
+    return Object.freeze({changed:true,revision:this.#revision,x:wx,y:wy,z:wz,previous:previousIdentity.id,previousStateKey:previousIdentity.stateKey,id:nextIdentity.id,stateKey:nextIdentity.stateKey,base,storedEdit:this.#edits.has(key),storedStateEdit:this.#stateEdits.has(key)});
+  }
+
+  editEntries(){
+    const entries=[],keys=new Set([...this.#edits.keys(),...this.#stateEdits.keys()]);
+    for(const key of keys){const{x,y,z}=parseEditKey(key),identity=this.getBlockState(x,y,z);entries.push({x,y,z,id:identity.id,stateKey:identity.stateKey});}
+    entries.sort((a,b)=>a.x-b.x||a.z-b.z||a.y-b.y||a.id-b.id||String(a.stateKey??'').localeCompare(String(b.stateKey??'')));return entries.map(Object.freeze);
+  }
   exportEdits(){const result={};for(const{x,y,z,id}of this.editEntries())result[editKey(x,y,z)]=id;return result;}
+  exportBlockStates(){const result={};for(const{x,y,z,id,stateKey}of this.editEntries())if(this.#stateEdits.has(editKey(x,y,z)))result[editKey(x,y,z)]=Object.freeze({id,stateKey});return result;}
   isSolidBlock(x,y,z){return !!BLOCKS[this.getBlock(x,y,z)]?.solid;}
   isLiquidBlock(x,y,z){return !!BLOCKS[this.getBlock(x,y,z)]?.liquid;}
   highestSolid(x,z){const wx=Math.floor(finite(x,'x')),wz=Math.floor(finite(z,'z'));for(let y=WORLD_HEIGHT-1;y>=0;y--)if(this.isSolidBlock(wx,y,wz))return y;return 0;}
