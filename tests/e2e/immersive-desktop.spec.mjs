@@ -12,6 +12,13 @@ test('desktop gameplay renders a real 3D first-person viewmodel with attack/use 
   await expect(viewCanvas).toHaveCount(1);await expect(viewCanvas).toBeVisible();
   await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E?.firstPersonViewModel?.())).toMatchObject({visible:true,itemId:'block:1',armGeometry:'BoxGeometry',sleeveGeometry:'BoxGeometry',itemGeometry:'3d'});
 
+  const ctrlWheelPrevented=await canvas.evaluate(element=>{
+    const event=new WheelEvent('wheel',{deltaY:120,ctrlKey:true,cancelable:true});
+    element.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(ctrlWheelPrevented).toBe(true);
+
   await page.keyboard.press('F3');await expect(debug).not.toHaveClass(/hidden/);await expect(debug).toContainText('Minecraft Web By AI');await page.keyboard.press('F3');await expect(debug).toHaveClass(/hidden/);
 
   await page.keyboard.press('F5');await expect(canvas).toHaveAttribute('data-view-mode','1');await expect.poll(()=>page.evaluate(()=>globalThis.__minecraftE2E.firstPersonViewModel().visible)).toBe(false);await expect(viewCanvas).toBeHidden();await expect(page.locator('#toast')).toContainText('第三人称背面');

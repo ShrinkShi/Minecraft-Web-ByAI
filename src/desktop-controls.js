@@ -48,10 +48,10 @@ export class DesktopControls{
       else if(e.button===2){publishFirstPersonAction('use');this.bus.setSecondary(this.source,true);}
     };
     this.onMouseUp=e=>{if(e.button===0)this.bus.setButton(this.source,'primary',false);else if(e.button===2)this.bus.setSecondary(this.source,false);};
-    this.onWheel=e=>{if(!this.gameplayEnabled)return;this.bus.action(this.source,'hotbar-step',{step:e.deltaY>0?1:-1});};
+    this.onWheel=e=>{if(!this.gameplayEnabled)return;e.preventDefault();this.bus.action(this.source,'hotbar-step',{step:e.deltaY>0?1:-1});};
     this.onCanvasClick=()=>this.bus.action(this.source,'focus');
     this.onWindowBlur=()=>{this.pointerMoveReady=false;this.reset();};
-    window.addEventListener('keydown',this.onKeyDown);window.addEventListener('keyup',this.onKeyUp);window.addEventListener('blur',this.onWindowBlur);document.addEventListener('mousemove',this.onMouseMove);this.canvas.addEventListener('mousedown',this.onMouseDown);window.addEventListener('mouseup',this.onMouseUp);this.canvas.addEventListener('wheel',this.onWheel,{passive:true});this.canvas.addEventListener('click',this.onCanvasClick);
+    window.addEventListener('keydown',this.onKeyDown);window.addEventListener('keyup',this.onKeyUp);window.addEventListener('blur',this.onWindowBlur);document.addEventListener('mousemove',this.onMouseMove);this.canvas.addEventListener('mousedown',this.onMouseDown);window.addEventListener('mouseup',this.onMouseUp);this.canvas.addEventListener('wheel',this.onWheel,{passive:false});this.canvas.addEventListener('click',this.onCanvasClick);
   }
 
   syncContinuous(){
