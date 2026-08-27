@@ -1,12 +1,12 @@
-# Project Baseline — 2026-08-26
+# Project Baseline — 2026-08-27
 
 This document records **merged `main` only**. Open PR work is excluded from merged facts.
 
 ## Authority
 
 - Branch: `main`
-- Commit: `9edb249f1f5c44dc9f4f0098fc4d7395b41974e7`
-- Includes merged work through PR #138.
+- Commit: `299c64b04df1f4280d0b2b399a1abdcb38b4bf75`
+- Includes merged work through PR #143.
 - Development line: `v0.4.0-dev`.
 - Strict Minecraft Java 1.20.1 gameplay/content parity remains a planning estimate of about **35%**. Engine, source-resource and multiplayer-authority foundations are materially further along than total content breadth.
 
@@ -27,7 +27,104 @@ Merged main provides:
 - compact voxel chunks, terrain/mesh Workers, bounded chunk streaming/unload/disposal and merged geometry;
 - selected-root Minecraft blockstate/model interpretation with parent/texture inheritance, variants/multipart, rotations, uvlock/cull/tint metadata and opaque/cutout/translucent batching.
 
-The generic interpreted-model acceptance closure after PR #138 is **24 blockstates / 70 block models / 39 textures / 0 metadata**. The deterministic model texture atlas remains **128×128**, SHA-256 `28dea729513157f790032964dc4607a88ba6657e72d3e9eca5a9cc85fa5ce1b5`. Tracked runtime/source manifests are byte-compared against regenerated CI output.
+The generic interpreted-model acceptance closure after PR #138 remains **24 blockstates / 70 block models / 39 textures / 0 metadata**. The deterministic model texture atlas remains **128×128**, SHA-256 `28dea729513157f790032964dc4607a88ba6657e72d3e9eca5a9cc85fa5ce1b5`.
+
+## Registry / blocks / world
+
+Block IDs remain append-only. Current merged gameplay families include:
+
+- grass/dirt/stone/sand/cobblestone;
+- oak planks/log/leaves plus stripped oak log;
+- granite, diorite and andesite;
+- spruce, birch, jungle, acacia, dark oak, mangrove and cherry planks;
+- water, crafting table, glass, furnace, iron ore and coal ore;
+- farmland moisture 0..7, wheat age 0..7, dirt path and short grass;
+- directional red-bed states.
+
+PR #138 appended IDs **44..53** for granite/diorite/andesite and seven additional wood plank species without reordering existing IDs. These source-backed full cubes use the declarative Minecraft blockstate/model path rather than per-block renderer special cases.
+
+Current terrain generator is **v4**:
+
+- v2 remains the explicit pre-coal compatibility path;
+- v3 adds deterministic coal while preserving v2 compatibility;
+- v4 adds deterministic short-grass surface decoration;
+- persisted worlds remain pinned to their recorded terrain version;
+- multiplayer requires the exact current terrain version.
+
+Java biome/climate generation, caves/aquifers, broad features/structures, full vertical range, Nether and End remain unimplemented.
+
+## Stateful block foundation
+
+The previous “one block ID per state” approach is no longer the intended expansion path for new stateful families.
+
+### Phase A — canonical property schemas, merged in PR #140
+
+Merged main includes a pure block-state schema layer with:
+
+- enum, boolean and bounded-integer properties;
+- strict validation and unknown-property rejection;
+- deterministic property ordering;
+- canonical `name=value,...` state keys and strict parse/round-trip;
+- representative schemas for log `axis`, furnace `facing/lit`, farmland `moisture`, wheat `age`, slab `type/waterlogged`, stair `facing/half/shape/waterlogged`, fence connectivity/waterlogged and door `facing/half/hinge/open/powered`.
+
+Existing furnace/farmland/wheat descriptors can consume normalized schema output without a second translation layer. This does not yet mean those legacy ID-encoded families have been migrated to the new sidecar representation.
+
+### Phase B1 — sparse in-memory state sidecar, merged in PR #142
+
+`VoxelWorld` keeps its dense `Uint8Array` block-ID fast path and adds a sparse `BlockStateSidecar` for non-default properties.
+
+Merged APIs include:
+
+- `getBlockState()`;
+- `setBlockState()`;
+- `exportBlockStates()`;
+- `savedBlockStates` constructor input;
+- independent `onBlockStateEdit` notification.
+
+Current sidecar registry opts in oak log, stripped oak log and furnace. A block identity is `{id,stateKey}`. Stateful default keys are canonical but elided from sparse storage; stateless blocks use `stateKey:null`. Sidecar rows retain their owning block ID and are reconciled against generated/edited dense IDs so stale properties cannot leak across ID replacement.
+
+Ordinary `setBlock()` remains compatible and means “set this ID in its canonical default state”. Legacy `onEdit` remains ID-only.
+
+### Phase B2a — singleplayer persistence, merged in PR #143
+
+Singleplayer save schema is now **v11** and persists:
+
+- existing sparse numeric `edits`;
+- new sparse `blockStates` sidecar.
+
+Compatibility is explicit:
+
+- pre-v11 saves with no `blockStates` migrate as canonical default states;
+- v11+ records missing `blockStates` are rejected rather than silently discarding properties;
+- present sidecars are validated through `BlockStateSidecar` before world construction;
+- terrain-version pinning is unchanged;
+- status effects remain a v10 persistence feature floor while the current schema is allowed to advance.
+
+### Not yet merged at this baseline
+
+Merged `main` does **not** yet contain:
+
+- multiplayer block-property transport/server authority;
+- a world-edit wire carrying `stateKey`;
+- mesh-worker/model-runtime state payloads from the sidecar;
+- property-aware placement/collision/interaction for logs/slabs/stairs/fences/doors;
+- broad stateful family registry expansion.
+
+Those items must not be inferred merely from the presence of schemas or the sidecar.
+
+## Persistence / compatibility
+
+Merged compatibility boundary at `main 299c64b04df1f4280d0b2b399a1abdcb38b4bf75`:
+
+- Singleplayer save schema: **v11**.
+- Block-state save feature floor: **v11**.
+- Terrain generator: **v4**.
+- Multiplayer handshake/subprotocol: **v5 / `minecraft-web-v5`**.
+- Player action frame: **v3**.
+- Historical `CREATIVE_START` order/slot mapping remains stable.
+- Block/item IDs remain append-only.
+
+A later open PR may intentionally bump another compatibility surface; until merged, this section remains the authority for `main`.
 
 ## Creative mode
 
@@ -42,43 +139,6 @@ Merged Creative behavior includes:
 - historical `CREATIVE_START` ordering and starter-slot mapping unchanged.
 
 Java 1.20.1 operator tabs, saved hotbars, complete registry breadth, full search tags and complete Creative command parity remain incomplete.
-
-## Registry / blocks / world
-
-Block IDs are append-only. Current merged gameplay families include:
-
-- grass/dirt/stone/sand/cobblestone;
-- oak planks/log/leaves plus stripped oak log;
-- granite, diorite and andesite;
-- spruce, birch, jungle, acacia, dark oak, mangrove and cherry planks;
-- water, crafting table, glass, furnace, iron ore and coal ore;
-- farmland moisture 0..7, wheat age 0..7, dirt path and short grass;
-- directional red-bed states.
-
-PR #138 appends IDs **44..53** for granite/diorite/andesite and seven additional wood plank species without reordering existing IDs. Oak planks and IDs 44..53 use canonical Java 1.20.1 source-backed blockstate/model/texture resources through the declarative `MINECRAFT_SIMPLE_FULL_CUBE_MODELS` path.
-
-The voxel world cell payload still stores **block ID only**. Existing stateful behavior therefore uses either separate append-only IDs (bed direction, farmland moisture, wheat age) or a fixed visual state (current furnace north/unlit). A general persisted block-property/state layer for `axis`, `facing`, `half`, `shape`, `open`, `waterlogged`, etc. is not yet merged.
-
-Current terrain generator is **v4**:
-
-- v2 remains the explicit pre-coal compatibility path;
-- v3 adds deterministic coal while preserving v2 compatibility;
-- v4 adds deterministic short-grass surface decoration;
-- persisted worlds remain pinned to their recorded terrain version;
-- multiplayer requires the exact current terrain version.
-
-Java biome/climate generation, caves/aquifers, broad features/structures, full vertical range, Nether and End remain unimplemented. The new PR #138 registry blocks are Creative-obtainable but are not added to worldgen distribution.
-
-## Persistence / compatibility
-
-- Singleplayer save schema: **v10**.
-- Terrain generator: **v4**.
-- Multiplayer handshake/subprotocol: **v5 / `minecraft-web-v5`**.
-- Player action frame: **v3**.
-- Historical `CREATIVE_START` order/slot mapping remains stable.
-- Block/item IDs remain append-only.
-
-Singleplayer save v10 persists normalized active status effects. `terrainVersion` remains required from schema v8 onward. Active input/use gestures remain transient rather than persisted.
 
 ## Farming / food / processing
 
@@ -128,9 +188,9 @@ Current mobs are cow, sheep, pig, chicken, zombie, skeleton, creeper and spider.
 
 The merged Node WebSocket runtime owns:
 
-- handshake/session/input validation and replay guards;
+- v5 handshake/session/input validation and replay guards;
 - 20 Hz movement/collision and player snapshots;
-- deterministic terrain + revisioned sparse world edits;
+- deterministic terrain + revisioned **ID-only** sparse world edits;
 - mining, placement and till/strip/flatten;
 - ground items/drop/pickup;
 - Inventory/cursor/item damage, Equipment, 2×2 crafting and transient 3×3 Workbench;
@@ -141,7 +201,7 @@ The merged Node WebSocket runtime owns:
 - revisioned Hunger/status effects/active food use;
 - server sprint gating, exhaustion, regeneration and starvation.
 
-The server does not yet own farming/random ticks/bone meal, mobs/PvE/projectiles/explosions, XP/levels, durable world/block-entity persistence or a generic block-property state layer. Missing multiplayer domains remain disabled rather than replaced by client-side competing truth.
+At this baseline the server does not own generic block-property state, farming/random ticks/bone meal, mobs/PvE/projectiles/explosions, XP/levels or durable world/block-entity persistence. Missing multiplayer domains remain disabled rather than replaced by client-side competing truth.
 
 ## Original Minecraft resources / audio
 
@@ -160,25 +220,28 @@ Repository quality is exact-head based:
 5. browser integration where Three.js/CSS/WebAudio/HTTP boundaries matter;
 6. final base-drift and review-surface checks.
 
-PR #138 final head `a40ac69137a0636f6831ba3e91d1590e676ad730` passed:
+PR #143 final head `9f1fe7bc7238b52bda011bb5355a67c0e4dfde4e` passed Repository quality run `33050099078` / #1314:
 
-- Minecraft asset source audit #317 (`32971126562`);
-- Repository quality #1296 (`32971126568`): static checks, Chromium 1/2 and Chromium 2/2 all succeeded;
-- final compare against `main 7dafe9f23700ae57af261d357339cc673eb4afb6`: ahead 21 / behind 0;
-- reviews 0, review threads 0, PR comments 0.
+- static checks: success;
+- browser-smoke shard 1/2: success;
+- browser-smoke shard 2/2: success;
+- reviews: 0;
+- review threads: 0;
+- comments: 0;
+- final branch relation to its base: ahead only / behind 0.
 
-It was squash-merged as `9edb249f1f5c44dc9f4f0098fc4d7395b41974e7`.
+PR #143 was squash-merged as `299c64b04df1f4280d0b2b399a1abdcb38b4bf75`.
 
 A green older head never validates a newer head.
 
 ## Next planned delivery
 
-The next continuous development slice is **Stateful registry families foundation**:
+Starting from this merged baseline, the next dependency order is:
 
-1. define reusable, canonical block-property schemas and deterministic state keys for properties such as `axis`, horizontal `facing`, `half`, stair `shape`, door `hinge/open/powered`, fence connectivity and `waterlogged`;
-2. decide and implement the world/save/network storage boundary for block properties instead of multiplying block IDs per state;
-3. feed normalized state properties into the existing Java 1.20.1 blockstate/model interpreter;
-4. add placement/collision/interaction rules only after the state representation is deterministic and persistence-safe;
-5. then expand common logs/slabs/stairs/fences/doors by wood species using data-driven family registration.
+1. **Phase B2b:** server-authoritative block identity + multiplayer snapshot/incremental transport, with an explicit wire/handshake bump if required;
+2. **Phase C1:** carry normalized state into the mesh/model runtime and prove log `axis` end to end;
+3. property-aware placement for representative logs;
+4. slabs → stairs → fences → doors, including collision/selection/interaction semantics;
+5. only after family infrastructure is stable, expand spruce/birch/jungle/acacia/dark oak/mangrove/cherry stateful entries.
 
-Broader worldgen, server-authoritative PvE/XP/persistence and deeper farming parity remain subsequent planned slices.
+Do not use per-state block-ID explosion or renderer-only state as a shortcut around this dependency chain.
