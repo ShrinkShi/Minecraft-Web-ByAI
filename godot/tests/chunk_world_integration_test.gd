@@ -5,6 +5,9 @@ const BlockRegistry = preload("res://godot/scripts/block_registry.gd")
 const TerrainGeneratorRuntime = preload("res://godot/scripts/terrain_generator.gd")
 
 func _init() -> void:
+	call_deferred("_run")
+
+func _run() -> void:
 	var world = VoxelWorldRuntime.new()
 	world.render_distance = 0
 	world.chunk_install_budget = 1
@@ -12,10 +15,10 @@ func _init() -> void:
 	get_root().add_child(world)
 
 	if world.loaded_chunk_count() != 1:
-		_fail(world, "native VoxelWorld did not synchronously prime exactly one spawn chunk")
+		_fail(world, "native VoxelWorld expected one synchronously primed spawn chunk, got %d" % world.loaded_chunk_count())
 		return
 	if not world.has_chunk_mesh(Vector2i.ZERO) or world.generated_chunk_node_count() != 1:
-		_fail(world, "native VoxelWorld did not synchronously build the spawn chunk mesh")
+		_fail(world, "native VoxelWorld expected one synchronous spawn mesh, got %d chunk nodes" % world.generated_chunk_node_count())
 		return
 	var chunk_node: Node = world.get_node_or_null("Chunk_0_0")
 	if chunk_node == null or chunk_node.get_node_or_null("Mesh") == null or chunk_node.get_node_or_null("Collision") == null:
