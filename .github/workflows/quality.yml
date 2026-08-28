@@ -93,6 +93,19 @@ jobs:
             exit 1
           fi
           grep -F 'Godot transparent water/foliage world pass: PASS' /tmp/godot-transparent-world.log
+      - name: Generate JavaScript save compatibility fixture
+        run: node scripts/generate-godot-save-fixtures.mjs /tmp/godot-save-fixtures.json
+      - name: Godot native save compatibility codec
+        env:
+          GODOT_SAVE_FIXTURE: /tmp/godot-save-fixtures.json
+        run: |
+          set -euo pipefail
+          timeout 30s godot --headless --path . --script godot/tests/world_save_runtime_test.gd 2>&1 | tee /tmp/godot-world-save.log
+          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file' /tmp/godot-world-save.log; then
+            echo 'Godot native save compatibility codec reported script errors.' >&2
+            exit 1
+          fi
+          grep -F 'Godot native save compatibility codec: PASS' /tmp/godot-world-save.log
 
   browser-smoke:
     needs: static-checks
