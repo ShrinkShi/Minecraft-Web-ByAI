@@ -8,3 +8,9 @@ test-results/
 __pycache__/
 *.py[cod]
 build/
+
+# Godot generated/editor state
+.godot/
+*.tmp
+*.pck
+exports/
