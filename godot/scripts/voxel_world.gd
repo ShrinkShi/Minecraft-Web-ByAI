@@ -120,11 +120,14 @@ func _material_for_texture(texture_path: String) -> StandardMaterial3D:
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	material.roughness = 1.0
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	var texture := load(texture_path) as Texture2D
-	if texture == null:
+	if not FileAccess.file_exists(texture_path):
 		push_warning("Missing Minecraft texture: %s" % texture_path)
 	else:
-		material.albedo_texture = texture
+		var image := Image.load_from_file(texture_path)
+		if image == null or image.is_empty():
+			push_warning("Failed to decode Minecraft texture: %s" % texture_path)
+		else:
+			material.albedo_texture = ImageTexture.create_from_image(image)
 	_materials[texture_path] = material
 	return material
 

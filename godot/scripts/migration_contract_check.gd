@@ -24,6 +24,6 @@ static func run() -> void:
 	assert(BlockStateCodec.normalized_key("waterlogged=false,axis=x") == canonical)
 	assert(BlockStateCodec.parse_key(canonical) == {"axis": "x", "waterlogged": "false"})
 
-	assert(ResourceLoader.exists(BlockRegistry.texture_for_face(BlockRegistry.GRASS, "top")))
-	assert(ResourceLoader.exists(BlockRegistry.texture_for_face(BlockRegistry.DIRT, "side")))
-	assert(ResourceLoader.exists(BlockRegistry.texture_for_face(BlockRegistry.STONE, "side")))
+	assert(FileAccess.file_exists(BlockRegistry.texture_for_face(BlockRegistry.GRASS, "top")))
+	assert(FileAccess.file_exists(BlockRegistry.texture_for_face(BlockRegistry.DIRT, "side")))
+	assert(FileAccess.file_exists(BlockRegistry.texture_for_face(BlockRegistry.STONE, "side")))
