@@ -175,7 +175,7 @@ func generate_chunk(cx: int, cz: int) -> PackedByteArray:
 				_set_block(chunk, lx, y, lz, BlockRegistry.WATER)
 			if top > int(parameters["sea"]) + 1 and chunk[terrain_chunk_index(lx, top, lz)] == BlockRegistry.GRASS and hash2(wx * 7, wz * 7) < float(parameters["forest"]) and lx > 2 and lx < 13 and lz > 2 and lz < 13:
 				_tree(chunk, lx, top + 1, lz)
-			if version >= 4 and top > int(parameters["sea"]) + 1 and top + 1 < WORLD_HEIGHT and chunk[terrain_chunk_index(lx, top + 1, lz)] == BlockRegistry.GRASS and chunk[terrain_chunk_index(lx, top + 1, lz)] == BlockRegistry.AIR and is_short_grass_decoration(wx, top + 1, wz):
+			if version >= 4 and top > int(parameters["sea"]) + 1 and top + 1 < WORLD_HEIGHT and chunk[terrain_chunk_index(lx, top, lz)] == BlockRegistry.GRASS and chunk[terrain_chunk_index(lx, top + 1, lz)] == BlockRegistry.AIR and is_short_grass_decoration(wx, top + 1, wz):
 				_set_block(chunk, lx, top + 1, lz, BlockRegistry.SHORT_GRASS)
 	return chunk
 
