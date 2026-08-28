@@ -44,6 +44,15 @@ jobs:
             echo 'Godot native smoke reported parser/resource errors.' >&2
             exit 1
           fi
+      - name: Godot block-state runtime parity checks
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script godot/tests/state_runtime_test.gd 2>&1 | tee /tmp/godot-state.log
+          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file' /tmp/godot-state.log; then
+            echo 'Godot block-state parity reported script errors.' >&2
+            exit 1
+          fi
+          grep -F 'Godot block-state runtime parity checks: PASS' /tmp/godot-state.log
 
   browser-smoke:
     needs: static-checks
