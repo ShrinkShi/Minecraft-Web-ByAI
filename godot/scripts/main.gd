@@ -12,8 +12,8 @@ const INPUT_BINDINGS := {
 }
 
 @onready var environment_node: WorldEnvironment = $WorldEnvironment
-@onready var player: CharacterBody3D = $Player
-@onready var hud: CanvasLayer = $HUD
+@onready var player = $Player
+@onready var hud = $HUD
 
 func _ready() -> void:
 	MigrationContractCheck.run()

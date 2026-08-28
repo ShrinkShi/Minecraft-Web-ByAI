@@ -1,6 +1,9 @@
 class_name VoxelWorld
 extends Node3D
 
+const BlockRegistry = preload("res://godot/scripts/block_registry.gd")
+const BlockStateCodec = preload("res://godot/scripts/block_state_codec.gd")
+
 @export var size_x := 32
 @export var size_z := 32
 @export var base_height := 5
@@ -39,7 +42,7 @@ func generate_demo_terrain() -> void:
 			var height := base_height + int(round(noise.get_noise_2d(float(x), float(z)) * 2.5))
 			height = maxi(height, 2)
 			for y in range(0, height + 1):
-				var block_id := BlockRegistry.STONE
+				var block_id: int = BlockRegistry.STONE
 				if y == height:
 					block_id = BlockRegistry.GRASS
 				elif y >= height - 2:
@@ -52,7 +55,7 @@ func set_block(cell: Vector3i, block_id: int, state_key := "") -> void:
 		_state_keys.erase(cell)
 		return
 	_blocks[cell] = block_id
-	var normalized := BlockStateCodec.normalized_key(str(state_key))
+	var normalized: String = BlockStateCodec.normalized_key(str(state_key))
 	if normalized.is_empty():
 		_state_keys.erase(cell)
 	else:
@@ -77,7 +80,7 @@ func rebuild_mesh() -> void:
 		for face in FACE_DEFINITIONS:
 			if BlockRegistry.is_solid(get_block(cell + face["neighbor"])):
 				continue
-			var texture_path := BlockRegistry.texture_for_face(block_id, str(face["name"]))
+			var texture_path: String = BlockRegistry.texture_for_face(block_id, str(face["name"]))
 			var surface := _surface_for_texture(builders, texture_path)
 			_emit_face(surface, collision_faces, cell, face)
 	for surface_variant in builders.values():

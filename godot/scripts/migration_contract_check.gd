@@ -1,6 +1,9 @@
 class_name MigrationContractCheck
 extends RefCounted
 
+const BlockRegistry = preload("res://godot/scripts/block_registry.gd")
+const BlockStateCodec = preload("res://godot/scripts/block_state_codec.gd")
+
 static func run() -> void:
 	assert(BlockRegistry.AIR == 0)
 	assert(BlockRegistry.GRASS == 1)
@@ -16,7 +19,7 @@ static func run() -> void:
 	assert(BlockRegistry.CHERRY_PLANKS == 53)
 	assert(BlockRegistry.CURRENT_MAX_ID == 53)
 
-	var canonical := BlockStateCodec.canonical_key({"waterlogged": "false", "axis": "x"})
+	var canonical: String = BlockStateCodec.canonical_key({"waterlogged": "false", "axis": "x"})
 	assert(canonical == "axis=x,waterlogged=false")
 	assert(BlockStateCodec.normalized_key("waterlogged=false,axis=x") == canonical)
 	assert(BlockStateCodec.parse_key(canonical) == {"axis": "x", "waterlogged": "false"})
