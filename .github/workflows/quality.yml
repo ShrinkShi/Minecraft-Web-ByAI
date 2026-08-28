@@ -75,6 +75,15 @@ jobs:
             exit 1
           fi
           grep -F 'Godot chunk streaming worker checks: PASS' /tmp/godot-chunk-stream.log
+      - name: Godot streamed VoxelWorld mesh and collision checks
+        run: |
+          set -euo pipefail
+          timeout 30s godot --headless --path . --script godot/tests/chunk_world_integration_test.gd 2>&1 | tee /tmp/godot-chunk-world.log
+          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file' /tmp/godot-chunk-world.log; then
+            echo 'Godot streamed VoxelWorld integration reported script errors.' >&2
+            exit 1
+          fi
+          grep -F 'Godot streamed VoxelWorld mesh/collision integration: PASS' /tmp/godot-chunk-world.log
 
   browser-smoke:
     needs: static-checks
