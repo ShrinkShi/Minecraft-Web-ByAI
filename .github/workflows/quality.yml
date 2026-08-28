@@ -53,6 +53,19 @@ jobs:
             exit 1
           fi
           grep -F 'Godot block-state runtime parity checks: PASS' /tmp/godot-state.log
+      - name: Generate JavaScript terrain compatibility fixtures
+        run: node scripts/generate-godot-terrain-fixtures.mjs /tmp/godot-terrain-fixtures.json
+      - name: Godot terrain compatibility and performance gate
+        env:
+          GODOT_TERRAIN_FIXTURE: /tmp/godot-terrain-fixtures.json
+        run: |
+          set -euo pipefail
+          timeout 30s godot --headless --path . --script godot/tests/terrain_generator_test.gd 2>&1 | tee /tmp/godot-terrain.log
+          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file' /tmp/godot-terrain.log; then
+            echo 'Godot terrain parity reported script errors.' >&2
+            exit 1
+          fi
+          grep -F 'Godot terrain generator compatibility parity: PASS' /tmp/godot-terrain.log
 
   browser-smoke:
     needs: static-checks
