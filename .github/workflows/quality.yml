@@ -84,6 +84,15 @@ jobs:
             exit 1
           fi
           grep -F 'Godot streamed VoxelWorld mesh/collision integration: PASS' /tmp/godot-chunk-world.log
+      - name: Godot transparent water and foliage checks
+        run: |
+          set -euo pipefail
+          timeout 30s godot --headless --path . --script godot/tests/transparent_world_pass_test.gd 2>&1 | tee /tmp/godot-transparent-world.log
+          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file' /tmp/godot-transparent-world.log; then
+            echo 'Godot transparent world pass reported script errors.' >&2
+            exit 1
+          fi
+          grep -F 'Godot transparent water/foliage world pass: PASS' /tmp/godot-transparent-world.log
 
   browser-smoke:
     needs: static-checks
