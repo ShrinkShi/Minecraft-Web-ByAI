@@ -117,6 +117,17 @@ jobs:
             exit 1
           fi
           grep -F 'Godot restored edits/block-state world integration: PASS' /tmp/godot-world-restore.log
+      - name: Godot native application save lifecycle
+        env:
+          GODOT_SAVE_FIXTURE: /tmp/godot-save-fixtures.json
+        run: |
+          set -euo pipefail
+          timeout 30s godot --headless --path . --script godot/tests/native_save_lifecycle_test.gd 2>&1 | tee /tmp/godot-save-lifecycle.log
+          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file' /tmp/godot-save-lifecycle.log; then
+            echo 'Godot native save lifecycle reported script errors.' >&2
+            exit 1
+          fi
+          grep -F 'Godot native application save lifecycle: PASS' /tmp/godot-save-lifecycle.log
 
   browser-smoke:
     needs: static-checks
