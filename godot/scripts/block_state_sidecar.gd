@@ -6,9 +6,11 @@ const StateRegistry = preload("res://godot/scripts/block_state_registry.gd")
 var entries: Dictionary = {}
 
 func _init(serialized: Dictionary = {}) -> void:
-	import_snapshot(serialized)
+	if not import_snapshot(serialized):
+		entries.clear()
 
 func import_snapshot(serialized: Dictionary = {}) -> bool:
+	var staged: Dictionary = {}
 	for raw_chunk_key in serialized.keys():
 		var chunk_key: String = str(raw_chunk_key)
 		if chunk_key.is_empty():
@@ -19,6 +21,7 @@ func import_snapshot(serialized: Dictionary = {}) -> bool:
 			push_error("block-state sidecar %s entries must be an array" % chunk_key)
 			return false
 		var seen: Dictionary = {}
+		var chunk_entries: Dictionary = {}
 		for row_variant in rows:
 			if typeof(row_variant) != TYPE_ARRAY:
 				push_error("block-state sidecar %s entry must be [index,id,stateKey]" % chunk_key)
@@ -27,28 +30,30 @@ func import_snapshot(serialized: Dictionary = {}) -> bool:
 			if row.size() != 3:
 				push_error("block-state sidecar %s entry must be [index,id,stateKey]" % chunk_key)
 				return false
-			if typeof(row[0]) != TYPE_INT or int(row[0]) < 0:
+			var index_value: Variant = _json_integer(row[0], 0, 0x7fffffffffffffff)
+			if index_value == null:
 				push_error("block-state sidecar index must be a non-negative integer")
 				return false
-			var index: int = int(row[0])
+			var index: int = int(index_value)
 			if seen.has(index):
 				push_error("block-state sidecar %s contains duplicate cell index: %d" % [chunk_key, index])
 				return false
 			seen[index] = true
-			if typeof(row[1]) != TYPE_INT:
+			var block_id_value: Variant = _json_integer(row[1], 0, 255)
+			if block_id_value == null:
 				push_error("block id must be an integer in 0..255")
 				return false
-			var identity: Variant = StateRegistry.block_identity_from_key(int(row[1]), row[2])
+			var identity: Variant = StateRegistry.block_identity_from_key(int(block_id_value), row[2])
 			if identity == null:
 				return false
 			var identity_dict: Dictionary = identity
 			var default_key: Variant = StateRegistry.default_state_key(int(identity_dict["id"]))
 			if identity_dict["stateKey"] == default_key:
 				continue
-			var chunk_entries: Variant = _chunk_entries(chunk_key, true)
-			var chunk_entries_dict: Dictionary = chunk_entries
-			chunk_entries_dict[index] = identity_dict.duplicate(true)
-	_prune_empty_chunks()
+			chunk_entries[index] = identity_dict.duplicate(true)
+		if not chunk_entries.is_empty():
+			staged[chunk_key] = chunk_entries
+	entries = staged
 	return true
 
 func get_identity(chunk_key: String, index: int, block_id: int) -> Variant:
@@ -160,12 +165,6 @@ func _chunk_entries(chunk_key: String, create: bool) -> Variant:
 	entries[chunk_key] = created
 	return created
 
-func _prune_empty_chunks() -> void:
-	for raw_chunk_key in entries.keys():
-		var chunk_entries: Dictionary = entries[raw_chunk_key]
-		if chunk_entries.is_empty():
-			entries.erase(raw_chunk_key)
-
 func _valid_location(chunk_key: String, index: int) -> bool:
 	if chunk_key.is_empty():
 		push_error("block-state sidecar chunk key must be a non-empty string")
@@ -174,3 +173,18 @@ func _valid_location(chunk_key: String, index: int) -> bool:
 		push_error("block-state sidecar index must be a non-negative integer")
 		return false
 	return true
+
+static func _json_integer(value: Variant, minimum: int, maximum: int) -> Variant:
+	var candidate: int
+	if typeof(value) == TYPE_INT:
+		candidate = int(value)
+	elif typeof(value) == TYPE_FLOAT:
+		var numeric: float = float(value)
+		if not is_finite(numeric) or floor(numeric) != numeric:
+			return null
+		candidate = int(numeric)
+	else:
+		return null
+	if candidate < minimum or candidate > maximum:
+		return null
+	return candidate
