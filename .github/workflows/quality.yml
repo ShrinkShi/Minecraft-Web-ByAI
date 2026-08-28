@@ -66,6 +66,15 @@ jobs:
             exit 1
           fi
           grep -F 'Godot terrain generator compatibility parity: PASS' /tmp/godot-terrain.log
+      - name: Godot chunk streaming worker checks
+        run: |
+          set -euo pipefail
+          timeout 20s godot --headless --path . --script godot/tests/chunk_stream_runtime_test.gd 2>&1 | tee /tmp/godot-chunk-stream.log
+          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file' /tmp/godot-chunk-stream.log; then
+            echo 'Godot chunk streaming reported script errors.' >&2
+            exit 1
+          fi
+          grep -F 'Godot chunk streaming worker checks: PASS' /tmp/godot-chunk-stream.log
 
   browser-smoke:
     needs: static-checks
