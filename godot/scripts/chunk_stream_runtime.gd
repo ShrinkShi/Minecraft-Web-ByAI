@@ -2,6 +2,7 @@ class_name ChunkStreamRuntime
 extends RefCounted
 
 const TerrainGeneratorRuntime = preload("res://godot/scripts/terrain_generator.gd")
+const WorldEditSidecar = preload("res://godot/scripts/world_edit_sidecar.gd")
 
 var seed: String
 var prompt: String
@@ -13,16 +14,20 @@ var chunks: Dictionary = {}
 var pending: Dictionary = {}
 var wanted: Dictionary = {}
 
+var _edits
 var _results: Dictionary = {}
 var _result_mutex := Mutex.new()
 var _disposed := false
 
-func _init(world_seed: String = "1", world_prompt: String = "", terrain_version: int = TerrainGeneratorRuntime.TERRAIN_GENERATOR_VERSION, view_distance: int = 2) -> void:
+func _init(world_seed: String = "1", world_prompt: String = "", terrain_version: int = TerrainGeneratorRuntime.TERRAIN_GENERATOR_VERSION, view_distance: int = 2, saved_edits: Dictionary = {}) -> void:
 	seed = world_seed
 	prompt = world_prompt
 	version = TerrainGeneratorRuntime.normalize_version(terrain_version)
 	render_distance = maxi(0, view_distance)
 	unload_distance = render_distance + 1
+	_edits = WorldEditSidecar.new()
+	if not _edits.import_snapshot(saved_edits):
+		push_error("chunk stream received invalid saved world edits")
 
 static func chunk_from_world(world_x: float, world_z: float) -> Vector2i:
 	return Vector2i(
@@ -32,6 +37,9 @@ static func chunk_from_world(world_x: float, world_z: float) -> Vector2i:
 
 static func chunk_from_cell(cell: Vector3i) -> Vector2i:
 	return chunk_from_world(float(cell.x), float(cell.z))
+
+static func chunk_key_string(key: Vector2i) -> String:
+	return "%d,%d" % [key.x, key.y]
 
 func desired_keys(center: Vector2i, radius: int = -1) -> Array[Vector2i]:
 	var resolved_radius: int = render_distance if radius < 0 else maxi(0, radius)
@@ -123,7 +131,7 @@ func get_block(world_cell: Vector3i) -> int:
 	var index: int = TerrainGeneratorRuntime.terrain_chunk_index(local_x, world_cell.y, local_z)
 	return int(data[index])
 
-func set_block(world_cell: Vector3i, block_id: int) -> bool:
+func set_block(world_cell: Vector3i, block_id: int, record_same_id: bool = false) -> bool:
 	if _disposed or world_cell.y < 0 or world_cell.y >= TerrainGeneratorRuntime.WORLD_HEIGHT or block_id < 0 or block_id > 255:
 		return false
 	var key: Vector2i = chunk_from_cell(world_cell)
@@ -134,11 +142,17 @@ func set_block(world_cell: Vector3i, block_id: int) -> bool:
 	var local_x: int = posmod(world_cell.x, TerrainGeneratorRuntime.CHUNK_SIZE)
 	var local_z: int = posmod(world_cell.z, TerrainGeneratorRuntime.CHUNK_SIZE)
 	var index: int = TerrainGeneratorRuntime.terrain_chunk_index(local_x, world_cell.y, local_z)
-	if int(bytes[index]) == block_id:
+	var id_changed: bool = int(bytes[index]) != block_id
+	if not id_changed and not record_same_id:
 		return false
-	bytes[index] = block_id
-	chunks[key] = bytes
+	if id_changed:
+		bytes[index] = block_id
+		chunks[key] = bytes
+	_edits.set_edit(chunk_key_string(key), index, block_id)
 	return true
+
+func export_edits() -> Dictionary:
+	return {} if _edits == null else _edits.export_snapshot()
 
 func dispose() -> void:
 	_result_mutex.lock()
@@ -156,6 +170,8 @@ func dispose() -> void:
 	_result_mutex.unlock()
 	chunks.clear()
 	wanted.clear()
+	if _edits != null:
+		_edits.clear()
 
 func _request_chunk(key: Vector2i) -> void:
 	if chunks.has(key) or pending.has(key):
@@ -187,6 +203,8 @@ func _install_chunk(key: Vector2i, data: Variant) -> bool:
 	if bytes.size() != expected_size:
 		push_error("terrain chunk %s returned invalid byte count: %d" % [key, bytes.size()])
 		return false
+	if _edits != null:
+		bytes = _edits.apply_chunk(chunk_key_string(key), bytes)
 	chunks[key] = bytes
 	return true
 

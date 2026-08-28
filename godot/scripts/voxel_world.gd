@@ -2,7 +2,9 @@ class_name VoxelWorld
 extends Node3D
 
 const BlockRegistry = preload("res://godot/scripts/block_registry.gd")
-const BlockStateCodec = preload("res://godot/scripts/block_state_codec.gd")
+const BlockStateRegistry = preload("res://godot/scripts/block_state_registry.gd")
+const BlockStateSidecar = preload("res://godot/scripts/block_state_sidecar.gd")
+const WorldEditSidecar = preload("res://godot/scripts/world_edit_sidecar.gd")
 const TerrainGeneratorRuntime = preload("res://godot/scripts/terrain_generator.gd")
 const ChunkStreamRuntime = preload("res://godot/scripts/chunk_stream_runtime.gd")
 
@@ -14,7 +16,8 @@ const ChunkStreamRuntime = preload("res://godot/scripts/chunk_stream_runtime.gd"
 @export_range(1, 8, 1) var mesh_rebuild_budget := 1
 
 var _stream: ChunkStreamRuntime
-var _state_keys: Dictionary = {}
+var _saved_edits: Dictionary = {}
+var _block_states = BlockStateSidecar.new()
 var _materials: Dictionary = {}
 var _chunk_nodes: Dictionary = {}
 var _chunk_render_stats: Dictionary = {}
@@ -42,11 +45,26 @@ const PLANT_QUADS := [
 	{"normal": Vector3(0.70710678, 0.0, -0.70710678), "verts": [Vector3(0.8182, 0, 0.1818), Vector3(0.8182, 1, 0.1818), Vector3(0.1818, 1, 0.8182), Vector3(0.1818, 0, 0.8182)]},
 ]
 
+func configure_restore(saved_edits: Dictionary = {}, saved_block_states: Dictionary = {}) -> bool:
+	if _stream != null:
+		push_error("VoxelWorld restore state must be configured before _ready")
+		return false
+	var staged_edits := WorldEditSidecar.new()
+	if not staged_edits.import_snapshot(saved_edits):
+		return false
+	var staged_states := BlockStateSidecar.new()
+	if not staged_states.import_snapshot(saved_block_states):
+		return false
+	_saved_edits = staged_edits.export_snapshot()
+	_block_states = staged_states
+	return true
+
 func _ready() -> void:
-	_stream = ChunkStreamRuntime.new(world_seed, world_prompt, terrain_version, render_distance)
+	_stream = ChunkStreamRuntime.new(world_seed, world_prompt, terrain_version, render_distance, _saved_edits)
 	if not _stream.prime_chunk_sync(Vector2i.ZERO):
 		push_error("failed to synchronously prime the native spawn chunk")
 		return
+	_reconcile_block_states_for_chunk(Vector2i.ZERO)
 	_last_center = Vector2i.ZERO
 	_stream.request_around_world(0.5, 0.5)
 	_rebuild_chunk_mesh(Vector2i.ZERO)
@@ -73,6 +91,7 @@ func advance_streaming_frame() -> void:
 		return
 	var installed: Array[Vector2i] = _stream.poll_completed(chunk_install_budget)
 	for key in installed:
+		_reconcile_block_states_for_chunk(key)
 		_queue_chunk_and_neighbors(key)
 	_sync_unloaded_chunk_nodes()
 	_process_mesh_queue(mesh_rebuild_budget)
@@ -81,8 +100,10 @@ func spawn_position_at(world_x: float, world_z: float) -> Vector3:
 	if _stream == null:
 		return Vector3(world_x, 12.0, world_z)
 	var key: Vector2i = ChunkStreamRuntime.chunk_from_world(world_x, world_z)
-	if not _stream.has_chunk(key) and not _stream.prime_chunk_sync(key):
-		return Vector3(world_x, 12.0, world_z)
+	if not _stream.has_chunk(key):
+		if not _stream.prime_chunk_sync(key):
+			return Vector3(world_x, 12.0, world_z)
+		_reconcile_block_states_for_chunk(key)
 	var cell_x: int = int(floor(world_x))
 	var cell_z: int = int(floor(world_z))
 	for y in range(TerrainGeneratorRuntime.WORLD_HEIGHT - 1, -1, -1):
@@ -91,17 +112,31 @@ func spawn_position_at(world_x: float, world_z: float) -> Vector3:
 			return Vector3(float(cell_x) + 0.5, float(y) + 1.95, float(cell_z) + 0.5)
 	return Vector3(float(cell_x) + 0.5, 12.0, float(cell_z) + 0.5)
 
-func set_block(cell: Vector3i, block_id: int, state_key := "") -> bool:
-	if _stream == null or not _stream.set_block(cell, block_id):
+func set_block(cell: Vector3i, block_id: int, state_key: Variant = null) -> bool:
+	var resolved_state_key: Variant = state_key
+	if resolved_state_key != null and str(resolved_state_key).strip_edges().is_empty():
+		resolved_state_key = null
+	var desired: Variant = BlockStateRegistry.block_identity_from_key(block_id, resolved_state_key)
+	return _set_block_identity(cell, desired)
+
+func set_block_state(cell: Vector3i, block_id: int, state: Dictionary = {}) -> bool:
+	return _set_block_identity(cell, BlockStateRegistry.block_identity(block_id, state))
+
+func _set_block_identity(cell: Vector3i, desired_variant: Variant) -> bool:
+	if _stream == null or typeof(desired_variant) != TYPE_DICTIONARY:
 		return false
-	if block_id == BlockRegistry.AIR:
-		_state_keys.erase(cell)
-	else:
-		var normalized: String = BlockStateCodec.normalized_key(str(state_key))
-		if normalized.is_empty():
-			_state_keys.erase(cell)
-		else:
-			_state_keys[cell] = normalized
+	var desired: Dictionary = desired_variant
+	var current: Dictionary = get_block_identity(cell)
+	if BlockStateRegistry.identity_equal(current, desired):
+		return false
+	var desired_id: int = int(desired.get("id", BlockRegistry.AIR))
+	var id_changed: bool = int(current.get("id", BlockRegistry.AIR)) != desired_id
+	if not _stream.set_block(cell, desired_id, not id_changed):
+		return false
+	var key: Vector2i = ChunkStreamRuntime.chunk_from_cell(cell)
+	var index: int = _cell_index(cell)
+	if _block_states.set_from_key(ChunkStreamRuntime.chunk_key_string(key), index, desired_id, desired.get("stateKey")) == null:
+		return false
 	_queue_changed_cell(cell)
 	return true
 
@@ -109,7 +144,19 @@ func get_block(cell: Vector3i) -> int:
 	return BlockRegistry.AIR if _stream == null else _stream.get_block(cell)
 
 func get_block_identity(cell: Vector3i) -> Dictionary:
-	return {"id": get_block(cell), "stateKey": str(_state_keys.get(cell, ""))}
+	var block_id: int = get_block(cell)
+	if _stream == null or cell.y < 0 or cell.y >= TerrainGeneratorRuntime.WORLD_HEIGHT:
+		var fallback: Variant = BlockStateRegistry.block_identity(block_id)
+		return fallback if typeof(fallback) == TYPE_DICTIONARY else {"id": block_id, "stateKey": null}
+	var key: Vector2i = ChunkStreamRuntime.chunk_from_cell(cell)
+	var identity: Variant = _block_states.get_identity(ChunkStreamRuntime.chunk_key_string(key), _cell_index(cell), block_id)
+	return identity if typeof(identity) == TYPE_DICTIONARY else {"id": block_id, "stateKey": null}
+
+func export_edits() -> Dictionary:
+	return _saved_edits.duplicate(true) if _stream == null else _stream.export_edits()
+
+func export_block_states() -> Dictionary:
+	return _block_states.export_snapshot()
 
 func loaded_chunk_count() -> int:
 	return 0 if _stream == null else _stream.chunks.size()
@@ -139,6 +186,21 @@ static func face_visible(block_id: int, neighbor_id: int) -> bool:
 	if bool(current.get("transparent", false)):
 		return neighbor_id != block_id and not bool(neighbor.get("solid", false))
 	return bool(neighbor.get("transparent", false))
+
+func _cell_index(cell: Vector3i) -> int:
+	return TerrainGeneratorRuntime.terrain_chunk_index(
+		posmod(cell.x, TerrainGeneratorRuntime.CHUNK_SIZE),
+		cell.y,
+		posmod(cell.z, TerrainGeneratorRuntime.CHUNK_SIZE)
+	)
+
+func _reconcile_block_states_for_chunk(key: Vector2i) -> void:
+	if _stream == null:
+		return
+	var data: PackedByteArray = _stream.get_chunk(key)
+	if data.is_empty():
+		return
+	_block_states.reconcile_chunk(ChunkStreamRuntime.chunk_key_string(key), data)
 
 func _queue_changed_cell(cell: Vector3i) -> void:
 	var key: Vector2i = ChunkStreamRuntime.chunk_from_cell(cell)

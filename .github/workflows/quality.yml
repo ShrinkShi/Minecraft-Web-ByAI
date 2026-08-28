@@ -106,6 +106,17 @@ jobs:
             exit 1
           fi
           grep -F 'Godot native save compatibility codec: PASS' /tmp/godot-world-save.log
+      - name: Godot restored edits and block-state world integration
+        env:
+          GODOT_SAVE_FIXTURE: /tmp/godot-save-fixtures.json
+        run: |
+          set -euo pipefail
+          timeout 30s godot --headless --path . --script godot/tests/world_restore_integration_test.gd 2>&1 | tee /tmp/godot-world-restore.log
+          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script|Cannot open file' /tmp/godot-world-restore.log; then
+            echo 'Godot restored world integration reported script errors.' >&2
+            exit 1
+          fi
+          grep -F 'Godot restored edits/block-state world integration: PASS' /tmp/godot-world-restore.log
 
   browser-smoke:
     needs: static-checks
