@@ -170,26 +170,26 @@ func generate_chunk(cx: int, cz: int) -> PackedByteArray:
 					block_id = BlockRegistry.IRON_ORE
 				elif is_coal_ore(wx, y, wz, top):
 					block_id = BlockRegistry.COAL_ORE
-				_set(chunk, lx, y, lz, block_id)
+				_set_block(chunk, lx, y, lz, block_id)
 			for y in range(top + 1, int(parameters["sea"]) + 1):
-				_set(chunk, lx, y, lz, BlockRegistry.WATER)
+				_set_block(chunk, lx, y, lz, BlockRegistry.WATER)
 			if top > int(parameters["sea"]) + 1 and chunk[terrain_chunk_index(lx, top, lz)] == BlockRegistry.GRASS and hash2(wx * 7, wz * 7) < float(parameters["forest"]) and lx > 2 and lx < 13 and lz > 2 and lz < 13:
 				_tree(chunk, lx, top + 1, lz)
-			if version >= 4 and top > int(parameters["sea"]) + 1 and top + 1 < WORLD_HEIGHT and chunk[terrain_chunk_index(lx, top, lz)] == BlockRegistry.GRASS and chunk[terrain_chunk_index(lx, top + 1, lz)] == BlockRegistry.AIR and is_short_grass_decoration(wx, top + 1, wz):
-				_set(chunk, lx, top + 1, lz, BlockRegistry.SHORT_GRASS)
+			if version >= 4 and top > int(parameters["sea"]) + 1 and top + 1 < WORLD_HEIGHT and chunk[terrain_chunk_index(lx, top + 1, lz)] == BlockRegistry.GRASS and chunk[terrain_chunk_index(lx, top + 1, lz)] == BlockRegistry.AIR and is_short_grass_decoration(wx, top + 1, wz):
+				_set_block(chunk, lx, top + 1, lz, BlockRegistry.SHORT_GRASS)
 	return chunk
 
 func _tree(chunk: PackedByteArray, lx: int, base: int, lz: int) -> void:
 	for y in range(4):
-		_set(chunk, lx, base + y, lz, BlockRegistry.LOG)
+		_set_block(chunk, lx, base + y, lz, BlockRegistry.LOG)
 	for y in range(base + 2, base + 6):
 		for x in range(lx - 2, lx + 3):
 			for z in range(lz - 2, lz + 3):
 				var distance: int = absi(x - lx) + absi(z - lz) + (1 if y == base + 5 else 0)
 				if distance <= 4 and not (x == lx and z == lz and y < base + 4):
-					_set(chunk, x, y, z, BlockRegistry.LEAVES)
+					_set_block(chunk, x, y, z, BlockRegistry.LEAVES)
 
-static func _set(chunk: PackedByteArray, x: int, y: int, z: int, block_id: int) -> void:
+static func _set_block(chunk: PackedByteArray, x: int, y: int, z: int, block_id: int) -> void:
 	if x >= 0 and x < CHUNK_SIZE and z >= 0 and z < CHUNK_SIZE and y >= 0 and y < WORLD_HEIGHT:
 		chunk[terrain_chunk_index(x, y, z)] = block_id
 
