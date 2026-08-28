@@ -30,6 +30,9 @@ static func chunk_from_world(world_x: float, world_z: float) -> Vector2i:
 		int(floor(world_z / float(TerrainGeneratorRuntime.CHUNK_SIZE)))
 	)
 
+static func chunk_from_cell(cell: Vector3i) -> Vector2i:
+	return chunk_from_world(float(cell.x), float(cell.z))
+
 func desired_keys(center: Vector2i, radius: int = -1) -> Array[Vector2i]:
 	var resolved_radius: int = render_distance if radius < 0 else maxi(0, radius)
 	var result: Array[Vector2i] = []
@@ -40,6 +43,24 @@ func desired_keys(center: Vector2i, radius: int = -1) -> Array[Vector2i]:
 					continue
 				result.append(center + Vector2i(dx, dz))
 	return result
+
+func prime_chunk_sync(key: Vector2i) -> bool:
+	if _disposed:
+		return false
+	wanted[key] = true
+	if chunks.has(key):
+		return true
+	if pending.has(key):
+		var task_id: int = int(pending[key])
+		var wait_error: Error = WorkerThreadPool.wait_for_task_completion(task_id)
+		pending.erase(key)
+		var pending_data: Variant = _take_result(key)
+		if wait_error != OK:
+			push_error("failed to synchronously reap terrain task %d for chunk %s: %s" % [task_id, key, error_string(wait_error)])
+			return false
+		return _install_chunk(key, pending_data)
+	var generator = TerrainGeneratorRuntime.new(seed, prompt, version)
+	return _install_chunk(key, generator.generate_chunk(key.x, key.y))
 
 func request_around_world(world_x: float, world_z: float) -> Array[Vector2i]:
 	if _disposed:
@@ -73,19 +94,18 @@ func poll_completed(max_results: int = 4) -> Array[Vector2i]:
 		var data: Variant = _take_result(key)
 		if not wanted.has(key):
 			continue
-		if typeof(data) != TYPE_PACKED_BYTE_ARRAY:
-			push_error("terrain task for chunk %s completed without PackedByteArray data" % key)
-			continue
-		var bytes: PackedByteArray = data
-		if bytes.size() != TerrainGeneratorRuntime.CHUNK_SIZE * TerrainGeneratorRuntime.CHUNK_SIZE * TerrainGeneratorRuntime.WORLD_HEIGHT:
-			push_error("terrain task for chunk %s returned invalid byte count: %d" % [key, bytes.size()])
-			continue
-		chunks[key] = bytes
-		installed.append(key)
+		if _install_chunk(key, data):
+			installed.append(key)
 	return installed
 
 func has_chunk(key: Vector2i) -> bool:
 	return chunks.has(key)
+
+func loaded_keys() -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	for key_variant in chunks.keys():
+		result.append(key_variant)
+	return result
 
 func get_chunk(key: Vector2i) -> PackedByteArray:
 	var data: Variant = chunks.get(key)
@@ -94,10 +114,7 @@ func get_chunk(key: Vector2i) -> PackedByteArray:
 func get_block(world_cell: Vector3i) -> int:
 	if world_cell.y < 0 or world_cell.y >= TerrainGeneratorRuntime.WORLD_HEIGHT:
 		return 0
-	var key := Vector2i(
-		int(floor(float(world_cell.x) / float(TerrainGeneratorRuntime.CHUNK_SIZE))),
-		int(floor(float(world_cell.z) / float(TerrainGeneratorRuntime.CHUNK_SIZE)))
-	)
+	var key: Vector2i = chunk_from_cell(world_cell)
 	var data: Variant = chunks.get(key)
 	if typeof(data) != TYPE_PACKED_BYTE_ARRAY:
 		return 0
@@ -106,10 +123,30 @@ func get_block(world_cell: Vector3i) -> int:
 	var index: int = TerrainGeneratorRuntime.terrain_chunk_index(local_x, world_cell.y, local_z)
 	return int(data[index])
 
+func set_block(world_cell: Vector3i, block_id: int) -> bool:
+	if _disposed or world_cell.y < 0 or world_cell.y >= TerrainGeneratorRuntime.WORLD_HEIGHT or block_id < 0 or block_id > 255:
+		return false
+	var key: Vector2i = chunk_from_cell(world_cell)
+	var data: Variant = chunks.get(key)
+	if typeof(data) != TYPE_PACKED_BYTE_ARRAY:
+		return false
+	var bytes: PackedByteArray = data
+	var local_x: int = posmod(world_cell.x, TerrainGeneratorRuntime.CHUNK_SIZE)
+	var local_z: int = posmod(world_cell.z, TerrainGeneratorRuntime.CHUNK_SIZE)
+	var index: int = TerrainGeneratorRuntime.terrain_chunk_index(local_x, world_cell.y, local_z)
+	if int(bytes[index]) == block_id:
+		return false
+	bytes[index] = block_id
+	chunks[key] = bytes
+	return true
+
 func dispose() -> void:
+	_result_mutex.lock()
 	if _disposed:
+		_result_mutex.unlock()
 		return
 	_disposed = true
+	_result_mutex.unlock()
 	for task_variant in pending.values():
 		var task_id: int = int(task_variant)
 		WorkerThreadPool.wait_for_task_completion(task_id)
@@ -140,6 +177,18 @@ func _take_result(key: Vector2i) -> Variant:
 	_results.erase(key)
 	_result_mutex.unlock()
 	return data
+
+func _install_chunk(key: Vector2i, data: Variant) -> bool:
+	if typeof(data) != TYPE_PACKED_BYTE_ARRAY:
+		push_error("terrain chunk %s did not produce PackedByteArray data" % key)
+		return false
+	var bytes: PackedByteArray = data
+	var expected_size: int = TerrainGeneratorRuntime.CHUNK_SIZE * TerrainGeneratorRuntime.CHUNK_SIZE * TerrainGeneratorRuntime.WORLD_HEIGHT
+	if bytes.size() != expected_size:
+		push_error("terrain chunk %s returned invalid byte count: %d" % [key, bytes.size()])
+		return false
+	chunks[key] = bytes
+	return true
 
 func _unload_far_chunks() -> void:
 	for key_variant in chunks.keys():

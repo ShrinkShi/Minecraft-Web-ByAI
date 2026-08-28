@@ -3,16 +3,25 @@ extends Node3D
 
 const BlockRegistry = preload("res://godot/scripts/block_registry.gd")
 const BlockStateCodec = preload("res://godot/scripts/block_state_codec.gd")
+const TerrainGeneratorRuntime = preload("res://godot/scripts/terrain_generator.gd")
+const ChunkStreamRuntime = preload("res://godot/scripts/chunk_stream_runtime.gd")
 
-@export var size_x := 32
-@export var size_z := 32
-@export var base_height := 5
-@export var terrain_seed := 12001
+@export var world_seed := "1"
+@export var world_prompt := ""
+@export var terrain_version := TerrainGeneratorRuntime.TERRAIN_GENERATOR_VERSION
+@export_range(0, 8, 1) var render_distance := 1
+@export_range(1, 8, 1) var chunk_install_budget := 2
+@export_range(1, 8, 1) var mesh_rebuild_budget := 1
 
-var _blocks: Dictionary = {}
+var _stream: ChunkStreamRuntime
 var _state_keys: Dictionary = {}
 var _materials: Dictionary = {}
+var _chunk_nodes: Dictionary = {}
+var _mesh_queue: Array[Vector2i] = []
+var _mesh_dirty: Dictionary = {}
+var _last_center := Vector2i(2147483647, 2147483647)
 
+const HORIZONTAL_NEIGHBORS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 const FACE_DEFINITIONS := [
 	{"name": "east", "normal": Vector3(1, 0, 0), "neighbor": Vector3i(1, 0, 0), "verts": [Vector3(1, 0, 0), Vector3(1, 1, 0), Vector3(1, 1, 1), Vector3(1, 0, 1)]},
 	{"name": "west", "normal": Vector3(-1, 0, 0), "neighbor": Vector3i(-1, 0, 0), "verts": [Vector3(0, 0, 1), Vector3(0, 1, 1), Vector3(0, 1, 0), Vector3(0, 0, 0)]},
@@ -25,76 +34,179 @@ const TRIANGLE_ORDER := [0, 1, 2, 0, 2, 3]
 const UVS := [Vector2(0, 1), Vector2(0, 0), Vector2(1, 0), Vector2(1, 1)]
 
 func _ready() -> void:
-	generate_demo_terrain()
-	rebuild_mesh()
-
-func generate_demo_terrain() -> void:
-	_blocks.clear()
-	_state_keys.clear()
-	var noise := FastNoiseLite.new()
-	noise.seed = terrain_seed
-	noise.frequency = 0.045
-	noise.fractal_octaves = 3
-	var half_x := int(size_x / 2)
-	var half_z := int(size_z / 2)
-	for x in range(-half_x, size_x - half_x):
-		for z in range(-half_z, size_z - half_z):
-			var height := base_height + int(round(noise.get_noise_2d(float(x), float(z)) * 2.5))
-			height = maxi(height, 2)
-			for y in range(0, height + 1):
-				var block_id: int = BlockRegistry.STONE
-				if y == height:
-					block_id = BlockRegistry.GRASS
-				elif y >= height - 2:
-					block_id = BlockRegistry.DIRT
-				set_block(Vector3i(x, y, z), block_id)
-
-func set_block(cell: Vector3i, block_id: int, state_key := "") -> void:
-	if block_id == BlockRegistry.AIR:
-		_blocks.erase(cell)
-		_state_keys.erase(cell)
+	_stream = ChunkStreamRuntime.new(world_seed, world_prompt, terrain_version, render_distance)
+	if not _stream.prime_chunk_sync(Vector2i.ZERO):
+		push_error("failed to synchronously prime the native spawn chunk")
 		return
-	_blocks[cell] = block_id
-	var normalized: String = BlockStateCodec.normalized_key(str(state_key))
-	if normalized.is_empty():
+	_last_center = Vector2i.ZERO
+	_stream.request_around_world(0.5, 0.5)
+	_rebuild_chunk_mesh(Vector2i.ZERO)
+
+func _process(_delta: float) -> void:
+	advance_streaming_frame()
+
+func _exit_tree() -> void:
+	if _stream != null:
+		_stream.dispose()
+
+func update_stream_center(world_position: Vector3) -> void:
+	if _stream == null:
+		return
+	var center: Vector2i = ChunkStreamRuntime.chunk_from_world(world_position.x, world_position.z)
+	if center == _last_center:
+		return
+	_last_center = center
+	_stream.request_around_world(world_position.x, world_position.z)
+	_sync_unloaded_chunk_nodes()
+
+func advance_streaming_frame() -> void:
+	if _stream == null:
+		return
+	var installed: Array[Vector2i] = _stream.poll_completed(chunk_install_budget)
+	for key in installed:
+		_queue_chunk_and_neighbors(key)
+	_sync_unloaded_chunk_nodes()
+	_process_mesh_queue(mesh_rebuild_budget)
+
+func spawn_position_at(world_x: float, world_z: float) -> Vector3:
+	if _stream == null:
+		return Vector3(world_x, 12.0, world_z)
+	var key: Vector2i = ChunkStreamRuntime.chunk_from_world(world_x, world_z)
+	if not _stream.has_chunk(key) and not _stream.prime_chunk_sync(key):
+		return Vector3(world_x, 12.0, world_z)
+	var cell_x: int = int(floor(world_x))
+	var cell_z: int = int(floor(world_z))
+	for y in range(TerrainGeneratorRuntime.WORLD_HEIGHT - 1, -1, -1):
+		var block_id: int = get_block(Vector3i(cell_x, y, cell_z))
+		if BlockRegistry.is_solid(block_id) or block_id == BlockRegistry.WATER:
+			return Vector3(float(cell_x) + 0.5, float(y) + 1.95, float(cell_z) + 0.5)
+	return Vector3(float(cell_x) + 0.5, 12.0, float(cell_z) + 0.5)
+
+func set_block(cell: Vector3i, block_id: int, state_key := "") -> bool:
+	if _stream == null or not _stream.set_block(cell, block_id):
+		return false
+	if block_id == BlockRegistry.AIR:
 		_state_keys.erase(cell)
 	else:
-		_state_keys[cell] = normalized
+		var normalized: String = BlockStateCodec.normalized_key(str(state_key))
+		if normalized.is_empty():
+			_state_keys.erase(cell)
+		else:
+			_state_keys[cell] = normalized
+	_queue_changed_cell(cell)
+	return true
 
 func get_block(cell: Vector3i) -> int:
-	return int(_blocks.get(cell, BlockRegistry.AIR))
+	return BlockRegistry.AIR if _stream == null else _stream.get_block(cell)
 
 func get_block_identity(cell: Vector3i) -> Dictionary:
 	return {"id": get_block(cell), "stateKey": str(_state_keys.get(cell, ""))}
 
-func rebuild_mesh() -> void:
-	_remove_generated_nodes()
+func loaded_chunk_count() -> int:
+	return 0 if _stream == null else _stream.chunks.size()
+
+func generated_chunk_node_count() -> int:
+	return _chunk_nodes.size()
+
+func pending_mesh_count() -> int:
+	return _mesh_queue.size()
+
+func has_chunk_mesh(key: Vector2i) -> bool:
+	return _chunk_nodes.has(key)
+
+func _queue_changed_cell(cell: Vector3i) -> void:
+	var key: Vector2i = ChunkStreamRuntime.chunk_from_cell(cell)
+	_queue_chunk_mesh(key)
+	var local_x: int = posmod(cell.x, TerrainGeneratorRuntime.CHUNK_SIZE)
+	var local_z: int = posmod(cell.z, TerrainGeneratorRuntime.CHUNK_SIZE)
+	if local_x == 0:
+		_queue_chunk_mesh(key + Vector2i(-1, 0))
+	elif local_x == TerrainGeneratorRuntime.CHUNK_SIZE - 1:
+		_queue_chunk_mesh(key + Vector2i(1, 0))
+	if local_z == 0:
+		_queue_chunk_mesh(key + Vector2i(0, -1))
+	elif local_z == TerrainGeneratorRuntime.CHUNK_SIZE - 1:
+		_queue_chunk_mesh(key + Vector2i(0, 1))
+
+func _queue_chunk_and_neighbors(key: Vector2i) -> void:
+	_queue_chunk_mesh(key)
+	for offset in HORIZONTAL_NEIGHBORS:
+		_queue_chunk_mesh(key + offset)
+
+func _queue_chunk_mesh(key: Vector2i) -> void:
+	if _stream == null or not _stream.has_chunk(key) or _mesh_dirty.has(key):
+		return
+	_mesh_dirty[key] = true
+	_mesh_queue.append(key)
+
+func _process_mesh_queue(budget: int) -> void:
+	var remaining: int = maxi(0, budget)
+	while remaining > 0 and not _mesh_queue.is_empty():
+		var key: Vector2i = _mesh_queue.pop_front()
+		_mesh_dirty.erase(key)
+		if _stream.has_chunk(key):
+			_rebuild_chunk_mesh(key)
+		remaining -= 1
+
+func _sync_unloaded_chunk_nodes() -> void:
+	if _stream == null:
+		return
+	for key_variant in _chunk_nodes.keys():
+		var key: Vector2i = key_variant
+		if _stream.has_chunk(key):
+			continue
+		_remove_chunk_node(key)
+		_mesh_dirty.erase(key)
+		for offset in HORIZONTAL_NEIGHBORS:
+			_queue_chunk_mesh(key + offset)
+
+func _rebuild_chunk_mesh(key: Vector2i) -> void:
+	_remove_chunk_node(key)
+	var data: PackedByteArray = _stream.get_chunk(key)
+	if data.is_empty():
+		return
+	var container := Node3D.new()
+	container.name = "Chunk_%d_%d" % [key.x, key.y]
+	container.position = Vector3(
+		key.x * TerrainGeneratorRuntime.CHUNK_SIZE,
+		0.0,
+		key.y * TerrainGeneratorRuntime.CHUNK_SIZE
+	)
 	var mesh := ArrayMesh.new()
 	var builders: Dictionary = {}
 	var collision_faces := PackedVector3Array()
-	for cell_variant in _blocks:
-		var cell: Vector3i = cell_variant
-		var block_id := get_block(cell)
-		if not BlockRegistry.is_solid(block_id):
-			continue
-		for face in FACE_DEFINITIONS:
-			if BlockRegistry.is_solid(get_block(cell + face["neighbor"])):
-				continue
-			var texture_path: String = BlockRegistry.texture_for_face(block_id, str(face["name"]))
-			var surface := _surface_for_texture(builders, texture_path)
-			_emit_face(surface, collision_faces, cell, face)
+	for y in range(TerrainGeneratorRuntime.WORLD_HEIGHT):
+		for lz in range(TerrainGeneratorRuntime.CHUNK_SIZE):
+			for lx in range(TerrainGeneratorRuntime.CHUNK_SIZE):
+				var index: int = TerrainGeneratorRuntime.terrain_chunk_index(lx, y, lz)
+				var block_id: int = int(data[index])
+				if not BlockRegistry.is_solid(block_id):
+					continue
+				var world_cell := Vector3i(
+					key.x * TerrainGeneratorRuntime.CHUNK_SIZE + lx,
+					y,
+					key.y * TerrainGeneratorRuntime.CHUNK_SIZE + lz
+				)
+				var local_cell := Vector3i(lx, y, lz)
+				for face_variant in FACE_DEFINITIONS:
+					var face: Dictionary = face_variant
+					var neighbor: Vector3i = face["neighbor"]
+					if BlockRegistry.is_solid(get_block(world_cell + neighbor)):
+						continue
+					var texture_path: String = BlockRegistry.texture_for_face(block_id, str(face["name"]))
+					var surface: SurfaceTool = _surface_for_texture(builders, texture_path)
+					_emit_face(surface, collision_faces, local_cell, face)
 	for surface_variant in builders.values():
 		var surface: SurfaceTool = surface_variant
 		surface.commit(mesh)
-
-	var mesh_instance := MeshInstance3D.new()
-	mesh_instance.name = "GeneratedMesh"
-	mesh_instance.mesh = mesh
-	add_child(mesh_instance)
-
+	if mesh.get_surface_count() > 0:
+		var mesh_instance := MeshInstance3D.new()
+		mesh_instance.name = "Mesh"
+		mesh_instance.mesh = mesh
+		container.add_child(mesh_instance)
 	if not collision_faces.is_empty():
 		var world_body := StaticBody3D.new()
-		world_body.name = "GeneratedCollision"
+		world_body.name = "Collision"
 		world_body.collision_layer = 1
 		world_body.collision_mask = 1
 		var collision_shape := CollisionShape3D.new()
@@ -102,7 +214,18 @@ func rebuild_mesh() -> void:
 		shape.set_faces(collision_faces)
 		collision_shape.shape = shape
 		world_body.add_child(collision_shape)
-		add_child(world_body)
+		container.add_child(world_body)
+	add_child(container)
+	_chunk_nodes[key] = container
+
+func _remove_chunk_node(key: Vector2i) -> void:
+	var node_variant: Variant = _chunk_nodes.get(key)
+	if node_variant is Node:
+		var node: Node = node_variant
+		if node.get_parent() == self:
+			remove_child(node)
+		node.queue_free()
+	_chunk_nodes.erase(key)
 
 func _surface_for_texture(builders: Dictionary, texture_path: String) -> SurfaceTool:
 	if builders.has(texture_path):
@@ -141,9 +264,3 @@ func _emit_face(surface: SurfaceTool, collision_faces: PackedVector3Array, cell:
 		surface.set_uv(UVS[index])
 		surface.add_vertex(vertex)
 		collision_faces.append(vertex)
-
-func _remove_generated_nodes() -> void:
-	for child in get_children():
-		if child.name == "GeneratedMesh" or child.name == "GeneratedCollision":
-			remove_child(child)
-			child.queue_free()

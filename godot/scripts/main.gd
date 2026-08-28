@@ -12,6 +12,7 @@ const INPUT_BINDINGS := {
 }
 
 @onready var environment_node: WorldEnvironment = $WorldEnvironment
+@onready var world = $World
 @onready var player = $Player
 @onready var hud = $HUD
 
@@ -19,9 +20,14 @@ func _ready() -> void:
 	MigrationContractCheck.run()
 	_configure_input_map()
 	_configure_environment()
+	player.global_position = world.spawn_position_at(0.0, 0.0)
+	world.update_stream_center(player.global_position)
 	player.selected_slot_changed.connect(hud.set_selected_slot)
 	hud.set_selected_slot(player.selected_slot)
 	DisplayServer.window_set_title("Minecraft Godot By AI — Native")
+
+func _process(_delta: float) -> void:
+	world.update_stream_center(player.global_position)
 
 func _configure_input_map() -> void:
 	for action_name in INPUT_BINDINGS:
